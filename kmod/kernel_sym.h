@@ -1,6 +1,7 @@
 // Usage:
-// #define KERNEL_SYMBOL_LIST X(ret_type, name, args)
-// #include "kernel_sym.h"
+//   #define KERNEL_SYMBOL_LIST X(ret_type, func_name, args)
+//   #include "kernel_sym.h"
+// Then the symbol can be accessed via "kernel_{func_name}".
 
 #include <linux/kprobes.h>
 
