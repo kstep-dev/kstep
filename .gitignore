@@ -4,7 +4,8 @@ compile_commands.events.json
 .cache
 
 # Linux source code
-/linux
+/linux/*
+!linux/config
 
 # Kernel module
 *.ko

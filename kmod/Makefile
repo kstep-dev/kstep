@@ -2,7 +2,7 @@ OUT ?= $(abspath ../rootfs/data)
 SRC ?= $(shell pwd)
 KERNELDIR ?= $(abspath ../linux/current)
 
-MODULES := sched_sim sched_trace interrupt
+MODULES := trace resched freeze
 
 obj-m := $(MODULES:%=%.o)
 

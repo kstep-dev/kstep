@@ -61,8 +61,8 @@ int builtin_help() {
   printf("  ls <dir>        - List directory:         `ls /proc`\n");
   printf("  cat <file>      - Print file contents:    `cat "
          "/sys/kernel/debug/sched/debug`\n");
-  printf("  insmod <file>   - Load a kernel module:   `insmod sched_sim.ko`\n");
-  printf("  rmmod <module>  - Unload a kernel module: `rmmod sched_sim`\n");
+  printf("  insmod <file>   - Load a kernel module:   `insmod trace.ko`\n");
+  printf("  rmmod <module>  - Unload a kernel module: `rmmod trace`\n");
   return 0;
 }
 

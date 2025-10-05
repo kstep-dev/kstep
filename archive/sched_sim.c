@@ -8,6 +8,22 @@
 // Linux private headers
 #include <kernel/sched/sched.h>
 
+#define KERNEL_SYMBOL_LIST                                                     \
+  X(void, enqueue_task, (struct rq * rq, struct task_struct * p, int flags))   \
+  X(bool, dequeue_task, (struct rq * rq, struct task_struct * p, int flags))   \
+  X(void, init_cfs_rq, (struct cfs_rq * cfs_rq))                               \
+  X(void, init_rt_rq, (struct rt_rq * rt_rq))                                  \
+  X(void, init_dl_rq, (struct dl_rq * dl_rq))                                  \
+  X(void, fair_server_init, (struct rq * rq))                                  \
+  X(void, init_tg_cfs_entry,                                                   \
+    (struct task_group * tg, struct cfs_rq * cfs_rq, struct sched_entity * se, \
+     int cpu, struct sched_entity *parent))                                    \
+  X(int, sched_fork, (unsigned long clone_flags, struct task_struct *p))       \
+  X(int, init_rootdomain, (struct root_domain * rd))                           \
+  X(void, rq_attach_root, (struct rq * rq, struct root_domain * rd))           \
+  X(void, init_cfs_bandwidth,                                                  \
+    (struct cfs_bandwidth * cfs_bandwidth,                                     \
+     struct cfs_bandwidth * parent_cfs_bandwidth))
 #include "kernel_sym.h"
 #include "utils.h"
 

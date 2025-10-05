@@ -1,14 +1,22 @@
+#ifndef LOGGING_H
+#define LOGGING_H
+
 #include <linux/printk.h>
 
-#define TERM_RESET "\x1b[0m"
-#define TERM_RED "\x1b[31m"
-#define TERM_GREEN "\x1b[32m"
-#define TERM_YELLOW "\x1b[33m"
-#define TERM_BLUE "\x1b[34m"
-#define TERM_MAGENTA "\x1b[35m"
-#define TERM_CYAN "\x1b[36m"
-#define TERM_GRAY "\x1b[90m"
+#ifndef TRACE_LEVEL
+#define TRACE_LEVEL LOGLEVEL_INFO
+#endif
 
-#define SCHED_INFO(fmt, ...) pr_info(TERM_GREEN fmt TERM_RESET, ##__VA_ARGS__)
-#define SCHED_WARN(fmt, ...) pr_info(TERM_YELLOW fmt TERM_RESET, ##__VA_ARGS__)
-#define SCHED_DEBUG(fmt, ...) pr_info(TERM_GRAY fmt TERM_RESET, ##__VA_ARGS__)
+#define TRACE_PRINT(level, fmt, ...)                                           \
+  (void)(LOGLEVEL_##level <= TRACE_LEVEL &&                                    \
+         (printk(KERN_##level "[%18s:%-3d] %24s: " fmt, __FILE_NAME__,         \
+                 __LINE__, __func__, ##__VA_ARGS__),                           \
+          0))
+
+#define TRACE_DEBUG(fmt, ...) TRACE_PRINT(DEBUG, fmt, ##__VA_ARGS__)
+#define TRACE_INFO(fmt, ...) TRACE_PRINT(INFO, fmt, ##__VA_ARGS__)
+#define TRACE_ERROR(fmt, ...) TRACE_PRINT(ERR, fmt, ##__VA_ARGS__)
+
+#define TRACE_CONT(fmt, ...) printk(KERN_CONT fmt, ##__VA_ARGS__)
+
+#endif

@@ -43,9 +43,10 @@ def run_qemu(debug: bool = False):
         "rw",
         "nokaslr",
         "sched_verbose",
-        "isolcpus=nohz,managed_irq,1",
+        "isolcpus=1",
         "rcu_nocbs=1",
-        "nowatchdog",
+        "nohz_full=1",
+        "tsc=nowatchdog",
     ]
 
     if Arch.get() == Arch.X86_64:

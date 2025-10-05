@@ -2,7 +2,7 @@
 
 import argparse
 
-from scripts import LINUX_DIR, PROJ_DIR, system
+from scripts import LINUX_CUSTOM_CONFIG, LINUX_DIR, system
 
 BEAR_CMD = "bear --append --output compile_commands.json --"
 
@@ -11,19 +11,19 @@ def make_linux(uml: bool = False, clean: bool = False):
 
     # Clean up old build
     if clean:
-        system(f"make -C {LINUX_DIR} -j$(nproc) mrproper")
+        system(f"cd {LINUX_DIR} && make -j$(nproc) mrproper")
 
     # Generate config
     if not (LINUX_DIR / ".config").exists():
-        system(f"make -C {LINUX_DIR} -j$(nproc) allnoconfig {extra}")
+        system(f"cd {LINUX_DIR} && make -j$(nproc) defconfig {extra}")
 
     # Merge config
     system(
-        f"cd {LINUX_DIR} && {LINUX_DIR}/scripts/kconfig/merge_config.sh {LINUX_DIR}/.config {PROJ_DIR}/config"
+        f"cd {LINUX_DIR} && {LINUX_DIR}/scripts/kconfig/merge_config.sh {LINUX_DIR}/.config {LINUX_CUSTOM_CONFIG}"
     )
 
     # Build kernel
-    system(f"{BEAR_CMD} make -C {LINUX_DIR} -j$(nproc) {extra}")
+    system(f"cd {LINUX_DIR} && {BEAR_CMD} make -j$(nproc) {extra}")
 
 
 if __name__ == "__main__":
