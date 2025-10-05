@@ -20,7 +20,7 @@ static int enqueue_task_fair_handler(struct kprobe *kp, struct pt_regs *regs) {
   struct task_struct *p = (void *)PT_REGS_PARM2(regs);
   int flags = (int)PT_REGS_PARM3(regs);
 
-  SCHED_DEBUG("enqueue_task_fair: cpu=%d, p=%s, flags=%o", rq->cpu, p->comm,
+  TRACE_DEBUG("enqueue_task_fair: cpu=%d, p=%s, flags=%o", rq->cpu, p->comm,
               flags);
   return 0;
 }
@@ -41,7 +41,7 @@ static int __init sched_trace_init(void) {
 static void __exit sched_trace_exit(void) { unregister_kprobe(&kp); }
 #else
 static int __init sched_trace_init(void) {
-  SCHED_INFO("kprobe not supported in UML");
+  TRACE_INFO("kprobe not supported in UML");
   return 0;
 }
 static void __exit sched_trace_exit(void) {}

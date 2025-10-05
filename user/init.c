@@ -1,5 +1,4 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/errno.h>
 #include <sys/mount.h>
@@ -10,6 +9,8 @@
 
 #define MAX_LINE 1024
 #define MAX_ARGS 64
+#define MAX_PATH 1024
+#define PROMPT "\033[0;32m# \033[0m"
 
 // Mount filesystems
 int mount_filesystems() {
@@ -41,7 +42,7 @@ int builtin_cd(char **args) {
 }
 
 int builtin_pwd() {
-  char cwd[1024];
+  char cwd[MAX_PATH];
   if (getcwd(cwd, sizeof(cwd)) != NULL) {
     printf("%s\n", cwd);
   }
@@ -59,9 +60,10 @@ int builtin_help() {
   printf("External commands:\n");
   printf("  ps              - List processes\n");
   printf("  ls <dir>        - List directory:         `ls /proc`\n");
-  printf("  cat <file>      - Print file contents:    `cat /proc/cpuinfo`\n");
-  printf("  insmod <file>   - Load a kernel module:   `insmod sched_sim.ko`\n");
-  printf("  rmmod <module>  - Unload a kernel module: `rmmod sched_sim`\n");
+  printf("  cat <file>      - Print file contents:    `cat "
+         "/sys/kernel/debug/sched/debug`\n");
+  printf("  insmod <file>   - Load a kernel module:   `insmod trace.ko`\n");
+  printf("  rmmod <module>  - Unload a kernel module: `rmmod trace`\n");
   return 0;
 }
 
@@ -111,7 +113,7 @@ int execute_external(char **args) {
     // Child process
     execvp(args[0], args);
     perror("execvp");
-    exit(1);
+    builtin_exit();
   } else if (pid > 0) {
     // Parent process
     int status;
@@ -128,7 +130,7 @@ void shell_loop() {
   builtin_help();
 
   while (1) {
-    printf("# ");
+    printf(PROMPT);
     fflush(stdout);
 
     char line[MAX_LINE];
@@ -151,22 +153,22 @@ void shell_loop() {
   builtin_exit();
 }
 
+void system(char *cmd) {
+  printf(PROMPT "%s\n", cmd);
+  char line[MAX_LINE];
+  strncpy(line, cmd, MAX_LINE);
+  char **args = parse_line(line);
+  execute_external(args);
+}
+
 int main() {
   printf("\n");
   printf("Welcome to UML Simple Root Filesystem\n");
 
   mount_filesystems();
-  // execute_external((char *[]){
-  //     "insmod",
-  //     "sched_trace.ko",
-  //     // "sched_sim.ko",
-  //     NULL,
-  // });
-  execute_external((char *[]){
-      "cat",
-      "/sys/kernel/debug/sched/debug",
-      NULL,
-  });
+  system("insmod freeze.ko cpu=1");
+  system("cat /sys/kernel/debug/sched/debug");
+
   // builtin_exit();
 
   shell_loop();

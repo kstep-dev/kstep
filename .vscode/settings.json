@@ -1,7 +1,15 @@
 {
     "files.exclude": {
-        "**/*.cmd": true,
         "**/.cache": true,
         "**/.tmp_*": true,
-    }
+        // Kernel module
+        "**/*.cmd": true,
+        "**/*.mod": true,
+        "**/*.mod.c": true,
+        "**/*.mod.o": true,
+        // Object files
+        "**/*.o": true,
+        "**/*.ko": true,
+    },
+    "search.useIgnoreFiles": false
 }

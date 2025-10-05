@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
+import signal
 
 from scripts import LINUX_DIR, system
 
 
 def run_gdb():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
     args = [
         f"-iex 'set auto-load safe-path {LINUX_DIR}'",
         "-ex 'target remote :1234'",
