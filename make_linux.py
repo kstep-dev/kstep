@@ -6,7 +6,7 @@ from scripts import LINUX_DIR, PROJ_DIR, system
 
 BEAR_CMD = "bear --append --output compile_commands.json --"
 
-def make_linux(uml: bool = False, debug: bool = False, clean: bool = False):
+def make_linux(uml: bool = False, clean: bool = False):
     extra = " ARCH=um" if uml else ""
 
     # Clean up old build
@@ -19,32 +19,16 @@ def make_linux(uml: bool = False, debug: bool = False, clean: bool = False):
 
     # Merge config
     system(
-        f"cd {LINUX_DIR} && {LINUX_DIR}/scripts/kconfig/merge_config.sh -n -O {LINUX_DIR} {LINUX_DIR}/.config {PROJ_DIR}/config"
+        f"cd {LINUX_DIR} && {LINUX_DIR}/scripts/kconfig/merge_config.sh {LINUX_DIR}/.config {PROJ_DIR}/config"
     )
 
-    # Enable debug symbols
-    # if debug:
-    #     args = [
-    #         "--enable KPROBES",
-    #         "--enable DEBUG_INFO_DWARF5",
-    #         "--disable DEBUG_INFO_REDUCED",
-    #         "--enable DEBUG_INFO_COMPRESSED_NONE",
-    #         "--disable DEBUG_INFO_SPLIT",
-    #         "--enable GDB_SCRIPTS",
-    #         "--enable SCHED_DEBUG",
-    #         "--enable NO_HZ_FULL",
-    #         "--enable RCU_NOCB_CPU",
-    #     ]
-    #     system(f"cd {LINUX_DIR} && ./scripts/config " + " ".join(args))
-
     # Build kernel
-    # system(f"{BEAR_CMD} make -C {LINUX_DIR} -j$(nproc) {extra}")
+    system(f"{BEAR_CMD} make -C {LINUX_DIR} -j$(nproc) {extra}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--uml", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--debug", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--clean", action=argparse.BooleanOptionalAction, default=False)
     args = parser.parse_args()
     make_linux(**vars(args))
