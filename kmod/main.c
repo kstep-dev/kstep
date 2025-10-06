@@ -71,7 +71,8 @@ static int __init init(void) {
   kernel_tick_sched_timer_dying(TARGET_CPU);
   kernel_clear_sched_clock_stable();
 
-  mocked_sched_clock_value = kernel_kvm_sched_clock_read() / 1000000 * 1000000;
+  mocked_sched_clock_value =
+      kernel_kvm_sched_clock_read() / NS_PER_MS * NS_PER_MS;
   kernel_paravirt_set_sched_clock(mocked_sched_clock);
 
   // Initialize ftrace
