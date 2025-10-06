@@ -27,7 +27,7 @@ static int __init resched_ipi_init(void) {
     TRACE_ERROR("Current CPU is not 0, skipping\n");
     return 0;
   }
-  if (send_reschedule) {
+  if (kernel_arch_smp_send_reschedule) {
     send_reschedule = kernel_arch_smp_send_reschedule;
   } else if (kernel_native_smp_send_reschedule) {
     send_reschedule = kernel_native_smp_send_reschedule;
