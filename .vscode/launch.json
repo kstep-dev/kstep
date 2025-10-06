@@ -5,8 +5,19 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "QEMU",
+            "type": "lldb",
+            "request": "attach",
+            "targetCreateCommands": [
+                "target create ${workspaceFolder}/linux/current/vmlinux"
+            ],
+            "processCreateCommands": [
+                "gdb-remote localhost:1234"
+            ],
+        },
+        {
             "name": "UML",
-            "type": "cppdbg",
+            "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/linux/current/linux",
             "args": [
@@ -14,23 +25,7 @@
                 "root=/dev/ubda",
                 "mem=256M"
             ],
-            "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ],
             "preLaunchTask": "rootfs"
         }
     ]
