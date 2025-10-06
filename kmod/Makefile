@@ -2,7 +2,7 @@ OUT ?= $(abspath ../rootfs/data)
 SRC ?= $(shell pwd)
 KERNELDIR ?= $(abspath ../linux/current)
 
-MODULES := trace resched freeze
+MODULES := main
 
 obj-m := $(MODULES:%=%.o)
 

@@ -36,7 +36,6 @@ static int __init resched_ipi_init(void) {
     return -ENOSYS;
   }
 
-  sched_clock_mock_set_warn(true);
   int target_cpu = 1;
   TRACE_INFO("Sending reschedule IPI from CPU %d to CPU %d\n", curr_cpu,
              target_cpu);
