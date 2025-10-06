@@ -47,6 +47,9 @@ def run_qemu(debug: bool = False):
         "rcu_nocbs=1",
         "nohz_full=1",
         "tsc=nowatchdog",
+        "notsc",
+        "initcall_blacklist=spawn_ksoftirqd",
+        "noapictimer",
     ]
 
     if Arch.get() == Arch.X86_64:

@@ -11,19 +11,17 @@ def make_linux(uml: bool = False, clean: bool = False):
 
     # Clean up old build
     if clean:
-        system(f"cd {LINUX_DIR} && make -j$(nproc) mrproper")
+        system(f"make -C {LINUX_DIR} -j$(nproc) mrproper")
 
     # Generate config
     if not (LINUX_DIR / ".config").exists():
-        system(f"cd {LINUX_DIR} && make -j$(nproc) defconfig {extra}")
-
-    # Merge config
-    system(
-        f"cd {LINUX_DIR} && {LINUX_DIR}/scripts/kconfig/merge_config.sh {LINUX_DIR}/.config {LINUX_CUSTOM_CONFIG}"
-    )
+        system(f"make -C {LINUX_DIR} -j$(nproc) defconfig {extra}")
+        system(
+            f"cd {LINUX_DIR} && {LINUX_DIR}/scripts/kconfig/merge_config.sh {LINUX_DIR}/.config {LINUX_CUSTOM_CONFIG}"
+        )
 
     # Build kernel
-    system(f"cd {LINUX_DIR} && {BEAR_CMD} make -j$(nproc) {extra}")
+    system(f"{BEAR_CMD} make -C {LINUX_DIR} -j$(nproc) {extra}")
 
 
 if __name__ == "__main__":

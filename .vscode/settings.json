@@ -7,9 +7,7 @@
         "**/*.mod": true,
         "**/*.mod.c": true,
         "**/*.mod.o": true,
-        // Object files
         "**/*.o": true,
-        "**/*.ko": true,
     },
     "search.useIgnoreFiles": false
 }

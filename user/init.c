@@ -113,7 +113,6 @@ int execute_external(char **args) {
     // Child process
     execvp(args[0], args);
     perror("execvp");
-    builtin_exit();
   } else if (pid > 0) {
     // Parent process
     int status;
@@ -166,10 +165,8 @@ int main() {
   printf("Welcome to UML Simple Root Filesystem\n");
 
   mount_filesystems();
-  system("insmod freeze.ko cpu=1");
-  system("cat /sys/kernel/debug/sched/debug");
-
-  // builtin_exit();
+  system("busy");
+  system("insmod main.ko");
 
   shell_loop();
   builtin_exit();
