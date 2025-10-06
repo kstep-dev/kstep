@@ -12,9 +12,8 @@
                 "target create ${workspaceFolder}/linux/current/vmlinux"
             ],
             "processCreateCommands": [
-                "gdb-remote :1234"
+                "gdb-remote localhost:1234"
             ],
-            "preLaunchTask": "rootfs"
         },
         {
             "name": "UML",
