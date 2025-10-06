@@ -6,7 +6,11 @@
 
 #define KERNEL_SYMBOL_LIST                                                     \
   X(void, tick_sched_timer_dying, (int cpu))                                   \
-  X(void, sched_tick, (void))
+  X(void, sched_tick, (void))                                                  \
+  X(u64, sched_clock, (void))                                                  \
+  X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
+  X(u64, kvm_sched_clock_read, (void))                                         \
+  X(void, clear_sched_clock_stable, (void))
 
 #include "kernel_sym.h"
 #include "logging.h"
@@ -15,16 +19,24 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Shawn Zhong");
 MODULE_DESCRIPTION("Scheduler control");
 
-static void main_remote(void *data) {
-  TRACE_INFO("sched_tick initiated on CPU %d: current->comm=%s\n",
-             smp_processor_id(), current->comm);
+static u64 mocked_sched_clock_value = 0;
+static u64 mocked_sched_clock(void) {
+  if (smp_processor_id() == 0)
+    return kernel_kvm_sched_clock_read();
+  return mocked_sched_clock_value;
+}
+
+static void remote_fn(void *data) {
+  TRACE_INFO("sched_tick initiated on CPU %d: comm=%s, clock=%llu\n",
+             smp_processor_id(), current->comm, kernel_sched_clock());
+  mocked_sched_clock_value += 1000000;
   kernel_sched_tick();
 }
 
 static int main_kthread(void *data) {
   while (1) {
-    msleep(3000);
-    smp_call_function_single(1, main_remote, NULL, 0);
+    msleep(5000);
+    smp_call_function_single(1, remote_fn, NULL, 0);
   }
   return 0;
 }
@@ -46,6 +58,10 @@ static int __init init(void) {
 
   TRACE_INFO("Freezing CPU %d\n", 1);
   kernel_tick_sched_timer_dying(1);
+  kernel_clear_sched_clock_stable();
+
+  mocked_sched_clock_value = kernel_kvm_sched_clock_read() / 1000000 * 1000000;
+  kernel_paravirt_set_sched_clock(mocked_sched_clock);
 
   // Initialize ftrace
   struct ftrace_ops ftrace_ops = {.func = &sched_tick_callback};
