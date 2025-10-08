@@ -9,6 +9,7 @@ compile_commands.events.json
 
 # Kernel module
 *.ko
+*.o.d
 
 # Filesystem image
 rootfs/img.ext4

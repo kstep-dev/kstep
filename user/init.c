@@ -167,6 +167,7 @@ int main() {
   mount_filesystems();
   system("busy");
   system("insmod main.ko");
+  // system("insmod trace.ko");
 
   shell_loop();
   builtin_exit();
