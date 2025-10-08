@@ -19,7 +19,7 @@ static void set_proc_affinity(int cpu) {
   }
 }
 
-int worker() {
+void worker() {
   set_proc_affinity(1);
   while (1) {
     __asm__("" : : : "memory");
