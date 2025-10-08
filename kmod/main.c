@@ -20,18 +20,34 @@
 #include "ksym.h"
 #include "logging.h"
 
-#define TARGET_TASK_PREFIX "test-proc-"
+#define TARGET_TASK_PREFIX "test-proc"
 #define MAX_TARGET_TASKS 10
 #define TARGET_CPU 1
-#define KTHREAD_SLEEP_MS 500
+#define KTHREAD_SLEEP_MS 100
 #define NS_PER_MS 1000000
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Shawn Zhong");
 MODULE_DESCRIPTION("Scheduler control");
 
-static struct task_struct *target_tasks[MAX_TARGET_TASKS];
-static int target_tasks_count = 0;
+static void print_tasks(void) {
+  TRACE_INFO("\t%c%s %15s %5s %12s %12s %9s\n", ' ', "", "task", "PID",
+             "vruntime", "sum-exec", "switches");
+  TRACE_INFO(
+      "\t-------------------------------------------------------------\n");
+  struct task_struct *p;
+  for_each_process(p) {
+    if (task_cpu(p) != TARGET_CPU)
+      continue;
+    if (!strstarts(p->comm, TARGET_TASK_PREFIX))
+      continue;
+
+    TRACE_INFO("\t%c%c %15s %5d %12lld %12lld %9lld\n",
+               p == current ? '>' : ' ', task_state_to_char(p), p->comm,
+               task_pid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
+               (long long int)(p->nvcsw + p->nivcsw));
+  }
+}
 
 static u64 mocked_sched_clock_value = 0;
 static u64 mocked_sched_clock(void) {
@@ -40,37 +56,31 @@ static u64 mocked_sched_clock(void) {
   return mocked_sched_clock_value;
 }
 
+static int count = 0;
 static void remote_fn(void *data) {
+  bool sent_signal = count % 10 == 0;
+  if (sent_signal) {
+    if (strstarts(current->comm, TARGET_TASK_PREFIX) && sent_signal) {
+      send_sig(SIGUSR1, current, 1);
+      TRACE_INFO("Sent SIGUSR1 to %s (pid %d)\n", current->comm, current->pid);
+    }
+  }
+  count++;
+
   struct rq *rq = this_cpu_ptr(ksym_runqueues);
   mocked_sched_clock_value += KTHREAD_SLEEP_MS * NS_PER_MS;
-  TRACE_INFO("Calling sched_tick on CPU %d: rq->clock=%lld, "
+  TRACE_INFO("CPU %d: rq->clock=%lld, "
              "sched_clock_cpu=%lld, sched_clock=%lld\n",
              smp_processor_id(), rq->clock,
              ksym_sched_clock_cpu(smp_processor_id()), ksym_sched_clock());
-  for (int i = 0; i < target_tasks_count; i++) {
-    struct task_struct *task = target_tasks[i];
-    TRACE_INFO("pid=%d, comm=%s, vruntime=%llu%s\n", task->pid, task->comm,
-               task->se.vruntime, task == current ? " (current)" : "");
-  }
+  print_tasks();
   ksym_sched_tick();
 }
 
 static int sched_controller(void *data) {
-  struct task_struct *task;
-  for_each_process(task) {
-    if (task_cpu(task) != TARGET_CPU)
-      continue;
-    if (!strstarts(task->comm, TARGET_TASK_PREFIX))
-      continue;
-    target_tasks[target_tasks_count++] = task;
-  }
-  if (target_tasks_count == 0) {
-    TRACE_ERROR("No target tasks found\n");
-    return -EINVAL;
-  }
   while (!kthread_should_stop()) {
-    msleep(KTHREAD_SLEEP_MS);
     smp_call_function_single(TARGET_CPU, remote_fn, NULL, 0);
+    msleep(KTHREAD_SLEEP_MS);
   }
   return 0;
 }

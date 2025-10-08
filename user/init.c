@@ -165,8 +165,9 @@ int main() {
   printf("Welcome to UML Simple Root Filesystem\n");
 
   mount_filesystems();
-  system("busy");
   system("insmod main.ko");
+  system("busy");
+
   // system("insmod trace.ko");
 
   shell_loop();
