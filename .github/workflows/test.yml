@@ -17,7 +17,7 @@ jobs:
       run: sudo apt update && sudo apt install -y libelf-dev
 
     - name: Download Linux
-      run: ./clone_linux.py --tarball
+      run: ./fetch_linux.py --tarball
 
     - name: Prepare Linux
       working-directory: linux/current
