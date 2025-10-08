@@ -1,22 +1,20 @@
 OUT ?= $(abspath ../rootfs/data)
 SRC ?= $(shell pwd)
-MODULES := $(filter-out %.mod.c,$(wildcard *.c))
-
 KDIR ?= $(abspath ../linux/current)
-ifeq ($(wildcard $(KDIR)),)
-override KDIR := /lib/modules/$(shell uname -r)/build
-$(warning KDIR not found, using default $(KDIR))
-endif
 
-obj-m := $(MODULES:.c=.o)
+obj-m := main.o trace.o
 
 # Allow the use of private headers
 ccflags-y := -I$(KDIR) -Wno-unused-variable -Wno-unused-function
 
-$(MODULES:.c=.ko): $(MODULES) $(wildcard *.h)
-	$(MAKE) -C ${KDIR} M=$(SRC) modules
-	cp $(MODULES:.c=.ko) $(OUT)
+$(obj-m:.o=.ko): $(obj-m:.o=.c) $(wildcard *.h)
+	$(MAKE) -C $(KDIR) M=$(SRC) modules
+	cp $(obj-m:.o=.ko) $(OUT)
+
+.PHONY: obj
+obj:
+	$(MAKE) -C $(KDIR) M=$(SRC) $(obj-m)
 
 .PHONY: clean
 clean:
-	$(MAKE) -C ${KDIR} M=$(SRC) clean
+	$(MAKE) -C $(KDIR) M=$(SRC) clean
