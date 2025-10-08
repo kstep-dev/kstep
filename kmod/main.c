@@ -23,7 +23,7 @@
 #define TARGET_TASK_PREFIX "test-proc"
 #define MAX_TARGET_TASKS 10
 #define TARGET_CPU 1
-#define KTHREAD_SLEEP_MS 500
+#define KTHREAD_SLEEP_MS 100
 #define NS_PER_MS 1000000
 
 MODULE_LICENSE("GPL");
@@ -58,16 +58,11 @@ static u64 mocked_sched_clock(void) {
 
 static int count = 0;
 static void remote_fn(void *data) {
-  if (count % 5 == 0 && count <= 20) {
-    struct task_struct *p;
-    for_each_process(p) {
-      if (task_cpu(p) != TARGET_CPU)
-        continue;
-      if (!strstarts(p->comm, TARGET_TASK_PREFIX))
-        continue;
-      send_sig(SIGUSR1, p, 1);
-      TRACE_INFO("Sent SIGUSR1 to %s\n", p->comm);
-      break;
+  bool sent_signal = count % 10 == 0;
+  if (sent_signal) {
+    if (strstarts(current->comm, TARGET_TASK_PREFIX) && sent_signal) {
+      send_sig(SIGUSR1, current, 1);
+      TRACE_INFO("Sent SIGUSR1 to %s (pid %d)\n", current->comm, current->pid);
     }
   }
   count++;
