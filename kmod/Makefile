@@ -14,7 +14,7 @@ ccflags-y := -I$(KERNELDIR) -Wno-unused-variable -Wno-unused-function
 
 $(MODULES:.c=.ko): $(MODULES) $(wildcard *.h)
 	$(MAKE) -C ${KERNELDIR} M=$(SRC) modules
-	cp $(SRC)/*.ko $(OUT)
+	cp $(MODULES:.c=.ko) $(OUT)
 
 .PHONY: clean
 clean:
