@@ -12,16 +12,16 @@ LINUX_MASTER_DIR = LINUX_VERSIONS_DIR / "master"
 def clone_master():
     if LINUX_MASTER_DIR.exists():
         logging.info(f"Linux master already cloned to {LINUX_MASTER_DIR}")
-        return
-    system(f"git clone {LINUX_GIT_URL} {LINUX_MASTER_DIR}")
+    else:
+        system(f"git clone {LINUX_GIT_URL} {LINUX_MASTER_DIR}")
 
 
 def add_worktree(version: str):
     worktree_dir = LINUX_VERSIONS_DIR / f"linux-{version}-git"
     if worktree_dir.exists():
         logging.info(f"Linux {version} already cloned to {worktree_dir}")
-        return
-    system(f"cd {LINUX_MASTER_DIR} && git worktree add {worktree_dir} {version}")
+    else:
+        system(f"cd {LINUX_MASTER_DIR} && git worktree add {worktree_dir} {version}")
     return worktree_dir
 
 
