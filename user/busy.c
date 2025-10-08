@@ -11,7 +11,7 @@
 void child(int proc_idx) {
   // Set process name
   char name[16];
-  snprintf(name, sizeof(name), "child-%d", proc_idx);
+  snprintf(name, sizeof(name), "test-proc-%d", proc_idx);
   prctl(PR_SET_NAME, name);
 
   // Set affinity
@@ -23,7 +23,7 @@ void child(int proc_idx) {
     perror("sched_setaffinity");
   }
 
-  printf("Child process %d (pid %d) running on CPU %d\n", proc_idx, getpid(),
+  printf("Test process `%s` (pid %d) running on CPU %d\n", name, getpid(),
          sched_getcpu());
 
   while (1) {

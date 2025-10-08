@@ -1,15 +1,23 @@
 // Usage:
-//   #define KERNEL_SYMBOL_LIST X(ret_type, func_name, args)
-//   #include "kernel_sym.h"
-// Then the symbol can be accessed via "kernel_{func_name}".
+//   #define KSYM_FUNC_LIST X(ret_type, func_name, args)
+//   #define KSYM_VAR_LIST X(type, var_name)
+//   #include "ksym.h"
+// Then the symbol can be accessed via "ksym_{name}".
 
 #include <linux/kprobes.h>
 
 #include "logging.h"
 
-#ifndef KERNEL_SYMBOL_LIST
-#define KERNEL_SYMBOL_LIST
-#error "KERNEL_SYMBOL_LIST is not defined"
+#ifndef KSYM_NAME
+#define KSYM_NAME(name) ksym_##name
+#endif
+
+#ifndef KSYM_FUNC_LIST
+#define KSYM_FUNC_LIST
+#endif
+
+#ifndef KSYM_VAR_LIST
+#define KSYM_VAR_LIST
 #endif
 
 static void uninitialized_stub(void) {
@@ -18,8 +26,13 @@ static void uninitialized_stub(void) {
 
 // Define function pointers
 #define X(ret_type, name, args)                                                \
-  ret_type(*kernel_##name) args = (void *)&uninitialized_stub;
-KERNEL_SYMBOL_LIST
+  static ret_type(*KSYM_NAME(name)) args = (void *)&uninitialized_stub;
+KSYM_FUNC_LIST
+#undef X
+
+// Define variables
+#define X(type, name) static type *KSYM_NAME(name);
+KSYM_VAR_LIST
 #undef X
 
 static void *get_kallsyms_lookup_name(void) {
@@ -39,13 +52,14 @@ static void *get_kallsyms_lookup_name(void) {
 static void init_kernel_symbols(void) {
   void *(*kallsyms_lookup_name)(const char *name) = get_kallsyms_lookup_name();
 
-#define X(ret_type, name, args)                                                \
+#define X(type, name, ...)                                                     \
   do {                                                                         \
-    kernel_##name = kallsyms_lookup_name(#name);                               \
-    if (kernel_##name == NULL) {                                               \
-      TRACE_ERROR("lookup_func_addr: %s not found\n", #name);                  \
+    KSYM_NAME(name) = kallsyms_lookup_name(#name);                             \
+    if (KSYM_NAME(name) == NULL) {                                             \
+      TRACE_ERROR("kallsyms_lookup_name: %s not found\n", #name);              \
     }                                                                          \
   } while (0);
-  KERNEL_SYMBOL_LIST
+  KSYM_FUNC_LIST
+  KSYM_VAR_LIST
 #undef X
 }
