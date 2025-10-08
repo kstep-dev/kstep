@@ -1,0 +1,30 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: sudo apt update && sudo apt install -y libelf-dev
+
+    - name: Download Linux
+      run: ./clone_linux.py --tarball
+
+    - name: Prepare Linux
+      working-directory: linux/current
+      run: | 
+        make defconfig
+        ./scripts/kconfig/merge_config.sh .config ../config
+        make modules_prepare -j$(nproc)
+
+    - name: Build kernel module
+      run: make -C kmod obj

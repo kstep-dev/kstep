@@ -30,26 +30,32 @@ static void update_rq_clock_callback(unsigned long ip, unsigned long parent_ip,
 static struct ftrace_ops ftrace_ops_update_rq_clock = {
     .func = &update_rq_clock_callback};
 
+static void __exit kmod_exit(void) {
+  unregister_ftrace_function(&ftrace_ops_sched_tick);
+  unregister_ftrace_function(&ftrace_ops_update_rq_clock);
+}
+
 static int __init kmod_init(void) {
   ftrace_set_filter(&ftrace_ops_sched_tick, "sched_tick", strlen("sched_tick"),
                     1);
   if (register_ftrace_function(&ftrace_ops_sched_tick)) {
-    TRACE_ERROR("Failed to initialize ftrace\n");
-    return -EINVAL;
+    TRACE_ERROR("Failed to register ftrace_ops_sched_tick\n");
+    goto err;
   }
 
   ftrace_set_filter(&ftrace_ops_update_rq_clock, "update_rq_clock",
                     strlen("update_rq_clock"), 1);
   if (register_ftrace_function(&ftrace_ops_update_rq_clock)) {
-    TRACE_ERROR("Failed to initialize ftrace\n");
-    return -EINVAL;
+    TRACE_ERROR("Failed to register ftrace_ops_update_rq_clock\n");
+    goto err;
   }
-  return 0;
-}
 
-static void __exit kmod_exit(void) {
-  unregister_ftrace_function(&ftrace_ops_sched_tick);
-  unregister_ftrace_function(&ftrace_ops_update_rq_clock);
+  TRACE_INFO("Ftrace initialized\n");
+  return 0;
+
+err:
+  kmod_exit();
+  return -EINVAL;
 }
 
 module_init(kmod_init);
