@@ -27,4 +27,4 @@ jobs:
         make modules_prepare -j$(nproc)
 
     - name: Build kernel module
-      run: make kmod
+      run: make -C kmod obj
