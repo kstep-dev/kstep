@@ -68,14 +68,15 @@ static int sched_controller(void *data) {
     TRACE_ERROR("No target tasks found\n");
     return -EINVAL;
   }
-  while (1) {
+  while (!kthread_should_stop()) {
     msleep(KTHREAD_SLEEP_MS);
     smp_call_function_single(TARGET_CPU, remote_fn, NULL, 0);
   }
   return 0;
 }
 
-static int __init init(void) {
+static struct task_struct *controller_task;
+static int __init kmod_init(void) {
   init_kernel_symbols();
 
   TRACE_INFO("Freezing CPU %d\n", TARGET_CPU);
@@ -85,14 +86,15 @@ static int __init init(void) {
   ksym_paravirt_set_sched_clock(mocked_sched_clock);
 
   // Create kthread for controller
-  struct task_struct *task =
-      kthread_run(sched_controller, NULL, "sched_controller");
-  if (IS_ERR(task)) {
+  controller_task = kthread_run(sched_controller, NULL, "sched_controller");
+  if (IS_ERR(controller_task)) {
     TRACE_ERROR("Failed to create kthread\n");
-    return PTR_ERR(task);
+    return PTR_ERR(controller_task);
   }
 
   return 0;
 }
 
-module_init(init);
+static void __exit kmod_exit(void) { kthread_stop(controller_task); }
+
+module_init(kmod_init);

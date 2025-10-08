@@ -1,7 +1,11 @@
 OUT ?= $(abspath ../rootfs/data)
 SRC ?= $(shell pwd)
-KERNELDIR ?= $(abspath ../linux/current)
 MODULES := $(filter-out %.mod.c,$(wildcard *.c))
+KERNELDIR ?= $(abspath ../linux/current)
+ifeq ($(wildcard $(KERNELDIR)),)
+override KERNELDIR := /lib/modules/$(shell uname -r)/build
+endif
+$(info KERNELDIR: $(KERNELDIR))
 
 obj-m := $(MODULES:.c=.o)
 
