@@ -98,3 +98,4 @@ static int __init kmod_init(void) {
 static void __exit kmod_exit(void) { kthread_stop(controller_task); }
 
 module_init(kmod_init);
+module_exit(kmod_exit);
