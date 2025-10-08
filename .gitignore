@@ -6,6 +6,7 @@ compile_commands.events.json
 # Linux source code
 /linux/*/
 /linux/current
+/linux/*.tar.xz
 
 # Kernel module
 *.ko

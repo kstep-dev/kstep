@@ -13,6 +13,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Install dependencies
+      run: sudo apt update && sudo apt install -y libelf-dev
+
     - name: Download Linux
       run: ./clone_linux.py --tarball
 
