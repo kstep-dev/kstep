@@ -7,7 +7,21 @@
 #include <sys/prctl.h>
 #include <unistd.h>
 
-static void sigusr1_handler(int signum) { fork(); }
+#include "../kmod/sigcode.h"
+
+static void signal_handler(int signum, siginfo_t *info, void *context) {
+  switch (info->si_code) {
+  case SIGCODE_FORK:
+    fork();
+    break;
+  case SIGCODE_SLEEP:
+    sleep(info->si_int);
+    break;
+  default:
+    printf("Unknown signal code: %d\n", info->si_code);
+    break;
+  }
+}
 
 static void set_proc_affinity(int cpu) {
   cpu_set_t cpuset;
@@ -27,7 +41,9 @@ void worker() {
 }
 
 int main() {
-  signal(SIGUSR1, sigusr1_handler);
+  struct sigaction sa = {.sa_sigaction = signal_handler,
+                         .sa_flags = SA_SIGINFO};
+  sigaction(SIGUSR1, &sa, NULL);
   prctl(PR_SET_NAME, "test-proc");
   pid_t pid = fork();
   if (pid < 0) {
