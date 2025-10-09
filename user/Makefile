@@ -3,8 +3,8 @@ EXES = $(patsubst %.c,$(OUT)/%,$(wildcard *.c))
 
 all: $(EXES)
 
-$(OUT)/%: %.c
-	gcc -Wall -Wextra -std=c99 -static -o $@ $<
+$(OUT)/%: %.c ../kmod/sigcode.h
+	gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ $<
 
 .PHONY: clean
 clean:

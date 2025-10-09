@@ -7,10 +7,6 @@
 
 #define TARGET_CPU 1
 
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Shawn Zhong");
-MODULE_DESCRIPTION("Scheduler trace");
-
 // Invoked when `sched_tick` is called
 static void sched_tick_callback(unsigned long ip, unsigned long parent_ip,
                                 struct ftrace_ops *op,
@@ -60,3 +56,7 @@ err:
 
 module_init(kmod_init);
 module_exit(kmod_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Shawn Zhong");
+MODULE_DESCRIPTION("Scheduler trace");
