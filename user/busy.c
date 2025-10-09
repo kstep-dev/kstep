@@ -14,6 +14,9 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
   case SIGCODE_FORK:
     fork();
     break;
+  case SIGCODE_SLEEP:
+    sleep(info->si_int);
+    break;
   default:
     printf("Unknown signal code: %d\n", info->si_code);
     break;

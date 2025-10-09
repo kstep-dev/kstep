@@ -55,11 +55,14 @@ static int controller(void *data) {
     msleep(SLEEP_MS / 2);
     bool sent_signal = tick_count % 5 == 0 && tick_count <= 25;
     if (sent_signal && strcmp(rq->curr->comm, TARGET_TASK) == 0) {
-      struct kernel_siginfo info = {.si_signo = SIGUSR1,
-                                    .si_code = SIGCODE_FORK};
+      struct kernel_siginfo info = {
+          .si_signo = SIGUSR1,
+          .si_code = SIGCODE_FORK,
+          .si_int = 0,
+      };
       send_sig_info(SIGUSR1, &info, rq->curr);
-      TRACE_INFO("Sent %s to pid %d\n", sigcode_to_str[info.si_code],
-                 rq->curr->pid);
+      TRACE_INFO("Sent %s (si_int=%d) to pid %d\n",
+                 sigcode_to_str[info.si_code], info.si_int, rq->curr->pid);
     }
 
     // Update clock
