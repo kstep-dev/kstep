@@ -1,29 +1,31 @@
 #!/usr/bin/env python3
 
 import argparse
+from pathlib import Path
 
-from scripts import LINUX_CUSTOM_CONFIG, LINUX_DIR, system
+from scripts import LINUX_CONFIG, get_linux_dir, system
 
 BEAR_CMD = "bear --append --output compile_commands.json --"
 
-def make_linux(clean: bool = False):
+def make_linux(linux_dir: Path, clean: bool = False):
     # Clean up old build
     if clean:
-        system(f"make -C {LINUX_DIR} -j$(nproc) mrproper")
+        system(f"make -C {linux_dir} -j$(nproc) mrproper")
 
     # Generate config
-    if not (LINUX_DIR / ".config").exists():
-        system(f"make -C {LINUX_DIR} -j$(nproc) defconfig")
+    if not (linux_dir / ".config").exists():
+        system(f"make -C {linux_dir} -j$(nproc) defconfig")
         system(
-            f"cd {LINUX_DIR} && {LINUX_DIR}/scripts/kconfig/merge_config.sh {LINUX_DIR}/.config {LINUX_CUSTOM_CONFIG}"
+            f"cd {linux_dir} && {linux_dir}/scripts/kconfig/merge_config.sh {linux_dir}/.config {LINUX_CONFIG}"
         )
 
     # Build kernel
-    system(f"{BEAR_CMD} make -C {LINUX_DIR} -j$(nproc)")
+    system(f"{BEAR_CMD} make -C {linux_dir} -j$(nproc)")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--clean", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--version", type=str, default=None)
     args = parser.parse_args()
-    make_linux(**vars(args))
+    make_linux(linux_dir=get_linux_dir(args.version), clean=args.clean)

@@ -46,6 +46,17 @@ static void print_tasks(struct rq *rq) {
   }
 }
 
+static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
+  struct kernel_siginfo info = {
+      .si_signo = SIGUSR1,
+      .si_code = code,
+      .si_int = val,
+  };
+  send_sig_info(SIGUSR1, &info, p);
+  TRACE_INFO("Sent %s (si_int=%d) to pid %d\n", sigcode_to_str[code], val,
+             p->pid);
+}
+
 static int controller(void *data) {
   struct rq *rq = per_cpu_ptr(ksym_runqueues, TARGET_CPU);
   while (!kthread_should_stop()) {
@@ -53,16 +64,14 @@ static int controller(void *data) {
 
     // Send signal
     msleep(SLEEP_MS / 2);
-    bool sent_signal = tick_count % 5 == 0 && tick_count <= 25;
-    if (sent_signal && strcmp(rq->curr->comm, TARGET_TASK) == 0) {
-      struct kernel_siginfo info = {
-          .si_signo = SIGUSR1,
-          .si_code = SIGCODE_FORK,
-          .si_int = 0,
-      };
-      send_sig_info(SIGUSR1, &info, rq->curr);
-      TRACE_INFO("Sent %s (si_int=%d) to pid %d\n",
-                 sigcode_to_str[info.si_code], info.si_int, rq->curr->pid);
+    if (strcmp(rq->curr->comm, TARGET_TASK) == 0) {
+      struct task_struct *p = rq->curr;
+      if (tick_count % 5 == 0 && tick_count <= 25)
+        send_sigcode(p, SIGCODE_FORK, 0);
+      if (tick_count == 5)
+        send_sigcode(p, SIGCODE_EXIT, 0);
+    } else {
+      TRACE_ERROR("The current task is %s\n", rq->curr->comm);
     }
 
     // Update clock
@@ -89,8 +98,8 @@ static int __init kmod_init(void) {
 
   // Take over tick timer and mock sched clock
   ksym_tick_sched_timer_dying(TARGET_CPU);
-  clock_value_init = ksym_kvm_sched_clock_read();
   ksym_paravirt_set_sched_clock(mocked_sched_clock);
+  clock_value_init = ksym_kvm_sched_clock_read();
 
   // Create kthread for controller
   controller_task = kthread_run(controller, NULL, "controller");

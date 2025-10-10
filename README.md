@@ -7,8 +7,8 @@ SchedTest
 
 - Build Linux kernel: `./make_linux.py [--clean]`
 
-- Prepare root filesystem: `make` (also triggered by `./run_*.py`)
+- Prepare root filesystem: `make`
 
-- Run kernel: `./run_qemu.py [--debug]`
+- Run kernel: `./run_qemu.py [--debug]` (also triggers `make`)
 
 - Debug kernel: `./run_gdb.py`

@@ -5,7 +5,7 @@ KDIR ?= $(abspath ../linux/current)
 obj-m := main.o trace.o
 
 # Allow the use of private headers
-ccflags-y := -I$(KDIR) -Wno-unused-variable -Wno-unused-function
+ccflags-y := -I$(SRC) -Wno-unused-variable -Wno-unused-function
 
 $(obj-m:.o=.ko): $(obj-m:.o=.c) $(wildcard *.h)
 	$(MAKE) -C $(KDIR) M=$(SRC) modules
