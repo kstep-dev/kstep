@@ -1,14 +1,14 @@
 SchedTest
 ==============
 
-- Download Linux kernel: `./fetch_linux.py [--versions <version>...] [--tarball]`
-
 - Install dependencies: `./install_deps.sh`
 
-- Build Linux kernel: `./make_linux.py [--clean]`
+- Download Linux kernel: `./fetch_linux.py [--versions <version>...] [--tarball]`
 
-- Prepare root filesystem: `make` (also triggered by `./run_*.py`)
+- Build Linux kernel: `./make_linux.py [--versions <version>...] [--clean]`
 
-- Run kernel: `./run_qemu.py [--debug]`
+- Prepare root filesystem: `make`
+
+- Run kernel: `./run_qemu.py [--debug]` (also triggers `make`)
 
 - Debug kernel: `./run_gdb.py`

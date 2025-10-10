@@ -2,43 +2,53 @@
 
 import argparse
 import logging
+import multiprocessing as mp
 
-from scripts import LINUX_DIR, LINUX_VERSIONS_DIR, system
+from scripts import LINUX_ROOT_DIR, get_linux_dir, system
 
-LINUX_GIT_URL = "https://github.com/torvalds/linux.git"
-LINUX_MASTER_DIR = LINUX_VERSIONS_DIR / "master"
+LINUX_MASTER_DIR = LINUX_ROOT_DIR / "master"
 
 
 def clone_master():
     if LINUX_MASTER_DIR.exists():
         logging.info(f"Linux master already cloned to {LINUX_MASTER_DIR}")
     else:
-        system(f"git clone {LINUX_GIT_URL} {LINUX_MASTER_DIR}")
+        system(f"git clone https://github.com/torvalds/linux.git {LINUX_MASTER_DIR}")
 
 
 def add_worktree(version: str):
-    worktree_dir = LINUX_VERSIONS_DIR / f"linux-{version}-git"
-    if worktree_dir.exists():
-        logging.info(f"Linux {version} already cloned to {worktree_dir}")
+    linux_dir = get_linux_dir(version)
+    if linux_dir.exists():
+        logging.info(f"Linux {version} already cloned to {linux_dir}")
     else:
-        system(f"cd {LINUX_MASTER_DIR} && git worktree add {worktree_dir} {version}")
-    return worktree_dir
+        system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} v{version}")
+    return linux_dir
 
 
 def download_tarball(version: str):
-    tarball_url = f"https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-{version}.tar.xz"
-    tarball_path = LINUX_VERSIONS_DIR / f"{version}.tar.xz"
+    linux_dir = get_linux_dir(version)
+    if linux_dir.exists():
+        logging.info(f"Linux {version} source already exists in {linux_dir}")
+        return linux_dir
+
+    tarball_path = LINUX_ROOT_DIR / f"{version}.tar.xz"
     if tarball_path.exists():
         logging.info(f"Linux {version} tarball already downloaded to {tarball_path}")
     else:
+        tarball_url = (
+            f"https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-{version}.tar.xz"
+        )
         system(f"wget {tarball_url} -O {tarball_path}")
 
-    src_path = LINUX_VERSIONS_DIR / f"linux-{version}"
-    if src_path.exists():
-        logging.info(f"Linux {version} source already extracted to {src_path}")
+    system(f"tar -xvf {tarball_path} -C {LINUX_ROOT_DIR}")
+    return linux_dir
+
+
+def fetch_linux(version: str, tarball: bool):
+    if tarball:
+        return download_tarball(version)
     else:
-        system(f"tar -xvf {tarball_path} -C {LINUX_VERSIONS_DIR}")
-    return src_path
+        return add_worktree(version)
 
 
 if __name__ == "__main__":
@@ -50,12 +60,12 @@ if __name__ == "__main__":
     if not args.tarball:
         clone_master()
 
-    for version in args.versions:
-        if args.tarball:
-            path = download_tarball(version)
-        else:
-            path = add_worktree(version)
+    with mp.Pool(processes=mp.cpu_count()) as pool:
+        results = pool.starmap(
+            fetch_linux, [(version, args.tarball) for version in args.versions]
+        )
 
-        if version == args.versions[0]:
-            LINUX_DIR.unlink(missing_ok=True)
-            LINUX_DIR.symlink_to(path)
+    linux_curr_dir = get_linux_dir()
+    linux_curr_dir.unlink(missing_ok=True)
+    linux_curr_dir.symlink_to(results[0])
+    logging.info(f"Current now points to {results[0]}")

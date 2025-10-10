@@ -5,7 +5,7 @@ import os
 from enum import Enum
 from pathlib import Path
 
-from scripts import LINUX_DIR, ROOTFS_IMG, make_rootfs, system
+from scripts import LINUX_CURR_DIR, PROJ_DIR, ROOTFS_IMG, system
 
 
 class Arch(Enum):
@@ -34,8 +34,8 @@ def run_qemu(debug: bool = False):
     }[Arch.get()]
 
     kernel_image_path = {
-        Arch.X86_64: LINUX_DIR / "arch/x86/boot/bzImage",
-        Arch.ARM64: LINUX_DIR / "arch/arm64/boot/Image",
+        Arch.X86_64: LINUX_CURR_DIR / "arch/x86/boot/bzImage",
+        Arch.ARM64: LINUX_CURR_DIR / "arch/arm64/boot/Image",
     }[Arch.get()]
 
     boot_args = [
@@ -84,5 +84,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
-    make_rootfs()
+    system(f"make -C {PROJ_DIR} -j$(nproc)")
     run_qemu(**vars(args))

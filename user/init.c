@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/errno.h>
@@ -165,10 +166,9 @@ int main() {
   printf("Welcome to UML Simple Root Filesystem\n");
 
   mount_filesystems();
+  signal(SIGCHLD, SIG_IGN);
   system("insmod main.ko");
   system("busy");
-
-  // system("insmod trace.ko");
 
   shell_loop();
   builtin_exit();
