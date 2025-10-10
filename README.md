@@ -1,11 +1,11 @@
 SchedTest
 ==============
 
-- Download Linux kernel: `./fetch_linux.py [--versions <version>...] [--tarball]`
-
 - Install dependencies: `./install_deps.sh`
 
-- Build Linux kernel: `./make_linux.py [--clean]`
+- Download Linux kernel: `./fetch_linux.py [--versions <version>...] [--tarball]`
+
+- Build Linux kernel: `./make_linux.py [--versions <version>...] [--clean]`
 
 - Prepare root filesystem: `make`
 
