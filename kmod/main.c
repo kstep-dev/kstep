@@ -1,3 +1,5 @@
+#define TRACE_LEVEL LOGLEVEL_DEBUG
+
 #include <linux/delay.h>
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
@@ -31,17 +33,18 @@ static u64 clock_value_init = 0;
 static struct task_struct *controller_task;
 
 static void print_tasks(struct rq *rq) {
-  TRACE_INFO("\t%c%s %5s %5s %12s %12s %9s\n", ' ', "", "PID", "PPID",
-             "vruntime", "sum-exec", "switches");
-  TRACE_INFO(
-      "\t-------------------------------------------------------------\n");
+  TRACE_DEBUG("\t%c%s %5s %5s %12s %12s %9s", ' ', "", "PID", "PPID",
+              "vruntime", "sum-exec", "switches");
+  TRACE_DEBUG(
+      "\t-------------------------------------------------------------");
   struct task_struct *p;
   for_each_process(p) {
     if (task_cpu(p) == rq->cpu && strcmp(p->comm, TARGET_TASK) == 0) {
-      TRACE_INFO("\t%c%c %5d %5d %12lld %12lld %9lld\n",
-                 p == rq->curr ? '>' : ' ', task_state_to_char(p),
-                 task_pid_nr(p), task_ppid_nr(p), p->se.vruntime,
-                 p->se.sum_exec_runtime, (long long int)(p->nvcsw + p->nivcsw));
+      TRACE_DEBUG("\t%c%c %5d %5d %12lld %12lld %9lld",
+                  p == rq->curr ? '>' : ' ', task_state_to_char(p),
+                  task_pid_nr(p), task_ppid_nr(p), p->se.vruntime,
+                  p->se.sum_exec_runtime,
+                  (long long int)(p->nvcsw + p->nivcsw));
     }
   }
 }
@@ -53,7 +56,7 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
       .si_int = val,
   };
   send_sig_info(SIGUSR1, &info, p);
-  TRACE_INFO("Sent %s (si_int=%d) to pid %d\n", sigcode_to_str[code], val,
+  TRACE_INFO("Sent %s (si_int=%d) to pid %d", sigcode_to_str[code], val,
              p->pid);
 }
 
@@ -71,13 +74,13 @@ static int controller(void *data) {
       if (tick_count == 5)
         send_sigcode(p, SIGCODE_EXIT, 0);
     } else {
-      TRACE_ERROR("The current task is %s\n", rq->curr->comm);
+      TRACE_ERR("The current task is %s", rq->curr->comm);
     }
 
     // Update clock
     msleep(SLEEP_MS / 2);
     clock_value = clock_value_init + tick_count * SLEEP_MS * NS_PER_MS;
-    TRACE_INFO("CPU %d tick %lld: nr_running=%d, nr_switches=%lld\n", rq->cpu,
+    TRACE_INFO("CPU %d tick %lld: nr_running=%d, nr_switches=%lld", rq->cpu,
                tick_count, rq->nr_running, rq->nr_switches);
     print_tasks(rq);
 
@@ -104,11 +107,11 @@ static int __init kmod_init(void) {
   // Create kthread for controller
   controller_task = kthread_run(controller, NULL, "controller");
   if (IS_ERR(controller_task)) {
-    TRACE_ERROR("Failed to create kthread\n");
+    TRACE_ERR("Failed to create kthread");
     return PTR_ERR(controller_task);
   }
 
-  TRACE_INFO("Scheduler managed on CPU %d\n", TARGET_CPU);
+  TRACE_INFO("Scheduler managed on CPU %d", TARGET_CPU);
   return 0;
 }
 
@@ -117,7 +120,7 @@ static void __exit kmod_exit(void) {
   ksym_paravirt_set_sched_clock(ksym_kvm_sched_clock_read);
   smp_call_function_single(TARGET_CPU, (void *)ksym_tick_setup_sched_timer,
                            (void *)true, 0);
-  TRACE_INFO("Scheduler released on CPU %d\n", TARGET_CPU);
+  TRACE_INFO("Scheduler released on CPU %d", TARGET_CPU);
 }
 
 module_init(kmod_init);

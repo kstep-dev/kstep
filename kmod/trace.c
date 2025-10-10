@@ -12,7 +12,7 @@ static void sched_tick_callback(unsigned long ip, unsigned long parent_ip,
                                 struct ftrace_ops *op,
                                 struct ftrace_regs *fregs) {
   if (smp_processor_id() == TARGET_CPU)
-    TRACE_INFO("sched_tick called on CPU %d\n", smp_processor_id());
+    TRACE_INFO("sched_tick called on CPU %d", smp_processor_id());
 }
 static struct ftrace_ops ftrace_ops_sched_tick = {.func = &sched_tick_callback};
 
@@ -21,7 +21,7 @@ static void update_rq_clock_callback(unsigned long ip, unsigned long parent_ip,
                                      struct ftrace_ops *op,
                                      struct ftrace_regs *fregs) {
   if (smp_processor_id() == TARGET_CPU)
-    TRACE_INFO("update_rq_clock called on CPU %d\n", smp_processor_id());
+    TRACE_INFO("update_rq_clock called on CPU %d", smp_processor_id());
 }
 static struct ftrace_ops ftrace_ops_update_rq_clock = {
     .func = &update_rq_clock_callback};
@@ -35,18 +35,18 @@ static int __init kmod_init(void) {
   ftrace_set_filter(&ftrace_ops_sched_tick, "sched_tick", strlen("sched_tick"),
                     1);
   if (register_ftrace_function(&ftrace_ops_sched_tick)) {
-    TRACE_ERROR("Failed to register ftrace_ops_sched_tick\n");
+    TRACE_ERR("Failed to register ftrace_ops_sched_tick");
     goto err;
   }
 
   ftrace_set_filter(&ftrace_ops_update_rq_clock, "update_rq_clock",
                     strlen("update_rq_clock"), 1);
   if (register_ftrace_function(&ftrace_ops_update_rq_clock)) {
-    TRACE_ERROR("Failed to register ftrace_ops_update_rq_clock\n");
+    TRACE_ERR("Failed to register ftrace_ops_update_rq_clock");
     goto err;
   }
 
-  TRACE_INFO("Ftrace initialized\n");
+  TRACE_INFO("Ftrace initialized");
   return 0;
 
 err:

@@ -24,7 +24,7 @@ static int __init resched_ipi_init(void) {
   init_kernel_symbols();
   int curr_cpu = smp_processor_id();
   if (curr_cpu != 0) {
-    TRACE_ERROR("Current CPU is not 0, skipping\n");
+    TRACE_ERR("Current CPU is not 0, skipping\n");
     return 0;
   }
   if (kernel_arch_smp_send_reschedule) {
@@ -32,7 +32,7 @@ static int __init resched_ipi_init(void) {
   } else if (kernel_native_smp_send_reschedule) {
     send_reschedule = kernel_native_smp_send_reschedule;
   } else {
-    TRACE_ERROR("Reschedule IPI not supported\n");
+    TRACE_ERR("Reschedule IPI not supported\n");
     return -ENOSYS;
   }
 
