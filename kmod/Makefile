@@ -4,9 +4,6 @@ src ?= $(shell pwd)
 ksrc ?= $(abspath $(src)/../linux/current)
 obj-m := main.o trace.o
 
-$(info src: $(src))
-$(info ksrc: $(ksrc))
-
 # Allow the use of private headers
 ccflags-y := -I$(ksrc) -Wno-unused-variable -Wno-unused-function
 
