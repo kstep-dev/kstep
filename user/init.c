@@ -170,8 +170,6 @@ int main() {
   system("insmod main.ko");
   system("busy");
 
-  // system("insmod trace.ko");
-
   shell_loop();
   builtin_exit();
   return 0;
