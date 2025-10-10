@@ -7,6 +7,7 @@ from scripts import LINUX_CONFIG, get_linux_dir, system
 
 BEAR_CMD = "bear --append --output compile_commands.json --"
 
+
 def make_linux(linux_dir: Path, clean: bool = False, modules_prepare: bool = False):
     # Clean up old build
     if clean:
@@ -20,10 +21,10 @@ def make_linux(linux_dir: Path, clean: bool = False, modules_prepare: bool = Fal
         )
 
     # Build kernel
-    cmd = f"{BEAR_CMD} make -C {linux_dir} -j$(nproc)"
     if modules_prepare:
-        cmd += " modules_prepare"
-    system(cmd)
+        system(f"make -C {linux_dir} -j$(nproc) modules_prepare")
+    else:
+        system(f"{BEAR_CMD} make -C {linux_dir} -j$(nproc)")
 
 
 if __name__ == "__main__":
