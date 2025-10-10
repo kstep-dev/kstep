@@ -21,10 +21,7 @@ jobs:
 
     - name: Prepare Linux
       working-directory: linux/current
-      run: | 
-        make defconfig
-        ./scripts/kconfig/merge_config.sh .config ../config
-        make modules_prepare -j$(nproc)
+      run: ./make_linux.py --modules_prepare
 
     - name: Build kernel module
       run: make -C kmod obj
