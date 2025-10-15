@@ -5,7 +5,7 @@ import os
 from enum import Enum
 from pathlib import Path
 
-from scripts import LINUX_CURR_DIR, PROJ_DIR, ROOTFS_IMG, system
+from scripts import PROJ_DIR, ROOTFS_IMG, get_linux_dir, system
 
 
 class Arch(Enum):
@@ -28,15 +28,17 @@ def run_qemu(debug: bool = False):
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
 
+    arch = Arch.get()
     exe = {
         Arch.X86_64: "qemu-system-x86_64",
         Arch.ARM64: "qemu-system-aarch64",
-    }[Arch.get()]
+    }[arch]
 
+    linux_dir = get_linux_dir()
     kernel_image_path = {
-        Arch.X86_64: LINUX_CURR_DIR / "arch/x86/boot/bzImage",
-        Arch.ARM64: LINUX_CURR_DIR / "arch/arm64/boot/Image",
-    }[Arch.get()]
+        Arch.X86_64: linux_dir / "arch/x86/boot/bzImage",
+        Arch.ARM64: linux_dir / "arch/arm64/boot/Image",
+    }[arch]
 
     boot_args = [
         "root=/dev/vda",

@@ -14,19 +14,6 @@
             "processCreateCommands": [
                 "gdb-remote localhost:1234"
             ],
-        },
-        {
-            "name": "UML",
-            "type": "lldb",
-            "request": "launch",
-            "program": "${workspaceFolder}/linux/current/linux",
-            "args": [
-                "ubd0=rootfs/img.ext4",
-                "root=/dev/ubda",
-                "mem=256M"
-            ],
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "rootfs"
         }
     ]
 }

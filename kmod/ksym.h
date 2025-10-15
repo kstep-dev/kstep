@@ -21,7 +21,7 @@
 #endif
 
 static void uninitialized_stub(void) {
-  TRACE_ERR("Uninitialized kernel symbol\n");
+  TRACE_ERR("Uninitialized kernel symbol");
 }
 
 // Define function pointers
@@ -39,7 +39,7 @@ static void *get_kallsyms_lookup_name(void) {
   struct kprobe kp = {.symbol_name = "kallsyms_lookup_name"};
   int ret = register_kprobe(&kp);
   if (ret < 0) {
-    TRACE_ERR("Failed to register kprobe: %d. Using hardcoded address.\n", ret);
+    TRACE_ERR("Failed to register kprobe: %d. Using hardcoded address.", ret);
     // From `nm linux/current/linux | grep kallsyms_lookup_name`
     return (void *)0x600ad515;
   }
@@ -55,7 +55,9 @@ static void init_kernel_symbols(void) {
   do {                                                                         \
     KSYM_NAME(name) = kallsyms_lookup_name(#name);                             \
     if (KSYM_NAME(name) == NULL) {                                             \
-      TRACE_ERR("kallsyms_lookup_name: %s not found\n", #name);                \
+      TRACE_ERR("Function %s not found", #name);                               \
+    } else {                                                                   \
+      TRACE_INFO("Function %s -> %lx", #name, KSYM_NAME(name));                \
     }                                                                          \
   } while (0);
   KSYM_FUNC_LIST
