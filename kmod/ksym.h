@@ -53,11 +53,12 @@ static void init_kernel_symbols(void) {
 
 #define X(type, name, ...)                                                     \
   do {                                                                         \
-    KSYM_NAME(name) = kallsyms_lookup_name(#name);                             \
-    if (KSYM_NAME(name) == NULL) {                                             \
-      TRACE_ERR("Function %s not found", #name);                               \
+    void *addr = kallsyms_lookup_name(#name);                                  \
+    if (addr == NULL) {                                                        \
+      TRACE_ERR("Symbol %s not found", #name);                                 \
     } else {                                                                   \
-      TRACE_INFO("Function %s -> %lx", #name, KSYM_NAME(name));                \
+      TRACE_INFO("Symbol %-32s -> %px", #name, addr);                          \
+      KSYM_NAME(name) = addr;                                                  \
     }                                                                          \
   } while (0);
   KSYM_FUNC_LIST
