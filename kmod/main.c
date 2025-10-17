@@ -43,7 +43,9 @@ struct clock_data {
 static u64 tick_count = 0;
 static u64 clock_value = 0;
 static u64 (*original_sched_clock)(void) = NULL;
-
+#ifdef CONFIG_GENERIC_SCHED_CLOCK
+static struct clock_data original_cd;
+#endif
 static struct task_struct *controller_task;
 
 static void print_tasks(struct rq *rq) {
@@ -117,10 +119,14 @@ static int __init kmod_init(void) {
   // Take over tick timer and mock sched clock
   ksym_tick_sched_timer_dying(TARGET_CPU);
 #ifdef CONFIG_GENERIC_SCHED_CLOCK
+  memcpy(&original_cd, ksym_cd, sizeof(struct clock_data));
   original_sched_clock = ksym_cd->actual_read_sched_clock;
   ksym_cd->actual_read_sched_clock = mocked_sched_clock;
-  ksym_cd->read_data[0].read_sched_clock = mocked_sched_clock;
-  ksym_cd->read_data[1].read_sched_clock = mocked_sched_clock;
+  for (int i = 0; i < 2; i++) {
+    ksym_cd->read_data[i].read_sched_clock = mocked_sched_clock;
+    ksym_cd->read_data[i].mult = 1;
+    ksym_cd->read_data[i].shift = 0;
+  }
 #else
   ksym_paravirt_set_sched_clock(mocked_sched_clock);
   original_sched_clock = ksym_kvm_sched_clock_read;
@@ -140,9 +146,7 @@ static int __init kmod_init(void) {
 static void __exit kmod_exit(void) {
   kthread_stop(controller_task);
 #ifdef CONFIG_GENERIC_SCHED_CLOCK
-  ksym_cd->actual_read_sched_clock = original_sched_clock;
-  ksym_cd->read_data[0].read_sched_clock = original_sched_clock;
-  ksym_cd->read_data[1].read_sched_clock = original_sched_clock;
+  memcpy(ksym_cd, &original_cd, sizeof(struct clock_data));
 #else
   ksym_paravirt_set_sched_clock(original_sched_clock);
 #endif
