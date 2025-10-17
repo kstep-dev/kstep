@@ -29,6 +29,9 @@
 #define SLEEP_MS 100
 #define NS_PER_MS 1000000
 
+static int target_cpus[4] = {};
+static int target_cpu_count = 0;
+
 static struct task_struct *controller_task;
 static u64 clock_value = 0;
 
@@ -94,20 +97,27 @@ static void sched_clock_restore(void) {
 #error "Sched clock mocking not supported for this platform"
 #endif
 
-static void print_tasks(struct rq *rq) {
-  TRACE_DEBUG("\t%c%s %5s %5s %12s %12s %9s", ' ', "", "PID", "PPID",
-              "vruntime", "sum-exec", "switches");
+static void print_tasks(void) {
+  TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
+              "PPID", "vruntime", "sum-exec", "switches");
   TRACE_DEBUG(
       "\t-------------------------------------------------------------");
   struct task_struct *p;
   for_each_process(p) {
-    if (task_cpu(p) == rq->cpu && strcmp(p->comm, TARGET_TASK) == 0) {
-      TRACE_DEBUG("\t%c%c %5d %5d %12lld %12lld %9lld",
-                  p == rq->curr ? '>' : ' ', task_state_to_char(p),
-                  task_pid_nr(p), task_ppid_nr(p), p->se.vruntime,
-                  p->se.sum_exec_runtime,
-                  (long long int)(p->nvcsw + p->nivcsw));
+    if (strcmp(p->comm, TARGET_TASK) != 0)
+      continue;
+    bool is_curr = false;
+    for (int i = 0; i < 2; i++) {
+      struct rq *rq = per_cpu_ptr(ksym_runqueues, i);
+      if (p == rq->curr) {
+        is_curr = true;
+        break;
+      }
     }
+    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %9lld", task_cpu(p),
+                is_curr ? '>' : ' ', task_state_to_char(p), task_pid_nr(p),
+                task_ppid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
+                (long long int)(p->nvcsw + p->nivcsw));
   }
 }
 
@@ -134,14 +144,17 @@ static int controller(void *data) {
 
     // Send signal
     msleep(SLEEP_MS / 2);
-    if (strcmp(rq->curr->comm, TARGET_TASK) == 0) {
-      struct task_struct *p = rq->curr;
-      if (tick_count % 5 == 0 && tick_count <= 25)
-        send_sigcode(p, SIGCODE_FORK, 0);
-      if (tick_count == 10)
-        send_sigcode(p, SIGCODE_PAUSE, 0);
-    } else {
-      TRACE_ERR("The current task is %s", rq->curr->comm);
+    for (int i = 1; i <= 2; i++) {
+      struct rq *rq = per_cpu_ptr(ksym_runqueues, i);
+      if (strcmp(rq->curr->comm, TARGET_TASK) == 0) {
+        struct task_struct *p = rq->curr;
+        if (tick_count % 5 == 0 && tick_count <= 25)
+          send_sigcode(p, SIGCODE_FORK, 0);
+        if (tick_count == 10)
+          send_sigcode(p, SIGCODE_PAUSE, 0);
+      } else {
+        TRACE_ERR("The current task is %s", rq->curr->comm);
+      }
     }
 
     // Update clock
@@ -149,7 +162,7 @@ static int controller(void *data) {
     clock_value += SLEEP_MS * NS_PER_MS;
     TRACE_INFO("CPU %d tick %lld: nr_running=%d, nr_switches=%lld", rq->cpu,
                tick_count, rq->nr_running, rq->nr_switches);
-    print_tasks(rq);
+    print_tasks();
 
     // Call tick function
     smp_call_function_single(rq->cpu, (void *)ksym_sched_tick, NULL, 0);
@@ -163,7 +176,9 @@ static int controller(void *data) {
 
 static int __init kmod_init(void) {
   init_kernel_symbols();
-  controller_task = kthread_run(controller, NULL, "controller");
+  controller_task = kthread_create(controller, NULL, "controller");
+  set_cpus_allowed_ptr(controller_task, cpumask_of(0));
+  wake_up_process(controller_task);
   if (IS_ERR(controller_task)) {
     TRACE_ERR("Failed to create kthread");
     return PTR_ERR(controller_task);

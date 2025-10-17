@@ -29,10 +29,12 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
   }
 }
 
-static void set_proc_affinity(int cpu) {
+static void set_proc_affinity(int cpus[], size_t size) {
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
-  CPU_SET(cpu, &cpuset);
+  for (size_t i = 0; i < size; i++) {
+    CPU_SET(cpus[i], &cpuset);
+  }
   int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
   if (s != 0) {
     perror("sched_setaffinity");
@@ -40,7 +42,7 @@ static void set_proc_affinity(int cpu) {
 }
 
 void worker() {
-  set_proc_affinity(1);
+  set_proc_affinity((int[]){1, 2}, 2);
   while (1) {
     __asm__("" : : : "memory");
   }

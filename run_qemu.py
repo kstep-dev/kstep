@@ -45,12 +45,12 @@ def run_qemu(debug: bool = False):
         "rw",
         "nokaslr",
         "sched_verbose",
-        "isolcpus=1",
-        "rcu_nocbs=1",
-        "nohz_full=1",
+        # "isolcpus=1,2",
+        "rcu_nocbs=1,2",
+        "nohz_full=1,2",
         "tsc=nowatchdog",
         # "notsc",
-        "initcall_blacklist=spawn_ksoftirqd",
+        # "initcall_blacklist=spawn_ksoftirqd",
         # "noapictimer",
     ]
 
@@ -59,7 +59,7 @@ def run_qemu(debug: bool = False):
 
     cmd = [
         exe,
-        "-smp 2",
+        "-smp 3",
         "-cpu max",
         "-m 256M",
         f"-kernel {kernel_image_path}",
