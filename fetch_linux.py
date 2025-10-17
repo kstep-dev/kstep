@@ -44,13 +44,6 @@ def download_tarball(version: str):
     return linux_dir
 
 
-def fetch_linux(version: str, tarball: bool):
-    if tarball:
-        return download_tarball(version)
-    else:
-        return add_worktree(version)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--versions", nargs="+", type=str, default=["6.14"])
@@ -61,11 +54,13 @@ if __name__ == "__main__":
         clone_master()
 
     with mp.Pool(processes=mp.cpu_count()) as pool:
-        results = pool.starmap(
-            fetch_linux, [(version, args.tarball) for version in args.versions]
-        )
+        if args.tarball:
+            results = pool.map(download_tarball, args.versions)
+        else:
+            results = pool.map(add_worktree, args.versions)
 
-    linux_curr_dir = get_linux_dir()
-    linux_curr_dir.unlink(missing_ok=True)
-    linux_curr_dir.symlink_to(results[0])
-    logging.info(f"Current now points to {results[0]}")
+    # Set symlink for default version
+    linux_dir = get_linux_dir()
+    linux_dir.unlink(missing_ok=True)
+    linux_dir.symlink_to(results[0])
+    logging.info(f"Current Linux now points to {results[0]}")
