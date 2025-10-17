@@ -89,7 +89,7 @@ static int controller(void *data) {
       if (tick_count % 5 == 0 && tick_count <= 25)
         send_sigcode(p, SIGCODE_FORK, 0);
       if (tick_count == 5)
-        send_sigcode(p, SIGCODE_EXIT, 0);
+        send_sigcode(p, SIGCODE_PAUSE, 0);
     } else {
       TRACE_ERR("The current task is %s", rq->curr->comm);
     }

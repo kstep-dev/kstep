@@ -20,6 +20,9 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
   case SIGCODE_EXIT:
     exit(0);
     break;
+  case SIGCODE_PAUSE:
+    pause();
+    break;
   default:
     printf("Unknown signal code: %d\n", info->si_code);
     break;
