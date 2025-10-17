@@ -26,22 +26,37 @@
 #define TARGET_TASK "test-proc"
 #define TARGET_CPU 1
 
-#define SLEEP_MS 500
+#define SLEEP_MS 100
 #define NS_PER_MS 1000000
 
 static struct task_struct *controller_task;
-static u64 tick_count = 0;
 static u64 clock_value = 0;
-static u64 (*original_sched_clock)(void) = NULL;
+
+#if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
+// On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
+// is a wrapper of `paravirt_sched_clock` which can be changed with
+// `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
 
 static u64 sched_clock(void) {
   if (smp_processor_id() == 0)
-    return original_sched_clock();
+    return ksym_kvm_sched_clock_read();
   return clock_value;
 }
 
-#ifdef CONFIG_GENERIC_SCHED_CLOCK
-// From kernel/time/sched_clock.c
+static void sched_clock_mock(void) {
+  ksym_paravirt_set_sched_clock(sched_clock);
+  clock_value = ksym_kvm_sched_clock_read();
+}
+
+static void sched_clock_restore(void) {
+  ksym_paravirt_set_sched_clock(ksym_kvm_sched_clock_read);
+}
+
+#elif defined(CONFIG_GENERIC_SCHED_CLOCK)
+// On other platforms (e.g., arm64), `sched_clock` is implemented in
+// `kernel/time/sched_clock.c`, and we can change the function pointer in
+// `struct clock_data` and `struct clock_read_data` to mock the sched clock.
+
 struct clock_data {
   seqcount_latch_t seq;
   struct clock_read_data read_data[2];
@@ -49,29 +64,34 @@ struct clock_data {
   unsigned long rate;
   u64 (*actual_read_sched_clock)(void);
 };
-static struct clock_data original_cd;
-static void mock_sched_clock(void) {
+
+static struct clock_data cd_backup;
+
+static u64 sched_clock(void) {
+  if (smp_processor_id() == 0)
+    return cd_backup.actual_read_sched_clock();
+  return clock_value;
+}
+
+static void sched_clock_mock(void) {
   struct clock_data *cd = ksym_cd;
-  memcpy(&original_cd, cd, sizeof(struct clock_data));
-  original_sched_clock = cd->actual_read_sched_clock;
+  memcpy(&cd_backup, cd, sizeof(struct clock_data));
   cd->actual_read_sched_clock = sched_clock;
   for (int i = 0; i < 2; i++) {
-    cd->read_data[i].read_sched_clock = sched_clock;
-    cd->read_data[i].mult = 1;
-    cd->read_data[i].shift = 0;
+    struct clock_read_data *rd = &cd->read_data[i];
+    rd->read_sched_clock = sched_clock;
+    rd->mult = 1;
+    rd->shift = 0;
   }
+  clock_value = cd_backup.actual_read_sched_clock();
 }
-static void restore_sched_clock(void) {
-  memcpy(ksym_cd, &original_cd, sizeof(struct clock_data));
+
+static void sched_clock_restore(void) {
+  memcpy(ksym_cd, &cd_backup, sizeof(struct clock_data));
 }
+
 #else
-static void mock_sched_clock(void) {
-  ksym_paravirt_set_sched_clock(sched_clock);
-  original_sched_clock = ksym_kvm_sched_clock_read;
-}
-static void restore_sched_clock(void) {
-  ksym_paravirt_set_sched_clock(original_sched_clock);
-}
+#error "Sched clock mocking not supported for this platform"
 #endif
 
 static void print_tasks(struct rq *rq) {
@@ -104,7 +124,11 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
 
 static int controller(void *data) {
   struct rq *rq = per_cpu_ptr(ksym_runqueues, TARGET_CPU);
-  u64 clock_value_init = original_sched_clock();
+  ksym_tick_sched_timer_dying(TARGET_CPU);
+  sched_clock_mock();
+  TRACE_INFO("Scheduler managed on CPU %d", TARGET_CPU);
+
+  u64 tick_count = 0;
   while (!kthread_should_stop()) {
     tick_count++;
 
@@ -114,7 +138,7 @@ static int controller(void *data) {
       struct task_struct *p = rq->curr;
       if (tick_count % 5 == 0 && tick_count <= 25)
         send_sigcode(p, SIGCODE_FORK, 0);
-      if (tick_count == 5)
+      if (tick_count == 10)
         send_sigcode(p, SIGCODE_PAUSE, 0);
     } else {
       TRACE_ERR("The current task is %s", rq->curr->comm);
@@ -122,7 +146,7 @@ static int controller(void *data) {
 
     // Update clock
     msleep(SLEEP_MS / 2);
-    clock_value = clock_value_init + tick_count * SLEEP_MS * NS_PER_MS;
+    clock_value += SLEEP_MS * NS_PER_MS;
     TRACE_INFO("CPU %d tick %lld: nr_running=%d, nr_switches=%lld", rq->cpu,
                tick_count, rq->nr_running, rq->nr_switches);
     print_tasks(rq);
@@ -130,34 +154,24 @@ static int controller(void *data) {
     // Call tick function
     smp_call_function_single(rq->cpu, (void *)ksym_sched_tick, NULL, 0);
   }
+  sched_clock_restore();
+  smp_call_function_single(TARGET_CPU, (void *)ksym_tick_setup_sched_timer,
+                           (void *)true, 0);
+  TRACE_INFO("Scheduler released on CPU %d", TARGET_CPU);
   return 0;
 }
 
 static int __init kmod_init(void) {
   init_kernel_symbols();
-
-  // Take over tick timer and mock sched clock
-  ksym_tick_sched_timer_dying(TARGET_CPU);
-  mock_sched_clock();
-
-  // Create kthread for controller
   controller_task = kthread_run(controller, NULL, "controller");
   if (IS_ERR(controller_task)) {
     TRACE_ERR("Failed to create kthread");
     return PTR_ERR(controller_task);
   }
-
-  TRACE_INFO("Scheduler managed on CPU %d", TARGET_CPU);
   return 0;
 }
 
-static void __exit kmod_exit(void) {
-  kthread_stop(controller_task);
-  restore_sched_clock();
-  smp_call_function_single(TARGET_CPU, (void *)ksym_tick_setup_sched_timer,
-                           (void *)true, 0);
-  TRACE_INFO("Scheduler released on CPU %d", TARGET_CPU);
-}
+static void __exit kmod_exit(void) { kthread_stop(controller_task); }
 
 module_init(kmod_init);
 module_exit(kmod_exit);
