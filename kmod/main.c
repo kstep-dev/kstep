@@ -9,6 +9,8 @@
 
 // Linux private headers
 #include <kernel/sched/sched.h>
+
+#ifdef CONFIG_GENERIC_SCHED_CLOCK
 // From kernel/time/sched_clock.c
 struct clock_data {
   seqcount_latch_t seq;
@@ -17,6 +19,7 @@ struct clock_data {
   unsigned long rate;
   u64 (*actual_read_sched_clock)(void);
 };
+#endif
 
 #define KSYM_FUNC_LIST                                                         \
   X(void, tick_sched_timer_dying, (int cpu))                                   \
