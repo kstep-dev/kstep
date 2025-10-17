@@ -4,10 +4,19 @@
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
 #include <linux/module.h>
+#include <linux/sched_clock.h>
 #include <linux/workqueue.h>
 
 // Linux private headers
 #include <kernel/sched/sched.h>
+// From kernel/time/sched_clock.c
+struct clock_data {
+  seqcount_latch_t seq;
+  struct clock_read_data read_data[2];
+  ktime_t wrap_kt;
+  unsigned long rate;
+  u64 (*actual_read_sched_clock)(void);
+};
 
 #define KSYM_FUNC_LIST                                                         \
   X(void, tick_sched_timer_dying, (int cpu))                                   \
@@ -15,7 +24,9 @@
   X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
   X(u64, kvm_sched_clock_read, (void))                                         \
   X(void, tick_setup_sched_timer, (bool hrtimer))
-#define KSYM_VAR_LIST X(struct rq, runqueues)
+#define KSYM_VAR_LIST                                                          \
+  X(struct rq, runqueues)                                                      \
+  X(struct clock_data, cd)
 #include "ksym.h"
 #include "logging.h"
 #include "sigcode.h"
@@ -28,7 +39,7 @@
 
 static u64 tick_count = 0;
 static u64 clock_value = 0;
-static u64 clock_value_init = 0;
+static u64 (*original_sched_clock)(void) = NULL;
 
 static struct task_struct *controller_task;
 
@@ -62,6 +73,7 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
 
 static int controller(void *data) {
   struct rq *rq = per_cpu_ptr(ksym_runqueues, TARGET_CPU);
+  u64 clock_value_init = original_sched_clock();
   while (!kthread_should_stop()) {
     tick_count++;
 
@@ -92,7 +104,7 @@ static int controller(void *data) {
 
 static u64 mocked_sched_clock(void) {
   if (smp_processor_id() == 0)
-    return ksym_kvm_sched_clock_read();
+    return original_sched_clock();
   return clock_value;
 }
 
@@ -101,8 +113,15 @@ static int __init kmod_init(void) {
 
   // Take over tick timer and mock sched clock
   ksym_tick_sched_timer_dying(TARGET_CPU);
+#ifdef CONFIG_GENERIC_SCHED_CLOCK
+  original_sched_clock = ksym_cd->actual_read_sched_clock;
+  ksym_cd->actual_read_sched_clock = mocked_sched_clock;
+  ksym_cd->read_data[0].read_sched_clock = mocked_sched_clock;
+  ksym_cd->read_data[1].read_sched_clock = mocked_sched_clock;
+#else
   ksym_paravirt_set_sched_clock(mocked_sched_clock);
-  clock_value_init = ksym_kvm_sched_clock_read();
+  original_sched_clock = ksym_kvm_sched_clock_read;
+#endif
 
   // Create kthread for controller
   controller_task = kthread_run(controller, NULL, "controller");
@@ -117,7 +136,13 @@ static int __init kmod_init(void) {
 
 static void __exit kmod_exit(void) {
   kthread_stop(controller_task);
-  ksym_paravirt_set_sched_clock(ksym_kvm_sched_clock_read);
+#ifdef CONFIG_GENERIC_SCHED_CLOCK
+  ksym_cd->actual_read_sched_clock = original_sched_clock;
+  ksym_cd->read_data[0].read_sched_clock = original_sched_clock;
+  ksym_cd->read_data[1].read_sched_clock = original_sched_clock;
+#else
+  ksym_paravirt_set_sched_clock(original_sched_clock);
+#endif
   smp_call_function_single(TARGET_CPU, (void *)ksym_tick_setup_sched_timer,
                            (void *)true, 0);
   TRACE_INFO("Scheduler released on CPU %d", TARGET_CPU);
