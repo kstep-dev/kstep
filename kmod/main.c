@@ -102,17 +102,8 @@ static void print_tasks(void) {
   for_each_process(p) {
     if (strcmp(p->comm, TARGET_TASK) != 0)
       continue;
-    bool is_curr = false;
-    int cpu;
-    for_each_cpu(cpu, cpu_active_mask) {
-      struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
-      if (p == rq->curr) {
-        is_curr = true;
-        break;
-      }
-    }
     TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %9lld", task_cpu(p),
-                is_curr ? '>' : ' ', task_state_to_char(p), task_pid_nr(p),
+                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p),
                 task_ppid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
                 (long long int)(p->nvcsw + p->nivcsw));
   }
@@ -146,7 +137,7 @@ static int controller(void *data) {
     struct task_struct *p;
     for_each_process(p) {
       if (strcmp(p->comm, TARGET_TASK) == 0) {
-        if (tick_count % 5 == 0 && tick_count <= 35) {
+        if (tick_count % 5 == 0 && tick_count <= 40) {
           send_sigcode(p, SIGCODE_FORK, 0);
         }
         if (tick_count == 5 || tick_count == 10) {
