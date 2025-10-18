@@ -33,7 +33,7 @@ static void set_proc_affinity() {
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
   int nproc = sysconf(_SC_NPROCESSORS_ONLN);
-  for (int i = 1; i < nproc; i++) {
+  for (int i = 1; i < nproc; i++) { // skip cpu 0
     CPU_SET(i, &cpuset);
   }
   int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);

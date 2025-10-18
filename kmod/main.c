@@ -184,10 +184,6 @@ static int __init kmod_init(void) {
   controller_task = kthread_create(controller, NULL, "controller");
   set_cpus_allowed_ptr(controller_task, cpumask_of(0));
   wake_up_process(controller_task);
-  if (IS_ERR(controller_task)) {
-    TRACE_ERR("Failed to create kthread");
-    return PTR_ERR(controller_task);
-  }
   return 0;
 }
 
