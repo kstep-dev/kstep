@@ -29,11 +29,12 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
   }
 }
 
-static void set_proc_affinity(int cpus[], size_t size) {
+static void set_proc_affinity() {
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
-  for (size_t i = 0; i < size; i++) {
-    CPU_SET(cpus[i], &cpuset);
+  int nproc = sysconf(_SC_NPROCESSORS_ONLN);
+  for (int i = 1; i < nproc; i++) {
+    CPU_SET(i, &cpuset);
   }
   int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
   if (s != 0) {
@@ -41,11 +42,9 @@ static void set_proc_affinity(int cpus[], size_t size) {
   }
 }
 
-void worker() {
-  set_proc_affinity((int[]){1, 2}, 2);
-  while (1) {
+static void loop() {
+  while (1)
     __asm__("" : : : "memory");
-  }
 }
 
 int main() {
@@ -59,7 +58,8 @@ int main() {
     return 1;
   } else if (pid == 0) {
     // Child process
-    worker();
+    set_proc_affinity();
+    loop();
     exit(0);
   }
   return 0;

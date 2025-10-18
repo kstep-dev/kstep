@@ -24,13 +24,9 @@
 #include "sigcode.h"
 
 #define TARGET_TASK "test-proc"
-#define TARGET_CPU 1
 
 #define SLEEP_MS 100
 #define NS_PER_MS 1000000
-
-static int target_cpus[4] = {};
-static int target_cpu_count = 0;
 
 static struct task_struct *controller_task;
 static u64 clock_value = 0;
@@ -107,8 +103,9 @@ static void print_tasks(void) {
     if (strcmp(p->comm, TARGET_TASK) != 0)
       continue;
     bool is_curr = false;
-    for (int i = 0; i < 2; i++) {
-      struct rq *rq = per_cpu_ptr(ksym_runqueues, i);
+    int cpu;
+    for_each_cpu(cpu, cpu_active_mask) {
+      struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
       if (p == rq->curr) {
         is_curr = true;
         break;
@@ -133,10 +130,12 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
 }
 
 static int controller(void *data) {
-  struct rq *rq = per_cpu_ptr(ksym_runqueues, TARGET_CPU);
-  ksym_tick_sched_timer_dying(TARGET_CPU);
+  struct cpumask mask = *cpu_active_mask;
+  cpumask_clear_cpu(0, &mask);
+
+  int cpu;
+  for_each_cpu(cpu, &mask) { ksym_tick_sched_timer_dying(cpu); }
   sched_clock_mock();
-  TRACE_INFO("Scheduler managed on CPU %d", TARGET_CPU);
 
   u64 tick_count = 0;
   while (!kthread_should_stop()) {
@@ -144,33 +143,39 @@ static int controller(void *data) {
 
     // Send signal
     msleep(SLEEP_MS / 2);
-    for (int i = 1; i <= 2; i++) {
-      struct rq *rq = per_cpu_ptr(ksym_runqueues, i);
-      if (strcmp(rq->curr->comm, TARGET_TASK) == 0) {
-        struct task_struct *p = rq->curr;
-        if (tick_count % 5 == 0 && tick_count <= 25)
+    struct task_struct *p;
+    for_each_process(p) {
+      if (strcmp(p->comm, TARGET_TASK) == 0) {
+        if (tick_count % 5 == 0 && tick_count <= 35) {
           send_sigcode(p, SIGCODE_FORK, 0);
-        if (tick_count == 10)
-          send_sigcode(p, SIGCODE_PAUSE, 0);
-      } else {
-        TRACE_ERR("The current task is %s", rq->curr->comm);
+        }
+        if (tick_count == 5 || tick_count == 10) {
+          send_sigcode(p, SIGCODE_EXIT, 0);
+        }
+        break;
       }
     }
 
     // Update clock
     msleep(SLEEP_MS / 2);
     clock_value += SLEEP_MS * NS_PER_MS;
-    TRACE_INFO("CPU %d tick %lld: nr_running=%d, nr_switches=%lld", rq->cpu,
-               tick_count, rq->nr_running, rq->nr_switches);
+    for_each_cpu(cpu, &mask) {
+      struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+      TRACE_INFO("Tick %lld: CPU %d nr_running=%d, nr_switches=%lld",
+                 tick_count, cpu, rq->nr_running, rq->nr_switches);
+    }
     print_tasks();
 
     // Call tick function
-    smp_call_function_single(rq->cpu, (void *)ksym_sched_tick, NULL, 0);
+    for_each_cpu(cpu, &mask) {
+      smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
+    }
   }
   sched_clock_restore();
-  smp_call_function_single(TARGET_CPU, (void *)ksym_tick_setup_sched_timer,
-                           (void *)true, 0);
-  TRACE_INFO("Scheduler released on CPU %d", TARGET_CPU);
+  for_each_cpu(cpu, &mask) {
+    smp_call_function_single(cpu, (void *)ksym_tick_setup_sched_timer,
+                             (void *)true, 0);
+  }
   return 0;
 }
 
