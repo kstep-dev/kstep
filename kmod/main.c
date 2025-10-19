@@ -15,7 +15,8 @@
   X(void, sched_tick, (void))                                                  \
   X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
   X(u64, kvm_sched_clock_read, (void))                                         \
-  X(void, tick_setup_sched_timer, (bool hrtimer))
+  X(void, tick_setup_sched_timer, (bool hrtimer))                              \
+  X(u64, sched_clock, (void))
 #define KSYM_VAR_LIST                                                          \
   X(struct rq, runqueues)                                                      \
   X(void, cd)
@@ -25,11 +26,15 @@
 
 #define TARGET_TASK "test-proc"
 
-#define SLEEP_MS 100
 #define NS_PER_MS 1000000
+#define SIM_INTERVAL_MS 10
+#define TICK_INTERVAL_NS (100 * NS_PER_MS)
 
+static struct cpumask cpu_controlled_mask;
 static struct task_struct *controller_task;
 static u64 clock_value = 0;
+
+#define for_each_controlled_cpu(cpu) for_each_cpu(cpu, &cpu_controlled_mask)
 
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
 // On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
@@ -44,7 +49,6 @@ static u64 sched_clock(void) {
 
 static void sched_clock_mock(void) {
   ksym_paravirt_set_sched_clock(sched_clock);
-  clock_value = ksym_kvm_sched_clock_read();
 }
 
 static void sched_clock_restore(void) {
@@ -82,7 +86,6 @@ static void sched_clock_mock(void) {
     rd->mult = 1;
     rd->shift = 0;
   }
-  clock_value = cd_backup.actual_read_sched_clock();
 }
 
 static void sched_clock_restore(void) {
@@ -94,6 +97,15 @@ static void sched_clock_restore(void) {
 #endif
 
 static void print_tasks(void) {
+  TRACE_INFO("Clock value: %lld", clock_value);
+  int cpu;
+  for_each_controlled_cpu(cpu) {
+    struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+    TRACE_INFO(
+        "- CPU %d nr_running=%d, nr_switches=%lld, clock=%lld, clock_task=%lld",
+        cpu, rq->nr_running, rq->nr_switches, rq->clock, rq->clock_task);
+  }
+
   TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
               "PPID", "vruntime", "sum-exec", "switches");
   TRACE_DEBUG(
@@ -121,11 +133,12 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
 }
 
 static int controller(void *data) {
-  struct cpumask mask = *cpu_active_mask;
-  cpumask_clear_cpu(0, &mask);
+  cpumask_copy(&cpu_controlled_mask, cpu_active_mask);
+  cpumask_clear_cpu(0, &cpu_controlled_mask);
 
   int cpu;
-  for_each_cpu(cpu, &mask) { ksym_tick_sched_timer_dying(cpu); }
+  for_each_controlled_cpu(cpu) { ksym_tick_sched_timer_dying(cpu); }
+  clock_value = ksym_sched_clock() / TICK_INTERVAL_NS * TICK_INTERVAL_NS;
   sched_clock_mock();
 
   u64 tick_count = 0;
@@ -133,37 +146,29 @@ static int controller(void *data) {
     tick_count++;
 
     // Send signal
-    msleep(SLEEP_MS / 2);
+    msleep(SIM_INTERVAL_MS / 2);
     struct task_struct *p;
     for_each_process(p) {
       if (strcmp(p->comm, TARGET_TASK) == 0) {
-        if (tick_count % 5 == 0 && tick_count <= 40) {
+        if (tick_count < 10) {
           send_sigcode(p, SIGCODE_FORK, 0);
-        }
-        if (tick_count == 5 || tick_count == 10) {
-          send_sigcode(p, SIGCODE_EXIT, 0);
         }
         break;
       }
     }
 
     // Update clock
-    msleep(SLEEP_MS / 2);
-    clock_value += SLEEP_MS * NS_PER_MS;
-    for_each_cpu(cpu, &mask) {
-      struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
-      TRACE_INFO("Tick %lld: CPU %d nr_running=%d, nr_switches=%lld",
-                 tick_count, cpu, rq->nr_running, rq->nr_switches);
-    }
+    msleep(SIM_INTERVAL_MS / 2);
+    clock_value += TICK_INTERVAL_NS;
     print_tasks();
 
     // Call tick function
-    for_each_cpu(cpu, &mask) {
+    for_each_controlled_cpu(cpu) {
       smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
     }
   }
   sched_clock_restore();
-  for_each_cpu(cpu, &mask) {
+  for_each_controlled_cpu(cpu) {
     smp_call_function_single(cpu, (void *)ksym_tick_setup_sched_timer,
                              (void *)true, 0);
   }
