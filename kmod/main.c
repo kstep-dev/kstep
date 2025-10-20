@@ -19,7 +19,8 @@
   X(u64, sched_clock, (void))
 #define KSYM_VAR_LIST                                                          \
   X(struct rq, runqueues)                                                      \
-  X(void, cd)
+  X(void, cd)                                                                  \
+  X(u64, __sched_clock_offset)
 #include "ksym.h"
 #include "logging.h"
 #include "sigcode.h"
@@ -44,6 +45,7 @@ static u64 sched_clock(void) { return clock_value; }
 // `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
 
 static void sched_clock_init(void) {
+  *ksym___sched_clock_offset = 0;
   ksym_paravirt_set_sched_clock(sched_clock);
 }
 
