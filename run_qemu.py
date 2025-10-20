@@ -46,17 +46,17 @@ def run_qemu(debug: bool = False, log_path: Optional[Path] = LOG_PATH):
         "rw",
         "nokaslr",
         "sched_verbose",
-        # "isolcpus=1,2",
+        "isolcpus=nohz,managed_irq,1,2",
+        "irqaffinity=0",
         "rcu_nocbs=1,2",
         "nohz_full=1,2",
-        "tsc=nowatchdog",
         # "notsc",
         # "initcall_blacklist=spawn_ksoftirqd",
         # "noapictimer",
     ]
 
     if Arch.get() == Arch.X86_64:
-        boot_args.append("console=ttyS0")
+        boot_args += ["console=ttyS0", "tsc=nowatchdog"]
 
     cmd = [
         exe,
