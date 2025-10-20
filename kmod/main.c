@@ -30,11 +30,15 @@
 #define SIM_INTERVAL_MS 10
 #define TICK_INTERVAL_NS (100 * NS_PER_MS)
 
-static struct cpumask cpu_controlled_mask;
 static struct task_struct *controller_task;
 static u64 clock_value = 0;
 
+static struct cpumask cpu_controlled_mask;
 #define for_each_controlled_cpu(cpu) for_each_cpu(cpu, &cpu_controlled_mask)
+static void init_controlled_mask(void) {
+  cpumask_copy(&cpu_controlled_mask, cpu_active_mask);
+  cpumask_clear_cpu(0, &cpu_controlled_mask);
+}
 
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
 // On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
@@ -101,9 +105,9 @@ static void print_tasks(void) {
   int cpu;
   for_each_controlled_cpu(cpu) {
     struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
-    TRACE_INFO(
-        "- CPU %d nr_running=%d, nr_switches=%lld, clock=%lld, clock_task=%lld",
-        cpu, rq->nr_running, rq->nr_switches, rq->clock, rq->clock_task);
+    TRACE_INFO("- CPU %d running=%d, switches=%lld, clock=%lld, avg_load=%lld",
+               cpu, rq->nr_running, rq->nr_switches, rq->clock,
+               rq->cfs.avg_load);
   }
 
   TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
@@ -132,51 +136,59 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
              p->pid);
 }
 
-static int controller(void *data) {
-  cpumask_copy(&cpu_controlled_mask, cpu_active_mask);
-  cpumask_clear_cpu(0, &cpu_controlled_mask);
-
+static void controller_init(void) {
   int cpu;
   for_each_controlled_cpu(cpu) { ksym_tick_sched_timer_dying(cpu); }
   clock_value = ksym_sched_clock() / TICK_INTERVAL_NS * TICK_INTERVAL_NS;
   sched_clock_mock();
 
-  u64 tick_count = 0;
-  while (!kthread_should_stop()) {
-    tick_count++;
-
-    // Send signal
-    msleep(SIM_INTERVAL_MS / 2);
-    struct task_struct *p;
+  // Wait for target task to be created, and send signal to fork processes
+  struct task_struct *p;
+  while (1) {
     for_each_process(p) {
       if (strcmp(p->comm, TARGET_TASK) == 0) {
-        if (tick_count < 10) {
-          send_sigcode(p, SIGCODE_FORK, 0);
-        }
-        break;
+        send_sigcode(p, SIGCODE_FORK, 6);
+        return;
       }
     }
-
-    // Update clock
-    msleep(SIM_INTERVAL_MS / 2);
-    clock_value += TICK_INTERVAL_NS;
-    print_tasks();
-
-    // Call tick function
-    for_each_controlled_cpu(cpu) {
-      smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
-    }
+    TRACE_INFO("Waiting for process %s to be created", TARGET_TASK);
+    msleep(SIM_INTERVAL_MS);
   }
+}
+
+static void controller_exit(void) {
+  int cpu;
   sched_clock_restore();
   for_each_controlled_cpu(cpu) {
     smp_call_function_single(cpu, (void *)ksym_tick_setup_sched_timer,
                              (void *)true, 0);
   }
+}
+
+static void controller_step(void) {
+  // Update clock
+  msleep(SIM_INTERVAL_MS);
+  clock_value += TICK_INTERVAL_NS;
+  print_tasks();
+
+  // Call tick function
+  int cpu;
+  for_each_controlled_cpu(cpu) {
+    smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
+  }
+}
+
+static int controller(void *data) {
+  controller_init();
+  while (!kthread_should_stop())
+    controller_step();
+  controller_exit();
   return 0;
 }
 
 static int __init kmod_init(void) {
   init_kernel_symbols();
+  init_controlled_mask();
   controller_task = kthread_create(controller, NULL, "controller");
   set_cpus_allowed_ptr(controller_task, cpumask_of(0));
   wake_up_process(controller_task);

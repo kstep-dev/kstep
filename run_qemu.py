@@ -4,8 +4,9 @@ import argparse
 import os
 from enum import Enum
 from pathlib import Path
+from typing import Optional
 
-from scripts import PROJ_DIR, ROOTFS_IMG, get_linux_dir, system
+from scripts import LOG_PATH, PROJ_DIR, ROOTFS_IMG, get_linux_dir, system
 
 
 class Arch(Enum):
@@ -23,7 +24,7 @@ class Arch(Enum):
             raise ValueError(f"Unsupported architecture: {machine}")
 
 
-def run_qemu(debug: bool = False):
+def run_qemu(debug: bool = False, log_path: Optional[Path] = LOG_PATH):
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
@@ -67,15 +68,25 @@ def run_qemu(debug: bool = False):
         f"-drive if=virtio,file={ROOTFS_IMG},format=raw",
         "-nographic",
     ]
+
     if kvm_path.exists():
         cmd += ["-accel kvm"]
     else:
         cmd += ["-accel tcg"]
+
     if Arch.get() == Arch.ARM64:
         cmd += [
             "-machine virt",
             "-cpu cortex-a57",
         ]
+
+    if log_path:
+        cmd += [
+            f"-chardev stdio,id=char0,mux=on,logfile={log_path},signal=off",
+            "-serial chardev:char0",
+            "-mon chardev=char0",
+        ]
+
     if debug:
         cmd += ["-s", "-S"]
 

@@ -10,22 +10,22 @@
 #include "../kmod/sigcode.h"
 
 static void signal_handler(int signum, siginfo_t *info, void *context) {
-  switch (info->si_code) {
-  case SIGCODE_FORK:
-    fork();
-    break;
-  case SIGCODE_SLEEP:
-    sleep(info->si_int);
-    break;
-  case SIGCODE_EXIT:
+  int code = info->si_code;
+  int val = info->si_int;
+  if (code == SIGCODE_FORK) {
+    for (int i = 0; i < val; i++) {
+      int pid = fork();
+      if (pid == 0)
+        return;
+    }
+  } else if (code == SIGCODE_SLEEP) {
+    sleep(val);
+  } else if (code == SIGCODE_EXIT) {
     exit(0);
-    break;
-  case SIGCODE_PAUSE:
+  } else if (code == SIGCODE_PAUSE) {
     pause();
-    break;
-  default:
-    printf("Unknown signal code: %d\n", info->si_code);
-    break;
+  } else {
+    printf("Unknown signal code: %d\n", code);
   }
 }
 
@@ -58,6 +58,7 @@ int main() {
     return 1;
   } else if (pid == 0) {
     // Child process
+    pause();
     set_proc_affinity();
     loop();
     exit(0);

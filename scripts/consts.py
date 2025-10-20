@@ -12,6 +12,10 @@ KMOD_DIR = PROJ_DIR / "kmod"
 ROOTFS_DIR = PROJ_DIR / "rootfs"
 ROOTFS_IMG = ROOTFS_DIR / "img.ext4"
 
+DATA_DIR = PROJ_DIR / "data"
+LOG_PATH = DATA_DIR / "log.txt"
+
+
 def get_linux_dir(version: Optional[str] = None):
     if version is None:
         return LINUX_ROOT_DIR / "current"
