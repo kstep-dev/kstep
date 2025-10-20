@@ -163,12 +163,13 @@ void system(char *cmd) {
 
 int main() {
   printf("\n");
-  printf("Welcome to UML Simple Root Filesystem\n");
+  printf("Welcome to SchedTest\n");
 
   mount_filesystems();
   signal(SIGCHLD, SIG_IGN);
   system("insmod main.ko");
   system("busy");
+  // system("insmod trace.ko");
 
   shell_loop();
   builtin_exit();

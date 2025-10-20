@@ -13,7 +13,13 @@ compile_commands.events.json
 *.o.d
 
 # Filesystem image
-rootfs/img.ext4
+/rootfs/img.ext4
+/rootfs/data/*/*
+!/rootfs/data/**/README.md
+
+# Data files
+/data/*
+!/data/**/README.md
 
 # Python
 __pycache__

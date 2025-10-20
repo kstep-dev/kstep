@@ -58,8 +58,8 @@ int main() {
     return 1;
   } else if (pid == 0) {
     // Child process
-    pause();
     set_proc_affinity();
+    pause();
     loop();
     exit(0);
   }

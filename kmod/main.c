@@ -24,14 +24,9 @@
 #include "logging.h"
 #include "sigcode.h"
 
+#define SIM_INTERVAL_MS 100
+#define TICK_INTERVAL_NS (1000ULL * 1000ULL) // 1 ms
 #define TARGET_TASK "test-proc"
-
-#define NS_PER_MS 1000000
-#define SIM_INTERVAL_MS 10
-#define TICK_INTERVAL_NS (100 * NS_PER_MS)
-
-static struct task_struct *controller_task;
-static u64 clock_value = 0;
 
 static struct cpumask cpu_controlled_mask;
 #define for_each_controlled_cpu(cpu) for_each_cpu(cpu, &cpu_controlled_mask)
@@ -40,22 +35,19 @@ static void init_controlled_mask(void) {
   cpumask_clear_cpu(0, &cpu_controlled_mask);
 }
 
+static u64 clock_value = 0;
+static u64 sched_clock(void) { return clock_value; }
+
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
 // On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
 // is a wrapper of `paravirt_sched_clock` which can be changed with
 // `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
 
-static u64 sched_clock(void) {
-  if (smp_processor_id() == 0)
-    return ksym_kvm_sched_clock_read();
-  return clock_value;
-}
-
-static void sched_clock_mock(void) {
+static void sched_clock_init(void) {
   ksym_paravirt_set_sched_clock(sched_clock);
 }
 
-static void sched_clock_restore(void) {
+static void sched_clock_exit(void) {
   ksym_paravirt_set_sched_clock(ksym_kvm_sched_clock_read);
 }
 
@@ -74,13 +66,7 @@ struct clock_data {
 
 static struct clock_data cd_backup;
 
-static u64 sched_clock(void) {
-  if (smp_processor_id() == 0)
-    return cd_backup.actual_read_sched_clock();
-  return clock_value;
-}
-
-static void sched_clock_mock(void) {
+static void sched_clock_init(void) {
   struct clock_data *cd = ksym_cd;
   memcpy(&cd_backup, cd, sizeof(struct clock_data));
   cd->actual_read_sched_clock = sched_clock;
@@ -89,10 +75,12 @@ static void sched_clock_mock(void) {
     rd->read_sched_clock = sched_clock;
     rd->mult = 1;
     rd->shift = 0;
+    rd->epoch_ns = 0;
+    rd->epoch_cyc = 0;
   }
 }
 
-static void sched_clock_restore(void) {
+static void sched_clock_exit(void) {
   memcpy(ksym_cd, &cd_backup, sizeof(struct clock_data));
 }
 
@@ -101,11 +89,10 @@ static void sched_clock_restore(void) {
 #endif
 
 static void print_tasks(void) {
-  TRACE_INFO("Clock value: %lld", clock_value);
   int cpu;
   for_each_controlled_cpu(cpu) {
     struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
-    TRACE_INFO("- CPU %d running=%d, switches=%lld, clock=%lld, avg_load=%lld",
+    TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
                cpu, rq->nr_running, rq->nr_switches, rq->clock,
                rq->cfs.avg_load);
   }
@@ -139,8 +126,8 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
 static void controller_init(void) {
   int cpu;
   for_each_controlled_cpu(cpu) { ksym_tick_sched_timer_dying(cpu); }
-  clock_value = ksym_sched_clock() / TICK_INTERVAL_NS * TICK_INTERVAL_NS;
-  sched_clock_mock();
+  clock_value = roundup(ksym_sched_clock(), TICK_INTERVAL_NS);
+  sched_clock_init();
 
   // Wait for target task to be created, and send signal to fork processes
   struct task_struct *p;
@@ -158,16 +145,16 @@ static void controller_init(void) {
 
 static void controller_exit(void) {
   int cpu;
-  sched_clock_restore();
+  sched_clock_exit();
   for_each_controlled_cpu(cpu) {
     smp_call_function_single(cpu, (void *)ksym_tick_setup_sched_timer,
                              (void *)true, 0);
   }
 }
 
-static void controller_step(void) {
+static void controller_step(int iter) {
   // Update clock
-  msleep(SIM_INTERVAL_MS);
+  TRACE_INFO("Step %d", iter);
   clock_value += TICK_INTERVAL_NS;
   print_tasks();
 
@@ -176,15 +163,20 @@ static void controller_step(void) {
   for_each_controlled_cpu(cpu) {
     smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
   }
+
+  msleep(SIM_INTERVAL_MS);
 }
 
 static int controller(void *data) {
   controller_init();
+  int iter = 0;
   while (!kthread_should_stop())
-    controller_step();
+    controller_step(iter++);
   controller_exit();
   return 0;
 }
+
+static struct task_struct *controller_task;
 
 static int __init kmod_init(void) {
   init_kernel_symbols();

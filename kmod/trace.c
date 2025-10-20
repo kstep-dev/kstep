@@ -1,50 +1,64 @@
 #include <linux/ftrace.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/mmu_context.h>
 #include <linux/module.h>
+#include <linux/sched/clock.h>
 
 #include "logging.h"
 
-#define TARGET_CPU 1
+// Linux private headers
+#include <kernel/sched/sched.h>
 
-// Invoked when `sched_tick` is called
+#define FTRACE_FUNC_LIST                                                       \
+  X(sched_tick)                                                                \
+  X(update_rq_clock)
+
 static void sched_tick_callback(unsigned long ip, unsigned long parent_ip,
                                 struct ftrace_ops *op,
                                 struct ftrace_regs *fregs) {
-  if (smp_processor_id() == TARGET_CPU)
-    TRACE_INFO("sched_tick called on CPU %d", smp_processor_id());
+  if (smp_processor_id() == 0)
+    return;
+  TRACE_INFO("sched_tick called on CPU %d", smp_processor_id());
 }
-static struct ftrace_ops ftrace_ops_sched_tick = {.func = &sched_tick_callback};
 
-// Invoked when `update_rq_clock` is called
 static void update_rq_clock_callback(unsigned long ip, unsigned long parent_ip,
                                      struct ftrace_ops *op,
                                      struct ftrace_regs *fregs) {
-  if (smp_processor_id() == TARGET_CPU)
-    TRACE_INFO("update_rq_clock called on CPU %d", smp_processor_id());
+  if (smp_processor_id() == 0)
+    return;
+
+  struct rq *rq = (void *)ftrace_regs_get_argument(fregs, 0);
+  u64 clock = sched_clock();
+  s64 delta = (s64)clock - rq->clock;
+  TRACE_INFO("update_rq_clock called on CPU %d, clock=%llu, rq->clock=%llu, "
+             "delta=%lld",
+             smp_processor_id(), clock, rq->clock, delta);
 }
-static struct ftrace_ops ftrace_ops_update_rq_clock = {
-    .func = &update_rq_clock_callback};
+
+#define X(name)                                                                \
+  static struct ftrace_ops ftrace_ops_##name = {                               \
+      .func = &name##_callback,                                                \
+      .flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED,                           \
+  };
+FTRACE_FUNC_LIST
+#undef X
 
 static void __exit kmod_exit(void) {
-  unregister_ftrace_function(&ftrace_ops_sched_tick);
-  unregister_ftrace_function(&ftrace_ops_update_rq_clock);
+#define X(name) unregister_ftrace_function(&ftrace_ops_##name);
+  FTRACE_FUNC_LIST
+#undef X
 }
 
 static int __init kmod_init(void) {
-  ftrace_set_filter(&ftrace_ops_sched_tick, "sched_tick", strlen("sched_tick"),
-                    1);
-  if (register_ftrace_function(&ftrace_ops_sched_tick)) {
-    TRACE_ERR("Failed to register ftrace_ops_sched_tick");
-    goto err;
+#define X(name)                                                                \
+  ftrace_set_filter(&ftrace_ops_##name, #name, strlen(#name), 1);              \
+  if (register_ftrace_function(&ftrace_ops_##name)) {                          \
+    TRACE_ERR("Failed to register ftrace_ops_##name");                         \
+    goto err;                                                                  \
   }
-
-  ftrace_set_filter(&ftrace_ops_update_rq_clock, "update_rq_clock",
-                    strlen("update_rq_clock"), 1);
-  if (register_ftrace_function(&ftrace_ops_update_rq_clock)) {
-    TRACE_ERR("Failed to register ftrace_ops_update_rq_clock");
-    goto err;
-  }
+  FTRACE_FUNC_LIST
+#undef X
 
   TRACE_INFO("Ftrace initialized");
   return 0;
