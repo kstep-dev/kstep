@@ -37,7 +37,10 @@ static void update_rq_clock_callback(unsigned long ip, unsigned long parent_ip,
 }
 
 #define X(name)                                                                \
-  static struct ftrace_ops ftrace_ops_##name = {.func = &name##_callback};
+  static struct ftrace_ops ftrace_ops_##name = {                               \
+      .func = &name##_callback,                                                \
+      .flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED,                           \
+  };
 FTRACE_FUNC_LIST
 #undef X
 

@@ -43,11 +43,11 @@ static u64 sched_clock(void) { return clock_value; }
 // is a wrapper of `paravirt_sched_clock` which can be changed with
 // `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
 
-static void sched_clock_mock(void) {
+static void sched_clock_init(void) {
   ksym_paravirt_set_sched_clock(sched_clock);
 }
 
-static void sched_clock_restore(void) {
+static void sched_clock_exit(void) {
   ksym_paravirt_set_sched_clock(ksym_kvm_sched_clock_read);
 }
 
@@ -66,7 +66,7 @@ struct clock_data {
 
 static struct clock_data cd_backup;
 
-static void sched_clock_mock(void) {
+static void sched_clock_init(void) {
   struct clock_data *cd = ksym_cd;
   memcpy(&cd_backup, cd, sizeof(struct clock_data));
   cd->actual_read_sched_clock = sched_clock;
@@ -80,7 +80,7 @@ static void sched_clock_mock(void) {
   }
 }
 
-static void sched_clock_restore(void) {
+static void sched_clock_exit(void) {
   memcpy(ksym_cd, &cd_backup, sizeof(struct clock_data));
 }
 
@@ -127,7 +127,7 @@ static void controller_init(void) {
   int cpu;
   for_each_controlled_cpu(cpu) { ksym_tick_sched_timer_dying(cpu); }
   clock_value = roundup(ksym_sched_clock(), TICK_INTERVAL_NS);
-  sched_clock_mock();
+  sched_clock_init();
 
   // Wait for target task to be created, and send signal to fork processes
   struct task_struct *p;
@@ -145,7 +145,7 @@ static void controller_init(void) {
 
 static void controller_exit(void) {
   int cpu;
-  sched_clock_restore();
+  sched_clock_exit();
   for_each_controlled_cpu(cpu) {
     smp_call_function_single(cpu, (void *)ksym_tick_setup_sched_timer,
                              (void *)true, 0);
