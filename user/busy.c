@@ -51,7 +51,6 @@ int main() {
   struct sigaction sa = {.sa_sigaction = signal_handler,
                          .sa_flags = SA_SIGINFO};
   sigaction(SIGUSR1, &sa, NULL);
-  prctl(PR_SET_NAME, "test-proc");
   pid_t pid = fork();
   if (pid < 0) {
     perror("fork");
@@ -59,6 +58,7 @@ int main() {
   } else if (pid == 0) {
     // Child process
     set_proc_affinity();
+    prctl(PR_SET_NAME, "test-proc");
     pause();
     loop();
     exit(0);

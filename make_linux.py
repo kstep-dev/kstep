@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import shutil
 from pathlib import Path
 
 from scripts import LINUX_CONFIG, PROJ_DIR, get_linux_dir, system
@@ -21,12 +22,15 @@ def make_linux(linux_dir: Path, clean: bool = False, modules_prepare: bool = Fal
             f"cd {linux_dir} && ./scripts/kconfig/merge_config.sh -m {config_path} {LINUX_CONFIG}"
         )
         system(f"make -C {linux_dir} -j$(nproc) olddefconfig")
+        system(f"make -C {linux_dir} -j$(nproc) mod2noconfig")
 
     # Build kernel
+    cmd = f"make -C {linux_dir} -j$(nproc)"
     if modules_prepare:
-        system(f"make -C {linux_dir} -j$(nproc) modules_prepare")
-    else:
-        system(f"{BEAR_CMD} make -C {linux_dir} -j$(nproc)")
+        cmd += " modules_prepare"
+    if shutil.which("bear"):
+        cmd = f"{BEAR_CMD} {cmd}"
+    system(cmd)
 
 
 if __name__ == "__main__":

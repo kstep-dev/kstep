@@ -1,3 +1,5 @@
+import os
+from enum import Enum
 from pathlib import Path
 from typing import Optional
 
@@ -20,3 +22,17 @@ def get_linux_dir(version: Optional[str] = None):
     if version is None:
         return LINUX_ROOT_DIR / "current"
     return LINUX_ROOT_DIR / f"linux-{version}"
+
+class Arch(Enum):
+    X86_64 = "x86_64"
+    ARM64 = "arm64"
+
+    @classmethod
+    def get(cls):
+        machine = os.uname().machine
+        if machine == "x86_64":
+            return cls.X86_64
+        elif machine == "aarch64":
+            return cls.ARM64
+        else:
+            raise ValueError(f"Unsupported architecture: {machine}")

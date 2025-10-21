@@ -20,13 +20,15 @@
 #define KSYM_VAR_LIST                                                          \
   X(struct rq, runqueues)                                                      \
   X(void, cd)                                                                  \
-  X(u64, __sched_clock_offset)
+  X(u64, __sched_clock_offset)                                                 \
+  X(unsigned int, sysctl_sched_migration_cost)
 #include "ksym.h"
 #include "logging.h"
 #include "sigcode.h"
 
-#define SIM_INTERVAL_MS 100
-#define TICK_INTERVAL_NS (1000ULL * 1000ULL) // 1 ms
+#define SIM_INTERVAL_MS 10
+#define TICK_INTERVAL_NS (1000ULL * 1000ULL)               // 1 ms
+#define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 #define TARGET_TASK "test-proc"
 
 static struct cpumask cpu_controlled_mask;
@@ -36,7 +38,7 @@ static void init_controlled_mask(void) {
   cpumask_clear_cpu(0, &cpu_controlled_mask);
 }
 
-static u64 clock_value = 0;
+static u64 clock_value = INIT_TIME_NS;
 static u64 sched_clock(void) { return clock_value; }
 
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
@@ -107,10 +109,10 @@ static void print_tasks(void) {
   for_each_process(p) {
     if (strcmp(p->comm, TARGET_TASK) != 0)
       continue;
-    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %9lld", task_cpu(p),
+    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
                 p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p),
                 task_ppid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
-                (long long int)(p->nvcsw + p->nivcsw));
+                p->nvcsw, p->nivcsw);
   }
 }
 
@@ -125,23 +127,37 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
              p->pid);
 }
 
-static void controller_init(void) {
-  int cpu;
-  for_each_controlled_cpu(cpu) { ksym_tick_sched_timer_dying(cpu); }
-  clock_value = roundup(ksym_sched_clock(), TICK_INTERVAL_NS);
-  sched_clock_init();
-
-  // Wait for target task to be created, and send signal to fork processes
+static struct task_struct *poll_target_task(void) {
   struct task_struct *p;
   while (1) {
     for_each_process(p) {
-      if (strcmp(p->comm, TARGET_TASK) == 0) {
-        send_sigcode(p, SIGCODE_FORK, 6);
-        return;
-      }
+      if (strcmp(p->comm, TARGET_TASK) == 0)
+        return p;
     }
-    TRACE_INFO("Waiting for process %s to be created", TARGET_TASK);
     msleep(SIM_INTERVAL_MS);
+    TRACE_INFO("Waiting for process %s to be created", TARGET_TASK);
+  }
+}
+
+static void controller_init(void) {
+  int cpu;
+  for_each_controlled_cpu(cpu) { ksym_tick_sched_timer_dying(cpu); }
+  sched_clock_init();
+
+  struct task_struct *p = poll_target_task();
+  send_sigcode(p, SIGCODE_FORK, 3);
+  p->se.vruntime = INIT_TIME_NS;
+  p->nivcsw = 0;
+  p->nvcsw = 0;
+  for_each_controlled_cpu(cpu) {
+    struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+    rq->avg_idle = 2 * *ksym_sysctl_sched_migration_cost;
+    rq->max_idle_balance_cost = *ksym_sysctl_sched_migration_cost;
+    rq->nr_switches = 0;
+
+    rq->cfs.min_vruntime = INIT_TIME_NS;
+    rq->cfs.avg_load = 0;
+    rq->cfs.load.weight = 0;
   }
 }
 
@@ -157,23 +173,23 @@ static void controller_exit(void) {
 static void controller_step(int iter) {
   // Update clock
   TRACE_INFO("Step %d", iter);
-  clock_value += TICK_INTERVAL_NS;
   print_tasks();
+  clock_value += TICK_INTERVAL_NS;
 
   // Call tick function
   int cpu;
   for_each_controlled_cpu(cpu) {
     smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
   }
-
   msleep(SIM_INTERVAL_MS);
 }
 
 static int controller(void *data) {
   controller_init();
   int iter = 0;
-  while (!kthread_should_stop())
+  while (!kthread_should_stop()) {
     controller_step(iter++);
+  }
   controller_exit();
   return 0;
 }
