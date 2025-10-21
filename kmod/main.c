@@ -156,8 +156,6 @@ static void controller_init(void) {
     rq->nr_switches = 0;
 
     rq->cfs.min_vruntime = INIT_TIME_NS;
-    rq->cfs.avg_load = 0;
-    rq->cfs.load.weight = 0;
   }
 }
 
@@ -172,7 +170,6 @@ static void controller_exit(void) {
 
 static void controller_step(int iter) {
   // Update clock
-  TRACE_INFO("Step %d", iter);
   print_tasks();
   clock_value += TICK_INTERVAL_NS;
 
