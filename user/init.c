@@ -1,10 +1,12 @@
+#define _GNU_SOURCE
+
+#include <sched.h>
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/errno.h>
 #include <sys/mount.h>
 #include <sys/reboot.h>
-#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -28,6 +30,16 @@ int mount_filesystems() {
     return 1;
   }
   return 0;
+}
+
+void set_cpu_affinity() {
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  CPU_SET(0, &cpuset);
+  int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+  if (s != 0) {
+    perror("sched_setaffinity");
+  }
 }
 
 // Built-in shell commands
@@ -165,10 +177,15 @@ int main() {
   printf("\n");
   printf("Welcome to SchedTest\n");
 
+  // Basic setup
   mount_filesystems();
+  set_cpu_affinity();
   signal(SIGCHLD, SIG_IGN);
+
+  // Run init commands
   system("insmod main.ko");
   system("busy");
+  system("stat");
   // system("insmod trace.ko");
 
   shell_loop();

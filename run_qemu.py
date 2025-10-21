@@ -2,26 +2,10 @@
 
 import argparse
 import os
-from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-from scripts import LOG_PATH, PROJ_DIR, ROOTFS_IMG, get_linux_dir, system
-
-
-class Arch(Enum):
-    X86_64 = "x86_64"
-    ARM64 = "arm64"
-
-    @classmethod
-    def get(cls):
-        machine = os.uname().machine
-        if machine == "x86_64":
-            return cls.X86_64
-        elif machine == "aarch64":
-            return cls.ARM64
-        else:
-            raise ValueError(f"Unsupported architecture: {machine}")
+from scripts import LOG_PATH, PROJ_DIR, ROOTFS_IMG, Arch, get_linux_dir, system
 
 
 def run_qemu(debug: bool = False, log_path: Optional[Path] = LOG_PATH):
