@@ -79,7 +79,6 @@ static struct trace_func_info trace_func_infos[] = {
 };
 
 static void trace_func_enable(struct trace_func_info *info) {
-  info->enabled = true;
   info->op.func = info->callback;
   info->op.flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED;
   ftrace_set_filter(&info->op, info->name, strlen(info->name), 1);
@@ -87,6 +86,7 @@ static void trace_func_enable(struct trace_func_info *info) {
     TRACE_ERR("Failed to register %s", info->name);
   } else {
     TRACE_INFO("Registered %s", info->name);
+    info->enabled = true;
   }
 }
 
