@@ -184,9 +184,10 @@ int main() {
 
   // Run init commands
   system("insmod main.ko");
+  system("insmod trace.ko func_names=sched_balance_rq");
+  // system("insmod trace.ko func_names=sched_tick,update_rq_clock");
   system("busy");
-  system("stat");
-  // system("insmod trace.ko");
+  // system("stat");
 
   shell_loop();
   builtin_exit();
