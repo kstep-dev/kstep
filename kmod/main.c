@@ -145,7 +145,7 @@ static void controller_init(void) {
   sched_clock_init();
 
   struct task_struct *p = poll_target_task();
-  send_sigcode(p, SIGCODE_FORK, 3);
+  send_sigcode(p, SIGCODE_FORK, 4);
   p->se.vruntime = INIT_TIME_NS;
   p->nivcsw = 0;
   p->nvcsw = 0;
@@ -172,11 +172,19 @@ static void controller_step(int iter) {
   // Update clock
   print_tasks();
   clock_value += TICK_INTERVAL_NS;
-
-  // Call tick function
   int cpu;
   for_each_controlled_cpu(cpu) {
-    smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
+    struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+    // force balance at every tick
+    rq->next_balance = 0;
+    for (struct sched_domain *sd = rq->sd; sd; sd = sd->parent) {
+      sd->last_balance = 0;
+    }
+  }
+
+  // Call tick function
+  for_each_controlled_cpu(cpu) {
+    smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 1);
   }
   msleep(SIM_INTERVAL_MS);
 }
