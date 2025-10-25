@@ -147,7 +147,7 @@ static void controller_init(void) {
     for_each_controlled_cpu(cpu) {
       ksym_tick_sched_timer_dying(cpu);
       smp_call_function_single(cpu, (void *)ksym_workqueue_offline_cpu,
-                               (void *)cpu, 1);
+                               (void *)(intptr_t)cpu, 1);
     }
   }
 
