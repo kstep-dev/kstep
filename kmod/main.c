@@ -16,7 +16,8 @@
   X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
   X(u64, kvm_sched_clock_read, (void))                                         \
   X(void, tick_setup_sched_timer, (bool hrtimer))                              \
-  X(u64, sched_clock, (void))
+  X(u64, sched_clock, (void))                                                  \
+  X(int, workqueue_offline_cpu, (int cpu))
 #define KSYM_VAR_LIST                                                          \
   X(struct rq, runqueues)                                                      \
   X(void, cd)                                                                  \
@@ -107,12 +108,12 @@ static void print_tasks(void) {
       "\t-------------------------------------------------------------");
   struct task_struct *p;
   for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0)
+    if (task_cpu(p) == 0)
       continue;
-    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
+    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu %s", task_cpu(p),
                 p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p),
                 task_ppid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
-                p->nvcsw, p->nivcsw);
+                p->nvcsw, p->nivcsw, p->comm);
   }
 }
 
@@ -140,8 +141,31 @@ static struct task_struct *poll_target_task(void) {
 }
 
 static void controller_init(void) {
-  int cpu;
-  for_each_controlled_cpu(cpu) { ksym_tick_sched_timer_dying(cpu); }
+  // Disable timer ticks and workqueue on all controlled CPUs
+  {
+    int cpu;
+    for_each_controlled_cpu(cpu) {
+      ksym_tick_sched_timer_dying(cpu);
+      smp_call_function_single(cpu, (void *)ksym_workqueue_offline_cpu,
+                               (void *)cpu, 1);
+    }
+  }
+
+  // Move non-essential kernel threads to CPU 0
+  {
+    struct task_struct *p;
+    for_each_process(p) {
+      if (task_cpu(p) == 0)
+        continue;
+      if (strncmp(p->comm, "cpuhp/", 6) == 0 ||
+          strncmp(p->comm, "migration/", 10) == 0 ||
+          strncmp(p->comm, "ksoftirqd/", 10) == 0)
+        continue;
+      set_cpus_allowed_ptr(p, cpumask_of(0));
+      wake_up_process(p);
+    }
+  }
+
   sched_clock_init();
 
   struct task_struct *p = poll_target_task();
@@ -149,6 +173,8 @@ static void controller_init(void) {
   p->se.vruntime = INIT_TIME_NS;
   p->nivcsw = 0;
   p->nvcsw = 0;
+
+  int cpu;
   for_each_controlled_cpu(cpu) {
     struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
     rq->avg_idle = 2 * *ksym_sysctl_sched_migration_cost;

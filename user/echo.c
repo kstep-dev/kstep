@@ -1,18 +1,18 @@
+#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 #define MAX_LINE 1024
 
 int main(int argc, char *argv[]) {
-  int redirect = 0;
   char *filename = NULL;
-  FILE *out = stdout;
+  int fd = STDOUT_FILENO;
 
   // Check for ">" in arguments
   for (int i = 1; i < argc; ++i) {
     if (strcmp(argv[i], ">") == 0) {
       if (i + 1 < argc) {
-        redirect = 1;
         filename = argv[i + 1];
         argv[i] = NULL; // terminate the arguments for echo
         break;
@@ -23,24 +23,33 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (redirect) {
-    out = fopen(filename, "w");
-    if (!out) {
-      perror("echo");
+  if (filename) {
+    fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1) {
+      perror("open");
       return 1;
     }
   }
 
   // Print the arguments up to the ">" (if any)
+  char buffer[MAX_LINE];
+  int buffer_len = 0;
   for (int i = 1; argv[i] != NULL; ++i) {
-    fputs(argv[i], out);
+    strncpy(buffer + buffer_len, argv[i], MAX_LINE - buffer_len);
+    buffer_len += strlen(argv[i]);
     if (argv[i + 1] != NULL)
-      fputc(' ', out);
+      buffer[buffer_len++] = ' ';
+    else
+      buffer[buffer_len++] = '\n';
   }
-  fputc('\n', out);
+  int written = write(fd, buffer, buffer_len);
+  if (written != buffer_len) {
+    perror("write");
+    return 1;
+  }
 
-  if (redirect && out != stdout) {
-    fclose(out);
+  if (fd != STDOUT_FILENO) {
+    close(fd);
   }
 
   return 0;

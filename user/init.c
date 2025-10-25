@@ -7,6 +7,7 @@
 #include <sys/errno.h>
 #include <sys/mount.h>
 #include <sys/reboot.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -26,6 +27,10 @@ int mount_filesystems() {
     return 1;
   }
   if (mount("none", "/sys/kernel/debug", "debugfs", 0, "") != 0) {
+    perror("mount");
+    return 1;
+  }
+  if (mount("none", "/sys/fs/cgroup", "cgroup2", 0, "") != 0) {
     perror("mount");
     return 1;
   }
