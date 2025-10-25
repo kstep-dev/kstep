@@ -37,6 +37,8 @@ int main(int argc, char *argv[]) {
   for (int i = 1; argv[i] != NULL; ++i) {
     strncpy(buffer + buffer_len, argv[i], MAX_LINE - buffer_len);
     buffer_len += strlen(argv[i]);
+    if (buffer_len >= MAX_LINE)
+      break;
     if (argv[i + 1] != NULL)
       buffer[buffer_len++] = ' ';
     else
