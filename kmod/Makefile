@@ -1,4 +1,4 @@
-OUT ?= $(abspath ../rootfs/data)
+OUT ?= $(abspath ../data/rootfs)
 
 src ?= $(shell pwd)
 ksrc ?= $(abspath $(src)/../linux/current)

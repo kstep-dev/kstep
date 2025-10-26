@@ -1,4 +1,4 @@
-ROOTFS ?= $(abspath ../rootfs/data)
+ROOTFS ?= $(abspath ../data/rootfs)
 EXES = $(patsubst %.c,$(ROOTFS)/bin/%,$(wildcard *.c))
 TARGETS = $(EXES) $(ROOTFS)/init.sh
 
