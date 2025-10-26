@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include <ctype.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdio.h>
@@ -181,12 +182,12 @@ void shell_loop() {
   builtin_exit();
 }
 
-void system(char *cmd) {
+int system(char *cmd) {
   printf(PROMPT "%s\n", cmd);
   char line[MAX_LINE];
   strncpy(line, cmd, MAX_LINE);
   char **args = parse_line(line);
-  execute_external(args);
+  return execute_external(args);
 }
 
 void run_init_sh() {
@@ -197,7 +198,25 @@ void run_init_sh() {
   }
   char line[MAX_LINE];
   while (fgets(line, sizeof(line), file) != NULL) {
-    system(line);
+    // Remove trailing newline
+    line[strcspn(line, "\n")] = 0;
+
+    // Trim leading whitespace
+    char *cmd = line;
+    while (isspace(*cmd)) {
+      cmd++;
+    }
+
+    // Ignore empty lines and comments
+    if (cmd[0] == '\0' || cmd[0] == '#') {
+      continue;
+    }
+
+    if (system(cmd) != 0) {
+      fprintf(stderr,
+              "init.sh: command `%s` failed, aborting initialization.\n", cmd);
+      break;
+    }
   }
   fclose(file);
 }
