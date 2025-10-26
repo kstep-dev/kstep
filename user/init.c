@@ -131,15 +131,26 @@ int execute_external(char **args) {
     // Child process
     execvp(args[0], args);
     perror("execvp");
+    _exit(1);
   } else if (pid > 0) {
     // Parent process
     int status;
     waitpid(pid, &status, 0);
+    if (WIFEXITED(status)) {
+      int exit_status = WEXITSTATUS(status);
+      if (exit_status != 0) {
+        printf("Command %s exited with status %d\n", args[0], exit_status);
+      }
+      return exit_status;
+    } else {
+      printf("Command %s exited with unknown status %d\n", args[0], status);
+      return 1;
+    }
   } else {
     perror("fork");
     return 1;
   }
-  return 1;
+  return 0;
 }
 
 // Main shell loop
@@ -178,6 +189,19 @@ void system(char *cmd) {
   execute_external(args);
 }
 
+void run_init_sh() {
+  FILE *file = fopen("init.sh", "r");
+  if (file == NULL) {
+    perror("fopen");
+    return;
+  }
+  char line[MAX_LINE];
+  while (fgets(line, sizeof(line), file) != NULL) {
+    system(line);
+  }
+  fclose(file);
+}
+
 int main() {
   printf("\n");
   printf("Welcome to SchedTest\n");
@@ -187,13 +211,7 @@ int main() {
   set_cpu_affinity();
   signal(SIGCHLD, SIG_IGN);
 
-  // Run init commands
-  system("insmod main.ko");
-  system("insmod trace.ko func_names=sched_balance_rq");
-  // system("insmod trace.ko func_names=sched_tick,update_rq_clock");
-  system("busy");
-  // system("stat");
-
+  run_init_sh();
   shell_loop();
   builtin_exit();
   return 0;
