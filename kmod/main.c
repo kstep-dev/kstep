@@ -6,6 +6,7 @@
 #include <linux/module.h>
 #include <linux/sched_clock.h>
 #include <linux/workqueue.h>
+#include <linux/reboot.h> // For kernel_power_off()
 
 // Linux private headers
 #include <kernel/sched/sched.h>
@@ -16,7 +17,8 @@
   X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
   X(u64, kvm_sched_clock_read, (void))                                         \
   X(void, tick_setup_sched_timer, (bool hrtimer))                              \
-  X(u64, sched_clock, (void))
+  X(u64, sched_clock, (void))                                                  \
+  X(void, update_rq_clock, (struct rq * rq))                                    
 #define KSYM_VAR_LIST                                                          \
   X(struct rq, runqueues)                                                      \
   X(void, cd)                                                                  \
@@ -92,6 +94,9 @@ static void sched_clock_exit(void) {
 #error "Sched clock mocking not supported for this platform"
 #endif
 
+static struct task_struct *controller_task;
+static struct task_struct *busy_task;
+
 static void print_tasks(void) {
   int cpu;
   for_each_controlled_cpu(cpu) {
@@ -109,9 +114,10 @@ static void print_tasks(void) {
   for_each_process(p) {
     if (strcmp(p->comm, TARGET_TASK) != 0)
       continue;
+    // TRACE_DEBUG("p->pid=%d, p->ppid=%d", task_pid_nr(busy_task), task_ppid_nr(busy_task));
     TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
-                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p),
-                task_ppid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
+                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p) - task_pid_nr(busy_task),
+                0, p->se.vruntime, p->se.sum_exec_runtime,
                 p->nvcsw, p->nivcsw);
   }
 }
@@ -145,18 +151,32 @@ static void controller_init(void) {
   sched_clock_init();
 
   struct task_struct *p = poll_target_task();
-  send_sigcode(p, SIGCODE_FORK, 3);
+  busy_task = p;
   p->se.vruntime = INIT_TIME_NS;
   p->nivcsw = 0;
   p->nvcsw = 0;
   for_each_controlled_cpu(cpu) {
     struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+    struct sched_domain *sd;
+
+    ksym_update_rq_clock(rq);
     rq->avg_idle = 2 * *ksym_sysctl_sched_migration_cost;
     rq->max_idle_balance_cost = *ksym_sysctl_sched_migration_cost;
     rq->nr_switches = 0;
 
     rq->cfs.min_vruntime = INIT_TIME_NS;
+    
+    for (sd = rcu_dereference_check_sched_domain(rq->sd); \
+			sd; sd = sd->parent) {
+      sd->last_balance = jiffies;
+      sd->balance_interval = sd->min_interval;
+      sd->nr_balance_failed = 0;
+    }
   }
+
+  send_sigcode(p, SIGCODE_FORK, 2);
+  msleep(SIM_INTERVAL_MS);
+  
 }
 
 static void controller_exit(void) {
@@ -166,6 +186,8 @@ static void controller_exit(void) {
     smp_call_function_single(cpu, (void *)ksym_tick_setup_sched_timer,
                              (void *)true, 0);
   }
+
+  kernel_power_off();
 }
 
 static void controller_step(int iter) {
@@ -177,6 +199,7 @@ static void controller_step(int iter) {
   int cpu;
   for_each_controlled_cpu(cpu) {
     smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
+    msleep(SIM_INTERVAL_MS);
   }
   msleep(SIM_INTERVAL_MS);
 }
@@ -186,12 +209,13 @@ static int controller(void *data) {
   int iter = 0;
   while (!kthread_should_stop()) {
     controller_step(iter++);
+    if (iter % 1000 == 0) {
+      break;
+    }
   }
   controller_exit();
   return 0;
 }
-
-static struct task_struct *controller_task;
 
 static int __init kmod_init(void) {
   init_kernel_symbols();
