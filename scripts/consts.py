@@ -11,11 +11,9 @@ LINUX_CONFIG = LINUX_ROOT_DIR / "config"
 USER_DIR = PROJ_DIR / "user"
 KMOD_DIR = PROJ_DIR / "kmod"
 
-ROOTFS_DIR = PROJ_DIR / "rootfs"
-ROOTFS_IMG = ROOTFS_DIR / "img.ext4"
-
 DATA_DIR = PROJ_DIR / "data"
 LOG_PATH = DATA_DIR / "log.txt"
+ROOTFS_IMG = DATA_DIR / "rootfs.ext4"
 
 
 def get_linux_dir(version: Optional[str] = None):
