@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include <ctype.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdio.h>
@@ -131,15 +132,26 @@ int execute_external(char **args) {
     // Child process
     execvp(args[0], args);
     perror("execvp");
+    _exit(1);
   } else if (pid > 0) {
     // Parent process
     int status;
     waitpid(pid, &status, 0);
+    if (WIFEXITED(status)) {
+      int exit_status = WEXITSTATUS(status);
+      if (exit_status != 0) {
+        printf("Command %s exited with status %d\n", args[0], exit_status);
+      }
+      return exit_status;
+    } else {
+      printf("Command %s exited with unknown status %d\n", args[0], status);
+      return 1;
+    }
   } else {
     perror("fork");
     return 1;
   }
-  return 1;
+  return 0;
 }
 
 // Main shell loop
@@ -170,12 +182,43 @@ void shell_loop() {
   builtin_exit();
 }
 
-void system(char *cmd) {
+int system(char *cmd) {
   printf(PROMPT "%s\n", cmd);
   char line[MAX_LINE];
   strncpy(line, cmd, MAX_LINE);
   char **args = parse_line(line);
-  execute_external(args);
+  return execute_external(args);
+}
+
+void run_init_sh() {
+  FILE *file = fopen("init.sh", "r");
+  if (file == NULL) {
+    perror("fopen");
+    return;
+  }
+  char line[MAX_LINE];
+  while (fgets(line, sizeof(line), file) != NULL) {
+    // Remove trailing newline
+    line[strcspn(line, "\n")] = 0;
+
+    // Trim leading whitespace
+    char *cmd = line;
+    while (isspace(*cmd)) {
+      cmd++;
+    }
+
+    // Ignore empty lines and comments
+    if (cmd[0] == '\0' || cmd[0] == '#') {
+      continue;
+    }
+
+    if (system(cmd) != 0) {
+      fprintf(stderr,
+              "init.sh: command `%s` failed, aborting initialization.\n", cmd);
+      break;
+    }
+  }
+  fclose(file);
 }
 
 int main() {
@@ -187,13 +230,7 @@ int main() {
   set_cpu_affinity();
   signal(SIGCHLD, SIG_IGN);
 
-  // Run init commands
-  system("insmod main.ko");
-  system("insmod trace.ko func_names=sched_balance_rq");
-  // system("insmod trace.ko func_names=sched_tick,update_rq_clock");
-  system("busy");
-  // system("stat");
-
+  run_init_sh();
   shell_loop();
   builtin_exit();
   return 0;
