@@ -4,7 +4,7 @@ src ?= $(shell pwd)
 ksrc ?= $(abspath $(src)/../linux/current)
 
 obj-m := schedtest.o
-schedtest-y := main.o ksym.o trace.o sched_clock.o
+schedtest-y := main.o ksym.o trace.o sched_clock.o bug_aa3ee4f.o bug_cd9626e.o utils.o
 
 # Allow the use of private headers
 ccflags-y := -I$(ksrc) -Wno-unused-variable -Wno-unused-function
