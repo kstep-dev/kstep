@@ -20,12 +20,11 @@
 #define TARGET_TASK "test-proc"
 
 static struct task_struct *busy_task;
-static int done = 0;
 static struct task_struct *pause_task = NULL;
+static int done = 0;
 
 static int controller_init(void) {
   busy_task = poll_task(TARGET_TASK);
-
   busy_task->se.vruntime = INIT_TIME_NS;
   busy_task->nivcsw = 0;
   busy_task->nvcsw = 0;
@@ -92,7 +91,7 @@ static int controller_step(int iter) {
     done++;
   }
 
-  return 0;
+  return done == 6;
 }
 
 static int controller_exit(void) {

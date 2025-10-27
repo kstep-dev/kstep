@@ -3,12 +3,16 @@
 import argparse
 import os
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from scripts import PROJ_DIR, ROOTFS_IMG, Arch, get_linux_dir, get_log_path, system
 
 
-def run_qemu(debug: bool = False, log_path: Optional[Path] = get_log_path(create=True)):
+def run_qemu(
+    debug: bool = False,
+    log_path: Optional[Path] = get_log_path(create=True),
+    params: Optional[List[str]] = None,
+):
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
@@ -41,6 +45,12 @@ def run_qemu(debug: bool = False, log_path: Optional[Path] = get_log_path(create
 
     if Arch.get() == Arch.X86_64:
         boot_args += ["console=ttyS0", "tsc=nowatchdog"]
+
+    if params:
+        # Everything after the `-` is passed to init
+        # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
+        boot_args += ["-"]
+        boot_args += params
 
     cmd = [
         exe,
@@ -80,6 +90,7 @@ def run_qemu(debug: bool = False, log_path: Optional[Path] = get_log_path(create
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--params", nargs="+", default=[])
     args = parser.parse_args()
     system(f"make -C {PROJ_DIR} -j$(nproc)")
     run_qemu(**vars(args))

@@ -221,7 +221,23 @@ void run_init_sh() {
   fclose(file);
 }
 
-int main() {
+void run_sched_test(int argc, char *argv[], char *envp[]) {
+  char *cmdline[MAX_ARGS] = {
+      "insmod",
+      "schedtest.ko",
+  };
+  int cmdline_len = 2;
+  for (int i = 2; i < argc; i++) {
+    cmdline[cmdline_len++] = argv[i];
+  }
+  for (int i = 2; envp[i] != NULL; i++) {
+    cmdline[cmdline_len++] = envp[i];
+  }
+  cmdline[cmdline_len] = NULL;
+  execute_external(cmdline);
+}
+
+int main(int argc, char *argv[], char *envp[]) {
   printf("\n");
   printf("Welcome to SchedTest\n");
 
@@ -230,6 +246,7 @@ int main() {
   set_cpu_affinity();
   signal(SIGCHLD, SIG_IGN);
 
+  run_sched_test(argc, argv, envp);
   run_init_sh();
   shell_loop();
   builtin_exit();
