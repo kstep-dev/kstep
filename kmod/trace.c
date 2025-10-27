@@ -1,5 +1,6 @@
+#define TRACE_LEVEL LOGLEVEL_DEBUG
+
 #include <linux/ftrace.h>
-#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mmu_context.h>
 #include <linux/module.h>
@@ -10,21 +11,42 @@
 // Linux private headers
 #include <kernel/sched/sched.h>
 
-#define KSYM_VAR_LIST X(struct rq, runqueues)
+#include "internal.h"
 #include "ksym.h"
 
 // Module parameters
-static char *func_names[32];
-static int func_count = 0;
-module_param_array(func_names, charp, &func_count, 0644);
-MODULE_PARM_DESC(func_names, "Function names to trace");
+static char *trace_funcs[32];
+static int trace_func_count = 0;
+module_param_array(trace_funcs, charp, &trace_func_count, 0644);
+MODULE_PARM_DESC(trace_funcs, "Function names to trace");
 
-static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
-                          struct ftrace_ops *op, struct ftrace_regs *fregs) {
-  int cpu = smp_processor_id();
-  if (cpu == 0)
-    return;
-  struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+bool json = false;
+module_param(json, bool, 0644);
+MODULE_PARM_DESC(json, "Output in JSON format");
+
+static void dump_state_table(int cpu) {
+  struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
+  TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
+             cpu, rq->nr_running, rq->nr_switches, rq->clock, rq->cfs.avg_load);
+
+  TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
+              "PPID", "vruntime", "sum-exec", "switches");
+  TRACE_DEBUG(
+      "\t-------------------------------------------------------------");
+  struct task_struct *g;
+  struct task_struct *p;
+  for_each_process_thread(g, p) {
+    if (task_cpu(p) != cpu)
+      continue;
+    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu %s", task_cpu(p),
+                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(g),
+                task_ppid_nr(g), p->se.vruntime, p->se.sum_exec_runtime,
+                p->nvcsw, p->nivcsw, p->comm);
+  }
+}
+
+static void dump_state_json(int cpu) {
+  struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
   pr_info("{"
           "\"rq[%d]\": "
           "{"
@@ -108,6 +130,18 @@ static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
   }
 }
 
+static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
+                          struct ftrace_ops *op, struct ftrace_regs *fregs) {
+  int cpu = smp_processor_id();
+  if (cpu == 0)
+    return;
+  if (json) {
+    dump_state_json(cpu);
+  } else {
+    dump_state_table(cpu);
+  }
+}
+
 static void update_rq_clock_cb(unsigned long ip, unsigned long parent_ip,
                                struct ftrace_ops *op,
                                struct ftrace_regs *fregs) {
@@ -168,9 +202,9 @@ static void trace_func_enable(struct trace_func_info *info) {
   info->op.flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED;
   ftrace_set_filter(&info->op, info->name, strlen(info->name), 1);
   if (register_ftrace_function(&info->op)) {
-    TRACE_ERR("Failed to register %s", info->name);
+    TRACE_ERR("Failed to trace %s", info->name);
   } else {
-    TRACE_INFO("Registered %s", info->name);
+    TRACE_INFO("Tracing %s", info->name);
     info->enabled = true;
   }
 }
@@ -192,10 +226,9 @@ static struct trace_func_info *trace_func_find(char *name) {
   return NULL;
 }
 
-static int __init kmod_init(void) {
-  init_kernel_symbols();
-  for (int i = 0; i < func_count; i++) {
-    char *name = func_names[i];
+int sched_trace_init(void) {
+  for (int i = 0; i < trace_func_count; i++) {
+    char *name = trace_funcs[i];
     struct trace_func_info *info = trace_func_find(name);
     if (info) {
       trace_func_enable(info);
@@ -208,17 +241,10 @@ static int __init kmod_init(void) {
   return 0;
 }
 
-static void __exit kmod_exit(void) {
+void sched_trace_exit(void) {
   for (int i = 0; i < ARRAY_SIZE(trace_func_infos); i++) {
     struct trace_func_info *info = &trace_func_infos[i];
     trace_func_disable(info);
   }
   TRACE_INFO("Scheduler trace uninitialized");
 }
-
-module_init(kmod_init);
-module_exit(kmod_exit);
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Shawn Zhong");
-MODULE_DESCRIPTION("Scheduler trace");

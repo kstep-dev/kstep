@@ -1,5 +1,4 @@
-insmod main.ko
+# insmod schedtest.ko trace_funcs=sched_tick
+insmod schedtest.ko trace_funcs=sched_tick json
 busy
-# insmod trace.ko func_names=sched_balance_rq
-insmod trace.ko func_names=sched_tick
 # stat
