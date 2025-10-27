@@ -19,9 +19,9 @@ LOGS_DIR = DATA_DIR / "logs"
 
 def get_log_path(create: bool):
     if create:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         for suffix in [".log", ".json", ".csv", ".txt"]:
-            name = f"log-{datetime.now().strftime('%Y%m%d_%H%M%S')}{suffix}"
-            actual = LOGS_DIR / name
+            actual = LOGS_DIR / f"log-{timestamp}{suffix}"
             actual.touch()
             symlink = LOGS_DIR / f"latest{suffix}"
             symlink.unlink(missing_ok=True)
