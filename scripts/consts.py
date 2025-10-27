@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
 from typing import Optional
@@ -12,8 +13,21 @@ USER_DIR = PROJ_DIR / "user"
 KMOD_DIR = PROJ_DIR / "kmod"
 
 DATA_DIR = PROJ_DIR / "data"
-LOG_PATH = DATA_DIR / "log.txt"
 ROOTFS_IMG = DATA_DIR / "rootfs.ext4"
+LOGS_DIR = DATA_DIR / "logs"
+
+
+def get_log_path(create: bool):
+    if create:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        for suffix in [".log", ".json", ".csv", ".txt"]:
+            actual = LOGS_DIR / f"log-{timestamp}{suffix}"
+            actual.touch()
+            symlink = LOGS_DIR / f"latest{suffix}"
+            symlink.unlink(missing_ok=True)
+            symlink.symlink_to(actual)
+
+    return LOGS_DIR / "latest.log"
 
 
 def get_linux_dir(version: Optional[str] = None):

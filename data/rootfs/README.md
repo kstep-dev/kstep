@@ -1,1 +1,1 @@
-This is the root filesystem for the User Mode Linux kernel.
+This is the root filesystem.
