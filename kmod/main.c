@@ -36,12 +36,12 @@ static u64 sched_clock(void) { return clock_value; }
 // `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
 
 static void sched_clock_init(void) {
-  *ksym___sched_clock_offset = 0;
-  ksym_paravirt_set_sched_clock(sched_clock);
+  *ksym.__sched_clock_offset = 0;
+  ksym.paravirt_set_sched_clock(sched_clock);
 }
 
 static void sched_clock_exit(void) {
-  ksym_paravirt_set_sched_clock(ksym_kvm_sched_clock_read);
+  ksym.paravirt_set_sched_clock(ksym.kvm_sched_clock_read);
 }
 
 #elif defined(CONFIG_GENERIC_SCHED_CLOCK)
