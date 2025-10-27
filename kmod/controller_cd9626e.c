@@ -2,10 +2,7 @@
 #include <linux/freezer.h>
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
-#include <linux/module.h>
 #include <linux/reboot.h>
-#include <linux/sched_clock.h>
-#include <linux/workqueue.h>
 
 // Linux private headers
 #include <kernel/sched/sched.h>
