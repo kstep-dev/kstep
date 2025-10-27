@@ -10,19 +10,7 @@
 // Linux private headers
 #include <kernel/sched/sched.h>
 
-#define KSYM_FUNC_LIST                                                         \
-  X(void, tick_sched_timer_dying, (int cpu))                                   \
-  X(void, sched_tick, (void))                                                  \
-  X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
-  X(u64, kvm_sched_clock_read, (void))                                         \
-  X(void, tick_setup_sched_timer, (bool hrtimer))                              \
-  X(u64, sched_clock, (void))                                                  \
-  X(int, workqueue_offline_cpu, (int cpu))
-#define KSYM_VAR_LIST                                                          \
-  X(struct rq, runqueues)                                                      \
-  X(void, cd)                                                                  \
-  X(u64, __sched_clock_offset)                                                 \
-  X(unsigned int, sysctl_sched_migration_cost)
+#include "internal.h"
 #include "ksym.h"
 #include "logging.h"
 #include "sigcode.h"
@@ -72,7 +60,7 @@ struct clock_data {
 static struct clock_data cd_backup;
 
 static void sched_clock_init(void) {
-  struct clock_data *cd = ksym_cd;
+  struct clock_data *cd = ksym.cd;
   memcpy(&cd_backup, cd, sizeof(struct clock_data));
   cd->actual_read_sched_clock = sched_clock;
   for (int i = 0; i < 2; i++) {
@@ -86,7 +74,7 @@ static void sched_clock_init(void) {
 }
 
 static void sched_clock_exit(void) {
-  memcpy(ksym_cd, &cd_backup, sizeof(struct clock_data));
+  memcpy(ksym.cd, &cd_backup, sizeof(struct clock_data));
 }
 
 #else
@@ -96,7 +84,7 @@ static void sched_clock_exit(void) {
 static void print_tasks(void) {
   int cpu;
   for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+    struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
     TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
                cpu, rq->nr_running, rq->nr_switches, rq->clock,
                rq->cfs.avg_load);
@@ -145,8 +133,8 @@ static void controller_init(void) {
   {
     int cpu;
     for_each_controlled_cpu(cpu) {
-      ksym_tick_sched_timer_dying(cpu);
-      smp_call_function_single(cpu, (void *)ksym_workqueue_offline_cpu,
+      ksym.tick_sched_timer_dying(cpu);
+      smp_call_function_single(cpu, (void *)ksym.workqueue_offline_cpu,
                                (void *)(intptr_t)cpu, 1);
     }
   }
@@ -180,9 +168,9 @@ static void controller_init(void) {
 
   int cpu;
   for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
-    rq->avg_idle = 2 * *ksym_sysctl_sched_migration_cost;
-    rq->max_idle_balance_cost = *ksym_sysctl_sched_migration_cost;
+    struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
+    rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;
+    rq->max_idle_balance_cost = *ksym.sysctl_sched_migration_cost;
     rq->nr_switches = 0;
 
     rq->cfs.min_vruntime = INIT_TIME_NS;
@@ -193,7 +181,7 @@ static void controller_exit(void) {
   int cpu;
   sched_clock_exit();
   for_each_controlled_cpu(cpu) {
-    smp_call_function_single(cpu, (void *)ksym_tick_setup_sched_timer,
+    smp_call_function_single(cpu, (void *)ksym.tick_setup_sched_timer,
                              (void *)true, 0);
   }
 }
@@ -204,7 +192,7 @@ static void controller_step(int iter) {
   clock_value += TICK_INTERVAL_NS;
   int cpu;
   for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+    struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
     // force balance at every tick
     rq->next_balance = 0;
     for (struct sched_domain *sd = rq->sd; sd; sd = sd->parent) {
@@ -214,7 +202,7 @@ static void controller_step(int iter) {
 
   // Call tick function on one cpu at at time, excluding CPU 0
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 1);
+    smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 1);
     msleep(SIM_INTERVAL_MS);
   }
 }
@@ -232,7 +220,8 @@ static int controller(void *data) {
 static struct task_struct *controller_task;
 
 static int __init kmod_init(void) {
-  init_kernel_symbols();
+  ksym_init();
+  sched_trace_init();
   init_controlled_mask();
   controller_task = kthread_create(controller, NULL, "controller");
   set_cpus_allowed_ptr(controller_task, cpumask_of(0));
@@ -240,7 +229,10 @@ static int __init kmod_init(void) {
   return 0;
 }
 
-static void __exit kmod_exit(void) { kthread_stop(controller_task); }
+static void __exit kmod_exit(void) {
+  kthread_stop(controller_task);
+  sched_trace_exit();
+}
 
 module_init(kmod_init);
 module_exit(kmod_exit);
