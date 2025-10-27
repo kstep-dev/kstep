@@ -1,10 +1,7 @@
-#define TRACE_LEVEL LOGLEVEL_DEBUG
-
 #include <linux/delay.h>
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
 #include <linux/module.h>
-#include <linux/sched_clock.h>
 #include <linux/workqueue.h>
 
 // Linux private headers
@@ -25,84 +22,6 @@ static struct cpumask cpu_controlled_mask;
 static void init_controlled_mask(void) {
   cpumask_copy(&cpu_controlled_mask, cpu_active_mask);
   cpumask_clear_cpu(0, &cpu_controlled_mask);
-}
-
-static u64 clock_value = INIT_TIME_NS;
-static u64 sched_clock(void) { return clock_value; }
-
-#if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
-// On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
-// is a wrapper of `paravirt_sched_clock` which can be changed with
-// `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
-
-static void sched_clock_init(void) {
-  *ksym.__sched_clock_offset = 0;
-  ksym.paravirt_set_sched_clock(sched_clock);
-}
-
-static void sched_clock_exit(void) {
-  ksym.paravirt_set_sched_clock(ksym.kvm_sched_clock_read);
-}
-
-#elif defined(CONFIG_GENERIC_SCHED_CLOCK)
-// On other platforms (e.g., arm64), `sched_clock` is implemented in
-// `kernel/time/sched_clock.c`, and we can change the function pointer in
-// `struct clock_data` and `struct clock_read_data` to mock the sched clock.
-
-struct clock_data {
-  seqcount_latch_t seq;
-  struct clock_read_data read_data[2];
-  ktime_t wrap_kt;
-  unsigned long rate;
-  u64 (*actual_read_sched_clock)(void);
-};
-
-static struct clock_data cd_backup;
-
-static void sched_clock_init(void) {
-  struct clock_data *cd = ksym.cd;
-  memcpy(&cd_backup, cd, sizeof(struct clock_data));
-  cd->actual_read_sched_clock = sched_clock;
-  for (int i = 0; i < 2; i++) {
-    struct clock_read_data *rd = &cd->read_data[i];
-    rd->read_sched_clock = sched_clock;
-    rd->mult = 1;
-    rd->shift = 0;
-    rd->epoch_ns = 0;
-    rd->epoch_cyc = 0;
-  }
-}
-
-static void sched_clock_exit(void) {
-  memcpy(ksym.cd, &cd_backup, sizeof(struct clock_data));
-}
-
-#else
-#error "Sched clock mocking not supported for this platform"
-#endif
-
-static void print_tasks(void) {
-  int cpu;
-  for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
-    TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
-               cpu, rq->nr_running, rq->nr_switches, rq->clock,
-               rq->cfs.avg_load);
-  }
-
-  TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
-              "PPID", "vruntime", "sum-exec", "switches");
-  TRACE_DEBUG(
-      "\t-------------------------------------------------------------");
-  struct task_struct *p;
-  for_each_process(p) {
-    if (task_cpu(p) == 0)
-      continue;
-    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu %s", task_cpu(p),
-                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p),
-                task_ppid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
-                p->nvcsw, p->nivcsw, p->comm);
-  }
 }
 
 static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
@@ -159,6 +78,7 @@ static void controller_init(void) {
   }
 
   sched_clock_init();
+  sched_clock_set(INIT_TIME_NS);
 
   struct task_struct *p = poll_target_task();
   send_sigcode(p, SIGCODE_FORK, 4);
@@ -189,7 +109,7 @@ static void controller_exit(void) {
 static void controller_step(int iter) {
   // Update clock
   // print_tasks();
-  clock_value += TICK_INTERVAL_NS;
+  sched_clock_inc(TICK_INTERVAL_NS);
   int cpu;
   for_each_controlled_cpu(cpu) {
     struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);

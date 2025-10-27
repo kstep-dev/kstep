@@ -5,12 +5,14 @@
 
 #include <fcntl.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 
 int main(int argc, char **argv) {
-  if (argc != 2 && argc != 3) {
-    fprintf(stderr, "Usage: %s <file> [args]\n", argv[0]);
+  if (argc < 2) {
+    fprintf(stderr, "Usage: %s <file> [param1=value1] [param2=value2] ...\n",
+            argv[0]);
     return 1;
   }
 
@@ -36,8 +38,16 @@ int main(int argc, char **argv) {
   }
   close(fd);
 
-  char *param = argc == 3 ? argv[2] : "";
-  int ret = syscall(SYS_init_module, addr, file_size, param);
+  char params[1024] = {};
+  int params_len = 0;
+  for (int i = 2; i < argc; i++) {
+    strncat(params + params_len, argv[i], sizeof(params) - params_len);
+    params_len += strlen(argv[i]);
+    strncat(params + params_len, " ", sizeof(params) - params_len);
+    params_len++;
+  }
+
+  int ret = syscall(SYS_init_module, addr, file_size, params);
   if (ret == -1) {
     perror("init_module");
     munmap(addr, file_size);

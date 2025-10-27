@@ -1,3 +1,5 @@
+#define TRACE_LEVEL LOGLEVEL_DEBUG
+
 #include <linux/ftrace.h>
 #include <linux/kernel.h>
 #include <linux/mmu_context.h>
@@ -18,11 +20,32 @@ static int trace_func_count = 0;
 module_param_array(trace_funcs, charp, &trace_func_count, 0644);
 MODULE_PARM_DESC(trace_funcs, "Function names to trace");
 
-static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
-                          struct ftrace_ops *op, struct ftrace_regs *fregs) {
-  int cpu = smp_processor_id();
-  if (cpu == 0)
-    return;
+bool json = false;
+module_param(json, bool, 0644);
+MODULE_PARM_DESC(json, "Output in JSON format");
+
+static void dump_state_table(int cpu) {
+  struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
+  TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
+             cpu, rq->nr_running, rq->nr_switches, rq->clock, rq->cfs.avg_load);
+
+  TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
+              "PPID", "vruntime", "sum-exec", "switches");
+  TRACE_DEBUG(
+      "\t-------------------------------------------------------------");
+  struct task_struct *g;
+  struct task_struct *p;
+  for_each_process_thread(g, p) {
+    if (task_cpu(p) != cpu)
+      continue;
+    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu %s", task_cpu(p),
+                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(g),
+                task_ppid_nr(g), p->se.vruntime, p->se.sum_exec_runtime,
+                p->nvcsw, p->nivcsw, p->comm);
+  }
+}
+
+static void dump_state_json(int cpu) {
   struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
   pr_info("{"
           "\"rq[%d]\": "
@@ -104,6 +127,18 @@ static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
             p->se.slice, p->se.sum_exec_runtime, p->nvcsw + p->nivcsw, p->prio,
             p->stats.wait_sum, p->stats.sum_sleep_runtime,
             p->stats.sum_block_runtime, task_node(p));
+  }
+}
+
+static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
+                          struct ftrace_ops *op, struct ftrace_regs *fregs) {
+  int cpu = smp_processor_id();
+  if (cpu == 0)
+    return;
+  if (json) {
+    dump_state_json(cpu);
+  } else {
+    dump_state_table(cpu);
   }
 }
 
