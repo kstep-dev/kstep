@@ -27,7 +27,9 @@ def parse_file(log_file: Path):
             if timestamp not in data:
                 data[timestamp] = {"timestamp": timestamp}
             data[timestamp] |= json_obj
-    return list(data.values())
+    result = list(data.values())
+    result.pop()  # remove the last item as it might be incomplete
+    return result
 
 
 def main(log_file: Path):
