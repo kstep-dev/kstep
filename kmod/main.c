@@ -17,13 +17,6 @@
 #define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 #define TARGET_TASK "test-proc"
 
-static struct cpumask cpu_controlled_mask;
-#define for_each_controlled_cpu(cpu) for_each_cpu(cpu, &cpu_controlled_mask)
-static void init_controlled_mask(void) {
-  cpumask_copy(&cpu_controlled_mask, cpu_active_mask);
-  cpumask_clear_cpu(0, &cpu_controlled_mask);
-}
-
 static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
   struct kernel_siginfo info = {
       .si_signo = SIGUSR1,
@@ -49,13 +42,10 @@ static struct task_struct *poll_target_task(void) {
 
 static void controller_init(void) {
   // Disable timer ticks and workqueue on all controlled CPUs
-  {
-    int cpu;
-    for_each_controlled_cpu(cpu) {
-      ksym.tick_sched_timer_dying(cpu);
-      smp_call_function_single(cpu, (void *)ksym.workqueue_offline_cpu,
-                               (void *)(intptr_t)cpu, 1);
-    }
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    ksym.tick_sched_timer_dying(cpu);
+    smp_call_function_single(cpu, (void *)ksym.workqueue_offline_cpu,
+                             (void *)(intptr_t)cpu, 1);
   }
 
   // Move non-essential kernel threads to CPU 0
@@ -86,8 +76,7 @@ static void controller_init(void) {
   p->nivcsw = 0;
   p->nvcsw = 0;
 
-  int cpu;
-  for_each_controlled_cpu(cpu) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
     rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;
     rq->max_idle_balance_cost = *ksym.sysctl_sched_migration_cost;
@@ -98,9 +87,8 @@ static void controller_init(void) {
 }
 
 static void controller_exit(void) {
-  int cpu;
   sched_clock_exit();
-  for_each_controlled_cpu(cpu) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     smp_call_function_single(cpu, (void *)ksym.tick_setup_sched_timer,
                              (void *)true, 0);
   }
@@ -108,10 +96,8 @@ static void controller_exit(void) {
 
 static void controller_step(int iter) {
   // Update clock
-  // print_tasks();
   sched_clock_inc(TICK_INTERVAL_NS);
-  int cpu;
-  for_each_controlled_cpu(cpu) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
     // force balance at every tick
     rq->next_balance = 0;
@@ -142,7 +128,6 @@ static struct task_struct *controller_task;
 static int __init kmod_init(void) {
   ksym_init();
   sched_trace_init();
-  init_controlled_mask();
   controller_task = kthread_create(controller, NULL, "controller");
   set_cpus_allowed_ptr(controller_task, cpumask_of(0));
   wake_up_process(controller_task);
