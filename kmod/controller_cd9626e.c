@@ -35,25 +35,8 @@ static int controller_init(void) {
   return 0;
 }
 
-static struct task_struct *find_not_eligible_task(void) {
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task)
-      continue;
-    if (p->on_cpu == 0)
-      continue;
-    TRACE_DEBUG("pid=%d, eligible=%d, on_cpu=%d", p->pid,
-                ksym.entity_eligible(p->se.cfs_rq, &p->se), p->on_cpu);
-
-    if (ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0) {
-      return p;
-    }
-  }
-  return NULL;
-}
-
 static int controller_step(int iter) {
-  struct task_struct *p = find_not_eligible_task();
+  struct task_struct *p = find_not_eligible_task(TARGET_TASK, busy_task);
 
   if (p && done == 0) {
     TRACE_INFO("dequeue ineligible task %d", p->pid);
