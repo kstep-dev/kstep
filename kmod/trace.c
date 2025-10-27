@@ -82,12 +82,12 @@ static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
     pr_info("{"
             "\"tasks[%d]\": "
             "{"
-            "\"cpu\": %d, "
-            "\"on_cpu\": %d, "
-            "\"task_state\": \"%c\", "
             "\"comm\": \"%s\", "
             "\"pid\": %d, "
             "\"ppid\": %d, "
+            "\"cpu\": %d, "
+            "\"on_cpu\": %d, "
+            "\"task_state\": \"%c\", "
             "\"vruntime\": %llu, "
             "\"deadline\": %llu, "
             "\"slice\": %llu, "
@@ -100,8 +100,8 @@ static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
             "\"node\": %d"
             "}"
             "}",
-            task_pid_nr(p), cpu, p->on_cpu, task_state_to_char(p), p->comm,
-            task_pid_nr(p), task_ppid_nr(p), p->se.vruntime, p->se.deadline,
+            task_pid_nr(p), p->comm, task_pid_nr(p), task_ppid_nr(p), cpu,
+            p->on_cpu, task_state_to_char(p), p->se.vruntime, p->se.deadline,
             p->se.slice, p->se.sum_exec_runtime, p->nvcsw + p->nivcsw, p->prio,
             p->stats.wait_sum, p->stats.sum_sleep_runtime,
             p->stats.sum_block_runtime, task_node(p));
