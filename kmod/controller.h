@@ -7,23 +7,14 @@ struct controller_ops {
   int (*exit)(void);
 };
 
-extern struct controller_ops bug_aa3ee4f_ops;
-extern struct controller_ops bug_cd9626e_ops;
-
-static int noop_init(void) { return 0; }
-static int noop_step(int iter) { return 0; }
-static int noop_exit(void) { return 0; }
-static struct controller_ops noop_ops = {
-    .name = "noop",
-    .init = noop_init,
-    .step = noop_step,
-    .exit = noop_exit,
-};
+extern struct controller_ops controller_aa3ee4f;
+extern struct controller_ops controller_cd9626e;
+extern struct controller_ops controller_noop;
 
 static struct controller_ops *controller_ops_list[] = {
-    &bug_aa3ee4f_ops,
-    &bug_cd9626e_ops,
-    &noop_ops,
+    &controller_aa3ee4f,
+    &controller_cd9626e,
+    &controller_noop,
 };
 
 static struct controller_ops *get_controller_ops(const char *name) {

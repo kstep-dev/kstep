@@ -2,6 +2,7 @@
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
 #include <linux/module.h>
+#include <linux/reboot.h>
 
 // Linux private headers
 #include <kernel/sched/sched.h>
@@ -10,6 +11,7 @@
 #include "internal.h"
 #include "ksym.h"
 #include "logging.h"
+#include "utils.h"
 
 static char controller_name[32] = "noop";
 module_param_string(controller_name, controller_name, sizeof(controller_name),

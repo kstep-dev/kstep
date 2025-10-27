@@ -3,6 +3,7 @@
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
 #include <linux/module.h>
+#include <linux/reboot.h>
 #include <linux/sched_clock.h>
 #include <linux/workqueue.h>
 
@@ -14,6 +15,7 @@
 #include "ksym.h"
 #include "logging.h"
 #include "sigcode.h"
+#include "utils.h"
 
 #define TARGET_TASK "test-proc"
 
@@ -93,9 +95,12 @@ static int controller_step(int iter) {
   return 0;
 }
 
-static int controller_exit(void) { return 0; }
+static int controller_exit(void) {
+  kernel_power_off();
+  return 0;
+}
 
-struct controller_ops bug_cd9626e_ops = {
+struct controller_ops controller_cd9626e = {
     .name = "cd9626e",
     .init = controller_init,
     .step = controller_step,
