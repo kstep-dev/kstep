@@ -3,13 +3,15 @@ OUT ?= $(abspath ../data/rootfs)
 src ?= $(shell pwd)
 ksrc ?= $(abspath $(src)/../linux/current)
 
+schedtest-srcs := $(notdir $(filter-out %.mod.c,$(wildcard $(src)/*.c)))
+
 obj-m := schedtest.o
-schedtest-y := main.o ksym.o trace.o sched_clock.o bug_aa3ee4f.o bug_cd9626e.o utils.o
+schedtest-y := $(schedtest-srcs:.c=.o)
 
 # Allow the use of private headers
 ccflags-y := -I$(ksrc) -Wno-unused-variable -Wno-unused-function
 
-schedtest.ko: $(schedtest-y:%.o=%.c) $(wildcard $(src)/*.h)
+schedtest.ko: $(schedtest-srcs) $(wildcard $(src)/*.h)
 	$(MAKE) -C $(ksrc) M=$(src) modules
 	cp schedtest.ko $(OUT)
 

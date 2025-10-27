@@ -1,5 +1,11 @@
 #include <linux/types.h>
 
+// Forward declarations
+struct rq;
+struct cfs_rq;
+struct sched_entity;
+struct task_struct;
+
 // Define function symbols
 // Format: X(ret_type, func_name, args)
 #define KSYM_FUNC_LIST                                                         \
