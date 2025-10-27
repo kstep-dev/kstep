@@ -159,8 +159,12 @@ static void controller_init(void) {
         continue;
       if (strncmp(p->comm, "cpuhp/", 6) == 0 ||
           strncmp(p->comm, "migration/", 10) == 0 ||
-          strncmp(p->comm, "ksoftirqd/", 10) == 0)
+          strncmp(p->comm, "ksoftirqd/", 10) == 0) {
+        p->se.vruntime = INIT_TIME_NS;
+        p->se.deadline = INIT_TIME_NS;
+        p->se.sum_exec_runtime = INIT_TIME_NS;
         continue;
+      }
       set_cpus_allowed_ptr(p, cpumask_of(0));
       wake_up_process(p);
     }
@@ -196,7 +200,7 @@ static void controller_exit(void) {
 
 static void controller_step(int iter) {
   // Update clock
-  print_tasks();
+  // print_tasks();
   clock_value += TICK_INTERVAL_NS;
   int cpu;
   for_each_controlled_cpu(cpu) {
@@ -208,11 +212,11 @@ static void controller_step(int iter) {
     }
   }
 
-  // Call tick function
-  for_each_controlled_cpu(cpu) {
+  // Call tick function on one cpu at at time, excluding CPU 0
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 1);
+    msleep(SIM_INTERVAL_MS);
   }
-  msleep(SIM_INTERVAL_MS);
 }
 
 static int controller(void *data) {

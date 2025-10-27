@@ -10,6 +10,9 @@
 // Linux private headers
 #include <kernel/sched/sched.h>
 
+#define KSYM_VAR_LIST X(struct rq, runqueues)
+#include "ksym.h"
+
 // Module parameters
 static char *func_names[32];
 static int func_count = 0;
@@ -18,9 +21,91 @@ MODULE_PARM_DESC(func_names, "Function names to trace");
 
 static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
                           struct ftrace_ops *op, struct ftrace_regs *fregs) {
-  if (smp_processor_id() == 0)
+  int cpu = smp_processor_id();
+  if (cpu == 0)
     return;
-  TRACE_INFO("sched_tick called on CPU %d", smp_processor_id());
+  struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+  pr_info("{"
+          "\"rq[%d]\": "
+          "{"
+          "\"nr_running\": %d, "
+          "\"nr_switches\": %llu, "
+          "\"nr_uninterruptible\": %d, "
+          "\"next_balance\": %lu, "
+          "\"curr->pid\": %d, "
+          "\"clock\": %llu, "
+          "\"clock_task\": %llu, "
+          "\"avg_idle\": %llu, "
+          "\"max_idle_balance_cost\": %llu"
+          "}"
+          "}",
+          cpu, rq->nr_running, rq->nr_switches, rq->nr_uninterruptible,
+          rq->next_balance, rq->curr->pid, rq->clock, rq->clock_task,
+          rq->avg_idle, rq->max_idle_balance_cost);
+  pr_info("{"
+          "\"cfs_rq[%d]\": "
+          "{"
+          "\"min_vruntime\": %llu, "
+          "\"avg_vruntime\": %llu, "
+          "\"nr_queued\": %u, "
+          "\"h_nr_runnable\": %u, "
+          "\"h_nr_queued\": %u, "
+          "\"h_nr_idle\": %u, "
+          "\"load\": %lu, "
+          "\"load_avg\": %lu, "
+          "\"runnable_avg\": %lu, "
+          "\"util_avg\": %lu, "
+          "\"util_est\": %d, "
+          "\"removed.load_avg\": %lu, "
+          "\"removed.util_avg\": %lu, "
+          "\"removed.runnable_avg\": %lu, "
+          "\"tg_load_avg_contrib\": %lu, "
+          "\"tg_load_avg\": %ld"
+          "}"
+          "}",
+          cpu, rq->cfs.min_vruntime, rq->cfs.avg_vruntime, rq->cfs.nr_queued,
+          rq->cfs.h_nr_runnable, rq->cfs.h_nr_queued, rq->cfs.h_nr_idle,
+          rq->cfs.load.weight, rq->cfs.avg.load_avg, rq->cfs.avg.runnable_avg,
+          rq->cfs.avg.util_avg, rq->cfs.avg.util_est, rq->cfs.removed.load_avg,
+          rq->cfs.removed.util_avg, rq->cfs.removed.runnable_avg,
+          rq->cfs.tg_load_avg_contrib, atomic_long_read(&rq->cfs.tg->load_avg));
+  pr_info("{\"rt_rq[%d]\": {\"rt_nr_running\": %u}}", cpu,
+          rq->rt.rt_nr_running);
+  pr_info("{\"dl_rq[%d]\": {\"dl_nr_running\": %u, \"bw\": %llu, "
+          "\"total_bw\": %llu}}",
+          cpu, rq->dl.dl_nr_running, rq->rd->dl_bw.bw, rq->rd->dl_bw.total_bw);
+  struct task_struct *g;
+  struct task_struct *p;
+  for_each_process_thread(g, p) {
+    if (task_cpu(p) != cpu)
+      continue;
+    pr_info("{"
+            "\"tasks[%d]\": "
+            "{"
+            "\"cpu\": %d, "
+            "\"on_cpu\": %d, "
+            "\"task_state\": \"%c\", "
+            "\"comm\": \"%s\", "
+            "\"pid\": %d, "
+            "\"ppid\": %d, "
+            "\"vruntime\": %llu, "
+            "\"deadline\": %llu, "
+            "\"slice\": %llu, "
+            "\"sum-exec\": %llu, "
+            "\"switches\": %lu, "
+            "\"prio\": %d, "
+            "\"wait-time\": %llu, "
+            "\"sum-sleep\": %llu, "
+            "\"sum-block\": %llu, "
+            "\"node\": %d"
+            "}"
+            "}",
+            task_pid_nr(p), cpu, p->on_cpu, task_state_to_char(p), p->comm,
+            task_pid_nr(p), task_ppid_nr(p), p->se.vruntime, p->se.deadline,
+            p->se.slice, p->se.sum_exec_runtime, p->nvcsw + p->nivcsw, p->prio,
+            p->stats.wait_sum, p->stats.sum_sleep_runtime,
+            p->stats.sum_block_runtime, task_node(p));
+  }
 }
 
 static void update_rq_clock_cb(unsigned long ip, unsigned long parent_ip,
@@ -108,6 +193,7 @@ static struct trace_func_info *trace_func_find(char *name) {
 }
 
 static int __init kmod_init(void) {
+  init_kernel_symbols();
   for (int i = 0; i < func_count; i++) {
     char *name = func_names[i];
     struct trace_func_info *info = trace_func_find(name);

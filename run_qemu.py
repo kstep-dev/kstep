@@ -5,10 +5,10 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from scripts import LOG_PATH, PROJ_DIR, ROOTFS_IMG, Arch, get_linux_dir, system
+from scripts import PROJ_DIR, ROOTFS_IMG, Arch, get_linux_dir, get_log_path, system
 
 
-def run_qemu(debug: bool = False, log_path: Optional[Path] = LOG_PATH):
+def run_qemu(debug: bool = False, log_path: Optional[Path] = get_log_path(create=True)):
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")

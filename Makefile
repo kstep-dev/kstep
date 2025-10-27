@@ -5,7 +5,7 @@ ROOTFS_IMG := $(abspath data/rootfs.ext4)
 ROOTFS_MOUNT := $(abspath data/mount)
 
 .PHONY: all
-all: user kmod $(ROOTFS_IMG)
+all: $(ROOTFS_IMG)
 
 # Build the userspace programs
 .PHONY: user

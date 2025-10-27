@@ -14,7 +14,7 @@ compile_commands.events.json
 
 # Data files
 /data/rootfs.ext4
-/data/log.txt
+/data/logs/*
 /data/rootfs/bin/*
 /data/rootfs/init.sh
 !/data/*/README.md
