@@ -16,13 +16,8 @@ static int done = 0;
 
 static int controller_init(void) {
   busy_task = poll_task(TARGET_TASK);
-  busy_task->se.vruntime = INIT_TIME_NS;
-  busy_task->nivcsw = 0;
-  busy_task->nvcsw = 0;
-
+  reset_task_stats(busy_task);
   send_sigcode(busy_task, SIGCODE_FORK, 5);
-  msleep(SIM_INTERVAL_MS);
-
   return 0;
 }
 

@@ -31,9 +31,7 @@ static void common_init(void) {
       if (strncmp(p->comm, "cpuhp/", 6) == 0 ||
           strncmp(p->comm, "migration/", 10) == 0 ||
           strncmp(p->comm, "ksoftirqd/", 10) == 0) {
-        p->se.vruntime = INIT_TIME_NS;
-        p->se.deadline = INIT_TIME_NS;
-        p->se.sum_exec_runtime = INIT_TIME_NS;
+        reset_task_stats(p);
         continue;
       }
       set_cpus_allowed_ptr(p, cpumask_of(0));
@@ -86,6 +84,7 @@ static int controller(void *data) {
   struct controller_ops *ops = data;
   common_init();
   ops->init();
+  msleep(SIM_INTERVAL_MS);
   int iter = 0;
   while (!kthread_should_stop()) {
     if (ops->step(iter) != 0) {
@@ -95,7 +94,7 @@ static int controller(void *data) {
     iter++;
   }
   ops->exit();
-  common_exit();
+  // common_exit();
   kernel_power_off();
   return 0;
 }

@@ -58,3 +58,11 @@ struct task_struct *find_not_eligible_task(const char *comm,
   }
   return NULL;
 }
+
+void reset_task_stats(struct task_struct *p) {
+  p->nivcsw = 0;
+  p->nvcsw = 0;
+  p->se.sum_exec_runtime = 0;
+  p->se.vruntime = INIT_TIME_NS;
+  p->se.deadline = INIT_TIME_NS;
+}
