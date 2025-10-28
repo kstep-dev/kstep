@@ -1,7 +1,6 @@
 #include <linux/delay.h>
 #include <linux/freezer.h>
 #include <linux/kthread.h>
-#include <linux/reboot.h>
 
 #include "controller.h"
 #include "internal.h"
@@ -69,10 +68,7 @@ static int controller_step(int iter) {
   return done == 6;
 }
 
-static int controller_exit(void) {
-  kernel_power_off();
-  return 0;
-}
+static int controller_exit(void) { return 0; }
 
 struct controller_ops controller_cd9626e = {
     .name = "cd9626e",

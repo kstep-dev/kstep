@@ -96,6 +96,7 @@ static int controller(void *data) {
   }
   ops->exit();
   common_exit();
+  kernel_power_off();
   return 0;
 }
 

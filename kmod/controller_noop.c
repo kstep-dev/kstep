@@ -1,5 +1,3 @@
-#include <linux/reboot.h>
-
 #include "controller.h"
 #include "logging.h"
 
@@ -18,7 +16,6 @@ static int controller_step(int iter) {
 
 static int controller_exit(void) {
   TRACE_INFO("Noop controller exited");
-  kernel_power_off();
   return 0;
 }
 

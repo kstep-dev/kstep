@@ -2,7 +2,6 @@
 
 #include <linux/ftrace.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/sched/clock.h>
 
 #include "internal.h"
@@ -10,8 +9,8 @@
 #include "logging.h"
 
 // Module parameters
-static char *trace_funcs[32];
-static int trace_func_count = 0;
+static char *trace_funcs[32] = {"sched_tick"};
+static int trace_func_count = 1;
 module_param_array(trace_funcs, charp, &trace_func_count, 0644);
 MODULE_PARM_DESC(trace_funcs, "Function names to trace");
 
