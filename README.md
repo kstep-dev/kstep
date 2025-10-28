@@ -14,7 +14,7 @@ SchedTest
     - `trace_funcs`: Function names to trace, see `kmod/trace.c` for available functions
     - `controller_name`: Controller name to run, see `kmod/controller.h` for available controllers
     - `json`: Output in JSON format
-    - Example: `./run_qemu.py --params trace_funcs=sched_tick controller_name=noop json`
-    - Example: `./run_qemu.py --params trace_funcs=sched_tick controller_name=cd9626e`
+    - Example: `./run_qemu.py --params controller_name=noop trace_funcs=sched_tick json`
+    - Example: `./run_qemu.py --params controller_name=cd9626e trace_funcs=`
 
 - Debug kernel: `./run_gdb.py`

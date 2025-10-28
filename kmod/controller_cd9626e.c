@@ -1,3 +1,5 @@
+// https://github.com/torvalds/linux/commit/cd9626e9ebc77edec33023fe95dab4b04ffc819d
+
 #include <linux/delay.h>
 #include <linux/freezer.h>
 #include <linux/kthread.h>
@@ -11,8 +13,6 @@
 #define TARGET_TASK "test-proc"
 
 static struct task_struct *busy_task;
-static struct task_struct *pause_task = NULL;
-static int done = 0;
 
 static int controller_init(void) {
   busy_task = poll_task(TARGET_TASK);
@@ -21,19 +21,30 @@ static int controller_init(void) {
   return 0;
 }
 
-static int controller_step(int iter) {
-  struct task_struct *p = find_not_eligible_task(TARGET_TASK, busy_task);
+enum state {
+  STATE_INIT,
+  STATE_PAUSED,
+  STATE_WAKING,
+  STATE_DONE,
+};
+static enum state state = STATE_INIT;
+static struct task_struct *pause_task;
 
-  if (p && done == 0) {
-    TRACE_INFO("dequeue ineligible task %d", p->pid);
+static int controller_step(int iter) {
+  if (state == STATE_INIT) {
+    struct task_struct *p = find_not_eligible_task(TARGET_TASK, busy_task);
+    if (!p)
+      return 0;
     pause_task = p;
-    send_sigcode(pause_task, SIGCODE_PAUSE, 1000);
+
+    TRACE_INFO("dequeue ineligible task %d", pause_task->pid);
+    send_sigcode(pause_task, SIGCODE_PAUSE, 0);
 
     msleep(SIM_INTERVAL_MS);
-    done = 1;
+    state = STATE_PAUSED;
   }
 
-  if (done == 2 && pause_task != NULL) {
+  else if (state == STATE_PAUSED) {
     TRACE_INFO("freeze ineligible task %d", pause_task->pid);
     static_branch_inc(&freezer_active);
     *ksym.pm_freezing = true;
@@ -44,23 +55,17 @@ static int controller_step(int iter) {
     msleep(SIM_INTERVAL_MS);
     *ksym.pm_freezing = false;
     static_branch_dec(&freezer_active);
-    done = 3;
+    state = STATE_WAKING;
   }
-  if (done == 5 && pause_task != NULL) {
+
+  else if (state == STATE_WAKING) {
     TRACE_INFO("wake up ineligible task %d", pause_task->pid);
     ksym.try_to_wake_up(pause_task, TASK_NORMAL, 0);
     msleep(SIM_INTERVAL_MS);
-    done = 6;
+    state = STATE_DONE;
   }
 
-  if (done == 1) {
-    done = 2;
-  }
-  if (done == 3 || done == 4) {
-    done++;
-  }
-
-  return done == 6;
+  return state == STATE_DONE;
 }
 
 static int controller_exit(void) { return 0; }
