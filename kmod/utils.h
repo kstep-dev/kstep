@@ -11,4 +11,3 @@ struct task_struct *find_not_eligible_task(const char *comm,
 void reset_task_stats(struct task_struct *p);
 
 extern const struct cpumask *cpu_controlled_mask;
-void cpu_controlled_mask_init(void);

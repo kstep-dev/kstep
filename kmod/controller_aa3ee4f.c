@@ -44,7 +44,7 @@ static int loop(void *data) {
   return 0;
 }
 
-static int controller_init(void) {
+static void controller_init(void) {
   busy_kthread = kthread_create(loop, NULL, "busy_kthread");
   set_cpus_allowed_ptr(busy_kthread, cpu_controlled_mask);
   wake_up_process(busy_kthread);
@@ -60,8 +60,6 @@ static int controller_init(void) {
   reset_task_stats(busy_kthread_children);
 
   send_sigcode(busy_task, SIGCODE_FORK, 5);
-
-  return 0;
 }
 
 static void sleep_all_tasks(int cpu, struct task_struct *target) {
@@ -74,41 +72,42 @@ static void sleep_all_tasks(int cpu, struct task_struct *target) {
   }
 }
 
-static int controller_step(int iter) {
+static void controller_body(void) {
   struct task_struct *p = find_not_eligible_task(TARGET_TASK, busy_task);
 
-  if (p && done == 0 && task_cpu(p) == task_cpu(busy_kthread)) {
-    TRACE_INFO("Found not eligible task %d on cpu %d", p->pid, task_cpu(p));
-    sleep_all_tasks(task_cpu(p), p);
+  int iter = 0;
+  while (1) {
+    if (p && done == 0 && task_cpu(p) == task_cpu(busy_kthread)) {
+      TRACE_INFO("Found not eligible task %d on cpu %d", p->pid, task_cpu(p));
+      sleep_all_tasks(task_cpu(p), p);
 
-    set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
-    set_cpus_allowed_ptr(p, cpumask_of(1));
+      set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
+      set_cpus_allowed_ptr(p, cpumask_of(1));
 
-    shared_data = iter;
-    atomic_set(&data_ready, 1);
-    wake_up_interruptible(&my_wq);
-    pause_task = p;
-    done = 1;
+      shared_data = iter;
+      atomic_set(&data_ready, 1);
+      wake_up_interruptible(&my_wq);
+      pause_task = p;
+      done = 1;
+    }
+
+    if (done == 2 && pause_task != NULL && pause_task->on_cpu == 1) {
+      send_sigcode(pause_task, SIGCODE_PAUSE, 0);
+      msleep(SIM_INTERVAL_MS);
+      done = 3;
+    }
+
+    if (done == 1) {
+      done = 2;
+    }
+
+    controller_tick();
+    iter++;
   }
-
-  if (done == 2 && pause_task != NULL && pause_task->on_cpu == 1) {
-    send_sigcode(pause_task, SIGCODE_PAUSE, 0);
-    msleep(SIM_INTERVAL_MS);
-    done = 3;
-  }
-
-  if (done == 1) {
-    done = 2;
-  }
-
-  return done == 3;
 }
-
-static int controller_exit(void) { return 0; }
 
 struct controller_ops controller_aa3ee4f = {
     .name = "aa3ee4f",
     .init = controller_init,
-    .step = controller_step,
-    .exit = controller_exit,
+    .body = controller_body,
 };

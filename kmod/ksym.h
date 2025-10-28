@@ -16,7 +16,7 @@
   X(void, update_rq_clock, (struct rq * rq))                                   \
   X(int, entity_eligible, (struct cfs_rq * cfs_rq, struct sched_entity * se))  \
   X(void, signal_wake_up_state, (struct task_struct * t, int state))           \
-  X(void, try_to_wake_up,                                                      \
+  X(int, try_to_wake_up,                                                       \
     (struct task_struct * p, unsigned int state, int wake_flags))              \
   X(void, sched_yield, (void))                                                 \
   X(void, freeze_task, (struct task_struct * p))
