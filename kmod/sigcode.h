@@ -1,3 +1,6 @@
+#ifndef SIGCODE_H
+#define SIGCODE_H
+
 #define SIGCODE_LIST                                                           \
   X(SIGCODE_UNKNOWN)                                                           \
   X(SIGCODE_FORK)                                                              \
@@ -16,3 +19,5 @@ static const char *sigcode_to_str[] = {
     SIGCODE_LIST
 #undef X
 };
+
+#endif

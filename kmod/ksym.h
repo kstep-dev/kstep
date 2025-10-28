@@ -1,10 +1,7 @@
+#include <linux/mmu_context.h>
 #include <linux/types.h>
 
-// Forward declarations
-struct rq;
-struct cfs_rq;
-struct sched_entity;
-struct task_struct;
+#include <kernel/sched/sched.h> // private header
 
 // Define function symbols
 // Format: X(ret_type, func_name, args)
@@ -48,3 +45,12 @@ struct ksym_t {
 extern struct ksym_t ksym;
 
 void ksym_init(void);
+
+#undef cpu_rq
+#define cpu_rq(cpu) (per_cpu_ptr(ksym.runqueues, (cpu)))
+
+#undef this_rq
+#define this_rq() this_cpu_ptr(ksym.runqueues)
+
+#undef raw_rq
+#define raw_rq() raw_cpu_ptr(ksym.runqueues)

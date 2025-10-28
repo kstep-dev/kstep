@@ -3,12 +3,12 @@
 #include "controller.h"
 #include "logging.h"
 
-static int noop_init(void) {
+static int controller_init(void) {
   TRACE_INFO("Noop controller initialized");
   return 0;
 }
 
-static int noop_step(int iter) {
+static int controller_step(int iter) {
   TRACE_INFO("Noop controller step %d", iter);
   if (iter == 10) {
     return 1;
@@ -16,7 +16,7 @@ static int noop_step(int iter) {
   return 0;
 }
 
-static int noop_exit(void) {
+static int controller_exit(void) {
   TRACE_INFO("Noop controller exited");
   kernel_power_off();
   return 0;
@@ -24,7 +24,7 @@ static int noop_exit(void) {
 
 struct controller_ops controller_noop = {
     .name = "noop",
-    .init = noop_init,
-    .step = noop_step,
-    .exit = noop_exit,
+    .init = controller_init,
+    .step = controller_step,
+    .exit = controller_exit,
 };

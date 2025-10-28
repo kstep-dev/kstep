@@ -2,17 +2,12 @@
 
 #include <linux/ftrace.h>
 #include <linux/kernel.h>
-#include <linux/mmu_context.h>
 #include <linux/module.h>
 #include <linux/sched/clock.h>
 
-#include "logging.h"
-
-// Linux private headers
-#include <kernel/sched/sched.h>
-
 #include "internal.h"
 #include "ksym.h"
+#include "logging.h"
 
 // Module parameters
 static char *trace_funcs[32];
@@ -25,7 +20,7 @@ module_param(json, bool, 0644);
 MODULE_PARM_DESC(json, "Output in JSON format");
 
 static void dump_state_table(int cpu) {
-  struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
+  struct rq *rq = cpu_rq(cpu);
   TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
              cpu, rq->nr_running, rq->nr_switches, rq->clock, rq->cfs.avg_load);
 
@@ -46,7 +41,7 @@ static void dump_state_table(int cpu) {
 }
 
 static void dump_state_json(int cpu) {
-  struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
+  struct rq *rq = cpu_rq(cpu);
   pr_info("{"
           "\"rq[%d]\": "
           "{"

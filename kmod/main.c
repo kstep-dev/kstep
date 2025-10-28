@@ -1,11 +1,7 @@
 #include <linux/delay.h>
 #include <linux/kthread.h>
-#include <linux/mmu_context.h>
 #include <linux/module.h>
 #include <linux/reboot.h>
-
-// Linux private headers
-#include <kernel/sched/sched.h>
 
 #include "controller.h"
 #include "internal.h"
@@ -49,7 +45,7 @@ static void common_init(void) {
   sched_clock_set(INIT_TIME_NS);
 
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
+    struct rq *rq = cpu_rq(cpu);
     ksym.update_rq_clock(rq);
 
     rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;

@@ -3,12 +3,10 @@
 #include <linux/sched.h>
 #include <linux/sched/signal.h>
 #include <linux/signal.h>
-#include <linux/types.h>
 
 #include "internal.h"
 #include "ksym.h"
 #include "logging.h"
-#include "sigcode.h"
 #include "utils.h"
 
 void send_sigcode(struct task_struct *p, enum sigcode code, int val) {

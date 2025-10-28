@@ -1,6 +1,7 @@
+#include "sigcode.h"
+
 // Forward declarations
 struct task_struct;
-enum sigcode;
 struct cpumask;
 
 void send_sigcode(struct task_struct *p, enum sigcode code, int val);
