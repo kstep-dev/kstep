@@ -257,9 +257,9 @@ static void controller_step(int iter) {
     pause_task->__state |= TASK_INTERRUPTIBLE;
     ksym_freeze_task(pause_task);
     
-    msleep(SIM_INTERVAL_MS);
     * ksym_pm_freezing = false;
     static_branch_dec(&freezer_active);
+    msleep(SIM_INTERVAL_MS);
     done = 3;
   }
   if (done == 5 && pause_task != NULL) {
