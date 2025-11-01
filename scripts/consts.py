@@ -17,17 +17,21 @@ ROOTFS_IMG = DATA_DIR / "rootfs.ext4"
 LOGS_DIR = DATA_DIR / "logs"
 
 
-def get_log_path(create: bool):
+def get_log_path(create: bool) -> Path:
+    symlink = LOGS_DIR / "latest.log"
+
     if create:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        for suffix in [".log", ".json", ".csv", ".txt"]:
-            actual = LOGS_DIR / f"log-{timestamp}{suffix}"
-            actual.touch()
-            symlink = LOGS_DIR / f"latest{suffix}"
-            symlink.unlink(missing_ok=True)
-            symlink.symlink_to(actual)
-
-    return LOGS_DIR / "latest.log"
+        actual = LOGS_DIR / f"log-{timestamp}.log"
+        actual.touch()
+        symlink.unlink(missing_ok=True)
+        symlink.symlink_to(actual)
+        return actual
+    else:
+        if symlink.exists():
+            return symlink.resolve()
+        else:
+            return symlink
 
 
 def get_linux_dir(version: Optional[str] = None):

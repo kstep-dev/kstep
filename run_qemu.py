@@ -10,7 +10,7 @@ from scripts import PROJ_DIR, ROOTFS_IMG, Arch, get_linux_dir, get_log_path, sys
 
 def run_qemu(
     debug: bool = False,
-    log_path: Optional[Path] = get_log_path(create=True),
+    log_file: Optional[Path] = None,
     params: Optional[List[str]] = None,
 ):
     kvm_path = Path("/dev/kvm")
@@ -74,9 +74,9 @@ def run_qemu(
             "-cpu cortex-a57",
         ]
 
-    if log_path:
+    if log_file:
         cmd += [
-            f"-chardev stdio,id=char0,mux=on,logfile={log_path},signal=off",
+            f"-chardev stdio,id=char0,mux=on,logfile={log_file},signal=off",
             "-serial chardev:char0",
             "-mon chardev=char0",
         ]
@@ -91,6 +91,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--params", nargs="+", default=[])
+    parser.add_argument("--log_file", type=Path, default=get_log_path(create=True))
     args = parser.parse_args()
     system(f"make -C {PROJ_DIR} -j$(nproc)")
     run_qemu(**vars(args))

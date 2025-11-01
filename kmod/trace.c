@@ -20,8 +20,9 @@ MODULE_PARM_DESC(json, "Output in JSON format");
 
 static void dump_state_table(int cpu) {
   struct rq *rq = cpu_rq(cpu);
-  TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
-             cpu, rq->nr_running, rq->nr_switches, rq->clock, rq->cfs.avg_load);
+  TRACE_DEBUG("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
+              cpu, rq->nr_running, rq->nr_switches, rq->clock,
+              rq->cfs.avg_load);
 
   TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
               "PPID", "vruntime", "sum-exec", "switches");
