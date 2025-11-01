@@ -174,6 +174,20 @@ static void controller_init(void) {
     }
   }
 
+  // create a cgroup tree
+  // root -> l1_0 -> l2_0 -> l3_0
+  //              -> l2_1 -> l3_1
+  send_sigcode(p, SIGCODE_CGROUP_CREATE, 0);
+  msleep(SIM_INTERVAL_MS);
+  send_sigcode(p, SIGCODE_CGROUP_CREATE, 1 << 16 | 0x0);
+  msleep(SIM_INTERVAL_MS);
+  send_sigcode(p, SIGCODE_CGROUP_CREATE, 1 << 16 | 0x0);
+  msleep(SIM_INTERVAL_MS);
+  send_sigcode(p, SIGCODE_CGROUP_CREATE, 2 << 16 | 0x0);
+  msleep(SIM_INTERVAL_MS);
+  send_sigcode(p, SIGCODE_CGROUP_CREATE, 2 << 16 | 0x1);
+  msleep(SIM_INTERVAL_MS);
+
   send_sigcode(p, SIGCODE_FORK, 2);
   msleep(SIM_INTERVAL_MS);
   

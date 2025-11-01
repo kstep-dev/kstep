@@ -3,7 +3,8 @@
   X(SIGCODE_FORK)                                                              \
   X(SIGCODE_SLEEP)                                                             \
   X(SIGCODE_EXIT)                                                              \
-  X(SIGCODE_PAUSE)
+  X(SIGCODE_PAUSE)                                                             \
+  X(SIGCODE_CGROUP_CREATE)
 
 enum sigcode {
 #define X(name) name,
