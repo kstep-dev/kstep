@@ -15,6 +15,23 @@
 #define MAX_PATH 1024
 #define PROMPT "\033[0;32m# \033[0m"
 
+#define CGROUP_ROOT "/sys/fs/cgroup"
+
+// mount cgroup filesystem
+int mount_cgroup_filesystem() {
+  if (mount("none", CGROUP_ROOT, "cgroup2", 0, NULL) < 0) {
+    if (errno == EBUSY) {
+        printf("cgroup2 already mounted on %s\n", CGROUP_ROOT);
+    } else {
+        perror("mount");
+        return 1;
+    }
+  } else {
+    printf("Mounted cgroup2 on %s\n", CGROUP_ROOT);
+  }
+  return 0;
+}
+
 // Mount filesystems
 int mount_filesystems() {
   if (mount("none", "/proc", "proc", 0, "") != 0) {
@@ -179,6 +196,7 @@ int main() {
 
   // Basic setup
   mount_filesystems();
+  mount_cgroup_filesystem();
   set_cpu_affinity();
   signal(SIGCHLD, SIG_IGN);
 
