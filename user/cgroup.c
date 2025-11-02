@@ -133,7 +133,6 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
       nextId[child_level_id]++;
     }
 
-    // TODO: should set to all cpus except cpu 0
     int nproc = sysconf(_SC_NPROCESSORS_ONLN);
     char cpus[10];
     int len = snprintf(cpus, sizeof cpus, "%d-%d", 1, nproc - 1);
@@ -150,11 +149,39 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
               id_in_level);
     printf("recorded cgroup path: %s\n", buffered_cgroup_path);
 
-  } else if (code == SIGCODE_BIND_CGROUP) {
-    attach_process_to_cgroup(buffered_cgroup_path, val);
+  } else if (code == SIGCODE_SETCPU_CGROUP) {
+    char cpus[10];
+    snprintf(cpus, sizeof cpus, "%d", val);
+    write_file_at(buffered_cgroup_path, "cpuset.cpus", cpus);
     // clear the buffered_cgroup_path
     buffered_cgroup_path[0] = '\0';
-}
+  } else if (code == SIGCODE_UNRIGISTER_CGROUP) {
+    int level_id = (val >> 16) & 0xFFFF;
+    int id_in_level = val & 0xFFFF;
+
+    snprintf(buffered_cgroup_path, sizeof(buffered_cgroup_path), 
+      "%s/l%d_%d", 
+              parent_cgroup_paths[level_id][id_in_level], 
+              level_id, 
+              id_in_level);
+    printf("unrigistering cgroup path: %s\n", buffered_cgroup_path);
+    if (rmdir(buffered_cgroup_path) < 0) {
+      perror("rmdir");
+    }
+    strcpy(parent_cgroup_paths[level_id][id_in_level], "");
+  } else if (code == SIGCODE_REWEIGHT_CGROUP) {
+    int level_id = (val >> 16) & 0xFFFF;
+    int id_in_level = val & 0xFFFF;
+
+    snprintf(buffered_cgroup_path, sizeof(buffered_cgroup_path), 
+      "%s/l%d_%d", 
+              parent_cgroup_paths[level_id][id_in_level], 
+              level_id, 
+              id_in_level);
+    printf("reweighting cgroup path: %s\n", buffered_cgroup_path);
+    write_file_at(buffered_cgroup_path, "cpu.weight.nice", "1");
+
+  }
   else {
     printf("Unknown signal code: %d\n", code);
   }

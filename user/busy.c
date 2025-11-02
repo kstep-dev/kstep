@@ -17,6 +17,24 @@
 
 #define CGROUP_ROOT "/sys/fs/cgroup"
 
+void clone3(int val, const char *cgroup_path) {
+  for (int i = 0; i < val; i++) {
+    int cgfd = open(cgroup_path, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+    if (cgfd < 0) { perror("open cgroup"); return; }
+
+    struct clone_args args;
+    memset(&args, 0, sizeof(args));
+    args.flags   = 0 | CLONE_INTO_CGROUP;
+    args.cgroup  = (uintptr_t)cgfd;  // <— CLONE_INTO_CGROUP: target cgroup fd
+
+    pid_t pid = syscall(SYS_clone3, &args, sizeof(args));
+    if (pid < 0) { perror("clone3"); return; }
+    if (pid == 0) {
+      return;
+    }
+    close(cgfd);
+  }
+}
 static void signal_handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
   int val = info->si_int;
@@ -32,21 +50,14 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
     exit(0);
   } else if (code == SIGCODE_PAUSE) {
     pause();
-  } else if (code == SIGCODE_CLONE3) {
-    int cgfd = open(CGROUP_ROOT "/l1_0/l2_0/l3_0", O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-    if (cgfd < 0) { perror("open cgroup"); return; }
-
-    struct clone_args args;
-    memset(&args, 0, sizeof(args));
-    args.flags   = 0 | CLONE_INTO_CGROUP;
-    args.cgroup  = (uintptr_t)cgfd;  // <— CLONE_INTO_CGROUP: target cgroup fd
-
-    pid_t pid = syscall(SYS_clone3, &args, sizeof(args));
-    if (pid < 0) { perror("clone3"); return; }
-    if (pid == 0) {
-      return;
-    }
-  } else {
+  } else if (code == SIGCODE_CLONE3_L3_0) {
+    clone3(val, CGROUP_ROOT "/l1_0/l2_0/l3_0");
+  } else if (code == SIGCODE_CLONE3_L3_1) {
+    clone3(val, CGROUP_ROOT "/l1_0/l2_0/l3_1");
+  } else if (code == SIGCODE_CLONE3_L2_1) {
+    clone3(val, CGROUP_ROOT "/l1_0/l2_1");
+  }
+  else {
     printf("Unknown signal code: %d\n", code);
   }
 }
