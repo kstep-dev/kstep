@@ -94,8 +94,9 @@ static void sched_clock_exit(void) {
 #error "Sched clock mocking not supported for this platform"
 #endif
 
-static struct task_struct *controller_task;
-static struct task_struct *busy_task;
+static struct task_struct *controller_task = NULL;
+static struct task_struct *busy_task = NULL;
+static struct task_struct *cgroup_task = NULL;
 
 static void print_tasks(void) {
   int cpu;
@@ -131,14 +132,19 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
   send_sig_info(SIGUSR1, &info, p);
   TRACE_INFO("Sent %s (si_int=%d) to pid %d", sigcode_to_str[code], val,
              p->pid);
+  msleep(SIM_INTERVAL_MS);
 }
 
-static struct task_struct *poll_target_task(void) {
+static void poll_target_task(void) {
   struct task_struct *p;
   while (1) {
     for_each_process(p) {
       if (strcmp(p->comm, TARGET_TASK) == 0)
-        return p;
+        busy_task = p;
+      if (strcmp(p->comm, "cgroup-proc") == 0)
+        cgroup_task = p;
+      if (cgroup_task != NULL && busy_task != NULL)
+        return;
     }
     msleep(SIM_INTERVAL_MS);
     TRACE_INFO("Waiting for process %s to be created", TARGET_TASK);
@@ -149,12 +155,23 @@ static void controller_init(void) {
   int cpu;
   for_each_controlled_cpu(cpu) { ksym_tick_sched_timer_dying(cpu); }
   sched_clock_init();
+  
+  poll_target_task();
+  TRACE_INFO("Found busy task: %d, cgroup task: %d", busy_task->pid, cgroup_task->pid);
 
-  struct task_struct *p = poll_target_task();
-  busy_task = p;
-  p->se.vruntime = INIT_TIME_NS;
-  p->nivcsw = 0;
-  p->nvcsw = 0;
+  busy_task->se.exec_start		= 0;
+	busy_task->se.sum_exec_runtime		= 0;
+	busy_task->se.prev_sum_exec_runtime	= 0;
+	busy_task->se.nr_migrations		= 0;
+	busy_task->se.vruntime			= INIT_TIME_NS;
+	busy_task->se.vlag			= 0;
+
+  memset(&busy_task->se.avg, 0, sizeof(struct sched_avg));
+  busy_task->se.avg.last_update_time = INIT_TIME_NS;
+  busy_task->se.avg.load_avg = scale_load_down(busy_task->se.load.weight);
+
+  busy_task->nivcsw = 0;
+  busy_task->nvcsw = 0;
   for_each_controlled_cpu(cpu) {
     struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
     struct sched_domain *sd;
@@ -165,6 +182,11 @@ static void controller_init(void) {
     rq->nr_switches = 0;
 
     rq->cfs.min_vruntime = INIT_TIME_NS;
+    rq->cfs.avg_vruntime = 0;
+    rq->cfs.avg_load = 0;
+
+    memset(&rq->cfs.avg, 0, sizeof(struct sched_avg));
+    rq->cfs.avg.last_update_time = INIT_TIME_NS;
     
     for (sd = rcu_dereference_check_sched_domain(rq->sd); \
 			sd; sd = sd->parent) {
@@ -177,20 +199,14 @@ static void controller_init(void) {
   // create a cgroup tree
   // root -> l1_0 -> l2_0 -> l3_0
   //              -> l2_1 -> l3_1
-  send_sigcode(p, SIGCODE_CGROUP_CREATE, 0);
-  msleep(SIM_INTERVAL_MS);
-  send_sigcode(p, SIGCODE_CGROUP_CREATE, 1 << 16 | 0x0);
-  msleep(SIM_INTERVAL_MS);
-  send_sigcode(p, SIGCODE_CGROUP_CREATE, 1 << 16 | 0x0);
-  msleep(SIM_INTERVAL_MS);
-  send_sigcode(p, SIGCODE_CGROUP_CREATE, 2 << 16 | 0x0);
-  msleep(SIM_INTERVAL_MS);
-  send_sigcode(p, SIGCODE_CGROUP_CREATE, 2 << 16 | 0x1);
-  msleep(SIM_INTERVAL_MS);
+  send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 0);
+  send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 1 << 16 | 0x0);
+  send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 1 << 16 | 0x0);
+  send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 2 << 16 | 0x0);
+  send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 2 << 16 | 0x1);
 
-  send_sigcode(p, SIGCODE_FORK, 2);
-  msleep(SIM_INTERVAL_MS);
-  
+  send_sigcode(busy_task, SIGCODE_CLONE3, 1);
+
 }
 
 static void controller_exit(void) {
@@ -201,7 +217,7 @@ static void controller_exit(void) {
                              (void *)true, 0);
   }
 
-  kernel_power_off();
+  // kernel_power_off();
 }
 
 static void controller_step(int iter) {
@@ -223,9 +239,8 @@ static int controller(void *data) {
   int iter = 0;
   while (!kthread_should_stop()) {
     controller_step(iter++);
-    if (iter % 1000 == 0) {
+    if (iter % 10 == 0)
       break;
-    }
   }
   controller_exit();
   return 0;

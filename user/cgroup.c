@@ -132,6 +132,12 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
       strcpy(parent_cgroup_paths[child_level_id][child_id_in_level], parent_path);
       nextId[child_level_id]++;
     }
+
+    // TODO: should set to all cpus except cpu 0
+    int nproc = sysconf(_SC_NPROCESSORS_ONLN);
+    char cpus[10];
+    int len = snprintf(cpus, sizeof cpus, "%d-%d", 1, nproc - 1);
+    write_file_at(child_path, "cpuset.cpus", cpus);
     
   } else if (code == SIGCODE_RECORD_CGROUP) {
     int level_id = (val >> 16) & 0xFFFF;

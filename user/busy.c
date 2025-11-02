@@ -32,8 +32,8 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
     exit(0);
   } else if (code == SIGCODE_PAUSE) {
     pause();
-  } else if (code == SIGCODE_FORK_ROOT) {
-    int cgfd = open(CGROUP_ROOT, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+  } else if (code == SIGCODE_CLONE3) {
+    int cgfd = open(CGROUP_ROOT "/l1_0/l2_0/l3_0", O_DIRECTORY | O_RDONLY | O_CLOEXEC);
     if (cgfd < 0) { perror("open cgroup"); return; }
 
     struct clone_args args;
