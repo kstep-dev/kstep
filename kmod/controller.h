@@ -20,4 +20,3 @@ static struct controller_ops *controller_ops_list[] = {
 
 void controller_run(struct controller_ops *ops);
 void call_tick_once(void);
-void print_tasks(void);

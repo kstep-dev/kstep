@@ -81,3 +81,51 @@ void reset_task_stats(struct task_struct *p) {
   p->se.avg.last_update_time = INIT_TIME_NS;
   p->se.avg.load_avg = scale_load_down(p->se.load.weight);
 }
+
+void print_tasks(void) {
+  struct task_struct *p;
+
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct rq *rq = cpu_rq(cpu);
+    TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
+               cpu,
+               rq->nr_running - (rq->cfs.h_nr_queued - rq->cfs.h_nr_runnable),
+               rq->nr_switches, rq->clock, rq->cfs.avg_load);
+  }
+
+  int min_pid = INT_MAX;
+  for_each_process(p) {
+    if (task_cpu(p) == 0 || is_sys_kthread(p))
+      continue;
+    if (task_pid_nr(p) < min_pid)
+      min_pid = task_pid_nr(p);
+  }
+
+  TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
+              "PPID", "vruntime", "sum-exec", "switches");
+  TRACE_DEBUG(
+      "\t-------------------------------------------------------------");
+
+  for_each_process(p) {
+    if (task_cpu(p) == 0 || is_sys_kthread(p))
+      continue;
+    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
+                p->on_cpu ? '>' : ' ', task_state_to_char(p),
+                task_pid_nr(p) - min_pid, task_ppid_nr(p), p->se.vruntime,
+                p->se.sum_exec_runtime, p->nvcsw, p->nivcsw);
+  }
+}
+
+static char *sys_kthread_comms[] = {
+    "cpuhp/",
+    "migration/",
+    "ksoftirqd/",
+};
+
+int is_sys_kthread(struct task_struct *p) {
+  for (int i = 0; i < ARRAY_SIZE(sys_kthread_comms); i++) {
+    if (strstarts(p->comm, sys_kthread_comms[i]))
+      return 1;
+  }
+  return 0;
+}
