@@ -3,12 +3,16 @@
 import argparse
 import os
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
-from scripts import LOG_PATH, PROJ_DIR, ROOTFS_IMG, Arch, get_linux_dir, system
+from scripts import PROJ_DIR, ROOTFS_IMG, Arch, get_linux_dir, get_log_path, system
 
 
-def run_qemu(debug: bool = False, log_path: Optional[Path] = LOG_PATH):
+def run_qemu(
+    debug: bool = False,
+    log_file: Optional[Path] = None,
+    params: Optional[List[str]] = None,
+):
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
@@ -42,6 +46,12 @@ def run_qemu(debug: bool = False, log_path: Optional[Path] = LOG_PATH):
     if Arch.get() == Arch.X86_64:
         boot_args += ["console=ttyS0", "tsc=nowatchdog"]
 
+    if params:
+        # Everything after the `-` is passed to init
+        # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
+        boot_args += ["-"]
+        boot_args += params
+
     cmd = [
         exe,
         "-smp 3",
@@ -64,9 +74,9 @@ def run_qemu(debug: bool = False, log_path: Optional[Path] = LOG_PATH):
             "-cpu cortex-a57",
         ]
 
-    if log_path:
+    if log_file:
         cmd += [
-            f"-chardev stdio,id=char0,mux=on,logfile={log_path},signal=off",
+            f"-chardev stdio,id=char0,mux=on,logfile={log_file},signal=off",
             "-serial chardev:char0",
             "-mon chardev=char0",
         ]
@@ -80,6 +90,8 @@ def run_qemu(debug: bool = False, log_path: Optional[Path] = LOG_PATH):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--params", nargs="+", default=[])
+    parser.add_argument("--log_file", type=Path, default=get_log_path(create=True))
     args = parser.parse_args()
     system(f"make -C {PROJ_DIR} -j$(nproc)")
     run_qemu(**vars(args))

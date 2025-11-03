@@ -1,15 +1,19 @@
-OUT ?= $(abspath ../rootfs/data)
+OUT ?= $(abspath ../data/rootfs)
 
 src ?= $(shell pwd)
 ksrc ?= $(abspath $(src)/../linux/current)
-obj-m := main.o trace.o
+
+schedtest-srcs := $(notdir $(filter-out %.mod.c,$(wildcard $(src)/*.c)))
+
+obj-m := schedtest.o
+schedtest-y := $(schedtest-srcs:.c=.o)
 
 # Allow the use of private headers
 ccflags-y := -I$(ksrc) -Wno-unused-variable -Wno-unused-function
 
-$(obj-m:.o=.ko): $(obj-m:.o=.c) $(wildcard $(src)/*.h)
+schedtest.ko: $(schedtest-srcs) $(wildcard $(src)/*.h)
 	$(MAKE) -C $(ksrc) M=$(src) modules
-	cp $(obj-m:.o=.ko) $(OUT)
+	cp schedtest.ko $(OUT)
 
 .PHONY: obj
 obj:

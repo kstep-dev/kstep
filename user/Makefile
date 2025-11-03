@@ -1,11 +1,15 @@
-OUT ?= $(abspath ../rootfs/data/bin)
-EXES = $(patsubst %.c,$(OUT)/%,$(wildcard *.c))
+ROOTFS ?= $(abspath ../data/rootfs)
+EXES = $(patsubst %.c,$(ROOTFS)/bin/%,$(wildcard *.c))
+TARGETS = $(EXES) $(ROOTFS)/init.sh
 
-all: $(EXES)
+all: $(TARGETS)
 
-$(OUT)/%: %.c ../kmod/sigcode.h
+$(ROOTFS)/bin/%: %.c ../kmod/sigcode.h
 	gcc -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -std=c99 -static -o $@ $<
+
+$(ROOTFS)/init.sh: init.sh
+	cp $< $@
 
 .PHONY: clean
 clean:
-	rm -rf $(EXES)
+	rm -rf $(TARGETS)

@@ -1,67 +1,56 @@
-// Usage:
-//   #define KSYM_FUNC_LIST X(ret_type, func_name, args)
-//   #define KSYM_VAR_LIST X(type, var_name)
-//   #include "ksym.h"
-// Then the symbol can be accessed via "ksym_{name}".
+#include <linux/mmu_context.h>
+#include <linux/types.h>
 
-#include <linux/kprobes.h>
+#include <kernel/sched/sched.h> // private header
 
-#include "logging.h"
+// Define function symbols
+// Format: X(ret_type, func_name, args)
+#define KSYM_FUNC_LIST                                                         \
+  X(void, tick_sched_timer_dying, (int cpu))                                   \
+  X(void, sched_tick, (void))                                                  \
+  X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
+  X(u64, kvm_sched_clock_read, (void))                                         \
+  X(void, tick_setup_sched_timer, (bool hrtimer))                              \
+  X(u64, sched_clock, (void))                                                  \
+  X(int, workqueue_offline_cpu, (int cpu))                                     \
+  X(void, update_rq_clock, (struct rq * rq))                                   \
+  X(int, entity_eligible, (struct cfs_rq * cfs_rq, struct sched_entity * se))  \
+  X(void, signal_wake_up_state, (struct task_struct * t, int state))           \
+  X(int, try_to_wake_up,                                                       \
+    (struct task_struct * p, unsigned int state, int wake_flags))              \
+  X(void, sched_yield, (void))                                                 \
+  X(void, freeze_task, (struct task_struct * p))
 
-#ifndef KSYM_NAME
-#define KSYM_NAME(name) ksym_##name
-#endif
+// Define variable symbols
+// Format: X(type, var_name)
+#define KSYM_VAR_LIST                                                          \
+  X(struct rq, runqueues)                                                      \
+  X(void, cd)                                                                  \
+  X(u64, __sched_clock_offset)                                                 \
+  X(unsigned int, sysctl_sched_migration_cost)                                 \
+  X(bool, pm_freezing)
 
-#ifndef KSYM_FUNC_LIST
-#define KSYM_FUNC_LIST
-#endif
+struct ksym_t {
+  void *(*kallsyms_lookup_name)(const char *name);
 
-#ifndef KSYM_VAR_LIST
-#define KSYM_VAR_LIST
-#endif
-
-static void uninitialized_stub(void) {
-  TRACE_ERR("Uninitialized kernel symbol");
-}
-
-// Define function pointers
-#define X(ret_type, name, args)                                                \
-  static ret_type(*KSYM_NAME(name)) args = (void *)&uninitialized_stub;
-KSYM_FUNC_LIST
-#undef X
-
-// Define variables
-#define X(type, name) static type *KSYM_NAME(name);
-KSYM_VAR_LIST
-#undef X
-
-static void *get_kallsyms_lookup_name(void) {
-  struct kprobe kp = {.symbol_name = "kallsyms_lookup_name"};
-  int ret = register_kprobe(&kp);
-  if (ret < 0) {
-    TRACE_ERR("Failed to register kprobe: %d. Using hardcoded address.", ret);
-    // From `nm linux/current/linux | grep kallsyms_lookup_name`
-    return (void *)0x600ad515;
-  }
-  unregister_kprobe(&kp);
-  return (void *)kp.addr;
-}
-
-// Initialize function pointers
-static void init_kernel_symbols(void) {
-  void *(*kallsyms_lookup_name)(const char *name) = get_kallsyms_lookup_name();
-
-#define X(type, name, ...)                                                     \
-  do {                                                                         \
-    void *addr = kallsyms_lookup_name(#name);                                  \
-    if (addr == NULL) {                                                        \
-      TRACE_ERR("Symbol %s not found", #name);                                 \
-    } else {                                                                   \
-      TRACE_INFO("Symbol %-32s -> %px", #name, addr);                          \
-      KSYM_NAME(name) = addr;                                                  \
-    }                                                                          \
-  } while (0);
+#define X(ret_type, name, args) ret_type(*name) args;
   KSYM_FUNC_LIST
+#undef X
+
+#define X(type, name) type *name;
   KSYM_VAR_LIST
 #undef X
-}
+};
+
+extern struct ksym_t ksym;
+
+void ksym_init(void);
+
+#undef cpu_rq
+#define cpu_rq(cpu) (per_cpu_ptr(ksym.runqueues, (cpu)))
+
+#undef this_rq
+#define this_rq() this_cpu_ptr(ksym.runqueues)
+
+#undef raw_rq
+#define raw_rq() raw_cpu_ptr(ksym.runqueues)
