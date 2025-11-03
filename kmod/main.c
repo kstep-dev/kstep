@@ -7,9 +7,8 @@
 #include "logging.h"
 
 static char controller_name[32] = "noop";
-module_param_string(controller_name, controller_name, sizeof(controller_name),
-                    0644);
-MODULE_PARM_DESC(controller_name, "Controller name to run");
+module_param_string(controller, controller_name, sizeof(controller_name), 0644);
+MODULE_PARM_DESC(controller, "Controller name to run");
 
 static struct task_struct *controller_task;
 

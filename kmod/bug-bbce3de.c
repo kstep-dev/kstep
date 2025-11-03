@@ -2,20 +2,11 @@
 
 #include <linux/delay.h>
 #include <linux/kthread.h>
-#include <linux/mmu_context.h>
-#include <linux/module.h>
-#include <linux/reboot.h> // For kernel_power_off()
-#include <linux/sched_clock.h>
-#include <linux/workqueue.h>
-
-// Linux private headers
-#include <kernel/sched/sched.h>
 
 #include "controller.h"
 #include "internal.h"
 #include "ksym.h"
 #include "logging.h"
-#include "sigcode.h"
 #include "utils.h"
 
 #define TARGET_TASK "test-proc"
