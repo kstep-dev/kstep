@@ -3,28 +3,15 @@
 #include <linux/delay.h>
 #include <linux/freezer.h>
 #include <linux/kthread.h>
-#include <linux/mmu_context.h>
-#include <linux/module.h>
-#include <linux/reboot.h> // For kernel_power_off()
-#include <linux/sched_clock.h>
-#include <linux/workqueue.h>
-
-// Linux private headers
-#include <kernel/sched/sched.h>
 
 #include "controller.h"
 #include "internal.h"
 #include "ksym.h"
 #include "logging.h"
-#include "sigcode.h"
 #include "utils.h"
 
-#define SIM_INTERVAL_MS 100
-#define TICK_INTERVAL_NS (1000ULL * 1000ULL)               // 1 ms
-#define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 #define TARGET_TASK "test-proc"
 
-static struct task_struct *controller_task;
 static struct task_struct *busy_task;
 
 static void print_tasks(void) {

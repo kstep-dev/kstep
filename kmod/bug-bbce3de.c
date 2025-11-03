@@ -18,12 +18,8 @@
 #include "sigcode.h"
 #include "utils.h"
 
-#define SIM_INTERVAL_MS 100
-#define TICK_INTERVAL_NS (1000ULL * 1000ULL)               // 1 ms
-#define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 #define TARGET_TASK "test-proc"
 
-static struct task_struct *controller_task = NULL;
 static struct task_struct *busy_task = NULL;
 static struct task_struct *cgroup_task = NULL;
 
