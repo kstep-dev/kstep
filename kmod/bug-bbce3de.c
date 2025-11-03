@@ -11,23 +11,7 @@
 // Linux private headers
 #include <kernel/sched/sched.h>
 
-#define KSYM_FUNC_LIST                                                         \
-  X(void, tick_sched_timer_dying, (int cpu))                                   \
-  X(void, sched_tick, (void))                                                  \
-  X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
-  X(u64, kvm_sched_clock_read, (void))                                         \
-  X(void, tick_setup_sched_timer, (bool hrtimer))                              \
-  X(u64, sched_clock, (void))                                                  \
-  X(void, update_rq_clock, (struct rq * rq))                                   \
-  X(int, entity_eligible, (struct cfs_rq *cfs_rq, struct sched_entity *se))    \
-  X(void, signal_wake_up_state, (struct task_struct * t, int state))          \
-  X(void, try_to_wake_up, (struct task_struct *p, unsigned int state, int wake_flags)) \
-  X(void, sched_yield, (void))
-#define KSYM_VAR_LIST                                                          \
-  X(struct rq, runqueues)                                                      \
-  X(void, cd)                                                                  \
-  X(u64, __sched_clock_offset)                                                 \
-  X(unsigned int, sysctl_sched_migration_cost)                                 
+#include "internal.h"
 #include "ksym.h"
 #include "logging.h"
 #include "sigcode.h"
@@ -44,60 +28,6 @@ static void init_controlled_mask(void) {
   cpumask_clear_cpu(0, &cpu_controlled_mask);
 }
 
-static u64 clock_value = INIT_TIME_NS;
-static u64 sched_clock(void) { return clock_value; }
-
-#if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
-// On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
-// is a wrapper of `paravirt_sched_clock` which can be changed with
-// `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
-
-static void sched_clock_init(void) {
-  *ksym___sched_clock_offset = 0;
-  ksym_paravirt_set_sched_clock(sched_clock);
-}
-
-static void sched_clock_exit(void) {
-  ksym_paravirt_set_sched_clock(ksym_kvm_sched_clock_read);
-}
-
-#elif defined(CONFIG_GENERIC_SCHED_CLOCK)
-// On other platforms (e.g., arm64), `sched_clock` is implemented in
-// `kernel/time/sched_clock.c`, and we can change the function pointer in
-// `struct clock_data` and `struct clock_read_data` to mock the sched clock.
-
-struct clock_data {
-  seqcount_latch_t seq;
-  struct clock_read_data read_data[2];
-  ktime_t wrap_kt;
-  unsigned long rate;
-  u64 (*actual_read_sched_clock)(void);
-};
-
-static struct clock_data cd_backup;
-
-static void sched_clock_init(void) {
-  struct clock_data *cd = ksym_cd;
-  memcpy(&cd_backup, cd, sizeof(struct clock_data));
-  cd->actual_read_sched_clock = sched_clock;
-  for (int i = 0; i < 2; i++) {
-    struct clock_read_data *rd = &cd->read_data[i];
-    rd->read_sched_clock = sched_clock;
-    rd->mult = 1;
-    rd->shift = 0;
-    rd->epoch_ns = 0;
-    rd->epoch_cyc = 0;
-  }
-}
-
-static void sched_clock_exit(void) {
-  memcpy(ksym_cd, &cd_backup, sizeof(struct clock_data));
-}
-
-#else
-#error "Sched clock mocking not supported for this platform"
-#endif
-
 static struct task_struct *controller_task = NULL;
 static struct task_struct *busy_task = NULL;
 static struct task_struct *cgroup_task = NULL;
@@ -105,7 +35,7 @@ static struct task_struct *cgroup_task = NULL;
 static void print_tasks(void) {
   int cpu;
   for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+    struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
     TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
                cpu, rq->nr_running, rq->nr_switches, rq->clock,
                rq->cfs.avg_load);
@@ -189,7 +119,7 @@ static void controller_init(void) {
   task_to_cgroup_id[busy_task->pid - busy_task->pid][0] = 0;
   task_to_cgroup_id[busy_task->pid - busy_task->pid][1] = 0;
 
-  for_each_controlled_cpu(cpu) { ksym_tick_sched_timer_dying(cpu); }
+  for_each_controlled_cpu(cpu) { ksym.tick_sched_timer_dying(cpu); }
   sched_clock_init();
   
   poll_target_task();
@@ -209,12 +139,12 @@ static void controller_init(void) {
   busy_task->nivcsw = 0;
   busy_task->nvcsw = 0;
   for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
+    struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
     struct sched_domain *sd;
 
-    ksym_update_rq_clock(rq);
-    rq->avg_idle = 2 * *ksym_sysctl_sched_migration_cost;
-    rq->max_idle_balance_cost = *ksym_sysctl_sched_migration_cost;
+    ksym.update_rq_clock(rq);
+    rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;
+    rq->max_idle_balance_cost = *ksym.sysctl_sched_migration_cost;
     rq->nr_switches = 0;
 
     rq->cfs.min_vruntime = INIT_TIME_NS;
@@ -254,7 +184,7 @@ static void controller_exit(void) {
   int cpu;
   sched_clock_exit();
   for_each_controlled_cpu(cpu) {
-    smp_call_function_single(cpu, (void *)ksym_tick_setup_sched_timer,
+    smp_call_function_single(cpu, (void *)ksym.tick_setup_sched_timer,
                              (void *)true, 0);
   }
 
@@ -271,10 +201,11 @@ static void find_not_eligible_tg(void) {
     if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task || p->on_cpu == 0)
       continue;
     struct sched_entity *se = &p->se;
-    // TRACE_DEBUG("pid=%d, eligible=%d", p->pid, ksym_entity_eligible(se->parent->cfs_rq, se->parent));
+    // TRACE_DEBUG("pid=%d, eligible=%d", p->pid,
+    // ksym.entity_eligible(se->parent->cfs_rq, se->parent));
     if (ineligible_task == NULL &&
-        ksym_entity_eligible(se->parent->cfs_rq, se->parent) == 0 && 
-        ksym_entity_eligible(se->cfs_rq, se) == 1) {
+        ksym.entity_eligible(se->parent->cfs_rq, se->parent) == 0 &&
+        ksym.entity_eligible(se->cfs_rq, se) == 1) {
       ineligible_task = p;
       ineligible_tg_se = se->parent;
       cpu_of_ineligible_task = task_cpu(p);
@@ -313,12 +244,12 @@ static struct task_struct * get_curr_task(int cpu) {
 
 static void call_tick_once(void) {
   print_tasks();
-  clock_value += TICK_INTERVAL_NS;
+  sched_clock_inc(TICK_INTERVAL_NS);
 
   // Call tick function
   int cpu;
   for_each_controlled_cpu(cpu) {
-    smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
+    smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
     msleep(SIM_INTERVAL_MS);
   }
 
@@ -377,21 +308,3 @@ static int controller(void *data) {
   controller_exit();
   return 0;
 }
-
-static int __init kmod_init(void) {
-  init_kernel_symbols();
-  init_controlled_mask();
-  controller_task = kthread_create(controller, NULL, "controller");
-  set_cpus_allowed_ptr(controller_task, cpumask_of(0));
-  wake_up_process(controller_task);
-  return 0;
-}
-
-static void __exit kmod_exit(void) { kthread_stop(controller_task); }
-
-module_init(kmod_init);
-module_exit(kmod_exit);
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Shawn Zhong");
-MODULE_DESCRIPTION("Scheduler control");
