@@ -1,3 +1,5 @@
+#define TRACE_LEVEL LOGLEVEL_DEBUG
+
 #include <linux/cpumask.h>
 #include <linux/delay.h>
 #include <linux/sched.h>

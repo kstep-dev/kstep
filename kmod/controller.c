@@ -16,8 +16,7 @@ void call_tick_once(void) {
   sched_clock_inc(TICK_INTERVAL_NS);
 
   // Call tick function
-  int cpu;
-  for_each_controlled_cpu(cpu) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
     msleep(SIM_INTERVAL_MS);
   }
