@@ -22,7 +22,7 @@
   X(void, update_rq_clock, (struct rq * rq))                                   \
   X(int, entity_eligible, (struct cfs_rq *cfs_rq, struct sched_entity *se))    \
   X(void, signal_wake_up_state, (struct task_struct * t, int state))           \
-  X(void, try_to_wake_up, (struct task_struct *p, unsigned int state, int wake_flags)) \
+  X(int, try_to_wake_up, (struct task_struct *p, unsigned int state, int wake_flags)) \
   X(void, sched_yield, (void))                                                 \
   X(void, freeze_task, (struct task_struct *p))
 #define KSYM_VAR_LIST                                                          \
@@ -119,13 +119,11 @@ static void print_tasks(void) {
       "\t-------------------------------------------------------------");
   struct task_struct *p;
   for_each_process(p) {
-    // if (strcmp(p->comm, TARGET_TASK) != 0 && p != busy_kthread && p != busy_kthread_children)
-    //   continue;
-    if (task_cpu(p) == 0)
+    if (strcmp(p->comm, TARGET_TASK) != 0)
       continue;
     // TRACE_DEBUG("p->pid=%d, p->ppid=%d", task_pid_nr(busy_task), task_ppid_nr(busy_task));
     TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
-                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p),
+                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p) - task_pid_nr(busy_task),
                 task_ppid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
                 p->nvcsw, p->nivcsw);
   }
@@ -141,6 +139,7 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
   send_sig_info(SIGUSR1, &info, p);
   TRACE_INFO("Sent %s (si_int=%d) to pid %d", sigcode_to_str[code], val,
              p->pid);
+  msleep(SIM_INTERVAL_MS);
 }
 
 static struct task_struct *poll_target_task(void) {
@@ -193,7 +192,7 @@ static void controller_init(void) {
   }
 
 
-  send_sigcode(busy_task, SIGCODE_FORK, 5);
+  send_sigcode(busy_task, SIGCODE_FORK, 3);
   msleep(SIM_INTERVAL_MS);
   
 }
@@ -209,12 +208,7 @@ static void controller_exit(void) {
   kernel_power_off();
 }
 
-// send data to the busy kthread
-static int shared_data = 0;
-static atomic_t data_ready;
-static DECLARE_WAIT_QUEUE_HEAD(my_wq);
 int done = 0;
-
 
 static struct task_struct *find_not_eligible_task(void) {
   struct task_struct *p;
@@ -232,43 +226,9 @@ static struct task_struct *find_not_eligible_task(void) {
   return NULL;
 }
 
-struct task_struct * pause_task = NULL;
-static void controller_step(int iter) {
-  // Update clock
+static void call_tick_once(void) {
   print_tasks();
   clock_value += TICK_INTERVAL_NS;
-
-  struct task_struct *p = find_not_eligible_task();
-  
-  if (p && done == 0) {
-    TRACE_INFO("dequeue ineligible task %d", p->pid);
-    pause_task = p;
-    send_sigcode(pause_task, SIGCODE_PAUSE, 1000);
-
-    msleep(SIM_INTERVAL_MS);
-    done = 1;
-  }
-
-  if (done == 2 && pause_task != NULL) {
-    TRACE_INFO("freeze ineligible task %d", pause_task->pid);
-    static_branch_inc(&freezer_active);
-    * ksym_pm_freezing = true;
-    pause_task->__state |= TASK_FREEZABLE;
-    pause_task->__state |= TASK_INTERRUPTIBLE;
-    ksym_freeze_task(pause_task);
-    
-    * ksym_pm_freezing = false;
-    static_branch_dec(&freezer_active);
-    msleep(SIM_INTERVAL_MS);
-    done = 3;
-  }
-  if (done == 5 && pause_task != NULL) {
-    TRACE_INFO("wake up ineligible task %d", pause_task->pid);
-    ksym_try_to_wake_up(pause_task, TASK_NORMAL, 0);
-    msleep(SIM_INTERVAL_MS);
-    done = 6;
-  }
-
 
   // Call tick function
   int cpu;
@@ -276,11 +236,48 @@ static void controller_step(int iter) {
     smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
     msleep(SIM_INTERVAL_MS);
   }
-  if (done == 1) {
-    done = 2;
+
+}
+
+struct task_struct * pause_task = NULL;
+static void controller_step(int iter) {
+
+  for (int i = 0; i < 20; i++) {
+    call_tick_once();
   }
-  if (done == 3 || done == 4) {
-    done++;
+
+  while (1) {
+    struct task_struct *p = find_not_eligible_task();
+    if (p) {
+      TRACE_INFO("dequeue ineligible task %d", p->pid);
+      pause_task = p;
+      send_sigcode(pause_task, SIGCODE_SLEEP, 1);
+      break;
+    }
+    call_tick_once();
+  }
+
+  call_tick_once();
+
+  TRACE_INFO("freeze ineligible task %d", pause_task->pid);
+  static_branch_inc(&freezer_active);
+  * ksym_pm_freezing = true;
+  ksym_freeze_task(pause_task);
+  
+  * ksym_pm_freezing = false;
+  static_branch_dec(&freezer_active);
+  msleep(SIM_INTERVAL_MS);
+
+  call_tick_once();
+  call_tick_once();
+  
+
+  send_sigcode(pause_task, SIGCODE_UNKNOWN, 0);
+  print_tasks();
+  msleep(SIM_INTERVAL_MS);
+
+  for (int i = 0; i < 20; i++) {
+    call_tick_once();
   }
 }
 
@@ -289,9 +286,7 @@ static int controller(void *data) {
   int iter = 0;
   while (!kthread_should_stop()) {
     controller_step(iter++);
-    if ((iter % 1000 == 0)) {
-      break;
-    }
+    break;
   }
   controller_exit();
   return 0;
@@ -300,8 +295,6 @@ static int controller(void *data) {
 static int __init kmod_init(void) {
   init_kernel_symbols();
   init_controlled_mask();
-
-  atomic_set(&data_ready, 0);
 
   controller_task = kthread_create(controller, NULL, "controller");
   set_cpus_allowed_ptr(controller_task, cpumask_of(0));
