@@ -6,13 +6,15 @@ struct controller_ops {
   void (*body)(void);
 };
 
-// extern struct controller_ops controller_aa3ee4f;
-// extern struct controller_ops controller_cd9626e;
+extern struct controller_ops controller_aa3ee4f;
+extern struct controller_ops controller_bbce3de;
+extern struct controller_ops controller_cd9626e;
 extern struct controller_ops controller_noop;
 
 static struct controller_ops *controller_ops_list[] = {
-    // &controller_aa3ee4f,
-    // &controller_cd9626e,
+    &controller_aa3ee4f,
+    &controller_bbce3de,
+    &controller_cd9626e,
     &controller_noop,
 };
 

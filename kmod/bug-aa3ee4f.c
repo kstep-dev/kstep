@@ -4,13 +4,14 @@
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
 #include <linux/module.h>
+#include <linux/reboot.h> // For kernel_power_off()
 #include <linux/sched_clock.h>
 #include <linux/workqueue.h>
-#include <linux/reboot.h> // For kernel_power_off()
 
 // Linux private headers
 #include <kernel/sched/sched.h>
 
+#include "controller.h"
 #include "internal.h"
 #include "ksym.h"
 #include "logging.h"
@@ -48,16 +49,17 @@ static void print_tasks(void) {
       "\t-------------------------------------------------------------");
   struct task_struct *p;
   for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 && p != busy_kthread && p != busy_kthread_children)
+    if (strcmp(p->comm, TARGET_TASK) != 0 && p != busy_kthread &&
+        p != busy_kthread_children)
       continue;
-    // TRACE_DEBUG("p->pid=%d, p->ppid=%d", task_pid_nr(busy_task), task_ppid_nr(busy_task));
+    // TRACE_DEBUG("p->pid=%d, p->ppid=%d", task_pid_nr(busy_task),
+    // task_ppid_nr(busy_task));
     TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
-                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p) - task_pid_nr(busy_kthread),
-                task_ppid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
-                p->nvcsw, p->nivcsw);
+                p->on_cpu ? '>' : ' ', task_state_to_char(p),
+                task_pid_nr(p) - task_pid_nr(busy_kthread), task_ppid_nr(p),
+                p->se.vruntime, p->se.sum_exec_runtime, p->nvcsw, p->nivcsw);
   }
 }
-
 
 static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
   struct kernel_siginfo info = {
@@ -74,7 +76,8 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
 static struct task_struct *poll_target_task(void) {
   struct task_struct *p;
   for_each_process(p) {
-    TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm, p->__state, p->on_cpu);
+    TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm,
+                p->__state, p->on_cpu);
   }
   while (1) {
     for_each_process(p) {
@@ -86,17 +89,25 @@ static struct task_struct *poll_target_task(void) {
   }
 }
 
-
+static int loopBusy(void *data);
+static int loop(void *data);
 
 static void controller_init(void) {
   int cpu;
-  for_each_controlled_cpu(cpu) { ksym.tick_sched_timer_dying(cpu); }
-  sched_clock_init();
 
+  busy_kthread = kthread_create(loop, NULL, "busy_kthread");
+  set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
+  // set_cpus_allowed_ptr(busy_kthread, & cpu_controlled_mask);
+  wake_up_process(busy_kthread);
+
+  busy_kthread_children =
+      kthread_create(loopBusy, NULL, "busy_kthread_children");
+  set_cpus_allowed_ptr(busy_kthread_children, &cpu_controlled_mask);
+  busy_kthread_children->wake_cpu = 2;
 
   // set_cpus_allowed_ptr(busy_kthread, &mask);
   msleep(SIM_INTERVAL_MS);
-  
+
   busy_task = poll_target_task();
 
   busy_task->se.vruntime = INIT_TIME_NS;
@@ -121,15 +132,13 @@ static void controller_init(void) {
     rq->nr_switches = 0;
 
     rq->cfs.min_vruntime = INIT_TIME_NS;
-    
-    for (sd = rcu_dereference_check_sched_domain(rq->sd); \
-			sd; sd = sd->parent) {
+
+    for (sd = rcu_dereference_check_sched_domain(rq->sd); sd; sd = sd->parent) {
       sd->last_balance = jiffies;
       sd->balance_interval = sd->min_interval;
       sd->nr_balance_failed = 0;
     }
   }
-
 
   send_sigcode(busy_task, SIGCODE_FORK, 3);
   struct task_struct *p;
@@ -137,23 +146,11 @@ static void controller_init(void) {
     if (strcmp(p->comm, TARGET_TASK) == 0)
       set_cpus_allowed_ptr(p, cpumask_of(1));
   }
-  
-}
-
-static void controller_exit(void) {
-  int cpu;
-  sched_clock_exit();
-  for_each_controlled_cpu(cpu) {
-    smp_call_function_single(cpu, (void *)ksym.tick_setup_sched_timer,
-                             (void *)true, 0);
-  }
-
-  kernel_power_off();
 }
 
 // send data to the busy kthread
 static int shared_data = 0;
-static atomic_t data_ready;
+static atomic_t data_ready = ATOMIC_INIT(0);
 static DECLARE_WAIT_QUEUE_HEAD(my_wq);
 
 static struct task_struct *find_not_eligible_task(void) {
@@ -192,10 +189,9 @@ static void call_tick_once(void) {
     smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
     msleep(SIM_INTERVAL_MS);
   }
-
 }
 static struct task_struct *pause_task = NULL;
-static void controller_step(int iter) {
+static void controller_body(void) {
   for (int i = 0; i < 20; i++) {
     call_tick_once();
   }
@@ -204,8 +200,8 @@ static void controller_step(int iter) {
     if (p && task_cpu(p) == task_cpu(busy_kthread)) {
       TRACE_INFO("Found not eligible task %d on cpu %d", p->pid, task_cpu(p));
       sleep_all_tasks(task_cpu(p), p);
-      
-      shared_data = iter;
+
+      shared_data = 0;
       atomic_set(&data_ready, 1);
       wake_up_interruptible(&my_wq);
       call_tick_once();
@@ -216,7 +212,7 @@ static void controller_step(int iter) {
   }
 
   while (1) {
-    if(pause_task->on_cpu == 1) {
+    if (pause_task->on_cpu == 1) {
       send_sigcode(pause_task, SIGCODE_PAUSE, 0);
       break;
     }
@@ -228,18 +224,7 @@ static void controller_step(int iter) {
   }
 }
 
-static int controller(void *data) {
-  controller_init();
-  int iter = 0;
-  while (!kthread_should_stop()) {
-    controller_step(iter++);
-    break;
-  }
-  controller_exit();
-  return 0;
-}
-
-static int loopBusy(void* data) {
+static int loopBusy(void *data) {
   TRACE_INFO("Sync wakeup's children started on CPU %d", smp_processor_id());
   while (!kthread_should_stop()) {
     __asm__("" : : : "memory");
@@ -247,10 +232,11 @@ static int loopBusy(void* data) {
   return 0;
 }
 
-static int loop(void * data) {
+static int loop(void *data) {
   TRACE_INFO("Busy kthread started on CPU %d", smp_processor_id());
   while (!kthread_should_stop()) {
-    wait_event_interruptible(my_wq, atomic_read(&data_ready) != 0 || kthread_should_stop());
+    wait_event_interruptible(my_wq, atomic_read(&data_ready) != 0 ||
+                                        kthread_should_stop());
     TRACE_INFO("Receiver: Woke up! Consumed data: %d", shared_data);
     if (kthread_should_stop()) {
       break;
@@ -258,27 +244,12 @@ static int loop(void * data) {
 
     ksym.try_to_wake_up(busy_kthread_children, TASK_NORMAL, 0 | WF_SYNC);
     atomic_set(&data_ready, 0);
-
   }
   return 0;
 }
 
-static int __init kmod_init(void) {
-  init_controlled_mask();
-
-  atomic_set(&data_ready, 0);
-
-  busy_kthread = kthread_create(loop, NULL, "busy_kthread");
-  set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
-  // set_cpus_allowed_ptr(busy_kthread, & cpu_controlled_mask);
-  wake_up_process(busy_kthread);
-
-  busy_kthread_children = kthread_create(loopBusy, NULL, "busy_kthread_children");
-  set_cpus_allowed_ptr(busy_kthread_children, & cpu_controlled_mask);
-  busy_kthread_children->wake_cpu = 2;
-
-  controller_task = kthread_create(controller, NULL, "controller");
-  set_cpus_allowed_ptr(controller_task, cpumask_of(0));
-  wake_up_process(controller_task);
-  return 0;
-}
+struct controller_ops controller_aa3ee4f = {
+    .name = "aa3ee4f",
+    .init = controller_init,
+    .body = controller_body,
+};

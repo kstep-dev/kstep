@@ -4,13 +4,14 @@
 #include <linux/kthread.h>
 #include <linux/mmu_context.h>
 #include <linux/module.h>
+#include <linux/reboot.h> // For kernel_power_off()
 #include <linux/sched_clock.h>
 #include <linux/workqueue.h>
-#include <linux/reboot.h> // For kernel_power_off()
 
 // Linux private headers
 #include <kernel/sched/sched.h>
 
+#include "controller.h"
 #include "internal.h"
 #include "ksym.h"
 #include "logging.h"
@@ -49,11 +50,12 @@ static void print_tasks(void) {
   for_each_process(p) {
     if (strcmp(p->comm, TARGET_TASK) != 0)
       continue;
-    // TRACE_DEBUG("p->pid=%d, p->ppid=%d", task_pid_nr(busy_task), task_ppid_nr(busy_task));
+    // TRACE_DEBUG("p->pid=%d, p->ppid=%d", task_pid_nr(busy_task),
+    // task_ppid_nr(busy_task));
     TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
-                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p) - task_pid_nr(busy_task),
-                0, p->se.vruntime, p->se.sum_exec_runtime,
-                p->nvcsw, p->nivcsw);
+                p->on_cpu ? '>' : ' ', task_state_to_char(p),
+                task_pid_nr(p) - task_pid_nr(busy_task), 0, p->se.vruntime,
+                p->se.sum_exec_runtime, p->nvcsw, p->nivcsw);
   }
 }
 
@@ -72,7 +74,8 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
 static void poll_target_task(void) {
   struct task_struct *p;
   for_each_process(p) {
-    TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm, p->__state, p->on_cpu);
+    TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm,
+                p->__state, p->on_cpu);
   }
   while (1) {
     for_each_process(p) {
@@ -95,8 +98,11 @@ static void record_task_groups(int val, int level_id, int id_in_level) {
   int count = 0;
   while (1) {
     for_each_process(p) {
-      if (strcmp(p->comm, TARGET_TASK) == 0 && task_to_cgroup_id[p->pid - busy_task->pid][0] == -1) {
-        TRACE_INFO("Recording task_to_cgroup_id: %d level_id: %d id_in_level: %d", p->pid, level_id, id_in_level);
+      if (strcmp(p->comm, TARGET_TASK) == 0 &&
+          task_to_cgroup_id[p->pid - busy_task->pid][0] == -1) {
+        TRACE_INFO(
+            "Recording task_to_cgroup_id: %d level_id: %d id_in_level: %d",
+            p->pid, level_id, id_in_level);
         task_to_cgroup_id[p->pid - busy_task->pid][0] = level_id;
         task_to_cgroup_id[p->pid - busy_task->pid][1] = id_in_level;
         if (++count == val) {
@@ -105,10 +111,11 @@ static void record_task_groups(int val, int level_id, int id_in_level) {
       }
     }
     msleep(SIM_INTERVAL_MS);
-    TRACE_INFO("Waiting for recording task_to_cgroup_id: %d level_id: %d id_in_level: %d", val, level_id, id_in_level);
+    TRACE_INFO("Waiting for recording task_to_cgroup_id: %d level_id: %d "
+               "id_in_level: %d",
+               val, level_id, id_in_level);
   }
 }
-
 
 static void controller_init(void) {
   int cpu;
@@ -119,18 +126,16 @@ static void controller_init(void) {
   task_to_cgroup_id[busy_task->pid - busy_task->pid][0] = 0;
   task_to_cgroup_id[busy_task->pid - busy_task->pid][1] = 0;
 
-  for_each_controlled_cpu(cpu) { ksym.tick_sched_timer_dying(cpu); }
-  sched_clock_init();
-  
   poll_target_task();
-  TRACE_INFO("Found busy task: %d, cgroup task: %d", busy_task->pid, cgroup_task->pid);
+  TRACE_INFO("Found busy task: %d, cgroup task: %d", busy_task->pid,
+             cgroup_task->pid);
 
-  busy_task->se.exec_start		= 0;
-	busy_task->se.sum_exec_runtime		= 0;
-	busy_task->se.prev_sum_exec_runtime	= 0;
-	busy_task->se.nr_migrations		= 0;
-	busy_task->se.vruntime			= INIT_TIME_NS;
-	busy_task->se.vlag			= 0;
+  busy_task->se.exec_start = 0;
+  busy_task->se.sum_exec_runtime = 0;
+  busy_task->se.prev_sum_exec_runtime = 0;
+  busy_task->se.nr_migrations = 0;
+  busy_task->se.vruntime = INIT_TIME_NS;
+  busy_task->se.vlag = 0;
 
   memset(&busy_task->se.avg, 0, sizeof(struct sched_avg));
   busy_task->se.avg.last_update_time = INIT_TIME_NS;
@@ -153,9 +158,8 @@ static void controller_init(void) {
 
     memset(&rq->cfs.avg, 0, sizeof(struct sched_avg));
     rq->cfs.avg.last_update_time = INIT_TIME_NS;
-    
-    for (sd = rcu_dereference_check_sched_domain(rq->sd); \
-			sd; sd = sd->parent) {
+
+    for (sd = rcu_dereference_check_sched_domain(rq->sd); sd; sd = sd->parent) {
       sd->last_balance = jiffies;
       sd->balance_interval = sd->min_interval;
       sd->nr_balance_failed = 0;
@@ -180,19 +184,8 @@ static void controller_init(void) {
   record_task_groups(5, 3, 1);
 }
 
-static void controller_exit(void) {
-  int cpu;
-  sched_clock_exit();
-  for_each_controlled_cpu(cpu) {
-    smp_call_function_single(cpu, (void *)ksym.tick_setup_sched_timer,
-                             (void *)true, 0);
-  }
-
-  // kernel_power_off();
-}
-
-static struct task_struct * ineligible_task = NULL;
-static struct sched_entity * ineligible_tg_se = NULL;
+static struct task_struct *ineligible_task = NULL;
+static struct sched_entity *ineligible_tg_se = NULL;
 static int cpu_of_ineligible_task = -1;
 
 static void find_not_eligible_tg(void) {
@@ -224,7 +217,7 @@ static void sleep_all_tasks_in_ineligible_tg(void) {
   }
 }
 
-static struct task_struct * get_task_by_cpu(int cpu) {
+static struct task_struct *get_task_by_cpu(int cpu) {
   struct task_struct *p;
   for_each_process(p) {
     if (task_cpu(p) == cpu && p->on_cpu == 1)
@@ -233,7 +226,7 @@ static struct task_struct * get_task_by_cpu(int cpu) {
   return NULL;
 }
 
-static struct task_struct * get_curr_task(int cpu) {
+static struct task_struct *get_curr_task(int cpu) {
   struct task_struct *p;
   for_each_process(p) {
     if (task_cpu(p) == cpu && p->on_cpu == 1)
@@ -252,23 +245,22 @@ static void call_tick_once(void) {
     smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
     msleep(SIM_INTERVAL_MS);
   }
-
 }
 
-static void controller_step(int iter) {
+static void controller_body(void) {
   // Update clock
   for (int i = 0; i < 20; i++) {
     call_tick_once();
   }
 
   while (1) {
-      find_not_eligible_tg();
-      if (ineligible_tg_se != NULL) {
-        TRACE_INFO("Found not eligible task group");
-        sleep_all_tasks_in_ineligible_tg();
-        break;
-      }
-      call_tick_once();
+    find_not_eligible_tg();
+    if (ineligible_tg_se != NULL) {
+      TRACE_INFO("Found not eligible task group");
+      sleep_all_tasks_in_ineligible_tg();
+      break;
+    }
+    call_tick_once();
   }
 
   call_tick_once();
@@ -287,24 +279,20 @@ static void controller_step(int iter) {
 
   while (1) {
     if (ineligible_tg_se->sched_delayed == 0) {
-      TRACE_INFO("Ineligible task group is cleared at cpu: %d", cpu_of_ineligible_task);
+      TRACE_INFO("Ineligible task group is cleared at cpu: %d",
+                 cpu_of_ineligible_task);
       break;
     }
     call_tick_once();
-  } 
+  }
 
   for (int i = 0; i < 60; i++) {
     call_tick_once();
   }
 }
 
-static int controller(void *data) {
-  controller_init();
-  int iter = 0;
-  while (!kthread_should_stop()) {
-    controller_step(iter++);
-    break;
-  }
-  controller_exit();
-  return 0;
-}
+struct controller_ops controller_bbce3de = {
+    .name = "bbce3de",
+    .init = controller_init,
+    .body = controller_body,
+};
