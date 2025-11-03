@@ -63,9 +63,21 @@ struct task_struct *find_not_eligible_task(const char *comm,
 #endif
 
 void reset_task_stats(struct task_struct *p) {
+  // reset generic task stats
   p->nivcsw = 0;
   p->nvcsw = 0;
+
+  // reset sched entity stats
+  p->se.exec_start = 0;
   p->se.sum_exec_runtime = 0;
+  p->se.prev_sum_exec_runtime = 0;
+  p->se.nr_migrations = 0;
   p->se.vruntime = INIT_TIME_NS;
-  p->se.deadline = INIT_TIME_NS;
+  // p->se.deadline = INIT_TIME_NS;
+  p->se.vlag = 0;
+
+  // reset sched avg stats
+  memset(&p->se.avg, 0, sizeof(struct sched_avg));
+  p->se.avg.last_update_time = INIT_TIME_NS;
+  p->se.avg.load_avg = scale_load_down(p->se.load.weight);
 }

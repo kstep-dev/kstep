@@ -91,36 +91,9 @@ static void controller_init(void) {
   msleep(SIM_INTERVAL_MS);
 
   busy_task = poll_target_task();
-
-  busy_task->se.vruntime = INIT_TIME_NS;
-  busy_kthread->se.vruntime = INIT_TIME_NS;
-  busy_kthread_children->se.vruntime = INIT_TIME_NS;
-
-  busy_task->nivcsw = 0;
-  busy_kthread->nivcsw = 0;
-  busy_kthread_children->nivcsw = 0;
-
-  busy_task->nvcsw = 0;
-  busy_kthread->nvcsw = 0;
-  busy_kthread_children->nvcsw = 0;
-
-  for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
-    struct sched_domain *sd;
-
-    ksym.update_rq_clock(rq);
-    rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;
-    rq->max_idle_balance_cost = *ksym.sysctl_sched_migration_cost;
-    rq->nr_switches = 0;
-
-    rq->cfs.min_vruntime = INIT_TIME_NS;
-
-    for (sd = rcu_dereference_check_sched_domain(rq->sd); sd; sd = sd->parent) {
-      sd->last_balance = jiffies;
-      sd->balance_interval = sd->min_interval;
-      sd->nr_balance_failed = 0;
-    }
-  }
+  reset_task_stats(busy_task);
+  reset_task_stats(busy_kthread);
+  reset_task_stats(busy_kthread_children);
 
   send_sigcode(busy_task, SIGCODE_FORK, 3);
   struct task_struct *p;

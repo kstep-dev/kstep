@@ -112,41 +112,7 @@ static void controller_init(void) {
   TRACE_INFO("Found busy task: %d, cgroup task: %d", busy_task->pid,
              cgroup_task->pid);
 
-  busy_task->se.exec_start = 0;
-  busy_task->se.sum_exec_runtime = 0;
-  busy_task->se.prev_sum_exec_runtime = 0;
-  busy_task->se.nr_migrations = 0;
-  busy_task->se.vruntime = INIT_TIME_NS;
-  busy_task->se.vlag = 0;
-
-  memset(&busy_task->se.avg, 0, sizeof(struct sched_avg));
-  busy_task->se.avg.last_update_time = INIT_TIME_NS;
-  busy_task->se.avg.load_avg = scale_load_down(busy_task->se.load.weight);
-
-  busy_task->nivcsw = 0;
-  busy_task->nvcsw = 0;
-  for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
-    struct sched_domain *sd;
-
-    ksym.update_rq_clock(rq);
-    rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;
-    rq->max_idle_balance_cost = *ksym.sysctl_sched_migration_cost;
-    rq->nr_switches = 0;
-
-    rq->cfs.min_vruntime = INIT_TIME_NS;
-    rq->cfs.avg_vruntime = 0;
-    rq->cfs.avg_load = 0;
-
-    memset(&rq->cfs.avg, 0, sizeof(struct sched_avg));
-    rq->cfs.avg.last_update_time = INIT_TIME_NS;
-
-    for (sd = rcu_dereference_check_sched_domain(rq->sd); sd; sd = sd->parent) {
-      sd->last_balance = jiffies;
-      sd->balance_interval = sd->min_interval;
-      sd->nr_balance_failed = 0;
-    }
-  }
+  reset_task_stats(busy_task);
 
   /*
     create a cgroup tree
