@@ -1,3 +1,5 @@
+#define TRACE_LEVEL LOGLEVEL_DEBUG
+
 #include <linux/delay.h>
 #include <linux/kthread.h>
 #include <linux/module.h>
@@ -9,15 +11,64 @@
 #include "logging.h"
 #include "utils.h"
 
-void controller_tick(void) {
-  // Call tick function on one cpu at at time, excluding CPU 0
+static char *sys_kthread_comms[] = {
+    "cpuhp/",
+    "migration/",
+    "ksoftirqd/",
+};
+
+static int is_sys_kthread(struct task_struct *p) {
+  for (int i = 0; i < ARRAY_SIZE(sys_kthread_comms); i++) {
+    if (strstarts(p->comm, sys_kthread_comms[i]))
+      return 1;
+  }
+  return 0;
+}
+
+void print_tasks(void) {
+  struct task_struct *p;
+
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 1);
-    msleep(SIM_INTERVAL_MS);
+    struct rq *rq = cpu_rq(cpu);
+    TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
+               cpu,
+               rq->nr_running - (rq->cfs.h_nr_queued - rq->cfs.h_nr_runnable),
+               rq->nr_switches, rq->clock, rq->cfs.avg_load);
   }
 
-  // Update clock
+  int min_pid = INT_MAX;
+  for_each_process(p) {
+    if (task_cpu(p) == 0 || is_sys_kthread(p))
+      continue;
+    if (task_pid_nr(p) < min_pid)
+      min_pid = task_pid_nr(p);
+  }
+
+  TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
+              "PPID", "vruntime", "sum-exec", "switches");
+  TRACE_DEBUG(
+      "\t-------------------------------------------------------------");
+
+  for_each_process(p) {
+    if (task_cpu(p) == 0 || is_sys_kthread(p))
+      continue;
+    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
+                p->on_cpu ? '>' : ' ', task_state_to_char(p),
+                task_pid_nr(p) - min_pid, task_ppid_nr(p), p->se.vruntime,
+                p->se.sum_exec_runtime, p->nvcsw, p->nivcsw);
+  }
+}
+
+void call_tick_once(void) {
+  print_tasks();
   sched_clock_inc(TICK_INTERVAL_NS);
+
+  // Call tick function
+  int cpu;
+  for_each_controlled_cpu(cpu) {
+    smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
+    msleep(SIM_INTERVAL_MS);
+  }
 }
 
 static void disable_timer_ticks(void) {
@@ -45,9 +96,7 @@ static void move_kthreads(void) {
   for_each_process(p) {
     if (task_cpu(p) == 0)
       continue;
-    if (strncmp(p->comm, "cpuhp/", 6) == 0 ||
-        strncmp(p->comm, "migration/", 10) == 0 ||
-        strncmp(p->comm, "ksoftirqd/", 10) == 0) {
+    if (is_sys_kthread(p)) {
       reset_task_stats(p);
       continue;
     }

@@ -14,7 +14,7 @@ static void controller_body(void) {
   for (int i = 0; i < 10; i++) {
     TRACE_INFO("Noop controller step %d", i);
     send_sigcode(busy_task, SIGCODE_FORK, 1);
-    controller_tick();
+    call_tick_once();
   }
 }
 

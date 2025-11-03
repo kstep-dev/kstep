@@ -15,33 +15,6 @@ static struct task_struct *busy_task;
 static struct task_struct *busy_kthread;
 static struct task_struct *busy_kthread_children;
 
-static void print_tasks(void) {
-  int cpu;
-  for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
-    TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
-               cpu, rq->nr_running, rq->nr_switches, rq->clock,
-               rq->cfs.avg_load);
-  }
-
-  TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
-              "PPID", "vruntime", "sum-exec", "switches");
-  TRACE_DEBUG(
-      "\t-------------------------------------------------------------");
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 && p != busy_kthread &&
-        p != busy_kthread_children)
-      continue;
-    // TRACE_DEBUG("p->pid=%d, p->ppid=%d", task_pid_nr(busy_task),
-    // task_ppid_nr(busy_task));
-    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
-                p->on_cpu ? '>' : ' ', task_state_to_char(p),
-                task_pid_nr(p) - task_pid_nr(busy_kthread), task_ppid_nr(p),
-                p->se.vruntime, p->se.sum_exec_runtime, p->nvcsw, p->nivcsw);
-  }
-}
-
 static struct task_struct *poll_target_task(void) {
   struct task_struct *p;
   for_each_process(p) {
@@ -121,17 +94,6 @@ static void sleep_all_tasks(int cpu, struct task_struct *target) {
   }
 }
 
-static void call_tick_once(void) {
-  print_tasks();
-  sched_clock_inc(TICK_INTERVAL_NS);
-
-  // Call tick function
-  int cpu;
-  for_each_controlled_cpu(cpu) {
-    smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
-    msleep(SIM_INTERVAL_MS);
-  }
-}
 static struct task_struct *pause_task = NULL;
 static void controller_body(void) {
   for (int i = 0; i < 20; i++) {
