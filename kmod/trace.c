@@ -2,21 +2,15 @@
 
 #include <linux/ftrace.h>
 #include <linux/kernel.h>
-#include <linux/mmu_context.h>
-#include <linux/module.h>
 #include <linux/sched/clock.h>
-
-#include "logging.h"
-
-// Linux private headers
-#include <kernel/sched/sched.h>
 
 #include "internal.h"
 #include "ksym.h"
+#include "logging.h"
 
 // Module parameters
-static char *trace_funcs[32];
-static int trace_func_count = 0;
+static char *trace_funcs[32] = {"sched_tick"};
+static int trace_func_count = 1;
 module_param_array(trace_funcs, charp, &trace_func_count, 0644);
 MODULE_PARM_DESC(trace_funcs, "Function names to trace");
 
@@ -25,9 +19,10 @@ module_param(json, bool, 0644);
 MODULE_PARM_DESC(json, "Output in JSON format");
 
 static void dump_state_table(int cpu) {
-  struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
-  TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
-             cpu, rq->nr_running, rq->nr_switches, rq->clock, rq->cfs.avg_load);
+  struct rq *rq = cpu_rq(cpu);
+  TRACE_DEBUG("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
+              cpu, rq->nr_running, rq->nr_switches, rq->clock,
+              rq->cfs.avg_load);
 
   TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
               "PPID", "vruntime", "sum-exec", "switches");
@@ -46,7 +41,7 @@ static void dump_state_table(int cpu) {
 }
 
 static void dump_state_json(int cpu) {
-  struct rq *rq = per_cpu_ptr(ksym.runqueues, cpu);
+  struct rq *rq = cpu_rq(cpu);
   pr_info("{"
           "\"rq[%d]\": "
           "{"

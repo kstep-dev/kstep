@@ -17,6 +17,23 @@
 #define MAX_PATH 1024
 #define PROMPT "\033[0;32m# \033[0m"
 
+#define CGROUP_ROOT "/sys/fs/cgroup"
+
+// mount cgroup filesystem
+int mount_cgroup_filesystem() {
+  if (mount("none", CGROUP_ROOT, "cgroup2", 0, NULL) < 0) {
+    if (errno == EBUSY) {
+        printf("cgroup2 already mounted on %s\n", CGROUP_ROOT);
+    } else {
+        perror("mount");
+        return 1;
+    }
+  } else {
+    printf("Mounted cgroup2 on %s\n", CGROUP_ROOT);
+  }
+  return 0;
+}
+
 // Mount filesystems
 int mount_filesystems() {
   if (mount("none", "/proc", "proc", 0, "") != 0) {
@@ -221,15 +238,33 @@ void run_init_sh() {
   fclose(file);
 }
 
-int main() {
+void run_sched_test(int argc, char *argv[], char *envp[]) {
+  char *cmdline[MAX_ARGS] = {
+      "insmod",
+      "schedtest.ko",
+  };
+  int cmdline_len = 2;
+  for (int i = 2; i < argc; i++) {
+    cmdline[cmdline_len++] = argv[i];
+  }
+  for (int i = 2; envp[i] != NULL; i++) {
+    cmdline[cmdline_len++] = envp[i];
+  }
+  cmdline[cmdline_len] = NULL;
+  execute_external(cmdline);
+}
+
+int main(int argc, char *argv[], char *envp[]) {
   printf("\n");
   printf("Welcome to SchedTest\n");
 
   // Basic setup
   mount_filesystems();
+  mount_cgroup_filesystem();
   set_cpu_affinity();
   signal(SIGCHLD, SIG_IGN);
 
+  run_sched_test(argc, argv, envp);
   run_init_sh();
   shell_loop();
   builtin_exit();
