@@ -16,18 +16,12 @@
 #include "ksym.h"
 #include "logging.h"
 #include "sigcode.h"
+#include "utils.h"
 
 #define SIM_INTERVAL_MS 100
 #define TICK_INTERVAL_NS (1000ULL * 1000ULL)               // 1 ms
 #define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 #define TARGET_TASK "test-proc"
-
-static struct cpumask cpu_controlled_mask;
-#define for_each_controlled_cpu(cpu) for_each_cpu(cpu, &cpu_controlled_mask)
-static void init_controlled_mask(void) {
-  cpumask_copy(&cpu_controlled_mask, cpu_active_mask);
-  cpumask_clear_cpu(0, &cpu_controlled_mask);
-}
 
 static struct task_struct *controller_task = NULL;
 static struct task_struct *busy_task = NULL;
@@ -57,18 +51,6 @@ static void print_tasks(void) {
                 task_pid_nr(p) - task_pid_nr(busy_task), 0, p->se.vruntime,
                 p->se.sum_exec_runtime, p->nvcsw, p->nivcsw);
   }
-}
-
-static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
-  struct kernel_siginfo info = {
-      .si_signo = SIGUSR1,
-      .si_code = code,
-      .si_int = val,
-  };
-  send_sig_info(SIGUSR1, &info, p);
-  TRACE_INFO("Sent %s (si_int=%d) to pid %d", sigcode_to_str[code], val,
-             p->pid);
-  msleep(SIM_INTERVAL_MS);
 }
 
 static void poll_target_task(void) {

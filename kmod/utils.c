@@ -18,6 +18,7 @@ void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
   send_sig_info(SIGUSR1, &info, p);
   TRACE_INFO("Sent %s (si_int=%d) to pid %d", sigcode_to_str[code], val,
              p->pid);
+  msleep(SIM_INTERVAL_MS);
 }
 
 struct task_struct *poll_task(const char *comm) {
@@ -41,6 +42,7 @@ void cpu_controlled_mask_init(void) {
   cpu_controlled_mask = &cpu_controlled_mask_data;
 }
 
+#if 0
 struct task_struct *find_not_eligible_task(const char *comm,
                                            struct task_struct *skip_task) {
   struct task_struct *p;
@@ -58,6 +60,7 @@ struct task_struct *find_not_eligible_task(const char *comm,
   }
   return NULL;
 }
+#endif
 
 void reset_task_stats(struct task_struct *p) {
   p->nivcsw = 0;
