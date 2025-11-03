@@ -41,8 +41,6 @@ static void controller_init(void) {
   msleep(SIM_INTERVAL_MS);
 }
 
-int done = 0;
-
 static struct task_struct *find_not_eligible_task(void) {
   struct task_struct *p;
   for_each_process(p) {
