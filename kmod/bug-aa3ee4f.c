@@ -118,13 +118,11 @@ static void print_tasks(void) {
       "\t-------------------------------------------------------------");
   struct task_struct *p;
   for_each_process(p) {
-    // if (strcmp(p->comm, TARGET_TASK) != 0 && p != busy_kthread && p != busy_kthread_children)
-    //   continue;
-    if (task_cpu(p) == 0)
+    if (strcmp(p->comm, TARGET_TASK) != 0 && p != busy_kthread && p != busy_kthread_children)
       continue;
     // TRACE_DEBUG("p->pid=%d, p->ppid=%d", task_pid_nr(busy_task), task_ppid_nr(busy_task));
     TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
-                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p),
+                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p) - task_pid_nr(busy_kthread),
                 task_ppid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
                 p->nvcsw, p->nivcsw);
   }
@@ -140,6 +138,7 @@ static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
   send_sig_info(SIGUSR1, &info, p);
   TRACE_INFO("Sent %s (si_int=%d) to pid %d", sigcode_to_str[code], val,
              p->pid);
+  msleep(SIM_INTERVAL_MS);
 }
 
 static struct task_struct *poll_target_task(void) {
@@ -202,8 +201,12 @@ static void controller_init(void) {
   }
 
 
-  send_sigcode(busy_task, SIGCODE_FORK, 5);
-  msleep(SIM_INTERVAL_MS);
+  send_sigcode(busy_task, SIGCODE_FORK, 3);
+  struct task_struct *p;
+  for_each_process(p) {
+    if (strcmp(p->comm, TARGET_TASK) == 0)
+      set_cpus_allowed_ptr(p, cpumask_of(1));
+  }
   
 }
 
@@ -222,8 +225,6 @@ static void controller_exit(void) {
 static int shared_data = 0;
 static atomic_t data_ready;
 static DECLARE_WAIT_QUEUE_HEAD(my_wq);
-int done = 0;
-
 
 static struct task_struct *find_not_eligible_task(void) {
   struct task_struct *p;
@@ -247,38 +248,12 @@ static void sleep_all_tasks(int cpu, struct task_struct *target) {
     if (strcmp(p->comm, TARGET_TASK) != 0 || p == target)
       continue;
     send_sigcode(p, SIGCODE_PAUSE, 0);
-    msleep(SIM_INTERVAL_MS);
   }
 }
 
-struct task_struct * pause_task = NULL;
-static void controller_step(int iter) {
-  // Update clock
+static void call_tick_once(void) {
   print_tasks();
   clock_value += TICK_INTERVAL_NS;
-
-  struct task_struct *p = find_not_eligible_task();
-  
-  if (p && done == 0 && task_cpu(p) == task_cpu(busy_kthread)) {
-    TRACE_INFO("Found not eligible task %d on cpu %d", p->pid, task_cpu(p));
-    sleep_all_tasks(task_cpu(p), p);
-
-    set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
-    set_cpus_allowed_ptr(p, cpumask_of(1));
-
-    shared_data = iter;
-    atomic_set(&data_ready, 1);
-    wake_up_interruptible(&my_wq);
-    pause_task = p;
-    done = 1;
-  }
-
-  if(done == 2 && pause_task != NULL && pause_task->on_cpu == 1) {
-    send_sigcode(pause_task, SIGCODE_PAUSE, 0);
-    msleep(SIM_INTERVAL_MS);
-    done = 3;
-  }
-
 
   // Call tick function
   int cpu;
@@ -286,8 +261,39 @@ static void controller_step(int iter) {
     smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
     msleep(SIM_INTERVAL_MS);
   }
-  if (done == 1) {
-    done = 2;
+
+}
+struct task_struct * pause_task = NULL;
+static void controller_step(int iter) {
+  for (int i = 0; i < 20; i++) {
+    call_tick_once();
+  }
+  while (1) {
+    struct task_struct *p = find_not_eligible_task();
+    if (p && task_cpu(p) == task_cpu(busy_kthread)) {
+      TRACE_INFO("Found not eligible task %d on cpu %d", p->pid, task_cpu(p));
+      sleep_all_tasks(task_cpu(p), p);
+      
+      shared_data = iter;
+      atomic_set(&data_ready, 1);
+      wake_up_interruptible(&my_wq);
+      call_tick_once();
+      pause_task = p;
+      break;
+    }
+    call_tick_once();
+  }
+
+  while (1) {
+    if(pause_task->on_cpu == 1) {
+      send_sigcode(pause_task, SIGCODE_PAUSE, 0);
+      break;
+    }
+    call_tick_once();
+  }
+
+  for (int i = 0; i < 20; i++) {
+    call_tick_once();
   }
 }
 
@@ -296,9 +302,7 @@ static int controller(void *data) {
   int iter = 0;
   while (!kthread_should_stop()) {
     controller_step(iter++);
-    if ((iter % 1000 == 0)) {
-      break;
-    }
+    break;
   }
   controller_exit();
   return 0;
@@ -311,6 +315,7 @@ static int loopBusy(void* data) {
   }
   return 0;
 }
+
 static int loop(void * data) {
   TRACE_INFO("Busy kthread started on CPU %d", smp_processor_id());
   while (!kthread_should_stop()) {
@@ -334,7 +339,8 @@ static int __init kmod_init(void) {
   atomic_set(&data_ready, 0);
 
   busy_kthread = kthread_create(loop, NULL, "busy_kthread");
-  set_cpus_allowed_ptr(busy_kthread, & cpu_controlled_mask);
+  set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
+  // set_cpus_allowed_ptr(busy_kthread, & cpu_controlled_mask);
   wake_up_process(busy_kthread);
 
   busy_kthread_children = kthread_create(loopBusy, NULL, "busy_kthread_children");
