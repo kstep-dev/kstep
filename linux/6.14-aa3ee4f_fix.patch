@@ -1,17 +1,17 @@
-From 39988dae8643a993fe68ebdafa1345a182b1c96d Mon Sep 17 00:00:00 2001
+From cbd5455f3c9383c054fe55e820fc683d1b02cdbd Mon Sep 17 00:00:00 2001
 From: Tingjia-0v0 <tjcao980311@gmail.com>
-Date: Mon, 3 Nov 2025 21:20:51 -0600
+Date: Tue, 4 Nov 2025 03:42:15 -0600
 Subject: [PATCH] aa3ee4f_fix
 
 ---
- kernel/sched/fair.c | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+ kernel/sched/fair.c | 23 +++++++++++++++++------
+ 1 file changed, 17 insertions(+), 6 deletions(-)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index ab939e4957c5..cd9c12af3164 100644
+index c798d2795243..76e3e016e2d8 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -1030,7 +1030,7 @@ static bool update_deadline(struct cfs_rq *cfs_rq, struct sched_entity *se)
+@@ -1029,7 +1029,7 @@ static bool update_deadline(struct cfs_rq *cfs_rq, struct sched_entity *se)
  #include "pelt.h"
  #ifdef CONFIG_SMP
  
@@ -20,7 +20,7 @@ index ab939e4957c5..cd9c12af3164 100644
  static unsigned long task_h_load(struct task_struct *p);
  static unsigned long capacity_of(int cpu);
  
-@@ -7184,6 +7184,11 @@ static bool dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
+@@ -7183,6 +7183,11 @@ static bool dequeue_task_fair(struct rq *rq, struct task_struct *p, int flags)
  	return true;
  }
  
@@ -32,7 +32,7 @@ index ab939e4957c5..cd9c12af3164 100644
  #ifdef CONFIG_SMP
  
  /* Working cpumask for: sched_balance_rq(), sched_balance_newidle(). */
-@@ -7345,8 +7350,12 @@ wake_affine_idle(int this_cpu, int prev_cpu, int sync)
+@@ -7344,8 +7349,12 @@ wake_affine_idle(int this_cpu, int prev_cpu, int sync)
  	if (available_idle_cpu(this_cpu) && cpus_share_cache(this_cpu, prev_cpu))
  		return available_idle_cpu(prev_cpu) ? prev_cpu : this_cpu;
  
@@ -47,7 +47,7 @@ index ab939e4957c5..cd9c12af3164 100644
  
  	if (available_idle_cpu(prev_cpu))
  		return prev_cpu;
-@@ -7814,7 +7823,7 @@ static inline bool asym_fits_cpu(unsigned long util,
+@@ -7813,7 +7822,7 @@ static inline bool asym_fits_cpu(unsigned long util,
  /*
   * Try and locate an idle core/thread in the LLC cache domain.
   */
@@ -56,17 +56,16 @@ index ab939e4957c5..cd9c12af3164 100644
  {
  	bool has_idle_core = false;
  	struct sched_domain *sd;
-@@ -7841,6 +7850,9 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
+@@ -7840,6 +7849,8 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
  	    asym_fits_cpu(task_util, util_min, util_max, target))
  		return target;
  
 +	if (sync && (cpu_rq(target)->nr_running - cfs_h_nr_delayed(cpu_rq(target))) == 1)
 +		return target;
-+
  	/*
  	 * If the previous CPU is cache affine and idle, don't be stupid:
  	 */
-@@ -8622,7 +8634,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
+@@ -8621,7 +8632,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
  		new_cpu = sched_balance_find_dst_cpu(sd, p, cpu, prev_cpu, sd_flag);
  	} else if (wake_flags & WF_TTWU) { /* XXX always ? */
  		/* Fast path */
@@ -74,7 +73,7 @@ index ab939e4957c5..cd9c12af3164 100644
 +		new_cpu = select_idle_sibling(p, prev_cpu, new_cpu, sync);
  	}
  	rcu_read_unlock();
- 
--- 
+
+--
 2.43.0
 

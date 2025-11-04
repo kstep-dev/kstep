@@ -17,10 +17,10 @@ if __name__ == "__main__":
     system(f"./fetch_linux.py --versions {args.version}")
     system(f"cd {linux_dir} && git restore . && cd -")
 
-    # patched jiffies
-    # patch_file = f"{PROJ_DIR}/linux/{args.version}-enable-fake-jiffies-in-sched-subsystem.patch"
-    # patch_cmd = f"cd {linux_dir} && git apply {patch_file} && cd -"
-    # system(patch_cmd)
+    # patched initial min_vruntime
+    patch_file = f"{PROJ_DIR}/linux/{args.version}-vruntime_min_init.patch"
+    patch_cmd = f"cd {linux_dir} && git apply {patch_file} && cd -"
+    system(patch_cmd)
 
     # Run the buggy version
     system(f"./make_linux.py --versions {args.version}")
