@@ -3,6 +3,7 @@
 #include <linux/cpumask.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
+#include <linux/sched/clock.h>
 #include <linux/sched/signal.h>
 #include <linux/signal.h>
 
