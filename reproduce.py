@@ -12,11 +12,16 @@ versions_map = {
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--controller", type=str, default="aa3ee4f")
+    parser.add_argument("--clean", action="store_true", default=False)
 
     args = parser.parse_args()
 
     version = versions_map[args.controller]
     linux_dir = get_linux_dir(version)
+
+    # Clean up old kmod build as it may conflicts with the new kernel build
+    if args.clean:
+        system(f"make clean")
 
     system(f"./fetch_linux.py --versions {version}")
     system(f"cd {linux_dir} && git restore . && cd -")
