@@ -7,9 +7,8 @@
 #include "logging.h"
 
 static char controller_name[32] = "noop";
-module_param_string(controller_name, controller_name, sizeof(controller_name),
-                    0644);
-MODULE_PARM_DESC(controller_name, "Controller name to run");
+module_param_string(controller, controller_name, sizeof(controller_name), 0644);
+MODULE_PARM_DESC(controller, "Controller name to run");
 
 static struct task_struct *controller_task;
 
@@ -24,7 +23,7 @@ static struct controller_ops *get_controller_ops(const char *name) {
 
 static int __init kmod_init(void) {
   ksym_init();
-  sched_trace_init();
+  // sched_trace_init();
   cpu_controlled_mask_init();
   struct controller_ops *ops = get_controller_ops(controller_name);
   if (ops == NULL) {
@@ -39,7 +38,7 @@ static int __init kmod_init(void) {
 
 static void __exit kmod_exit(void) {
   kthread_stop(controller_task);
-  sched_trace_exit();
+  // sched_trace_exit();
 }
 
 module_init(kmod_init);

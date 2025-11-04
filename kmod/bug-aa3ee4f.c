@@ -2,149 +2,24 @@
 
 #include <linux/delay.h>
 #include <linux/kthread.h>
-#include <linux/mmu_context.h>
-#include <linux/module.h>
-#include <linux/sched_clock.h>
-#include <linux/workqueue.h>
-#include <linux/reboot.h> // For kernel_power_off()
 
-// Linux private headers
-#include <kernel/sched/sched.h>
-
-#define KSYM_FUNC_LIST                                                         \
-  X(void, tick_sched_timer_dying, (int cpu))                                   \
-  X(void, sched_tick, (void))                                                  \
-  X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
-  X(u64, kvm_sched_clock_read, (void))                                         \
-  X(void, tick_setup_sched_timer, (bool hrtimer))                              \
-  X(u64, sched_clock, (void))                                                  \
-  X(void, update_rq_clock, (struct rq * rq))                                   \
-  X(int, entity_eligible, (struct cfs_rq *cfs_rq, struct sched_entity *se))    \
-  X(void, signal_wake_up_state, (struct task_struct * t, int state))          \
-  X(void, try_to_wake_up, (struct task_struct *p, unsigned int state, int wake_flags)) \
-  X(void, sched_yield, (void))
-#define KSYM_VAR_LIST                                                          \
-  X(struct rq, runqueues)                                                      \
-  X(void, cd)                                                                  \
-  X(u64, __sched_clock_offset)                                                 \
-  X(unsigned int, sysctl_sched_migration_cost)                                 
+#include "controller.h"
+#include "internal.h"
 #include "ksym.h"
 #include "logging.h"
-#include "sigcode.h"
+#include "utils.h"
 
-#define SIM_INTERVAL_MS 100
-#define TICK_INTERVAL_NS (1000ULL * 1000ULL)               // 1 ms
-#define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 #define TARGET_TASK "test-proc"
 
-static struct cpumask cpu_controlled_mask;
-#define for_each_controlled_cpu(cpu) for_each_cpu(cpu, &cpu_controlled_mask)
-static void init_controlled_mask(void) {
-  cpumask_copy(&cpu_controlled_mask, cpu_active_mask);
-  cpumask_clear_cpu(0, &cpu_controlled_mask);
-}
-
-static u64 clock_value = INIT_TIME_NS;
-static u64 sched_clock(void) { return clock_value; }
-
-#if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
-// On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
-// is a wrapper of `paravirt_sched_clock` which can be changed with
-// `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
-
-static void sched_clock_init(void) {
-  *ksym___sched_clock_offset = 0;
-  ksym_paravirt_set_sched_clock(sched_clock);
-}
-
-static void sched_clock_exit(void) {
-  ksym_paravirt_set_sched_clock(ksym_kvm_sched_clock_read);
-}
-
-#elif defined(CONFIG_GENERIC_SCHED_CLOCK)
-// On other platforms (e.g., arm64), `sched_clock` is implemented in
-// `kernel/time/sched_clock.c`, and we can change the function pointer in
-// `struct clock_data` and `struct clock_read_data` to mock the sched clock.
-
-struct clock_data {
-  seqcount_latch_t seq;
-  struct clock_read_data read_data[2];
-  ktime_t wrap_kt;
-  unsigned long rate;
-  u64 (*actual_read_sched_clock)(void);
-};
-
-static struct clock_data cd_backup;
-
-static void sched_clock_init(void) {
-  struct clock_data *cd = ksym_cd;
-  memcpy(&cd_backup, cd, sizeof(struct clock_data));
-  cd->actual_read_sched_clock = sched_clock;
-  for (int i = 0; i < 2; i++) {
-    struct clock_read_data *rd = &cd->read_data[i];
-    rd->read_sched_clock = sched_clock;
-    rd->mult = 1;
-    rd->shift = 0;
-    rd->epoch_ns = 0;
-    rd->epoch_cyc = 0;
-  }
-}
-
-static void sched_clock_exit(void) {
-  memcpy(ksym_cd, &cd_backup, sizeof(struct clock_data));
-}
-
-#else
-#error "Sched clock mocking not supported for this platform"
-#endif
-
-static struct task_struct *controller_task;
 static struct task_struct *busy_task;
 static struct task_struct *busy_kthread;
 static struct task_struct *busy_kthread_children;
 
-static void print_tasks(void) {
-  int cpu;
-  for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
-    TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
-               cpu, rq->nr_running, rq->nr_switches, rq->clock,
-               rq->cfs.avg_load);
-  }
-
-  TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
-              "PPID", "vruntime", "sum-exec", "switches");
-  TRACE_DEBUG(
-      "\t-------------------------------------------------------------");
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 && p != busy_kthread && p != busy_kthread_children)
-      continue;
-    // TRACE_DEBUG("p->pid=%d, p->ppid=%d", task_pid_nr(busy_task), task_ppid_nr(busy_task));
-    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu", task_cpu(p),
-                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(p) - task_pid_nr(busy_kthread),
-                task_ppid_nr(p), p->se.vruntime, p->se.sum_exec_runtime,
-                p->nvcsw, p->nivcsw);
-  }
-}
-
-
-static void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
-  struct kernel_siginfo info = {
-      .si_signo = SIGUSR1,
-      .si_code = code,
-      .si_int = val,
-  };
-  send_sig_info(SIGUSR1, &info, p);
-  TRACE_INFO("Sent %s (si_int=%d) to pid %d", sigcode_to_str[code], val,
-             p->pid);
-  msleep(SIM_INTERVAL_MS);
-}
-
 static struct task_struct *poll_target_task(void) {
   struct task_struct *p;
   for_each_process(p) {
-    TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm, p->__state, p->on_cpu);
+    TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm,
+                p->__state, p->on_cpu);
   }
   while (1) {
     for_each_process(p) {
@@ -156,93 +31,59 @@ static struct task_struct *poll_target_task(void) {
   }
 }
 
-
+static int loopBusy(void *data);
+static int loop(void *data);
 
 static void controller_init(void) {
   int cpu;
-  for_each_controlled_cpu(cpu) { ksym_tick_sched_timer_dying(cpu); }
-  sched_clock_init();
 
+  // create a busy kthread on cpu 1
+  busy_kthread = kthread_create(loop, NULL, "busy_kthread");
+  set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
+  wake_up_process(busy_kthread);
 
-  // set_cpus_allowed_ptr(busy_kthread, &mask);
+  // create a busy kthread children on all controlled cpus
+  // don't wake up the children immediately
+  busy_kthread_children =
+      kthread_create(loopBusy, NULL, "busy_kthread_children");
+  set_cpus_allowed_ptr(busy_kthread_children, cpu_controlled_mask);
+  busy_kthread_children->wake_cpu = 2;
+
   msleep(SIM_INTERVAL_MS);
-  
+
   busy_task = poll_target_task();
+  reset_task_stats(busy_task);
+  reset_task_stats(busy_kthread);
+  reset_task_stats(busy_kthread_children);
 
-  busy_task->se.vruntime = INIT_TIME_NS;
-  busy_kthread->se.vruntime = INIT_TIME_NS;
-  busy_kthread_children->se.vruntime = INIT_TIME_NS;
-
-  busy_task->nivcsw = 0;
-  busy_kthread->nivcsw = 0;
-  busy_kthread_children->nivcsw = 0;
-
-  busy_task->nvcsw = 0;
-  busy_kthread->nvcsw = 0;
-  busy_kthread_children->nvcsw = 0;
-
-  for_each_controlled_cpu(cpu) {
-    struct rq *rq = per_cpu_ptr(ksym_runqueues, cpu);
-    struct sched_domain *sd;
-
-    ksym_update_rq_clock(rq);
-    rq->avg_idle = 2 * *ksym_sysctl_sched_migration_cost;
-    rq->max_idle_balance_cost = *ksym_sysctl_sched_migration_cost;
-    rq->nr_switches = 0;
-
-    rq->cfs.min_vruntime = INIT_TIME_NS;
-    
-    for (sd = rcu_dereference_check_sched_domain(rq->sd); \
-			sd; sd = sd->parent) {
-      sd->last_balance = jiffies;
-      sd->balance_interval = sd->min_interval;
-      sd->nr_balance_failed = 0;
-    }
-  }
-
-
+  // fork 3 processes on cpu 1
   send_sigcode(busy_task, SIGCODE_FORK, 3);
   struct task_struct *p;
   for_each_process(p) {
     if (strcmp(p->comm, TARGET_TASK) == 0)
       set_cpus_allowed_ptr(p, cpumask_of(1));
   }
-  
-}
-
-static void controller_exit(void) {
-  int cpu;
-  sched_clock_exit();
-  for_each_controlled_cpu(cpu) {
-    smp_call_function_single(cpu, (void *)ksym_tick_setup_sched_timer,
-                             (void *)true, 0);
-  }
-
-  kernel_power_off();
 }
 
 // send data to the busy kthread
 static int shared_data = 0;
-static atomic_t data_ready;
+static atomic_t data_ready = ATOMIC_INIT(0);
 static DECLARE_WAIT_QUEUE_HEAD(my_wq);
 
 static struct task_struct *find_not_eligible_task(void) {
   struct task_struct *p;
   for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task)
+    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task || p->on_cpu == 0)
       continue;
-    if (p->on_cpu == 0)
-      continue;
-    TRACE_DEBUG("pid=%d, eligible=%d, on_cpu=%d", p->pid, ksym_entity_eligible(p->se.cfs_rq, &p->se), p->on_cpu);
-    
-    if (ksym_entity_eligible(p->se.cfs_rq, &p->se) == 0) {
+
+    if (ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0) {
       return p;
     }
   }
   return NULL;
 }
 
-static void sleep_all_tasks(int cpu, struct task_struct *target) {
+static void sleep_all_tasks_except(int cpu, struct task_struct *target) {
   struct task_struct *p;
   for_each_process(p) {
     if (strcmp(p->comm, TARGET_TASK) != 0 || p == target)
@@ -251,64 +92,50 @@ static void sleep_all_tasks(int cpu, struct task_struct *target) {
   }
 }
 
-static void call_tick_once(void) {
-  print_tasks();
-  clock_value += TICK_INTERVAL_NS;
-
-  // Call tick function
-  int cpu;
-  for_each_controlled_cpu(cpu) {
-    smp_call_function_single(cpu, (void *)ksym_sched_tick, NULL, 0);
-    msleep(SIM_INTERVAL_MS);
-  }
-
-}
-struct task_struct * pause_task = NULL;
-static void controller_step(int iter) {
+static void controller_body(void) {
   for (int i = 0; i < 20; i++) {
     call_tick_once();
   }
+
+  struct task_struct *not_eligible_task = NULL;
+  // tick until there is a not eligible task on the same cpu as the busy kthread
   while (1) {
-    struct task_struct *p = find_not_eligible_task();
-    if (p && task_cpu(p) == task_cpu(busy_kthread)) {
-      TRACE_INFO("Found not eligible task %d on cpu %d", p->pid, task_cpu(p));
-      sleep_all_tasks(task_cpu(p), p);
-      
-      shared_data = iter;
-      atomic_set(&data_ready, 1);
-      wake_up_interruptible(&my_wq);
-      call_tick_once();
-      pause_task = p;
+    not_eligible_task = find_not_eligible_task();
+    if (not_eligible_task && task_cpu(not_eligible_task) == task_cpu(busy_kthread)) {
       break;
     }
     call_tick_once();
   }
 
+  // sleep all colocated tasks 
+  TRACE_INFO("Found not eligible task %d on cpu %d", not_eligible_task->pid, task_cpu(not_eligible_task));
+  sleep_all_tasks_except(task_cpu(not_eligible_task), not_eligible_task);
+  
+  call_tick_once();
+  
+  // wake up the kthread to call sync wakeup
+  shared_data = 0;
+  atomic_set(&data_ready, 1);
+  wake_up_interruptible(&my_wq);
+
+  call_tick_once();
+
+  // tick until the not eligible task is running on the cpu and pause it
   while (1) {
-    if(pause_task->on_cpu == 1) {
-      send_sigcode(pause_task, SIGCODE_PAUSE, 0);
+    if (not_eligible_task->on_cpu == 1) {
+      send_sigcode(not_eligible_task, SIGCODE_PAUSE, 0);
       break;
     }
     call_tick_once();
   }
 
+  // tick to show the impact
   for (int i = 0; i < 20; i++) {
     call_tick_once();
   }
 }
 
-static int controller(void *data) {
-  controller_init();
-  int iter = 0;
-  while (!kthread_should_stop()) {
-    controller_step(iter++);
-    break;
-  }
-  controller_exit();
-  return 0;
-}
-
-static int loopBusy(void* data) {
+static int loopBusy(void *data) {
   TRACE_INFO("Sync wakeup's children started on CPU %d", smp_processor_id());
   while (!kthread_should_stop()) {
     __asm__("" : : : "memory");
@@ -316,51 +143,24 @@ static int loopBusy(void* data) {
   return 0;
 }
 
-static int loop(void * data) {
+static int loop(void *data) {
   TRACE_INFO("Busy kthread started on CPU %d", smp_processor_id());
   while (!kthread_should_stop()) {
-    wait_event_interruptible(my_wq, atomic_read(&data_ready) != 0 || kthread_should_stop());
+    wait_event_interruptible(my_wq, atomic_read(&data_ready) != 0 ||
+                                        kthread_should_stop());
     TRACE_INFO("Receiver: Woke up! Consumed data: %d", shared_data);
     if (kthread_should_stop()) {
       break;
     }
-    
-    ksym_try_to_wake_up(busy_kthread_children, TASK_NORMAL, 0 | WF_SYNC);
-    atomic_set(&data_ready, 0);
 
+    ksym.try_to_wake_up(busy_kthread_children, TASK_NORMAL, 0 | WF_SYNC);
+    atomic_set(&data_ready, 0);
   }
   return 0;
 }
 
-static int __init kmod_init(void) {
-  init_kernel_symbols();
-  init_controlled_mask();
-
-  atomic_set(&data_ready, 0);
-
-  busy_kthread = kthread_create(loop, NULL, "busy_kthread");
-  set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
-  // set_cpus_allowed_ptr(busy_kthread, & cpu_controlled_mask);
-  wake_up_process(busy_kthread);
-
-  busy_kthread_children = kthread_create(loopBusy, NULL, "busy_kthread_children");
-  set_cpus_allowed_ptr(busy_kthread_children, & cpu_controlled_mask);
-  busy_kthread_children->wake_cpu = 2;
-
-  controller_task = kthread_create(controller, NULL, "controller");
-  set_cpus_allowed_ptr(controller_task, cpumask_of(0));
-  wake_up_process(controller_task);
-  return 0;
-}
-
-static void __exit kmod_exit(void) { 
-  kthread_stop(controller_task); 
-  kthread_stop(busy_kthread);
-}
-
-module_init(kmod_init);
-module_exit(kmod_exit);
-
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Shawn Zhong");
-MODULE_DESCRIPTION("Scheduler control");
+struct controller_ops controller_aa3ee4f = {
+    .name = "aa3ee4f",
+    .init = controller_init,
+    .body = controller_body,
+};

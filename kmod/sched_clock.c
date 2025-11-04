@@ -5,7 +5,7 @@
 #include "ksym.h"
 
 static u64 clock_value = 0;
-static u64 sched_clock(void) { return clock_value; }
+static u64 sched_clock_mock(void) { return clock_value; }
 
 void sched_clock_set(u64 value) { clock_value = value; }
 void sched_clock_inc(u64 delta) { clock_value += delta; }
@@ -17,7 +17,7 @@ void sched_clock_inc(u64 delta) { clock_value += delta; }
 
 void sched_clock_init(void) {
   *ksym.__sched_clock_offset = 0;
-  ksym.paravirt_set_sched_clock(sched_clock);
+  ksym.paravirt_set_sched_clock(sched_clock_mock);
 }
 
 void sched_clock_exit(void) {
@@ -45,7 +45,7 @@ void sched_clock_init(void) {
   cd->actual_read_sched_clock = sched_clock;
   for (int i = 0; i < 2; i++) {
     struct clock_read_data *rd = &cd->read_data[i];
-    rd->read_sched_clock = sched_clock;
+    rd->read_sched_clock = sched_clock_mock;
     rd->mult = 1;
     rd->shift = 0;
     rd->epoch_ns = 0;

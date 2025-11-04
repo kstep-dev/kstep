@@ -1,6 +1,8 @@
 #include <linux/mmu_context.h>
 #include <linux/types.h>
 
+u64 sched_clock(void);
+
 #include <kernel/sched/sched.h> // private header
 
 // Define function symbols

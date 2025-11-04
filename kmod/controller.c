@@ -1,3 +1,5 @@
+#define TRACE_LEVEL LOGLEVEL_DEBUG
+
 #include <linux/delay.h>
 #include <linux/kthread.h>
 #include <linux/module.h>
@@ -9,15 +11,15 @@
 #include "logging.h"
 #include "utils.h"
 
-void controller_tick(void) {
-  // Call tick function on one cpu at at time, excluding CPU 0
+void call_tick_once(void) {
+  print_tasks();
+  sched_clock_inc(TICK_INTERVAL_NS);
+
+  // Call tick function
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 1);
+    smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
     msleep(SIM_INTERVAL_MS);
   }
-
-  // Update clock
-  sched_clock_inc(TICK_INTERVAL_NS);
 }
 
 static void disable_timer_ticks(void) {
@@ -45,9 +47,7 @@ static void move_kthreads(void) {
   for_each_process(p) {
     if (task_cpu(p) == 0)
       continue;
-    if (strncmp(p->comm, "cpuhp/", 6) == 0 ||
-        strncmp(p->comm, "migration/", 10) == 0 ||
-        strncmp(p->comm, "ksoftirqd/", 10) == 0) {
+    if (is_sys_kthread(p)) {
       reset_task_stats(p);
       continue;
     }
@@ -59,14 +59,21 @@ static void move_kthreads(void) {
 static void reset_rq(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = cpu_rq(cpu);
-    ksym.update_rq_clock(rq);
 
+    // reset rq
+    ksym.update_rq_clock(rq);
     rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;
     rq->max_idle_balance_cost = *ksym.sysctl_sched_migration_cost;
     rq->nr_switches = 0;
 
+    // reset cfs rq
     rq->cfs.min_vruntime = INIT_TIME_NS;
+    rq->cfs.avg_vruntime = 0;
+    rq->cfs.avg_load = 0;
+    memset(&rq->cfs.avg, 0, sizeof(struct sched_avg));
+    rq->cfs.avg.last_update_time = INIT_TIME_NS;
 
+    // reset sched domain
     for (struct sched_domain *sd = rcu_dereference_check_sched_domain(rq->sd);
          sd; sd = sd->parent) {
       sd->last_balance = jiffies;
