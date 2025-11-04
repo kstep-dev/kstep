@@ -111,17 +111,13 @@ static void dump_state_json(int cpu) {
             "\"sum-exec\": %llu, "
             "\"switches\": %lu, "
             "\"prio\": %d, "
-            "\"wait-time\": %llu, "
-            "\"sum-sleep\": %llu, "
-            "\"sum-block\": %llu, "
             "\"node\": %d"
             "}"
             "}",
             task_pid_nr(p), p->comm, task_pid_nr(p), task_ppid_nr(p), cpu,
             p->on_cpu, task_state_to_char(p), p->se.vruntime, p->se.deadline,
             p->se.slice, p->se.sum_exec_runtime, p->nvcsw + p->nivcsw, p->prio,
-            p->stats.wait_sum, p->stats.sum_sleep_runtime,
-            p->stats.sum_block_runtime, task_node(p));
+            task_node(p));
   }
 }
 
