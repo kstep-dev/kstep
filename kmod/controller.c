@@ -52,14 +52,23 @@ static void disable_workqueue(void) {
 static void move_kthreads(void) {
   struct task_struct *p;
   for_each_process(p) {
-    if (task_cpu(p) == 0)
+    // Skip if 0 is the only allowed cpu
+    if (cpumask_test_cpu(0, &p->cpus_mask)
+        && cpumask_weight(&p->cpus_mask) == 1) {
       continue;
+    }
+    // skip non-kthreads
+    if (!(p->flags & PF_KTHREAD)) {
+      continue;
+    }
+
     if (is_sys_kthread(p)) {
       reset_task_stats(p);
       continue;
     }
     set_cpus_allowed_ptr(p, cpumask_of(0));
     wake_up_process(p);
+    udelay(SIM_INTERVAL_US); // sometimes kworker/1:2H can be started very late and miss the move_kthreads
   }
 }
 
