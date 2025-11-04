@@ -16,7 +16,7 @@ index 225b31aaee55..beb0f9aa5240 100644
  {
  	cfs_rq->tasks_timeline = RB_ROOT_CACHED;
 -	cfs_rq->min_vruntime = (u64)(-(1LL << 20));
-+	cfs_rq->min_vruntime = 10000000000;
++	cfs_rq->min_vruntime = 10ULL * NSEC_PER_SEC;
  #ifdef CONFIG_SMP
  	raw_spin_lock_init(&cfs_rq->removed.lock);
  #endif
