@@ -26,7 +26,7 @@ static struct task_struct *poll_target_task(void) {
       if (strcmp(p->comm, TARGET_TASK) == 0)
         return p;
     }
-    msleep(SIM_INTERVAL_MS);
+    udelay(SIM_INTERVAL_US);
     TRACE_INFO("Waiting for process %s to be created", TARGET_TASK);
   }
 }
@@ -49,7 +49,7 @@ static void controller_init(void) {
   set_cpus_allowed_ptr(busy_kthread_children, cpu_controlled_mask);
   busy_kthread_children->wake_cpu = 2;
 
-  msleep(SIM_INTERVAL_MS);
+  udelay(SIM_INTERVAL_US);
 
   busy_task = poll_target_task();
   reset_task_stats(busy_task);

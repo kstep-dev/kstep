@@ -1,8 +1,6 @@
 #include <linux/mmu_context.h>
 #include <linux/types.h>
 
-u64 sched_clock(void);
-
 #include <kernel/sched/sched.h> // private header
 
 // Define function symbols
@@ -21,7 +19,8 @@ u64 sched_clock(void);
   X(int, try_to_wake_up,                                                       \
     (struct task_struct * p, unsigned int state, int wake_flags))              \
   X(void, sched_yield, (void))                                                 \
-  X(void, freeze_task, (struct task_struct * p))
+  X(void, freeze_task, (struct task_struct * p))                               \
+  X(void, tick_offline_cpu, (unsigned int cpu))
 
 // Define variable symbols
 // Format: X(type, var_name)

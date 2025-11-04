@@ -1,3 +1,6 @@
+# Avoid adding "-dirty" to the version string, which results in kernel module version magic mismatch
+CONFIG_LOCALVERSION_AUTO=n
+
 # Debugging and tracing
 CONFIG_DEBUG_KERNEL=y
 CONFIG_DEBUG_INFO_DWARF5=y
