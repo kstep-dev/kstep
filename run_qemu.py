@@ -9,10 +9,13 @@ from scripts import PROJ_DIR, ROOTFS_IMG, Arch, get_linux_dir, get_log_path, sys
 
 
 def run_qemu(
+    linux_dir: Path,
     debug: bool = False,
     log_file: Optional[Path] = None,
     params: Optional[List[str]] = None,
 ):
+    system(f"make -C {PROJ_DIR} -j$(nproc)")
+
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
@@ -23,7 +26,6 @@ def run_qemu(
         Arch.ARM64: "qemu-system-aarch64",
     }[arch]
 
-    linux_dir = get_linux_dir()
     kernel_image_path = {
         Arch.X86_64: linux_dir / "arch/x86/boot/bzImage",
         Arch.ARM64: linux_dir / "arch/arm64/boot/Image",
@@ -89,9 +91,9 @@ def run_qemu(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--linux_dir", type=Path, default=get_linux_dir())
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--params", nargs="+", default=[])
     parser.add_argument("--log_file", type=Path, default=get_log_path(create=True))
     args = parser.parse_args()
-    system(f"make -C {PROJ_DIR} -j$(nproc)")
     run_qemu(**vars(args))
