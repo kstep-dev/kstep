@@ -18,7 +18,7 @@ void call_tick_once(void) {
   // Call tick function
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
-    msleep(SIM_INTERVAL_MS);
+    udelay(SIM_INTERVAL_US);
   }
 }
 
@@ -32,6 +32,13 @@ static void enable_timer_ticks(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     smp_call_function_single(cpu, (void *)ksym.tick_setup_sched_timer,
                              (void *)true, 0);
+  }
+}
+
+static void disable_ticks(void) {
+  // disable ticks on all cpus to avoid jiffies from being updated
+  for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
+    ksym.tick_offline_cpu(cpu);
   }
 }
 
@@ -85,6 +92,7 @@ static void reset_rq(void) {
 
 void controller_run(struct controller_ops *ops) {
   disable_timer_ticks();
+  disable_ticks();
   disable_workqueue();
   sched_clock_init();
   sched_clock_set(INIT_TIME_NS);
@@ -93,7 +101,7 @@ void controller_run(struct controller_ops *ops) {
 
   TRACE_INFO("Initializing controller %s", ops->name);
   ops->init();
-  msleep(SIM_INTERVAL_MS);
+  udelay(SIM_INTERVAL_US);
   TRACE_INFO("Running controller %s", ops->name);
   ops->body();
   TRACE_INFO("Exiting controller %s", ops->name);

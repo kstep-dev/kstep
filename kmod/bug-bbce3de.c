@@ -29,7 +29,7 @@ static void poll_target_task(void) {
       if (cgroup_task != NULL && busy_task != NULL)
         return;
     }
-    msleep(SIM_INTERVAL_MS);
+    udelay(SIM_INTERVAL_US);
     TRACE_INFO("Waiting for process %s to be created", TARGET_TASK);
   }
 }
@@ -53,7 +53,7 @@ static void record_task_groups(int val, int level_id, int id_in_level) {
         }
       }
     }
-    msleep(SIM_INTERVAL_MS);
+    udelay(SIM_INTERVAL_US);
     TRACE_INFO("Waiting for recording task_to_cgroup_id: %d level_id: %d "
                "id_in_level: %d",
                val, level_id, id_in_level);

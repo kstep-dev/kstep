@@ -20,7 +20,7 @@ void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
   send_sig_info(SIGUSR1, &info, p);
   TRACE_INFO("Sent %s (si_int=%d) to pid %d", sigcode_to_str[code], val,
              p->pid);
-  msleep(SIM_INTERVAL_MS);
+  udelay(SIM_INTERVAL_US);
 }
 
 struct task_struct *poll_task(const char *comm) {
@@ -30,7 +30,7 @@ struct task_struct *poll_task(const char *comm) {
       if (strcmp(p->comm, comm) == 0)
         return p;
     }
-    msleep(SIM_INTERVAL_MS);
+    udelay(SIM_INTERVAL_US);
     TRACE_INFO("Waiting for process %s to be created", comm);
   }
 }
@@ -87,12 +87,14 @@ void reset_task_stats(struct task_struct *p) {
 void print_tasks(void) {
   struct task_struct *p;
 
+  TRACE_INFO("sched_clock=%lld, jiffies=%lu", sched_clock(),
+             jiffies - INITIAL_JIFFIES);
+
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = cpu_rq(cpu);
-    TRACE_INFO("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
-               cpu,
+    TRACE_INFO("- CPU %d running=%d, switches=%3lld, avg_load=%lld", cpu,
                rq->nr_running - (rq->cfs.h_nr_queued - rq->cfs.h_nr_runnable),
-               rq->nr_switches, rq->clock, rq->cfs.avg_load);
+               rq->nr_switches, rq->cfs.avg_load);
   }
 
   int min_pid = INT_MAX;

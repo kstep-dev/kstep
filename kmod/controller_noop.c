@@ -1,4 +1,7 @@
+#include <linux/delay.h>
+
 #include "controller.h"
+#include "internal.h"
 #include "logging.h"
 #include "utils.h"
 
@@ -10,6 +13,8 @@ static void controller_body(void) {
   static struct task_struct *busy_task;
   busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);
+
+  udelay(SIM_INTERVAL_US);
 
   for (int i = 0; i < 10; i++) {
     TRACE_INFO("Noop controller step %d", i);

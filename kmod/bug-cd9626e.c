@@ -25,20 +25,20 @@ static struct task_struct *poll_target_task(void) {
       if (strcmp(p->comm, TARGET_TASK) == 0)
         return p;
     }
-    msleep(SIM_INTERVAL_MS);
+    udelay(SIM_INTERVAL_US);
     TRACE_INFO("Waiting for process %s to be created", TARGET_TASK);
   }
 }
 
 static void controller_init(void) {
   // set_cpus_allowed_ptr(busy_kthread, &mask);
-  msleep(SIM_INTERVAL_MS);
+  udelay(SIM_INTERVAL_US);
 
   busy_task = poll_target_task();
   reset_task_stats(busy_task);
 
   send_sigcode(busy_task, SIGCODE_FORK, 3);
-  msleep(SIM_INTERVAL_MS);
+  udelay(SIM_INTERVAL_US);
 }
 
 static struct task_struct *find_not_eligible_task(void) {
@@ -85,14 +85,14 @@ static void controller_body(void) {
 
   *ksym.pm_freezing = false;
   static_branch_dec(&freezer_active);
-  msleep(SIM_INTERVAL_MS);
+  udelay(SIM_INTERVAL_US);
 
   call_tick_once();
   call_tick_once();
 
   send_sigcode(pause_task, SIGCODE_UNKNOWN, 0);
   print_tasks();
-  msleep(SIM_INTERVAL_MS);
+  udelay(SIM_INTERVAL_US);
 
   for (int i = 0; i < 20; i++) {
     call_tick_once();

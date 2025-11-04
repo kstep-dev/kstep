@@ -7,8 +7,14 @@
 static u64 clock_value = 0;
 static u64 sched_clock_mock(void) { return clock_value; }
 
-void sched_clock_set(u64 value) { clock_value = value; }
-void sched_clock_inc(u64 delta) { clock_value += delta; }
+void sched_clock_set(u64 value) {
+  clock_value = value;
+  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(clock_value);
+}
+void sched_clock_inc(u64 delta) {
+  clock_value += delta;
+  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(clock_value);
+}
 
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
 // On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
