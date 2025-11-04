@@ -16,7 +16,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    version = versions_map[args.controller]
+    version = versions_map.get(args.controller)
+    if not version:
+        parser.error(f"controller '{args.controller}' not found in versions_map. Valid options are: {list(versions_map.keys())}")
     linux_dir = get_linux_dir(version)
 
     # Clean up old kmod build as it may conflicts with the new kernel build
