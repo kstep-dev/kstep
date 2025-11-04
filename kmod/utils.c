@@ -23,6 +23,7 @@ void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
   TRACE_INFO("Sent %s (si_int=%d) to pid %d", sigcode_to_str[code], val,
              p->pid);
   udelay(SIM_INTERVAL_US);
+  yield(); // yield to let the task (e.g. busy during its init, cgroup controller uthread) run
 }
 
 struct task_struct *poll_task(const char *comm) {

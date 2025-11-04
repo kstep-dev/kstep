@@ -18,8 +18,6 @@
 # define MAX_ID_IN_LEVEL 65536
 # define MAX_CGROUP_PATH_LENGTH 128
 
-static char buffered_cgroup_path[MAX_CGROUP_PATH_LENGTH];
-
 void write_file(const char *path, const char *value) {
   int fd = open(path, O_WRONLY);
   if (fd < 0) {
@@ -32,30 +30,14 @@ void write_file(const char *path, const char *value) {
   close(fd);
 }
 
-void write_file_at(const char *cgpath, const char * filename, const char *value) {
-  int dir = open(cgpath, O_DIRECTORY | O_RDONLY);
-  if (dir < 0) { perror("open cgroup dir"); return; }
-
-  int fd = openat(dir, filename, O_WRONLY | O_CLOEXEC);
-  if (fd < 0) { perror("open cgroup file"); close(dir); return; }
-
-  if (write(fd, value, strlen(value)) < 0) {
-    perror("write cgroup file failed");
-  }
-  printf("wrote %s to %s\n", value, filename);
-  close(fd);
-}
-
 int nextId[MAX_CGROUP_LEVELS];
 char parent_cgroup_paths[MAX_CGROUP_LEVELS][MAX_ID_IN_LEVEL][MAX_CGROUP_PATH_LENGTH];
-
 
 static void init_cgroup_nextId() {
   for (int i = 0; i < MAX_CGROUP_LEVELS; i++) {
     nextId[i] = 0;
   }
 }
-
 
 static void init_cgroup_parent_paths() {
   for (int i = 0; i < MAX_CGROUP_LEVELS; i++) {
@@ -65,19 +47,33 @@ static void init_cgroup_parent_paths() {
   }
 }
 
-static void attach_process_to_cgroup(const char *cgpath, int pid) {
-  char buf[32];
-  int len = snprintf(buf, sizeof buf, "%d", pid);
-  printf("attaching process %d to cgroup %s\n", pid, cgpath);
-  if (len <= 0 || len >= (int)sizeof buf) { 
-    perror("write cgroup.procs failed");
-    return;
-  }
-
-  write_file_at(cgpath, "cgroup.procs", buf);
-  return;
+static int form_subtree_control_path(char *path, size_t path_size, const char *parent_path) {
+  size_t written = snprintf(path, path_size, 
+                            "%s/cgroup.subtree_control", 
+                            parent_path);
+  return written > 0 && written < path_size;
 }
 
+static int form_cpuset_path(char *path, size_t path_size, const char *parent_path) {
+  size_t written = snprintf(path, path_size, 
+                            "%s/cpuset.cpus", 
+                            parent_path);
+  return written > 0 && written < path_size;
+}
+
+static int make_child_cgroup_path(char *path, size_t path_size, 
+                                  const char *parent_path, int child_level_id, int child_id_in_level) {
+  size_t written = snprintf(path, path_size, 
+                            "%s/l%d_%d", parent_path, 
+                            child_level_id, child_id_in_level);
+  return written > 0 && written < path_size;
+}
+
+static int form_cpuset_buffer(char *buf, size_t buf_size) {
+  size_t len = snprintf(buf, buf_size, 
+                        "%ld-%ld", 1L, sysconf(_SC_NPROCESSORS_ONLN) - 1L);
+  return len > 0 && len < buf_size;
+}
 static void signal_handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
   int val = info->si_int;
@@ -92,19 +88,20 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
 
     char parent_path[MAX_CGROUP_PATH_LENGTH];
     char child_path[MAX_CGROUP_PATH_LENGTH];
+    char parent_cgroup_control_path[MAX_CGROUP_PATH_LENGTH];
+    char cpuset_path[MAX_CGROUP_PATH_LENGTH];
+    char cpus[10];
 
     // if the parent_level_id is 0, the parent_path is the root cgroup
     if (parent_level_id == 0) {
-      if(parent_id_in_level != 0) perror("root cgroup id != 0");
+      if(parent_id_in_level != 0) { perror("root cgroup id != 0"); return; }
       strcpy(parent_path, CGROUP_ROOT);
-    } else { 
-      snprintf(parent_path, sizeof(parent_path),  
-        "%s/l%d_%d", 
-               parent_cgroup_paths[parent_level_id][parent_id_in_level], 
-               parent_level_id, 
-               parent_id_in_level);
+    } else if (!make_child_cgroup_path(parent_path, sizeof(parent_path), 
+                                       parent_cgroup_paths[parent_level_id][parent_id_in_level], 
+                                       parent_level_id, parent_id_in_level)) {
+      perror("make_child_cgroup_path failed");
+      return;
     }
-
 
     // check if the parent cgroup exists
     if (access(parent_path, F_OK) != 0) {
@@ -112,18 +109,21 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
       return;
     }
 
-    // write +cpu to the parent cgroup.subtree_control
-    char parent_cgroup_control_path[MAX_CGROUP_PATH_LENGTH];
-    snprintf(parent_cgroup_control_path, sizeof(parent_cgroup_control_path), 
-     "%s/cgroup.subtree_control", 
-             parent_path);
+    // write +cpu +cpuset to the parent cgroup.subtree_control
+    if (!form_subtree_control_path(parent_cgroup_control_path, 
+                                   sizeof(parent_cgroup_control_path), 
+                                   parent_path)) {
+      perror("form_subtree_control_path failed");
+      return;
+    }
     write_file(parent_cgroup_control_path, "+cpu +cpuset");
 
     // create the child cgroup path
-    snprintf(child_path, sizeof(child_path), 
-      "%s/l%d_%d", parent_path, 
-      child_level_id, 
-      child_id_in_level);
+    if (!make_child_cgroup_path(child_path, sizeof(child_path), 
+                                parent_path, child_level_id, child_id_in_level)) {
+      perror("make_child_cgroup_path failed");
+      return;
+    }
 
     // create the child cgroup
     if (mkdir(child_path, 0755))
@@ -133,56 +133,18 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
       nextId[child_level_id]++;
     }
 
-    int nproc = sysconf(_SC_NPROCESSORS_ONLN);
-    char cpus[10];
-    int len = snprintf(cpus, sizeof cpus, "%d-%d", 1, nproc - 1);
-    write_file_at(child_path, "cpuset.cpus", cpus);
-    
-  } else if (code == SIGCODE_RECORD_CGROUP) {
-    int level_id = (val >> 16) & 0xFFFF;
-    int id_in_level = val & 0xFFFF;
-
-    snprintf(buffered_cgroup_path, sizeof(buffered_cgroup_path), 
-      "%s/l%d_%d", 
-              parent_cgroup_paths[level_id][id_in_level], 
-              level_id, 
-              id_in_level);
-    printf("recorded cgroup path: %s\n", buffered_cgroup_path);
-
-  } else if (code == SIGCODE_SETCPU_CGROUP) {
-    char cpus[10];
-    snprintf(cpus, sizeof cpus, "%d", val);
-    write_file_at(buffered_cgroup_path, "cpuset.cpus", cpus);
-    // clear the buffered_cgroup_path
-    buffered_cgroup_path[0] = '\0';
-  } else if (code == SIGCODE_UNRIGISTER_CGROUP) {
-    int level_id = (val >> 16) & 0xFFFF;
-    int id_in_level = val & 0xFFFF;
-
-    snprintf(buffered_cgroup_path, sizeof(buffered_cgroup_path), 
-      "%s/l%d_%d", 
-              parent_cgroup_paths[level_id][id_in_level], 
-              level_id, 
-              id_in_level);
-    printf("unrigistering cgroup path: %s\n", buffered_cgroup_path);
-    if (rmdir(buffered_cgroup_path) < 0) {
-      perror("rmdir");
+    // set the cpuset to our testing cpu range
+    if (!form_cpuset_path(cpuset_path, sizeof(cpuset_path), child_path)) {
+      perror("form_cpuset_path failed");
+      return;
     }
-    strcpy(parent_cgroup_paths[level_id][id_in_level], "");
-  } else if (code == SIGCODE_REWEIGHT_CGROUP) {
-    int level_id = (val >> 16) & 0xFFFF;
-    int id_in_level = val & 0xFFFF;
+    if (!form_cpuset_buffer(cpus, sizeof(cpus))) {
+      perror("form_cpuset_buffer failed");
+      return;
+    }
+    write_file(cpuset_path, cpus);
 
-    snprintf(buffered_cgroup_path, sizeof(buffered_cgroup_path), 
-      "%s/l%d_%d", 
-              parent_cgroup_paths[level_id][id_in_level], 
-              level_id, 
-              id_in_level);
-    printf("reweighting cgroup path: %s\n", buffered_cgroup_path);
-    write_file_at(buffered_cgroup_path, "cpu.weight.nice", "1");
-
-  }
-  else {
+  } else {
     printf("Unknown signal code: %d\n", code);
   }
 }
@@ -203,7 +165,6 @@ int main() {
   sigaction(SIGUSR1, &sa, NULL);
   init_cgroup_nextId();
   init_cgroup_parent_paths();
-  // INSERT_YOUR_CODE
 
   pid_t pid = fork();
   if (pid < 0) {
