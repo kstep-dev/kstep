@@ -14,26 +14,6 @@
 static struct task_struct *busy_task = NULL;
 static struct task_struct *cgroup_task = NULL;
 
-static void poll_target_task(void) {
-  struct task_struct *p;
-  for_each_process(p) {
-    TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm,
-                p->__state, p->on_cpu);
-  }
-  while (1) {
-    for_each_process(p) {
-      if (strcmp(p->comm, TARGET_TASK) == 0)
-        busy_task = p;
-      if (strcmp(p->comm, "cgroup-proc") == 0)
-        cgroup_task = p;
-      if (cgroup_task != NULL && busy_task != NULL)
-        return;
-    }
-    udelay(SIM_INTERVAL_US);
-    TRACE_INFO("Waiting for process %s to be created", TARGET_TASK);
-  }
-}
-
 static int task_to_cgroup_id[128][2];
 
 static void record_task_groups(int val, int level_id, int id_in_level) {
@@ -69,7 +49,7 @@ static void controller_init(void) {
   task_to_cgroup_id[busy_task->pid - busy_task->pid][0] = 0;
   task_to_cgroup_id[busy_task->pid - busy_task->pid][1] = 0;
 
-  poll_target_task();
+  poll_task(TARGET_TASK);
   TRACE_INFO("Found busy task: %d, cgroup task: %d", busy_task->pid,
              cgroup_task->pid);
 

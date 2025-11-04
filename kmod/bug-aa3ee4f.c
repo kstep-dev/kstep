@@ -15,22 +15,6 @@ static struct task_struct *busy_task;
 static struct task_struct *busy_kthread;
 static struct task_struct *busy_kthread_children;
 
-static struct task_struct *poll_target_task(void) {
-  struct task_struct *p;
-  for_each_process(p) {
-    TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm,
-                p->__state, p->on_cpu);
-  }
-  while (1) {
-    for_each_process(p) {
-      if (strcmp(p->comm, TARGET_TASK) == 0)
-        return p;
-    }
-    udelay(SIM_INTERVAL_US);
-    TRACE_INFO("Waiting for process %s to be created", TARGET_TASK);
-  }
-}
-
 static int loopBusy(void *data);
 static int loop(void *data);
 
@@ -51,7 +35,7 @@ static void controller_init(void) {
 
   udelay(SIM_INTERVAL_US);
 
-  busy_task = poll_target_task();
+  busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);
   reset_task_stats(busy_kthread);
   reset_task_stats(busy_kthread_children);
