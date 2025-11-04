@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+
 import re
 from collections import defaultdict
 import sys
 import os
-
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch
@@ -10,25 +12,13 @@ from matplotlib import colors
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from scripts import PROJ_DIR
-
-bugId = "aa3ee4f"
-log_file  = f"{PROJ_DIR}/data/{bugId}_buggy.txt"
-title_buggy = f"{bugId} (buggy)"
-
-log_file2 = f"{PROJ_DIR}/data/{bugId}_fixed.txt"
-title_fixed = f"{bugId} (fixed)"
-
-output_file = f"{PROJ_DIR}/plot/{bugId}.pdf"
-
-start_timestamp = 10.000000
+from scripts import PROJ_DIR, LOGS_DIR
 
 cmap = plt.cm.tab20
-
 overall_color_matrix = []
 pid_to_color = {}
-
 all_cpus = [1, 2]
+
 def build_pid_matrix(filename):
     # Dictionary to store results: {timestamp: {cpu: pid}}
     current_tasks = defaultdict(dict)
@@ -56,12 +46,6 @@ def build_pid_matrix(filename):
             print(f"  CPU {cpu}: PID {pid}")
         print()
 
-
-    # Get all cpus and sorted timestamps
-    # all_cpus = set()
-    # for ts in current_tasks.values():
-        # all_cpus.update(ts.keys())
-    # all_cpus = sorted(all_cpus)
     timestamps = sorted(current_tasks.keys())
 
     # Build a 2D array: rows = cpus, cols = timestamps, values = pid
@@ -112,35 +96,50 @@ def build_color_matrix(pid_matrix, cpu_count, time_count, all_cpus, ax, title):
     ax.set_xlabel("Time (ms)")
     ax.set_title(title)
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--controller", type=str, default="aa3ee4f")
+    args = parser.parse_args()
 
-fig, axes = plt.subplots(2, 1, figsize=(8, 3), constrained_layout=True)
-pid_matrix_buggy, cpu_count_buggy, time_count_buggy, all_cpus_buggy = build_pid_matrix(log_file)
-pid_matrix_fixed, cpu_count_fixed, time_count_fixed, all_cpus_fixed = build_pid_matrix(log_file2)
-pid_to_color[-1] = 0
+    bugId = args.controller
+    log_file_buggy  = f"{LOGS_DIR}/{bugId}_buggy.log"
+    title_buggy = f"{bugId} (buggy)"
 
-build_color_matrix(pid_matrix_buggy, cpu_count_buggy, time_count_buggy, all_cpus_buggy, axes[0], title_buggy)
-build_color_matrix(pid_matrix_fixed, cpu_count_fixed, time_count_fixed, all_cpus_fixed, axes[1], title_fixed)
+    log_file_fixed = f"{LOGS_DIR}/{bugId}_fixed.log"
+    title_fixed = f"{bugId} (fixed)"
 
-legend_elements = []
+    output_file = f"{PROJ_DIR}/plot/{bugId}.pdf"
 
-norm = colors.Normalize(vmin=min([overall_color_matrix[i].min() for i in range(len(overall_color_matrix))]), 
-                        vmax=max([overall_color_matrix[i].max() for i in range(len(overall_color_matrix))]))
-for pid, color_idx in pid_to_color.items():
-    print("--", color_idx, pid)
-    if not any((overall_color_matrix[i] == color_idx).any() for i in range(len(overall_color_matrix))):
-        continue
-    
-    if pid == -1:
-        label = "No task"
-    else:
-        label = f"PID {pid}"
-    legend_elements.append(Patch(facecolor=cmap(norm(color_idx)), label=label))
-# legend_elements.append(Patch(facecolor=cmap(norm(pid_to_color[-1])), label="No task"))
-fig.legend(handles=legend_elements, 
-            bbox_to_anchor=(1.01, 0.5), 
-            loc='center left', 
-            borderaxespad=0.,
-            ncol=1)
+    start_timestamp = 10.000000
 
-plt.tight_layout()
-plt.savefig(output_file, bbox_inches='tight', pad_inches=0)
+    fig, axes = plt.subplots(2, 1, figsize=(8, 3), constrained_layout=True)
+    pid_matrix_buggy, cpu_count_buggy, time_count_buggy, all_cpus_buggy = build_pid_matrix(log_file_buggy)
+    pid_matrix_fixed, cpu_count_fixed, time_count_fixed, all_cpus_fixed = build_pid_matrix(log_file_fixed)
+    pid_to_color[-1] = 0
+
+    build_color_matrix(pid_matrix_buggy, cpu_count_buggy, time_count_buggy, all_cpus_buggy, axes[0], title_buggy)
+    build_color_matrix(pid_matrix_fixed, cpu_count_fixed, time_count_fixed, all_cpus_fixed, axes[1], title_fixed)
+
+    legend_elements = []
+
+    norm = colors.Normalize(vmin=min([overall_color_matrix[i].min() for i in range(len(overall_color_matrix))]), 
+                            vmax=max([overall_color_matrix[i].max() for i in range(len(overall_color_matrix))]))
+    for pid, color_idx in pid_to_color.items():
+        print("--", color_idx, pid)
+        if not any((overall_color_matrix[i] == color_idx).any() for i in range(len(overall_color_matrix))):
+            continue
+        
+        if pid == -1:
+            label = "No task"
+        else:
+            label = f"PID {pid}"
+        legend_elements.append(Patch(facecolor=cmap(norm(color_idx)), label=label))
+    # legend_elements.append(Patch(facecolor=cmap(norm(pid_to_color[-1])), label="No task"))
+    fig.legend(handles=legend_elements, 
+                bbox_to_anchor=(1.01, 0.5), 
+                loc='center left', 
+                borderaxespad=0.,
+                ncol=1)
+
+    plt.tight_layout()
+    plt.savefig(output_file, bbox_inches='tight', pad_inches=0)

@@ -37,17 +37,18 @@ static int loop(void *data);
 static void controller_init(void) {
   int cpu;
 
+  // create a busy kthread on cpu 1
   busy_kthread = kthread_create(loop, NULL, "busy_kthread");
   set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
-  // set_cpus_allowed_ptr(busy_kthread, & cpu_controlled_mask);
   wake_up_process(busy_kthread);
 
+  // create a busy kthread children on all controlled cpus
+  // don't wake up the children immediately
   busy_kthread_children =
       kthread_create(loopBusy, NULL, "busy_kthread_children");
   set_cpus_allowed_ptr(busy_kthread_children, cpu_controlled_mask);
   busy_kthread_children->wake_cpu = 2;
 
-  // set_cpus_allowed_ptr(busy_kthread, &mask);
   msleep(SIM_INTERVAL_MS);
 
   busy_task = poll_target_task();
@@ -55,6 +56,7 @@ static void controller_init(void) {
   reset_task_stats(busy_kthread);
   reset_task_stats(busy_kthread_children);
 
+  // fork 3 processes on cpu 1
   send_sigcode(busy_task, SIGCODE_FORK, 3);
   struct task_struct *p;
   for_each_process(p) {
@@ -71,12 +73,8 @@ static DECLARE_WAIT_QUEUE_HEAD(my_wq);
 static struct task_struct *find_not_eligible_task(void) {
   struct task_struct *p;
   for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task)
+    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task || p->on_cpu == 0)
       continue;
-    if (p->on_cpu == 0)
-      continue;
-    TRACE_DEBUG("pid=%d, eligible=%d, on_cpu=%d", p->pid,
-                ksym.entity_eligible(p->se.cfs_rq, &p->se), p->on_cpu);
 
     if (ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0) {
       return p;
@@ -85,7 +83,7 @@ static struct task_struct *find_not_eligible_task(void) {
   return NULL;
 }
 
-static void sleep_all_tasks(int cpu, struct task_struct *target) {
+static void sleep_all_tasks_except(int cpu, struct task_struct *target) {
   struct task_struct *p;
   for_each_process(p) {
     if (strcmp(p->comm, TARGET_TASK) != 0 || p == target)
@@ -94,35 +92,44 @@ static void sleep_all_tasks(int cpu, struct task_struct *target) {
   }
 }
 
-static struct task_struct *pause_task = NULL;
 static void controller_body(void) {
   for (int i = 0; i < 20; i++) {
     call_tick_once();
   }
-  while (1) {
-    struct task_struct *p = find_not_eligible_task();
-    if (p && task_cpu(p) == task_cpu(busy_kthread)) {
-      TRACE_INFO("Found not eligible task %d on cpu %d", p->pid, task_cpu(p));
-      sleep_all_tasks(task_cpu(p), p);
 
-      shared_data = 0;
-      atomic_set(&data_ready, 1);
-      wake_up_interruptible(&my_wq);
-      call_tick_once();
-      pause_task = p;
+  struct task_struct *not_eligible_task = NULL;
+  // tick until there is a not eligible task on the same cpu as the busy kthread
+  while (1) {
+    not_eligible_task = find_not_eligible_task();
+    if (not_eligible_task && task_cpu(not_eligible_task) == task_cpu(busy_kthread)) {
       break;
     }
     call_tick_once();
   }
 
+  // sleep all colocated tasks 
+  TRACE_INFO("Found not eligible task %d on cpu %d", not_eligible_task->pid, task_cpu(not_eligible_task));
+  sleep_all_tasks_except(task_cpu(not_eligible_task), not_eligible_task);
+  
+  call_tick_once();
+  
+  // wake up the kthread to call sync wakeup
+  shared_data = 0;
+  atomic_set(&data_ready, 1);
+  wake_up_interruptible(&my_wq);
+
+  call_tick_once();
+
+  // tick until the not eligible task is running on the cpu and pause it
   while (1) {
-    if (pause_task->on_cpu == 1) {
-      send_sigcode(pause_task, SIGCODE_PAUSE, 0);
+    if (not_eligible_task->on_cpu == 1) {
+      send_sigcode(not_eligible_task, SIGCODE_PAUSE, 0);
       break;
     }
     call_tick_once();
   }
 
+  // tick to show the impact
   for (int i = 0; i < 20; i++) {
     call_tick_once();
   }

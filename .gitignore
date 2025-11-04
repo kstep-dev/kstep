@@ -20,5 +20,8 @@ compile_commands.events.json
 !/data/*/README.md
 !/data/*/*/README.md
 
+# Plots
+/plot/*.pdf
+
 # Python
 __pycache__
