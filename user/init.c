@@ -262,10 +262,11 @@ int main(int argc, char *argv[], char *envp[]) {
   mount_filesystems();
   mount_cgroup_filesystem();
   set_cpu_affinity();
-  signal(SIGCHLD, SIG_IGN);
 
   run_sched_test(argc, argv, envp);
   run_init_sh();
+  signal(SIGCHLD, SIG_IGN); // waitpid in init should be called before set SIG_IGN 
+
   shell_loop();
   builtin_exit();
   return 0;
