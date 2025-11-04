@@ -42,18 +42,18 @@ static struct task_struct *find_not_eligible_task(void) {
   return NULL;
 }
 
-static struct task_struct *pause_task = NULL;
 static void controller_body(void) {
 
   for (int i = 0; i < 20; i++) {
     call_tick_once();
   }
 
+  struct task_struct *pause_task = NULL;
+
   while (1) {
-    struct task_struct *p = find_not_eligible_task();
-    if (p) {
-      TRACE_INFO("dequeue ineligible task %d", p->pid);
-      pause_task = p;
+    pause_task = find_not_eligible_task();
+    if (pause_task) {
+      TRACE_INFO("dequeue ineligible task %d", pause_task->pid);
       send_sigcode(pause_task, SIGCODE_SLEEP, 1);
       break;
     }
