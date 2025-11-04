@@ -48,7 +48,7 @@ static struct clock_data cd_backup;
 void sched_clock_init(void) {
   struct clock_data *cd = ksym.cd;
   memcpy(&cd_backup, cd, sizeof(struct clock_data));
-  cd->actual_read_sched_clock = sched_clock;
+  cd->actual_read_sched_clock = sched_clock_mock;
   for (int i = 0; i < 2; i++) {
     struct clock_read_data *rd = &cd->read_data[i];
     rd->read_sched_clock = sched_clock_mock;
