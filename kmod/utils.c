@@ -6,6 +6,7 @@
 #include <linux/sched/clock.h>
 #include <linux/sched/signal.h>
 #include <linux/signal.h>
+#include <linux/version.h>
 
 #include "internal.h"
 #include "ksym.h"
@@ -98,8 +99,15 @@ void print_tasks(void) {
 
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = cpu_rq(cpu);
+
+    int h_nr_runnable_val = 0, h_nr_queued_val = 0;
+    #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
+      h_nr_runnable_val = rq->cfs.h_nr_runnable;
+      h_nr_queued_val = rq->cfs.h_nr_queued;
+    #endif
+
     TRACE_INFO("- CPU %d running=%d, switches=%3lld, avg_load=%lld", cpu,
-               rq->nr_running - (rq->cfs.h_nr_queued - rq->cfs.h_nr_runnable),
+               rq->nr_running - (h_nr_queued_val - h_nr_runnable_val),
                rq->nr_switches, rq->cfs.avg_load);
   }
 

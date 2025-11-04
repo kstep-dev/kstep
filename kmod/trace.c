@@ -3,6 +3,7 @@
 #include <linux/ftrace.h>
 #include <linux/kernel.h>
 #include <linux/sched/clock.h>
+#include <linux/version.h>
 
 #include "internal.h"
 #include "ksym.h"
@@ -42,6 +43,14 @@ static void dump_state_table(int cpu) {
 
 static void dump_state_json(int cpu) {
   struct rq *rq = cpu_rq(cpu);
+  int h_nr_runnable_val = 0, h_nr_queued_val = 0, h_nr_idle_val = 0, nr_queued_val = 0;
+  #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
+    h_nr_runnable_val = rq->cfs.h_nr_runnable;
+    h_nr_queued_val = rq->cfs.h_nr_queued;
+    h_nr_idle_val = rq->cfs.h_nr_idle;
+    nr_queued_val = rq->cfs.nr_queued;
+  #endif
+
   pr_info("{"
           "\"rq[%d]\": "
           "{"
@@ -80,8 +89,8 @@ static void dump_state_json(int cpu) {
           "\"tg_load_avg\": %ld"
           "}"
           "}",
-          cpu, rq->cfs.min_vruntime, rq->cfs.avg_vruntime, rq->cfs.nr_queued,
-          rq->cfs.h_nr_runnable, rq->cfs.h_nr_queued, rq->cfs.h_nr_idle,
+          cpu, rq->cfs.min_vruntime, rq->cfs.avg_vruntime, nr_queued_val,
+          h_nr_runnable_val, h_nr_queued_val, h_nr_idle_val,
           rq->cfs.load.weight, rq->cfs.avg.load_avg, rq->cfs.avg.runnable_avg,
           rq->cfs.avg.util_avg, rq->cfs.avg.util_est, rq->cfs.removed.load_avg,
           rq->cfs.removed.util_avg, rq->cfs.removed.runnable_avg,
