@@ -1,17 +1,17 @@
 #define _GNU_SOURCE
 
+#include <fcntl.h>
+#include <linux/sched.h> // struct clone_args
 #include <sched.h>
 #include <signal.h>
+#include <stdint.h> // for uintptr_t
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/prctl.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <string.h>
+#include <sys/prctl.h>
 #include <sys/stat.h>
-#include <sys/syscall.h>    // SYS_clone3
-#include <linux/sched.h>    // struct clone_args
-#include <stdint.h>         // for uintptr_t
+#include <sys/syscall.h> // SYS_clone3
+#include <unistd.h>
 
 #include "../kmod/sigcode.h"
 
@@ -20,15 +20,21 @@
 void clone3(int val, const char *cgroup_path) {
   for (int i = 0; i < val; i++) {
     int cgfd = open(cgroup_path, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-    if (cgfd < 0) { perror("open cgroup"); return; }
+    if (cgfd < 0) {
+      perror("open cgroup");
+      return;
+    }
 
     struct clone_args args;
     memset(&args, 0, sizeof(args));
-    args.flags   = 0 | CLONE_INTO_CGROUP;
-    args.cgroup  = (uintptr_t)cgfd;  // <— CLONE_INTO_CGROUP: target cgroup fd
+    args.flags = 0 | CLONE_INTO_CGROUP;
+    args.cgroup = (uintptr_t)cgfd; // <— CLONE_INTO_CGROUP: target cgroup fd
 
     pid_t pid = syscall(SYS_clone3, &args, sizeof(args));
-    if (pid < 0) { perror("clone3"); return; }
+    if (pid < 0) {
+      perror("clone3");
+      return;
+    }
     if (pid == 0) {
       return;
     }
@@ -40,11 +46,21 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
   int val = info->si_int;
   int val2 = info->si_pid;
   int val3 = info->si_uid;
-  if (code == SIGCODE_FORK) {
+  if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
-      if (pid == 0)
+      if (pid == 0) {
+        if (code == SIGCODE_FORK_PIN) {
+          cpu_set_t cpuset;
+          CPU_ZERO(&cpuset);
+          CPU_SET(1, &cpuset);
+          int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+          if (s != 0) {
+            perror("sched_setaffinity");
+          }
+        }
         return;
+      }
     }
   } else if (code == SIGCODE_SLEEP) {
     sleep(val);
@@ -58,8 +74,7 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
     clone3(val, CGROUP_ROOT "/l1_0/l2_0/l3_1");
   } else if (code == SIGCODE_CLONE3_L2_1) {
     clone3(val, CGROUP_ROOT "/l1_0/l2_1");
-  }
-  else {
+  } else {
     printf("Unknown signal code: %d\n", code);
   }
 }

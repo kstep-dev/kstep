@@ -8,6 +8,7 @@
 #define KSYM_FUNC_LIST                                                         \
   X(void, tick_sched_timer_dying, (int cpu))                                   \
   X(void, sched_tick, (void))                                                  \
+  X(void, scheduler_tick, (void))                                              \
   X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
   X(u64, kvm_sched_clock_read, (void))                                         \
   X(void, tick_setup_sched_timer, (bool hrtimer))                              \
