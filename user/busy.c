@@ -38,6 +38,8 @@ void clone3(int val, const char *cgroup_path) {
 static void signal_handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
   int val = info->si_int;
+  int val2 = info->si_pid;
+  int val3 = info->si_uid;
   if (code == SIGCODE_FORK) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
