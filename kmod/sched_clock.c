@@ -5,7 +5,11 @@
 #include "ksym.h"
 
 static u64 clock_value = 0;
-static u64 sched_clock_mock(void) { return clock_value; }
+static u64 sched_clock_mock(void) { 
+  // without this, the first tick's jiffies is not faked
+  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(clock_value);
+  return clock_value; 
+}
 
 void sched_clock_set(u64 value) {
   clock_value = value;

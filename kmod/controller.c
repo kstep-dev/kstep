@@ -86,6 +86,7 @@ static void reset_rq(void) {
     rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;
     rq->max_idle_balance_cost = *ksym.sysctl_sched_migration_cost;
     rq->nr_switches = 0;
+    rq->next_balance = INITIAL_JIFFIES + nsecs_to_jiffies(INIT_TIME_NS);
 
     // reset cfs rq
     rq->cfs.min_vruntime = INIT_TIME_NS;
