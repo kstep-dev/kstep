@@ -38,11 +38,21 @@ void clone3(int val, const char *cgroup_path) {
 static void signal_handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
   int val = info->si_int;
-  if (code == SIGCODE_FORK) {
+  if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
-      if (pid == 0)
+      if (pid == 0) {
+        if (code == SIGCODE_FORK_PIN) {
+          cpu_set_t cpuset;
+          CPU_ZERO(&cpuset);
+          CPU_SET(1, &cpuset);
+          int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+          if (s != 0) {
+            perror("sched_setaffinity");
+          }
+        }
         return;
+      }
     }
   } else if (code == SIGCODE_SLEEP) {
     sleep(val);

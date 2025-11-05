@@ -11,7 +11,8 @@ from scripts import LOGS_DIR, PROJ_DIR, get_linux_dir, system
 versions_map = {
     "aa3ee4f": "6.14",
     "cd9626e": "6.12-rc3",
-    "bbce3de": "6.14"
+    "bbce3de": "6.14",
+    "2feab24": "6.9"
 }
 
 

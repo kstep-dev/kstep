@@ -4,6 +4,7 @@
 #include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/reboot.h>
+#include <linux/version.h>
 
 #include "controller.h"
 #include "internal.h"
@@ -17,7 +18,11 @@ void call_tick_once(void) {
 
   // Call tick function
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
     smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
+    #else
+    smp_call_function_single(cpu, (void *)ksym.scheduler_tick, NULL, 0);
+    #endif
     udelay(SIM_INTERVAL_US);
   }
 }
