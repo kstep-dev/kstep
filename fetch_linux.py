@@ -3,6 +3,8 @@
 import argparse
 import logging
 import multiprocessing as mp
+from pathlib import Path
+from typing import Optional
 
 from scripts import LINUX_ROOT_DIR, get_linux_dir, system
 
@@ -16,8 +18,9 @@ def clone_master():
         system(f"git clone https://github.com/torvalds/linux.git {LINUX_MASTER_DIR}")
 
 
-def add_worktree(version: str):
-    linux_dir = get_linux_dir(version)
+def add_worktree(version: str, linux_dir: Optional[Path] = None):
+    if linux_dir is None:
+        linux_dir = get_linux_dir(version)
     if linux_dir.exists():
         logging.info(f"Linux {version} already cloned to {linux_dir}")
     else:
@@ -44,6 +47,20 @@ def download_tarball(version: str):
     return linux_dir
 
 
+def set_current_linux(linux_dir: Path):
+    """Set symlink for default version"""
+    symlink = get_linux_dir()
+    symlink.unlink(missing_ok=True)
+    symlink.symlink_to(linux_dir)
+    logging.info(f"Current Linux now points to {linux_dir}")
+
+
+def fetch_linux(version: str, linux_dir: Path):
+    clone_master()
+    add_worktree(version, linux_dir=linux_dir)
+    set_current_linux(linux_dir)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--versions", nargs="+", type=str, default=["6.14"])
@@ -59,8 +76,4 @@ if __name__ == "__main__":
         else:
             results = pool.map(add_worktree, args.versions)
 
-    # Set symlink for default version
-    linux_dir = get_linux_dir()
-    linux_dir.unlink(missing_ok=True)
-    linux_dir.symlink_to(results[0])
-    logging.info(f"Current Linux now points to {results[0]}")
+    set_current_linux(results[0])

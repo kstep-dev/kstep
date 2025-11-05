@@ -25,7 +25,7 @@ def make_linux(linux_dir: Path, clean: bool = False, modules_prepare: bool = Fal
         system(f"make -C {linux_dir} -j$(nproc) mod2noconfig")
 
     # Build kernel
-    cmd = f"make -C {linux_dir} -j$(nproc)"
+    cmd = f"make -C {linux_dir} -j$(nproc) LOCALVERSION=-kstep"
     if modules_prepare:
         cmd += " modules_prepare"
     if shutil.which("bear"):
