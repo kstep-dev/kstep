@@ -13,15 +13,18 @@
 #include "logging.h"
 #include "utils.h"
 
-void send_sigcode(struct task_struct *p, enum sigcode code, int val) {
+void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
+                   int val3) {
   struct kernel_siginfo info = {
       .si_signo = SIGUSR1,
       .si_code = code,
-      .si_int = val,
+      .si_int = val1,
+      .si_pid = val2,
+      .si_uid = val3,
   };
   send_sig_info(SIGUSR1, &info, p);
-  TRACE_INFO("Sent %s (si_int=%d) to pid %d", sigcode_to_str[code], val,
-             p->pid);
+  TRACE_INFO("Sent %s (val1=%d, val2=%d, val3=%d) to pid %d",
+             sigcode_to_str[code], val1, val2, val3, p->pid);
   udelay(SIM_INTERVAL_US);
   yield(); // yield to let the task (e.g. busy during its init, cgroup controller uthread) run
 }
@@ -38,7 +41,8 @@ struct task_struct *poll_task(const char *comm) {
         return p;
     }
     udelay(SIM_INTERVAL_US);
-    yield(); // busy might be blocked by the busy controller, yield to let it run
+    yield(); // busy might be blocked by the busy controller, yield to let it
+             // run
     TRACE_INFO("Waiting for process %s to be created", comm);
   }
 }
@@ -102,10 +106,10 @@ void print_tasks(void) {
     struct rq *rq = cpu_rq(cpu);
 
     int h_nr_runnable_val = 0, h_nr_queued_val = 0;
-    #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
-      h_nr_runnable_val = rq->cfs.h_nr_runnable;
-      h_nr_queued_val = rq->cfs.h_nr_queued;
-    #endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
+    h_nr_runnable_val = rq->cfs.h_nr_runnable;
+    h_nr_queued_val = rq->cfs.h_nr_queued;
+#endif
 
     TRACE_INFO("- CPU %d running=%d, switches=%3lld, avg_load=%lld", cpu,
                rq->nr_running - (h_nr_queued_val - h_nr_runnable_val),
