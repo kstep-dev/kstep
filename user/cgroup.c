@@ -61,6 +61,13 @@ static int form_cpuset_path(char *path, size_t path_size, const char *parent_pat
   return written > 0 && written < path_size;
 }
 
+static int form_weight_path(char *path, size_t path_size, const char *parent_path) {
+  size_t written = snprintf(path, path_size, 
+                            "%s/cpu.weight", 
+                            parent_path);
+  return written > 0 && written < path_size;
+}
+
 static int make_child_cgroup_path(char *path, size_t path_size, 
                                   const char *parent_path, int child_level_id, int child_id_in_level) {
   size_t written = snprintf(path, path_size, 
@@ -74,6 +81,7 @@ static int form_cpuset_buffer(char *buf, size_t buf_size) {
                         "%ld-%ld", 1L, sysconf(_SC_NPROCESSORS_ONLN) - 1L);
   return len > 0 && len < buf_size;
 }
+
 static void signal_handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
   int val = info->si_int;
@@ -144,7 +152,48 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
     }
     write_file(cpuset_path, cpus);
 
-  } else {
+  } else if (code == SIGCODE_REWEIGHT_CGROUP_20 || code == SIGCODE_REWEIGHT_CGROUP_100) {
+    int level_id = (val >> 16) & 0xFFFF;
+    int id_in_level = val & 0xFFFF;
+
+    char cgroup_path[MAX_CGROUP_PATH_LENGTH];
+    char weight_path[MAX_CGROUP_PATH_LENGTH];
+    if (!make_child_cgroup_path(cgroup_path, sizeof(cgroup_path), 
+                                parent_cgroup_paths[level_id][id_in_level], 
+                                level_id, id_in_level)) {
+      perror("make_child_cgroup_path failed");
+      return;
+    }
+    if (!form_weight_path(weight_path, sizeof(weight_path), cgroup_path)) {
+      perror("form_weight_path failed");
+      return;
+    }
+
+    if (code == SIGCODE_REWEIGHT_CGROUP_20) {
+      write_file(weight_path, "20");
+    } else if (code == SIGCODE_REWEIGHT_CGROUP_100) {
+      write_file(weight_path, "100");
+    }
+  } else if (code == SIGCODE_SETCPU_CGROUP_1) {
+    int level_id = (val >> 16) & 0xFFFF;
+    int id_in_level = val & 0xFFFF;
+
+    char cgroup_path[MAX_CGROUP_PATH_LENGTH];
+    char cpuset_path[MAX_CGROUP_PATH_LENGTH];
+    if (!make_child_cgroup_path(cgroup_path, sizeof(cgroup_path), 
+                                parent_cgroup_paths[level_id][id_in_level], 
+                                level_id, id_in_level)) {
+      perror("make_child_cgroup_path failed");
+      return;
+    }
+    // set the cpuset to our testing cpu range
+    if (!form_cpuset_path(cpuset_path, sizeof(cpuset_path), cgroup_path)) {
+      perror("form_cpuset_path failed");
+      return;
+    }
+    write_file(cpuset_path, "1");
+  }
+  else {
     printf("Unknown signal code: %d\n", code);
   }
 }

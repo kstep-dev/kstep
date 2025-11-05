@@ -56,7 +56,7 @@ def run_qemu(
 
     cmd = [
         exe,
-        "-smp 3",
+        "-smp cpus=3,cores=3",
         "-cpu max",
         "-m 256M",
         f"-kernel {kernel_image_path}",

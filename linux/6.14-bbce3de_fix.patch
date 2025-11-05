@@ -1,0 +1,34 @@
+From 91e59ecb9dcfcb4b226afa5566307c1f47f52267 Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Tue, 4 Nov 2025 15:24:33 -0600
+Subject: [PATCH] bbce3de_fix
+
+---
+ kernel/sched/fair.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index f2efd27adb5f..37a6358ea49b 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -7068,9 +7068,6 @@ static int dequeue_entities(struct rq *rq, struct sched_entity *se, int flags)
+ 		h_nr_idle = task_has_idle_policy(p);
+ 		if (task_sleep || task_delayed || !se->sched_delayed)
+ 			h_nr_runnable = 1;
+-	} else {
+-		cfs_rq = group_cfs_rq(se);
+-		slice = cfs_rq_min_slice(cfs_rq);
+ 	}
+ 
+ 	for_each_sched_entity(se) {
+@@ -7080,6 +7077,7 @@ static int dequeue_entities(struct rq *rq, struct sched_entity *se, int flags)
+ 			if (p && &p->se == se)
+ 				return -1;
+ 
++			slice = cfs_rq_min_slice(cfs_rq);
+ 			break;
+ 		}
+ 
+-- 
+2.43.0
+
