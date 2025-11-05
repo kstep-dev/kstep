@@ -20,7 +20,8 @@
     (struct task_struct * p, unsigned int state, int wake_flags))              \
   X(void, sched_yield, (void))                                                 \
   X(void, freeze_task, (struct task_struct * p))                               \
-  X(void, tick_offline_cpu, (unsigned int cpu))
+  X(void, tick_offline_cpu, (unsigned int cpu))                                \
+  X(void, dequeue_entities, (struct cfs_rq * cfs_rq, struct sched_entity * se, int flags))
 
 // Define variable symbols
 // Format: X(type, var_name)

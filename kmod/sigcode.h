@@ -14,7 +14,9 @@
   X(SIGCODE_RECORD_CGROUP)                                                     \
   X(SIGCODE_SETCPU_CGROUP)                                                      \
   X(SIGCODE_UNRIGISTER_CGROUP)                                                \
-  X(SIGCODE_REWEIGHT_CGROUP)
+  X(SIGCODE_REWEIGHT_CGROUP_20)                                               \
+  X(SIGCODE_REWEIGHT_CGROUP_100)                                              \
+  X(SIGCODE_SETCPU_CGROUP_1)
 
 enum sigcode {
 #define X(name) name,
