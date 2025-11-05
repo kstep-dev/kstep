@@ -19,8 +19,6 @@ static int loopBusy(void *data);
 static int loop(void *data);
 
 static void controller_init(void) {
-  int cpu;
-
   // create a busy kthread on cpu 1
   busy_kthread = kthread_create(loop, NULL, "busy_kthread");
   set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
