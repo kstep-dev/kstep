@@ -3,6 +3,9 @@ src ?= $(shell pwd)
 
 kern-src ?= $(realpath $(src)/../linux/current)
 kern-ver := $(patsubst linux-%,%,$(notdir $(kern-src)))
+ifeq ($(kern-src),)
+    $(error kern-src does not exist)
+endif
 
 kmod-srcs := $(notdir $(filter-out %.mod.c,$(wildcard $(src)/*.c)))
 kmod-name := kstep-$(kern-ver)
