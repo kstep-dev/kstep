@@ -31,7 +31,8 @@
   X(void, cd)                                                                  \
   X(u64, __sched_clock_offset)                                                 \
   X(unsigned int, sysctl_sched_migration_cost)                                 \
-  X(bool, pm_freezing)
+  X(bool, pm_freezing)                                                          \
+  X(unsigned long, arch_freq_scale)
 
 struct ksym_t {
   void *(*kallsyms_lookup_name)(const char *name);
