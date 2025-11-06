@@ -241,7 +241,7 @@ void run_init_sh() {
 void run_sched_test(int argc, char *argv[], char *envp[]) {
   char *cmdline[MAX_ARGS] = {
       "insmod",
-      "schedtest.ko",
+      "kmod.ko",
   };
   int cmdline_len = 2;
   for (int i = 2; i < argc; i++) {
