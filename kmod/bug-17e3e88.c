@@ -5,7 +5,6 @@
 #include "internal.h"
 #include "ksym.h"
 #include "logging.h"
-#include "utils.h"
 
 #define TARGET_TASK "test-proc"
 
