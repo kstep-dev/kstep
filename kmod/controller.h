@@ -21,4 +21,4 @@ static struct controller_ops *controller_ops_list[] = {
 };
 
 void controller_run(struct controller_ops *ops);
-void call_tick_once(void);
+void call_tick_once(bool print_tasks_flag);
