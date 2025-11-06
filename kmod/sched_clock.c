@@ -5,19 +5,18 @@
 #include "ksym.h"
 
 static u64 clock_value = 0;
-static u64 sched_clock_mock(void) { 
-  // without this, the first tick's jiffies is not faked
-  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(clock_value);
-  return clock_value; 
-}
+static u64 sched_clock_mock(void) { return clock_value; }
 
 void sched_clock_set(u64 value) {
   clock_value = value;
   jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(clock_value);
+  smp_mb();
 }
-void sched_clock_inc(u64 delta) {
-  clock_value += delta;
-  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(clock_value);
+
+void sched_clock_tick(void) {
+  clock_value += TICK_NSEC;
+  jiffies += 1;
+  smp_mb();
 }
 
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
