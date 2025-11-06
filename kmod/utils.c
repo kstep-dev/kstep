@@ -17,7 +17,7 @@ void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
   struct kernel_siginfo info = {
       .si_signo = SIGUSR1,
       .si_code = code,
-      ._sifields = {._rt = {._sigval = {1}, ._pid = 2, ._uid = 3}}};
+      ._sifields = {._rt = {._sigval = {val1}, ._pid = val2, ._uid = val3}}};
   send_sig_info(SIGUSR1, &info, p);
   TRACE_INFO("Sent %s (val1=%d, val2=%d, val3=%d) to pid %d",
              sigcode_to_str[code], val1, val2, val3, p->pid);
