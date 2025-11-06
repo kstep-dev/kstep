@@ -15,6 +15,12 @@ versions_map = {
     "2feab24": "6.9"
 }
 
+plot_formats = {
+    "aa3ee4f": "cur_task",
+    "cd9626e": "cur_task",
+    "bbce3de": "cur_task",
+    "2feab24": "rebalance"
+}
 
 def patch_linux(linux_dir: Path, patch_file: Path):
     system(f"cd {linux_dir} && git apply {patch_file} && cd -")
@@ -23,6 +29,8 @@ def patch_linux(linux_dir: Path, patch_file: Path):
 def reset_git(linux_dir: Path):
     system(f"cd {linux_dir} && git restore . && cd -")
 
+def plot_data(python_script: str, controller: str):
+    system(f"{PROJ_DIR}/plot/plot_{python_script}.py --controller={controller}")
 
 def main(version: str, controller: str, clean: bool = False):
     linux_dir = get_linux_dir(version)
@@ -58,7 +66,7 @@ def main(version: str, controller: str, clean: bool = False):
     )
 
     # plot the logs
-    system(f"./plot/plot_cur_task.py --controller={controller}")
+    plot_data(plot_formats[controller], controller)
 
 
 if __name__ == "__main__":

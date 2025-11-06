@@ -12,8 +12,10 @@
 #include "logging.h"
 #include "utils.h"
 
-void call_tick_once(void) {
-  print_tasks();
+void call_tick_once(bool print_tasks_flag) {
+  if (print_tasks_flag) {
+    print_tasks();
+  }
   sched_clock_inc(TICK_INTERVAL_NS);
 
   // Call tick function

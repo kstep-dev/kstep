@@ -58,7 +58,7 @@ def run_qemu(
         exe,
         "-smp cpus=3,cores=3",
         "-cpu max",
-        "-m 256M",
+        "-m 25600M",
         f"-kernel {kernel_image_path}",
         f'-append "{" ".join(boot_args)}"',
         f"-drive if=virtio,file={ROOTFS_IMG},format=raw",
