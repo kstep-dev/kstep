@@ -1,0 +1,37 @@
+From aed4c9f9154d9f8adf98e6469fac6cb52bac68be Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Wed, 5 Nov 2025 21:26:32 -0600
+Subject: [PATCH] 6.9-2feab24_fix
+
+---
+ kernel/sched/fair.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index d70d6b8127cf..2dce6c82f3b1 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -9090,8 +9090,7 @@ static int detach_tasks(struct lb_env *env)
+ 		 * We've more or less seen every task there is, call it quits
+ 		 * unless we haven't found any movable task yet.
+ 		 */
+-		if (env->loop > env->loop_max &&
+-		    !(env->flags & LBF_ALL_PINNED))
++		if (env->loop > env->loop_max)
+ 			break;
+ 
+ 		/* take a breather every nr_migrate tasks */
+@@ -11348,9 +11347,7 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+ 
+ 		if (env.flags & LBF_NEED_BREAK) {
+ 			env.flags &= ~LBF_NEED_BREAK;
+-			/* Stop if we tried all running tasks */
+-			if (env.loop < busiest->nr_running)
+-				goto more_balance;
++			goto more_balance;
+ 		}
+ 
+ 		/*
+-- 
+2.43.0
+

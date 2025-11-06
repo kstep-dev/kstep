@@ -4,7 +4,6 @@
 #include "controller.h"
 #include "internal.h"
 #include "ksym.h"
-#include "logging.h"
 #include "utils.h"
 
 #define TARGET_TASK "test-proc"
@@ -18,8 +17,12 @@ static void controller_init(void) {
 }
 
 static void controller_body(void) {
-  for (int i = 0; i < 500; i++) {
-    call_tick_once();
+  for (int i = 0; i < 1000; i++) {
+    send_sigcode(busy_task, SIGCODE_FORK_PIN, 100);
+  }
+
+  for (int i = 0; i < 1000; i++) {
+    call_tick_once(false);
   }
 }
 
