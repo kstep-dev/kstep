@@ -35,13 +35,8 @@ def make_linux(linux_dir: Path, clean: bool = False, modules_prepare: bool = Fal
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--versions", nargs="+", type=str, default=["6.14"])
+    parser.add_argument("--linux_dir", type=Path, default=get_linux_dir())
     parser.add_argument("--clean", action="store_true", default=False)
     parser.add_argument("--modules_prepare", action="store_true", default=False)
     args = parser.parse_args()
-    for version in args.versions:
-        make_linux(
-            linux_dir=get_linux_dir(version),
-            clean=args.clean,
-            modules_prepare=args.modules_prepare,
-        )
+    make_linux(**vars(args))

@@ -1,24 +1,29 @@
 OUT ?= $(abspath ../data/rootfs)
-
 src ?= $(shell pwd)
-ksrc ?= $(abspath $(src)/../linux/current)
 
-schedtest-srcs := $(notdir $(filter-out %.mod.c,$(wildcard $(src)/*.c)))
+kern-src ?= $(realpath $(src)/../linux/current)
+kern-ver := $(patsubst linux-%,%,$(notdir $(kern-src)))
+ifeq ($(kern-src),)
+    $(error kern-src does not exist)
+endif
 
-obj-m := schedtest.o
-schedtest-y := $(schedtest-srcs:.c=.o)
+kmod-srcs := $(notdir $(filter-out %.mod.c,$(wildcard $(src)/*.c)))
+kmod-name := kstep-$(kern-ver)
+
+obj-m := $(kmod-name).o
+$(kmod-name)-y := $(kmod-srcs:.c=.o)
 
 # Allow the use of private headers
-ccflags-y := -I$(ksrc) -Wno-unused-variable -Wno-unused-function
+ccflags-y := -I$(kern-src) -Wno-unused-variable -Wno-unused-function
 
-schedtest.ko: $(schedtest-srcs) $(wildcard $(src)/*.h)
-	$(MAKE) -C $(ksrc) M=$(src) modules
-	cp schedtest.ko $(OUT)
+$(kmod-name).ko: $(kmod-srcs) $(wildcard $(src)/*.h)
+	$(MAKE) -C $(kern-src) M=$(src) modules
+	cp $(kmod-name).ko $(OUT)/kmod.ko
 
 .PHONY: obj
 obj:
-	$(MAKE) -C $(ksrc) M=$(src) $(obj-m)
+	$(MAKE) -C $(kern-src) M=$(src) $(obj-m)
 
 .PHONY: clean
 clean:
-	$(MAKE) -C $(ksrc) M=$(src) clean
+	$(MAKE) -C $(kern-src) M=$(src) clean
