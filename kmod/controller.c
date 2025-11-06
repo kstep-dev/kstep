@@ -10,7 +10,6 @@
 #include "internal.h"
 #include "ksym.h"
 #include "logging.h"
-#include "utils.h"
 
 void call_tick_once(void) {
   print_tasks();

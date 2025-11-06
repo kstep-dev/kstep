@@ -11,22 +11,19 @@
 #include "internal.h"
 #include "ksym.h"
 #include "logging.h"
-#include "utils.h"
 
 void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
                    int val3) {
   struct kernel_siginfo info = {
       .si_signo = SIGUSR1,
       .si_code = code,
-      .si_int = val1,
-      .si_pid = val2,
-      .si_uid = val3,
-  };
+      ._sifields = {._rt = {._sigval = {1}, ._pid = 2, ._uid = 3}}};
   send_sig_info(SIGUSR1, &info, p);
   TRACE_INFO("Sent %s (val1=%d, val2=%d, val3=%d) to pid %d",
              sigcode_to_str[code], val1, val2, val3, p->pid);
   udelay(SIM_INTERVAL_US);
-  yield(); // yield to let the task (e.g. busy during its init, cgroup controller uthread) run
+  yield(); // yield to let the task (e.g. busy during its init, cgroup
+           // controller uthread) run
 }
 
 struct task_struct *poll_task(const char *comm) {
@@ -55,26 +52,6 @@ void cpu_controlled_mask_init(void) {
   cpumask_clear_cpu(0, &cpu_controlled_mask_data);
   cpu_controlled_mask = &cpu_controlled_mask_data;
 }
-
-#if 0
-struct task_struct *find_not_eligible_task(const char *comm,
-                                           struct task_struct *skip_task) {
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, comm) != 0 || p == skip_task)
-      continue;
-    if (p->on_cpu == 0)
-      continue;
-    TRACE_DEBUG("pid=%d, eligible=%d, on_cpu=%d", p->pid,
-                ksym.entity_eligible(p->se.cfs_rq, &p->se), p->on_cpu);
-
-    if (ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0) {
-      return p;
-    }
-  }
-  return NULL;
-}
-#endif
 
 void reset_task_stats(struct task_struct *p) {
   // reset generic task stats

@@ -10,47 +10,20 @@
 #include "logging.h"
 
 // Module parameters
-static char *trace_funcs[32] = {"sched_tick"};
-static int trace_func_count = 1;
+static char *trace_funcs[32] = {};
+static int trace_func_count = 0;
 module_param_array(trace_funcs, charp, &trace_func_count, 0644);
 MODULE_PARM_DESC(trace_funcs, "Function names to trace");
 
-bool json = false;
-module_param(json, bool, 0644);
-MODULE_PARM_DESC(json, "Output in JSON format");
-
-static void dump_state_table(int cpu) {
-  struct rq *rq = cpu_rq(cpu);
-  TRACE_DEBUG("- CPU %d running=%d, switches=%3lld, clock=%lld, avg_load=%lld",
-              cpu, rq->nr_running, rq->nr_switches, rq->clock,
-              rq->cfs.avg_load);
-
-  TRACE_DEBUG("\t%3s %c%s %5s %5s %12s %12s %9s", "CPU", ' ', "S", "PID",
-              "PPID", "vruntime", "sum-exec", "switches");
-  TRACE_DEBUG(
-      "\t-------------------------------------------------------------");
-  struct task_struct *g;
-  struct task_struct *p;
-  for_each_process_thread(g, p) {
-    if (task_cpu(p) != cpu)
-      continue;
-    TRACE_DEBUG("\t%3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu %s", task_cpu(p),
-                p->on_cpu ? '>' : ' ', task_state_to_char(p), task_pid_nr(g),
-                task_ppid_nr(g), p->se.vruntime, p->se.sum_exec_runtime,
-                p->nvcsw, p->nivcsw, p->comm);
-  }
-}
-
-static void dump_state_json(int cpu) {
-  struct rq *rq = cpu_rq(cpu);
-  int h_nr_runnable_val = 0, h_nr_queued_val = 0, h_nr_idle_val = 0, nr_queued_val = 0;
-  #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
-    h_nr_runnable_val = rq->cfs.h_nr_runnable;
-    h_nr_queued_val = rq->cfs.h_nr_queued;
-    h_nr_idle_val = rq->cfs.h_nr_idle;
-    nr_queued_val = rq->cfs.nr_queued;
-  #endif
-
+void print_rq_json(struct rq *rq) {
+  int h_nr_runnable_val = 0, h_nr_queued_val = 0, h_nr_idle_val = 0,
+      nr_queued_val = 0;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
+  h_nr_runnable_val = rq->cfs.h_nr_runnable;
+  h_nr_queued_val = rq->cfs.h_nr_queued;
+  h_nr_idle_val = rq->cfs.h_nr_idle;
+  nr_queued_val = rq->cfs.nr_queued;
+#endif
   pr_info("{"
           "\"rq[%d]\": "
           "{"
@@ -65,7 +38,7 @@ static void dump_state_json(int cpu) {
           "\"max_idle_balance_cost\": %llu"
           "}"
           "}",
-          cpu, rq->nr_running, rq->nr_switches, rq->nr_uninterruptible,
+          rq->cpu, rq->nr_running, rq->nr_switches, rq->nr_uninterruptible,
           rq->next_balance, rq->curr->pid, rq->clock, rq->clock_task,
           rq->avg_idle, rq->max_idle_balance_cost);
   pr_info("{"
@@ -89,44 +62,86 @@ static void dump_state_json(int cpu) {
           "\"tg_load_avg\": %ld"
           "}"
           "}",
-          cpu, rq->cfs.min_vruntime, rq->cfs.avg_vruntime, nr_queued_val,
+          rq->cpu, rq->cfs.min_vruntime, rq->cfs.avg_vruntime, nr_queued_val,
           h_nr_runnable_val, h_nr_queued_val, h_nr_idle_val,
           rq->cfs.load.weight, rq->cfs.avg.load_avg, rq->cfs.avg.runnable_avg,
           rq->cfs.avg.util_avg, rq->cfs.avg.util_est, rq->cfs.removed.load_avg,
           rq->cfs.removed.util_avg, rq->cfs.removed.runnable_avg,
           rq->cfs.tg_load_avg_contrib, atomic_long_read(&rq->cfs.tg->load_avg));
-  pr_info("{\"rt_rq[%d]\": {\"rt_nr_running\": %u}}", cpu,
+  pr_info("{\"rt_rq[%d]\": {\"rt_nr_running\": %u}}", rq->cpu,
           rq->rt.rt_nr_running);
   pr_info("{\"dl_rq[%d]\": {\"dl_nr_running\": %u, \"bw\": %llu, "
           "\"total_bw\": %llu}}",
-          cpu, rq->dl.dl_nr_running, rq->rd->dl_bw.bw, rq->rd->dl_bw.total_bw);
+          rq->cpu, rq->dl.dl_nr_running, rq->rd->dl_bw.bw,
+          rq->rd->dl_bw.total_bw);
+}
+
+void print_task_json(struct task_struct *p) {
+  pr_info("{"
+          "\"tasks[%d]\": "
+          "{"
+          "\"comm\": \"%s\", "
+          "\"pid\": %d, "
+          "\"ppid\": %d, "
+          "\"cpu\": %d, "
+          "\"on_cpu\": %d, "
+          "\"task_state\": \"%c\", "
+          "\"vruntime\": %llu, "
+          "\"deadline\": %llu, "
+          "\"slice\": %llu, "
+          "\"sum-exec\": %llu, "
+          "\"switches\": %lu, "
+          "\"prio\": %d, "
+          "\"node\": %d"
+          "}"
+          "}",
+          task_pid_nr(p), p->comm, task_pid_nr(p), task_ppid_nr(p), task_cpu(p),
+          p->on_cpu, task_state_to_char(p), p->se.vruntime, p->se.deadline,
+          p->se.slice, p->se.sum_exec_runtime, p->nvcsw + p->nivcsw, p->prio,
+          task_node(p));
+}
+
+void print_sd_json(struct sched_domain *sd) {
+  pr_info("{"
+          "\"sd[\"%s\"]\": "
+          "{"
+          "\"last_balance\": %lu, "
+          "\"balance_interval\": %u, "
+          "\"nr_balance_failed\": %u, "
+          "\"min_interval\": %lu, "
+          "\"max_interval\": %lu, "
+          "\"max_newidle_lb_cost\": %llu, "
+          "\"busy_factor\": %u, "
+          "\"imbalance_pct\": %u, "
+          "\"cache_nice_tries\": %u, "
+          "\"imb_numa_nr\": %u, "
+          "\"nohz_idle\": %d, "
+          "\"flags\": %u, "
+          "\"level\": %u, "
+          "\"span_weight\": %u "
+          "}"
+          "}",
+          sd->name, sd->last_balance, sd->balance_interval,
+          sd->nr_balance_failed, sd->min_interval, sd->max_interval,
+          sd->max_newidle_lb_cost, sd->busy_factor, sd->imbalance_pct,
+          sd->cache_nice_tries, sd->imb_numa_nr, sd->nohz_idle, sd->flags,
+          sd->level, sd->span_weight);
+}
+
+void print_sched_state_json(void) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    print_rq_json(cpu_rq(cpu));
+  }
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct sched_domain *sd;
+    for_each_domain(cpu, sd) { print_sd_json(sd); }
+  }
   struct task_struct *g;
   struct task_struct *p;
   for_each_process_thread(g, p) {
-    if (task_cpu(p) != cpu)
+    if (task_cpu(p) == 0)
       continue;
-    pr_info("{"
-            "\"tasks[%d]\": "
-            "{"
-            "\"comm\": \"%s\", "
-            "\"pid\": %d, "
-            "\"ppid\": %d, "
-            "\"cpu\": %d, "
-            "\"on_cpu\": %d, "
-            "\"task_state\": \"%c\", "
-            "\"vruntime\": %llu, "
-            "\"deadline\": %llu, "
-            "\"slice\": %llu, "
-            "\"sum-exec\": %llu, "
-            "\"switches\": %lu, "
-            "\"prio\": %d, "
-            "\"node\": %d"
-            "}"
-            "}",
-            task_pid_nr(p), p->comm, task_pid_nr(p), task_ppid_nr(p), cpu,
-            p->on_cpu, task_state_to_char(p), p->se.vruntime, p->se.deadline,
-            p->se.slice, p->se.sum_exec_runtime, p->nvcsw + p->nivcsw, p->prio,
-            task_node(p));
+    print_task_json(p);
   }
 }
 
@@ -135,11 +150,7 @@ static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
   int cpu = smp_processor_id();
   if (cpu == 0)
     return;
-  if (json) {
-    dump_state_json(cpu);
-  } else {
-    dump_state_table(cpu);
-  }
+  TRACE_INFO("sched_tick called on CPU %d", cpu);
 }
 
 static void update_rq_clock_cb(unsigned long ip, unsigned long parent_ip,
