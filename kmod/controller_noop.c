@@ -3,7 +3,6 @@
 #include "controller.h"
 #include "internal.h"
 #include "logging.h"
-#include "utils.h"
 
 #define TARGET_TASK "test-proc"
 

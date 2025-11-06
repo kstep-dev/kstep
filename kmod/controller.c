@@ -10,7 +10,6 @@
 #include "internal.h"
 #include "ksym.h"
 #include "logging.h"
-#include "utils.h"
 
 void call_tick_once(bool print_tasks_flag) {
   if (print_tasks_flag) {
