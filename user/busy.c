@@ -46,7 +46,7 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
   int val = info->si_int;
   int val2 = info->si_pid;
   int val3 = info->si_uid;
-  if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN) {
+  if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN || code == SIGCODE_FORK_FF) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
       if (pid == 0) {
@@ -58,6 +58,12 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
           if (s != 0) {
             perror("sched_setaffinity");
           }
+        } else if (code == SIGCODE_FORK_FF) {
+          struct sched_param sp = { .sched_priority = 80 };
+          if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
+            perror("sched_setscheduler");
+          }
+          printf("set scheduler to FIFO with priority %d\n", sp.sched_priority);
         }
         return;
       }
