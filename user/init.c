@@ -256,7 +256,7 @@ void run_sched_test(int argc, char *argv[], char *envp[]) {
 
 int main(int argc, char *argv[], char *envp[]) {
   printf("\n");
-  printf("Welcome to SchedTest\n");
+  printf("Welcome to kSTEP\n");
 
   // Basic setup
   mount_filesystems();
