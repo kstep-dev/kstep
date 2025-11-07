@@ -2,9 +2,7 @@
 
 import argparse
 import logging
-import multiprocessing as mp
 from pathlib import Path
-from typing import Optional
 
 from scripts import LINUX_ROOT_DIR, get_linux_dir, system
 
@@ -18,21 +16,17 @@ def clone_master():
         system(f"git clone https://github.com/torvalds/linux.git {LINUX_MASTER_DIR}")
 
 
-def add_worktree(version: str, linux_dir: Optional[Path] = None):
-    if linux_dir is None:
-        linux_dir = get_linux_dir(version)
+def add_worktree(version: str, linux_dir: Path):
     if linux_dir.exists():
         logging.info(f"Linux {version} already cloned to {linux_dir}")
     else:
         system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} v{version}")
-    return linux_dir
 
 
-def download_tarball(version: str):
-    linux_dir = get_linux_dir(version)
+def download_tarball(version: str, linux_dir: Path):
     if linux_dir.exists():
         logging.info(f"Linux {version} source already exists in {linux_dir}")
-        return linux_dir
+        return
 
     tarball_path = LINUX_ROOT_DIR / f"{version}.tar.xz"
     if tarball_path.exists():
@@ -43,8 +37,8 @@ def download_tarball(version: str):
         )
         system(f"wget {tarball_url} -O {tarball_path}")
 
-    system(f"tar -xvf {tarball_path} -C {LINUX_ROOT_DIR}")
-    return linux_dir
+    linux_dir.mkdir(parents=True, exist_ok=True)
+    system(f"tar -xvf {tarball_path} -C {linux_dir} --strip-components=1")
 
 
 def set_current_linux(linux_dir: Path):
@@ -55,25 +49,23 @@ def set_current_linux(linux_dir: Path):
     logging.info(f"Current Linux now points to {linux_dir}")
 
 
-def fetch_linux(version: str, linux_dir: Path):
-    clone_master()
-    add_worktree(version, linux_dir=linux_dir)
+def fetch_linux(version: str, linux_dir: Path, tarball: bool = False):
+    if tarball:
+        download_tarball(version, linux_dir)
+    else:
+        clone_master()
+        add_worktree(version, linux_dir)
     set_current_linux(linux_dir)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--versions", nargs="+", type=str, default=["6.14"])
+    parser.add_argument("--version", type=str, default="6.14")
     parser.add_argument("--tarball", help="Download tarball", action="store_true")
     args = parser.parse_args()
 
-    if not args.tarball:
-        clone_master()
-
-    with mp.Pool(processes=mp.cpu_count()) as pool:
-        if args.tarball:
-            results = pool.map(download_tarball, args.versions)
-        else:
-            results = pool.map(add_worktree, args.versions)
-
-    set_current_linux(results[0])
+    fetch_linux(
+        version=args.version,
+        linux_dir=get_linux_dir(args.version),
+        tarball=args.tarball,
+    )
