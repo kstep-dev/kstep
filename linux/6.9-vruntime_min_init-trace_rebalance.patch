@@ -1,0 +1,53 @@
+From 40ca54df6e26bdfd74342190fe6d346f58b889ed Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Wed, 5 Nov 2025 21:24:56 -0600
+Subject: [PATCH] 6.9-vruntime_min_init
+
+---
+ kernel/sched/fair.c | 16 +++++++++++++++-
+ 1 file changed, 15 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index c62805dbd608..d70d6b8127cf 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -12418,6 +12418,16 @@ static __latent_entropy void run_rebalance_domains(struct softirq_action *h)
+ 	enum cpu_idle_type idle = this_rq->idle_balance ?
+ 						CPU_IDLE : CPU_NOT_IDLE;
+ 
++	if (this_rq->cpu == 0) {
++		return;
++	}
++
++	/* Measure the latency spent in this function */
++	ktime_t __sched_func_start, __sched_func_end;
++	s64 __sched_func_latency_ns;
++
++	__sched_func_start = ktime_get();
++
+ 	/*
+ 	 * If this CPU has a pending nohz_balance_kick, then do the
+ 	 * balancing on behalf of the other idle CPUs whose ticks are
+@@ -12432,6 +12442,10 @@ static __latent_entropy void run_rebalance_domains(struct softirq_action *h)
+ 	/* normal load balance */
+ 	update_blocked_averages(this_rq->cpu);
+ 	rebalance_domains(this_rq, idle);
++
++	__sched_func_end = ktime_get();
++	__sched_func_latency_ns = ktime_to_ns(__sched_func_end - __sched_func_start);
++	printk(KERN_INFO "run_rebalance_domains on CPU %d, latency: %lld ns\n", this_rq->cpu, __sched_func_latency_ns);
+ }
+ 
+ /*
+@@ -12808,7 +12822,7 @@ static void set_next_task_fair(struct rq *rq, struct task_struct *p, bool first)
+ void init_cfs_rq(struct cfs_rq *cfs_rq)
+ {
+ 	cfs_rq->tasks_timeline = RB_ROOT_CACHED;
+-	u64_u32_store(cfs_rq->min_vruntime, (u64)(-(1LL << 20)));
++	cfs_rq->min_vruntime = 10ULL * NSEC_PER_SEC;
+ #ifdef CONFIG_SMP
+ 	raw_spin_lock_init(&cfs_rq->removed.lock);
+ #endif
+-- 
+2.43.0
+
