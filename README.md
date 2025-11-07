@@ -1,11 +1,11 @@
-SchedTest
+kSTEP
 ==============
 
 - Install dependencies: `./install_deps.sh`
 
-- Download Linux kernel: `./fetch_linux.py [--versions <version>...] [--tarball]`
+- Download Linux kernel: `./fetch_linux.py [--version <version>] [--tarball]`
 
-- Build Linux kernel: `./make_linux.py [--versions <version>...] [--clean]`
+- Build Linux kernel: `./make_linux.py [--clean]`
 
 - Prepare root filesystem: `make`
 
