@@ -88,9 +88,10 @@ void print_tasks(void) {
     h_nr_queued_val = rq->cfs.h_nr_queued;
 #endif
 
-    TRACE_INFO("- CPU %d running=%d, switches=%3lld, avg_load=%lld", cpu,
+    TRACE_INFO("- CPU %d running=%d, switches=%3lld, avg_load=%lld, avg_util=%lu", cpu,
                rq->nr_running - (h_nr_queued_val - h_nr_runnable_val),
-               rq->nr_switches, rq->cfs.avg_load);
+               rq->nr_switches, rq->cfs.avg_load, 
+               rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg);
   }
 
   int min_pid = INT_MAX;
