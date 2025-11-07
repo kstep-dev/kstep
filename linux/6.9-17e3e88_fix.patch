@@ -1,0 +1,50 @@
+From 3971ecf624ce8c07a08bf4e349f3dc39d843b77c Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Thu, 6 Nov 2025 22:45:03 -0600
+Subject: [PATCH] 6.9-17e3e88_fix
+
+---
+ kernel/sched/fair.c | 25 ++++++++++++-------------
+ 1 file changed, 12 insertions(+), 13 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index ff1d318a63f9..680bfabe7099 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -8514,21 +8514,20 @@ done: __maybe_unused;
+ 	return p;
+ 
+ idle:
+-	if (!rf)
+-		return NULL;
+-
+-	new_tasks = newidle_balance(rq, rf);
++	if (rf) {
++		new_tasks = newidle_balance(rq, rf);
+ 
+-	/*
+-	 * Because newidle_balance() releases (and re-acquires) rq->lock, it is
+-	 * possible for any higher priority task to appear. In that case we
+-	 * must re-start the pick_next_entity() loop.
+-	 */
+-	if (new_tasks < 0)
+-		return RETRY_TASK;
++		/*
++		* Because newidle_balance() releases (and re-acquires) rq->lock, it is
++		* possible for any higher priority task to appear. In that case we
++		* must re-start the pick_next_entity() loop.
++		*/
++		if (new_tasks < 0)
++			return RETRY_TASK;
+ 
+-	if (new_tasks > 0)
+-		goto again;
++		if (new_tasks > 0)
++			goto again;
++	}
+ 
+ 	/*
+ 	 * rq is about to be idle, check if we need to update the
+-- 
+2.43.0
+

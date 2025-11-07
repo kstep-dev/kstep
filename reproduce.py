@@ -12,14 +12,16 @@ versions_map = {
     "aa3ee4f": "6.14",
     "cd9626e": "6.12-rc3",
     "bbce3de": "6.14",
-    "2feab24": "6.9"
+    "2feab24": "6.9",
+    "17e3e88": "6.9"
 }
 
 plot_formats = {
     "aa3ee4f": "cur_task",
     "cd9626e": "cur_task",
     "bbce3de": "cur_task",
-    "2feab24": "rebalance"
+    "2feab24": "rebalance",
+    "17e3e88": "util_avg"
 }
 
 def patch_linux(linux_dir: Path, patch_file: Path):
@@ -43,7 +45,12 @@ def main(version: str, controller: str, clean: bool = False):
     reset_git(linux_dir)
 
     # patched initial min_vruntime
-    patch_file = f"{PROJ_DIR}/linux/{version}-vruntime_min_init.patch"
+    # Select appropriate patch file based on plot format type
+    if plot_formats[controller] == "rebalance":
+        suffix = "-vruntime_min_init-trace_rebalance.patch"
+    else:
+        suffix = "-vruntime_min_init.patch"
+    patch_file = f"{PROJ_DIR}/linux/{version}{suffix}"
     patch_linux(linux_dir, patch_file)
 
     # Run the buggy version
