@@ -15,15 +15,15 @@ void call_tick_once(bool print_tasks_flag) {
   if (print_tasks_flag) {
     print_tasks();
   }
-  sched_clock_inc(TICK_INTERVAL_NS);
+  sched_clock_tick();
 
   // Call tick function
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
     smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
-    #else
+#else
     smp_call_function_single(cpu, (void *)ksym.scheduler_tick, NULL, 0);
-    #endif
+#endif
     udelay(SIM_INTERVAL_US);
   }
 }
@@ -59,8 +59,8 @@ static void move_kthreads(void) {
   struct task_struct *p;
   for_each_process(p) {
     // Skip if 0 is the only allowed cpu
-    if (cpumask_test_cpu(0, &p->cpus_mask)
-        && cpumask_weight(&p->cpus_mask) == 1) {
+    if (cpumask_test_cpu(0, &p->cpus_mask) &&
+        cpumask_weight(&p->cpus_mask) == 1) {
       continue;
     }
     // skip non-kthreads
@@ -74,7 +74,8 @@ static void move_kthreads(void) {
     }
     set_cpus_allowed_ptr(p, cpumask_of(0));
     wake_up_process(p);
-    udelay(SIM_INTERVAL_US); // sometimes kworker/1:2H can be started very late and miss the move_kthreads
+    udelay(SIM_INTERVAL_US); // sometimes kworker/1:2H can be started very late
+                             // and miss the move_kthreads
   }
 }
 
