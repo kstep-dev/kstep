@@ -4,7 +4,7 @@ import argparse
 import signal
 from pathlib import Path
 
-from scripts import get_linux_dir, system
+from scripts import LINUX_CURR_DIR, system
 
 
 def run_gdb(linux_dir: Path):
@@ -19,6 +19,6 @@ def run_gdb(linux_dir: Path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--linux_dir", type=Path, default=get_linux_dir())
+    parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
     args = parser.parse_args()
     run_gdb(**vars(args))

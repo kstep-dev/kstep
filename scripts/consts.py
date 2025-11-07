@@ -2,12 +2,13 @@ import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 PROJ_DIR = Path(__file__).parent.parent.resolve()
 
 LINUX_ROOT_DIR = PROJ_DIR / "linux"
 LINUX_CONFIG = LINUX_ROOT_DIR / "config"
+LINUX_MASTER_DIR = LINUX_ROOT_DIR / "master"
+LINUX_CURR_DIR = LINUX_ROOT_DIR / "current"
 
 USER_DIR = PROJ_DIR / "user"
 KMOD_DIR = PROJ_DIR / "kmod"
@@ -15,6 +16,10 @@ KMOD_DIR = PROJ_DIR / "kmod"
 DATA_DIR = PROJ_DIR / "data"
 ROOTFS_IMG = DATA_DIR / "rootfs.ext4"
 LOGS_DIR = DATA_DIR / "logs"
+
+
+def get_linux_dir(version: str):
+    return LINUX_ROOT_DIR / f"linux-{version}"
 
 
 def get_log_path(create: bool) -> Path:
@@ -34,10 +39,6 @@ def get_log_path(create: bool) -> Path:
             return symlink
 
 
-def get_linux_dir(version: Optional[str] = None):
-    if version is None:
-        return LINUX_ROOT_DIR / "current"
-    return LINUX_ROOT_DIR / f"linux-{version}"
 
 class Arch(Enum):
     X86_64 = "x86_64"
