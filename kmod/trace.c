@@ -9,6 +9,7 @@
 #include "ksym.h"
 #include "logging.h"
 
+#ifdef KSTEP_TRACE_SCHED
 // Module parameters
 static char *trace_funcs[32] = {};
 static int trace_func_count = 0;
@@ -259,3 +260,11 @@ void sched_trace_exit(void) {
   }
   TRACE_INFO("Scheduler trace uninitialized");
 }
+#else
+int sched_trace_init(void) {
+  return 0;
+}
+
+void sched_trace_exit(void) {
+}
+#endif
