@@ -11,6 +11,7 @@ extern struct controller_ops controller_bbce3de;
 extern struct controller_ops controller_cd9626e;
 extern struct controller_ops controller_2feab24;
 extern struct controller_ops controller_17e3e88;
+extern struct controller_ops controller_5068d84;
 extern struct controller_ops controller_noop;
 
 static struct controller_ops *controller_ops_list[] = {
@@ -19,6 +20,7 @@ static struct controller_ops *controller_ops_list[] = {
     &controller_cd9626e,
     &controller_2feab24,
     &controller_17e3e88,
+    &controller_5068d84,
     &controller_noop,
 };
 

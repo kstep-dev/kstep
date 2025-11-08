@@ -13,7 +13,8 @@ versions_map = {
     "cd9626e": "6.12-rc3",
     "bbce3de": "6.14",
     "2feab24": "6.9",
-    "17e3e88": "6.9"
+    "17e3e88": "6.9",
+    "5068d84": "6.7"
 }
 
 plot_formats = {
@@ -21,7 +22,8 @@ plot_formats = {
     "cd9626e": "cur_task",
     "bbce3de": "cur_task",
     "2feab24": "rebalance",
-    "17e3e88": "util_avg"
+    "17e3e88": "util_avg",
+    "5068d84": "min_vruntime"
 }
 
 def patch_linux(linux_dir: Path, patch_file: Path):
