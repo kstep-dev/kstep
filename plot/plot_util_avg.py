@@ -46,7 +46,7 @@ def plot_util_avg(timestamps_buggy, util_avg_values_buggy,
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 3))
     
     # Plot buggy version in first subplot
-    ax1.plot(timestamps_buggy, util_avg_values_buggy, linewidth=1, marker='*', linestyle='-', color='#A72703')
+    ax1.plot(timestamps_buggy, util_avg_values_buggy, linewidth=3, linestyle='-', color='#A72703')
     # ax1.set_xlabel('Time (ms)')
     ax1.set_ylabel('util_avg')
     ax1.set_title(f'{bugId} - Buggy Version')
@@ -55,7 +55,7 @@ def plot_util_avg(timestamps_buggy, util_avg_values_buggy,
     ax1.set_xlim(0, max(max(timestamps_buggy), max(timestamps_fixed)))
     
     # Plot fixed version in second subplot
-    ax2.plot(timestamps_fixed, util_avg_values_fixed, linewidth=1, marker='s', linestyle='-', color='#BBC863')
+    ax2.plot(timestamps_fixed, util_avg_values_fixed, linewidth=3, linestyle='-', color='#BBC863')
     ax2.set_xlabel('Time (ms)')
     ax2.set_ylabel('util_avg')
     ax2.set_title(f'{bugId} - Fixed Version')
