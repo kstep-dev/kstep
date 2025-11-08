@@ -1,6 +1,10 @@
 #include <linux/mmu_context.h>
 #include <linux/types.h>
+#include <linux/version.h>
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(6, 7, 0)
+#include <linux/sched/cputime.h>
+#endif
 #include <kernel/sched/sched.h> // private header
 
 // Define function symbols
@@ -22,7 +26,8 @@
   X(void, sched_yield, (void))                                                 \
   X(void, freeze_task, (struct task_struct * p))                               \
   X(void, tick_offline_cpu, (unsigned int cpu))                                \
-  X(void, dequeue_entities, (struct cfs_rq * cfs_rq, struct sched_entity * se, int flags))
+  X(void, dequeue_entities, (struct cfs_rq * cfs_rq, struct sched_entity * se, int flags)) \
+  X(u64, avg_vruntime, (struct cfs_rq * cfs_rq))
 
 // Define variable symbols
 // Format: X(type, var_name)

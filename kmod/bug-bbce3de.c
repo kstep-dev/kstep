@@ -65,12 +65,12 @@ static void controller_init(void) {
   send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 2 << 16 | 0x0);
 
   // set up the configuration for the cgroup tree
-  send_sigcode(cgroup_task, SIGCODE_REWEIGHT_CGROUP_20, 3 << 16 | 0x0);
-  send_sigcode(cgroup_task, SIGCODE_SETCPU_CGROUP_1, 1 << 16 | 0x0);
-  send_sigcode(cgroup_task, SIGCODE_SETCPU_CGROUP_1, 2 << 16 | 0x0);
-  send_sigcode(cgroup_task, SIGCODE_SETCPU_CGROUP_1, 2 << 16 | 0x1);
-  send_sigcode(cgroup_task, SIGCODE_SETCPU_CGROUP_1, 3 << 16 | 0x0);
-  send_sigcode(cgroup_task, SIGCODE_SETCPU_CGROUP_1, 3 << 16 | 0x1);
+  send_sigcode2(cgroup_task, SIGCODE_REWEIGHT_CGROUP, 3 << 16 | 0x0, 20);
+  send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 1 << 16 | 0x0, 1);
+  send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 2 << 16 | 0x0, 1);
+  send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 2 << 16 | 0x1, 1);
+  send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 3 << 16 | 0x0, 1);
+  send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 3 << 16 | 0x1, 1);
 
   // create 1 task in l3_0
   send_sigcode(busy_task, SIGCODE_CLONE3_L3_0, 1);
@@ -142,7 +142,7 @@ static void controller_body(void) {
 
   ksym.dequeue_entities(ineligible_tg_se->cfs_rq, ineligible_tg_se, DEQUEUE_SLEEP);
   struct task_struct *p = get_curr_task(cpu_of_ineligible_task);
-  send_sigcode(cgroup_task, SIGCODE_REWEIGHT_CGROUP_100, 3 << 16 | 0x0);
+  send_sigcode2(cgroup_task, SIGCODE_REWEIGHT_CGROUP, 3 << 16 | 0x0, 100);
 
   send_sigcode(p, SIGCODE_CLONE3_L3_0, 1);
 

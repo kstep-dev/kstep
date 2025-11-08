@@ -1,0 +1,44 @@
+From fc3757c9460fc2a7c3698d1ea1c3e10145225402 Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Fri, 7 Nov 2025 23:38:55 -0600
+Subject: [PATCH] 6.7-5068d84_fix
+
+---
+ kernel/sched/fair.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 3c431d44d4cc..b45d4f8ea98c 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -3811,17 +3811,17 @@ static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
+ 	enqueue_load_avg(cfs_rq, se);
+ 	if (se->on_rq) {
+ 		update_load_add(&cfs_rq->load, se->load.weight);
+-		if (!curr) {
+-			/*
+-			 * The entity's vruntime has been adjusted, so let's check
+-			 * whether the rq-wide min_vruntime needs updated too. Since
+-			 * the calculations above require stable min_vruntime rather
+-			 * than up-to-date one, we do the update at the end of the
+-			 * reweight process.
+-			 */
++		if (!curr)
+ 			__enqueue_entity(cfs_rq, se);
+-			update_min_vruntime(cfs_rq);
+-		}
++			
++		/*
++		 * The entity's vruntime has been adjusted, so let's check
++		 * whether the rq-wide min_vruntime needs updated too. Since
++		 * the calculations above require stable min_vruntime rather
++		 * than up-to-date one, we do the update at the end of the
++		 * reweight process.
++		 */
++		update_min_vruntime(cfs_rq);
+ 	}
+ }
+ 
+-- 
+2.43.0
+
