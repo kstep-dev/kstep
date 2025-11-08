@@ -12,6 +12,7 @@
 #include <sys/stat.h>
 #include <sys/syscall.h> // SYS_clone3
 #include <unistd.h>
+#include <sys/resource.h> // for setpriority
 
 #include "../kmod/sigcode.h"
 
@@ -53,7 +54,7 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
         if (code == SIGCODE_FORK_PIN) {
           cpu_set_t cpuset;
           CPU_ZERO(&cpuset);
-          CPU_SET(1, &cpuset);
+          CPU_SET(val2, &cpuset);
           int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
           if (s != 0) {
             perror("sched_setaffinity");
@@ -74,12 +75,19 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
     exit(0);
   } else if (code == SIGCODE_PAUSE) {
     pause();
-  } else if (code == SIGCODE_CLONE3_L3_0) {
+  } // TODO: generalize the logic of clone3 to different cgroup
+  else if (code == SIGCODE_CLONE3_L3_0) {
     clone3(val, CGROUP_ROOT "/l1_0/l2_0/l3_0");
   } else if (code == SIGCODE_CLONE3_L3_1) {
     clone3(val, CGROUP_ROOT "/l1_0/l2_0/l3_1");
   } else if (code == SIGCODE_CLONE3_L2_1) {
     clone3(val, CGROUP_ROOT "/l1_0/l2_1");
+  } else if (code == SIGCODE_CLONE3_L1_0) {
+    clone3(val, CGROUP_ROOT "/l1_0");
+  } else if (code == SIGCODE_REWEIGHT) { 
+    if (setpriority(PRIO_PROCESS, 0, val) == -1) {
+      perror("setpriority");
+    }
   } else {
     printf("Unknown signal code: %d\n", code);
   }

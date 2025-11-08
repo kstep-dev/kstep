@@ -85,6 +85,8 @@ static int form_cpuset_buffer(char *buf, size_t buf_size) {
 static void signal_handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
   int val = info->si_int;
+  int val2 = info->si_pid;
+  int val3 = info->si_uid;
   if (code == SIGCODE_CGROUP_CREATE) {
     
     // parse the parent cgroup path si_int: {parent_level_id}_{parent_id_in_level}
@@ -152,7 +154,7 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
     }
     write_file(cpuset_path, cpus);
 
-  } else if (code == SIGCODE_REWEIGHT_CGROUP_20 || code == SIGCODE_REWEIGHT_CGROUP_100) {
+  } else if (code == SIGCODE_REWEIGHT_CGROUP) {
     int level_id = (val >> 16) & 0xFFFF;
     int id_in_level = val & 0xFFFF;
 
@@ -169,12 +171,16 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
       return;
     }
 
-    if (code == SIGCODE_REWEIGHT_CGROUP_20) {
-      write_file(weight_path, "20");
-    } else if (code == SIGCODE_REWEIGHT_CGROUP_100) {
-      write_file(weight_path, "100");
+    char buf[10];
+    size_t len = snprintf(buf, sizeof(buf), "%d", val2);
+    if (len > 0 && len < sizeof(buf)) {
+      write_file(weight_path, buf);
+    } else {
+      perror("snprintf failed");
+      return;
     }
-  } else if (code == SIGCODE_SETCPU_CGROUP_1) {
+
+  } else if (code == SIGCODE_SETCPU_CGROUP) {
     int level_id = (val >> 16) & 0xFFFF;
     int id_in_level = val & 0xFFFF;
 
@@ -191,7 +197,14 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
       perror("form_cpuset_path failed");
       return;
     }
-    write_file(cpuset_path, "1");
+    char buf[10];
+    size_t len = snprintf(buf, sizeof(buf), "%d", val2);
+    if (len > 0 && len < sizeof(buf)) {
+      write_file(cpuset_path, buf);
+    } else {
+      perror("snprintf failed");
+      return;
+    }
   }
   else {
     printf("Unknown signal code: %d\n", code);
