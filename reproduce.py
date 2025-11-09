@@ -35,6 +35,12 @@ bugs = [
         smp="8,dies=4,cores=2,threads=1",
         fix_patch_file="use_special_topo.patch",
     ),
+    Bug(
+        name="6d7e478", 
+        version="6.7-rc1", 
+        plot_format="lb_event", 
+        smp="8,sockets=2,cores=2,threads=2"
+    ),
 ]
 
 def patch_linux(linux_dir: Path, patch_file: Path):
@@ -59,6 +65,8 @@ def main(bug: Bug):
     # Select appropriate patch file based on plot format type
     if bug.plot_format == "rebalance":
         suffix = "-vruntime_min_init-trace_rebalance.patch"
+    elif bug.plot_format == "lb_event":
+        suffix = "-vruntime_min_init-trace-lb.patch"
     else:
         suffix = "-vruntime_min_init.patch"
     patch_file = f"{PROJ_DIR}/linux/{bug.version}{suffix}"
