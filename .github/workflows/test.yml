@@ -20,14 +20,30 @@ jobs:
     - name: Install dependencies
       run: sudo apt update && sudo apt install -y libelf-dev
 
+    - name: Restore Linux cache
+      id: restore-cache
+      uses: actions/cache@v4
+      with:
+        path: linux/current
+        key: test-${{ matrix.linux_version }}
+
     - name: Download Linux
+      if: steps.restore-cache.outputs.cache-hit != 'true'
       run: |
         mkdir -p linux/current
         wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ matrix.linux_version }}.tar.xz -O linux.tar.xz
         tar -xvf linux.tar.xz -C linux/current --strip-components=1
 
     - name: Prepare Linux
+      if: steps.restore-cache.outputs.cache-hit != 'true'
       run: ./make_linux.py --modules_prepare
+
+    - name: Save Linux cache
+      if: steps.restore-cache.outputs.cache-hit != 'true'
+      uses: actions/cache@v4
+      with:
+        path: linux/current
+        key: test-${{ matrix.linux_version }}
 
     - name: Build kernel module
       run: make -C kmod obj
