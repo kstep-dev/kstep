@@ -30,7 +30,12 @@ void call_tick_once(bool print_tasks_flag) {
 
 static void disable_timer_ticks(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    ksym.tick_sched_timer_dying(cpu);
+    // Ref: tick_sched_timer_dying in
+    // https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L1606
+    struct tick_sched *ts = ksym.tick_get_tick_sched(cpu);
+    hrtimer_cancel(&ts->sched_timer);
+    memset(ts, 0, sizeof(struct tick_sched));
+    TRACE_INFO("Disabled timer ticks on CPU %d", cpu);
   }
 }
 
