@@ -13,6 +13,7 @@ def run_qemu(
     debug: bool = False,
     log_file: Optional[Path] = None,
     params: Optional[List[str]] = None,
+    smp: str = "cpus=3,cores=3",
 ):
     system(f"make -C {PROJ_DIR} -j$(nproc)")
 
@@ -56,7 +57,7 @@ def run_qemu(
 
     cmd = [
         exe,
-        "-smp cpus=3,cores=3",
+        f"-smp {smp}",
         "-cpu max",
         "-m 25600M",
         f"-kernel {kernel_image_path}",
@@ -95,5 +96,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--params", nargs="+", default=[])
     parser.add_argument("--log_file", type=Path, default=get_log_path(create=True))
+    parser.add_argument("--smp", type=str, default="cpus=3,cores=3")
+    # 8,dies=4,cores=2,threads=1
     args = parser.parse_args()
     run_qemu(**vars(args))
