@@ -19,10 +19,6 @@ struct sched_domain;
 int kstep_trace_init(void);
 void kstep_trace_exit(void);
 void kstep_make_function_noop(char *name);
-void print_sched_state_json(void);
-void print_task_json(struct task_struct *p);
-void print_rq_json(struct rq *rq);
-void print_sd_json(struct sched_domain *sd);
 
 // sched_clock.c
 void sched_clock_init(void);
