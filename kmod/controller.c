@@ -63,7 +63,7 @@ static void disable_jiffies_update(void) {
   // https://github.com/torvalds/linux/commit/a1ff03cd6fb9c501fff63a4a2bface9adcfa81cd
   // allows a non-timekeeper CPU to update jiffies. We force
   // `tick_do_update_jiffies64` to be a noop function to avoid the update.
-  kstep_make_function_noop("tick_do_update_jiffies64");
+  // kstep_make_function_noop("tick_do_update_jiffies64");
 }
 
 static void disable_workqueue(void) {

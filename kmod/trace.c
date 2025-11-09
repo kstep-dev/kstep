@@ -179,6 +179,13 @@ void print_sched_state_json(void) {
   regs_get_kernel_argument(arch_ftrace_get_regs(fregs), n)
 #endif
 
+// https://github.com/torvalds/linux/commit/e4cf33ca48128d580e25ebe779b7ba7b4b4cf733
+#ifdef arch_ftrace_regs
+#undef ftrace_override_function_with_return
+#define ftrace_override_function_with_return(fregs)                            \
+  ksym.override_function_with_return(&arch_ftrace_regs(fregs)->regs)
+#endif
+
 // do not call the original function, and directly return to the caller
 static void noop_cb(unsigned long ip, unsigned long parent_ip,
                     struct ftrace_ops *op, struct ftrace_regs *fregs) {
