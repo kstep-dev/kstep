@@ -16,6 +16,17 @@
             ],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "rootfs"
+        },
+        {
+            "name": "QEMU",
+            "type": "lldb",
+            "request": "attach",
+            "targetCreateCommands": [
+                "target create ${workspaceFolder}/linux/current/vmlinux"
+            ],
+            "processCreateCommands": [
+                "gdb-remote localhost:1234"
+            ]
         }
     ]
 }
