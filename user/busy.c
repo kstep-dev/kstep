@@ -47,7 +47,10 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
   int val = info->si_int;
   int val2 = info->si_pid;
   int val3 = info->si_uid;
-  if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN || code == SIGCODE_FORK_FF) {
+  if (code == SIGCODE_FORK ||
+      code == SIGCODE_FORK_PIN ||
+      code == SIGCODE_FORK_FF ||
+      code == SIGCODE_FORK_PIN_RANGE) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
       if (pid == 0) {
@@ -55,6 +58,16 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
           cpu_set_t cpuset;
           CPU_ZERO(&cpuset);
           CPU_SET(val2, &cpuset);
+          int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+          if (s != 0) {
+            perror("sched_setaffinity");
+          }
+        } else if (code == SIGCODE_FORK_PIN_RANGE) {
+          cpu_set_t cpuset;
+          CPU_ZERO(&cpuset);
+          for (int i = val2; i <= val3; i++) {
+            CPU_SET(i, &cpuset);
+          }
           int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
           if (s != 0) {
             perror("sched_setaffinity");
@@ -87,6 +100,20 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
   } else if (code == SIGCODE_REWEIGHT) { 
     if (setpriority(PRIO_PROCESS, 0, val) == -1) {
       perror("setpriority");
+    }
+  } else if (code == SIGCODE_PIN) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(val, &cpuset);
+    if (val2 == 0) {
+      CPU_SET(val, &cpuset);
+    } else {
+      for (int i = val; i <= val2; i++)
+        CPU_SET(i, &cpuset);
+    }
+    int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
+    if (s != 0) {
+      perror("sched_setaffinity");
     }
   } else {
     printf("Unknown signal code: %d\n", code);
