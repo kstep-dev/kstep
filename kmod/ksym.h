@@ -41,7 +41,7 @@
   X(unsigned long, arch_freq_scale)                                            \
   X(const struct sched_class, rt_sched_class)
 
-    struct ksym_t {
+struct ksym_t {
   void *(*kallsyms_lookup_name)(const char *name);
 
 #define X(ret_type, name, args) ret_type(*name) args;
