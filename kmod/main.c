@@ -23,7 +23,6 @@ static struct controller_ops *get_controller_ops(const char *name) {
 
 static int __init kmod_init(void) {
   ksym_init();
-  kstep_trace_init();
   cpu_controlled_mask_init();
   struct controller_ops *ops = get_controller_ops(controller_name);
   if (ops == NULL) {
@@ -36,10 +35,7 @@ static int __init kmod_init(void) {
   return 0;
 }
 
-static void __exit kmod_exit(void) {
-  kthread_stop(controller_task);
-  kstep_trace_exit();
-}
+static void __exit kmod_exit(void) { kthread_stop(controller_task); }
 
 module_init(kmod_init);
 module_exit(kmod_exit);

@@ -136,6 +136,7 @@ static void reset_rq(void) {
 }
 
 void controller_run(struct controller_ops *ops) {
+  kstep_trace_init();
   disable_timer_ticks();
   disable_jiffies_update();
   disable_workqueue();
@@ -154,4 +155,5 @@ void controller_run(struct controller_ops *ops) {
 
   sched_clock_exit();
   enable_timer_ticks();
+  kstep_trace_exit();
 }
