@@ -29,7 +29,7 @@ static void *get_addr(const char *name, void *default_addr) {
   }
 }
 
-static void fn_stub(void) { TRACE_ERR("Uninitialized kernel symbol"); }
+static void fn_stub(void) { panic("Uninitialized kernel function called"); }
 
 void ksym_init(void) {
   ksym.kallsyms_lookup_name = get_kallsyms_lookup_name();
