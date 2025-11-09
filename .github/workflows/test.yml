@@ -22,7 +22,7 @@ jobs:
       uses: actions/cache@v4
       with:
         path: linux/current
-        key: test-${{ matrix.linux_version }}
+        key: ${{ matrix.linux_version }}
 
     - name: Download Linux
       if: steps.restore-cache.outputs.cache-hit != 'true'
