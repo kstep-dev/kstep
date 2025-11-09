@@ -15,6 +15,7 @@ static int trace_func_count = 0;
 module_param_array(trace_funcs, charp, &trace_func_count, 0644);
 MODULE_PARM_DESC(trace_funcs, "Function names to trace");
 
+#if 0
 void print_rq_json(struct rq *rq) {
   int h_nr_runnable_val = 0, h_nr_queued_val = 0, h_nr_idle_val = 0,
       nr_queued_val = 0;
@@ -152,6 +153,7 @@ void print_sched_state_json(void) {
     print_task_json(p);
   }
 }
+#endif
 
 static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
                           struct ftrace_ops *op, struct ftrace_regs *fregs) {
