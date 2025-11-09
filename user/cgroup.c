@@ -198,7 +198,11 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
       return;
     }
     char buf[10];
-    size_t len = snprintf(buf, sizeof(buf), "%d", val2);
+    size_t len;
+    if (val3 == 0)
+      len = snprintf(buf, sizeof(buf), "%d", val2);
+    else
+      len = snprintf(buf, sizeof(buf), "%d-%d", val2, val3);
     if (len > 0 && len < sizeof(buf)) {
       write_file(cpuset_path, buf);
     } else {

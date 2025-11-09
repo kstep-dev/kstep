@@ -1,0 +1,25 @@
+From 70104a399256eccf9bd0016c2a70600e9ca8f7e4 Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Sun, 9 Nov 2025 03:39:28 -0600
+Subject: [PATCH] vruntime_min_init
+
+---
+ kernel/sched/fair.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 2048138ce54b..98a74a3fedc2 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -12644,7 +12644,7 @@ static void set_next_task_fair(struct rq *rq, struct task_struct *p, bool first)
+ void init_cfs_rq(struct cfs_rq *cfs_rq)
+ {
+ 	cfs_rq->tasks_timeline = RB_ROOT_CACHED;
+-	u64_u32_store(cfs_rq->min_vruntime, (u64)(-(1LL << 20)));
++	cfs_rq->min_vruntime = 10ULL * NSEC_PER_SEC;
+ #ifdef CONFIG_SMP
+ 	raw_spin_lock_init(&cfs_rq->removed.lock);
+ #endif
+-- 
+2.43.0
+

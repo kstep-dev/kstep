@@ -1,0 +1,50 @@
+From 7e6e5bb200379b549adbb41043488e969e368d40 Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Sun, 9 Nov 2025 03:41:33 -0600
+Subject: [PATCH] use_special_topo
+
+---
+ arch/x86/kernel/smpboot.c      | 7 +++----
+ include/linux/sched/topology.h | 8 +++++++-
+ 2 files changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/arch/x86/kernel/smpboot.c b/arch/x86/kernel/smpboot.c
+index 2cc2aa120b4b..cf9997cb10c4 100644
+--- a/arch/x86/kernel/smpboot.c
++++ b/arch/x86/kernel/smpboot.c
+@@ -615,10 +615,9 @@ static int x86_cluster_flags(void)
+ 
+ static int x86_die_flags(void)
+ {
+-	if (cpu_feature_enabled(X86_FEATURE_HYBRID_CPU))
+-	       return x86_sched_itmt_flags();
+-
+-	return 0;
++	// Qemu x86 does not support cluster CPU topology, simulate with die using cluster flags.
++	// TODO: using qemu arm to experiment this bug.
++	return cpu_cluster_flags() | x86_sched_itmt_flags();
+ }
+ 
+ /*
+diff --git a/include/linux/sched/topology.h b/include/linux/sched/topology.h
+index de545ba85218..684372c6114b 100644
+--- a/include/linux/sched/topology.h
++++ b/include/linux/sched/topology.h
+@@ -260,7 +260,13 @@ static inline void rebuild_sched_domains_energy(void)
+ static __always_inline
+ unsigned long arch_scale_cpu_capacity(int cpu)
+ {
+-	return SCHED_CAPACITY_SCALE;
++	// fake the asym cpu capacity.
++	// TODO: move this fake into kSTEP isntead of here.
++	if (cpu % 2 == 0) {
++		return SCHED_CAPACITY_SCALE;
++	} else {
++		return SCHED_CAPACITY_SCALE >> 1;
++	}
+ }
+ #endif
+ 
+-- 
+2.43.0
+

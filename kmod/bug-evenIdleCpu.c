@@ -1,0 +1,53 @@
+#include <linux/delay.h>
+#include <linux/kthread.h>
+
+#include "controller.h"
+#include "internal.h"
+#include "ksym.h"
+#include "logging.h"
+#include "sigcode.h"
+
+#define TARGET_TASK "test-proc"
+#define CGROUP_TASK "cgroup-proc"
+
+static struct task_struct *busy_task;
+static struct task_struct *cgroup_task;
+
+static void controller_init(void) {
+  busy_task = poll_task(TARGET_TASK);
+  reset_task_stats(busy_task);
+  udelay(SIM_INTERVAL_US);
+  send_sigcode(busy_task, SIGCODE_PIN, 1);
+  cgroup_task = poll_task(CGROUP_TASK);
+}
+
+static void controller_body(void) {
+  // making the nr_running on cpu 4-7 to [1, 0, 3, 1]
+  send_sigcode(busy_task, SIGCODE_PIN, 4);
+  send_sigcode3(busy_task, SIGCODE_FORK_PIN_RANGE, 3, 6, 6);
+  send_sigcode3(busy_task, SIGCODE_FORK_PIN_RANGE, 1, 7, 7);
+  
+  for (int i = 0; i < 200; i++) {
+    call_tick_once(true);
+  }
+
+  struct task_struct *pin_task;
+  for_each_process(pin_task) {
+    if (strcmp(pin_task->comm, TARGET_TASK) != 0 || pin_task == busy_task)
+      continue;
+    if (task_cpu(pin_task) == 6)
+      send_sigcode2(pin_task, SIGCODE_PIN, 4, 6);
+  }
+
+
+  for(int i = 0; i < 1000; i++) {
+    call_tick_once(true);
+  }
+
+}
+
+struct controller_ops controller_evenIdleCpu = {
+    .name = "evenIdleCpu",
+    .init = controller_init,
+    .body = controller_body,
+};
