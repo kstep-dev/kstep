@@ -14,6 +14,7 @@ def run_qemu(
     log_file: Optional[Path] = None,
     params: Optional[List[str]] = None,
     smp: str = "cpus=3,cores=3",
+    mem_mb: int = 256,
 ):
     system(f"make -C {PROJ_DIR} -j$(nproc)")
 
@@ -59,7 +60,7 @@ def run_qemu(
         exe,
         f"-smp {smp}",
         "-cpu max",
-        "-m 25600M",
+        f"-m {mem_mb}M",
         f"-kernel {kernel_image_path}",
         f'-append "{" ".join(boot_args)}"',
         f"-drive if=virtio,file={ROOTFS_IMG},format=raw",
