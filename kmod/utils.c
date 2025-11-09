@@ -66,7 +66,7 @@ void reset_task_stats(struct task_struct *p) {
   p->se.vruntime = INIT_TIME_NS;
   // p->se.deadline = INIT_TIME_NS;
 
-  // https://github.com/torvalds/linux/commit/86bfbb7ce4f67a88df2639198169b685668e7349
+// https://github.com/torvalds/linux/commit/86bfbb7ce4f67a88df2639198169b685668e7349
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
   p->se.vlag = 0;
 #endif
