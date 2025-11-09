@@ -1,46 +1,41 @@
 #!/usr/bin/env python3
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Optional
 
 from checkout_linux import checkout_linux
 from make_linux import make_linux
 from run_qemu import run_qemu
 from scripts import LOGS_DIR, PROJ_DIR, get_linux_dir, system
 
-versions_map = {
-    "aa3ee4f": "6.14",
-    "cd9626e": "6.12-rc3",
-    "bbce3de": "6.14",
-    "2feab24": "6.9",
-    "17e3e88": "6.9",
-    "5068d84": "6.7",
-    "evenIdleCpu": "6.7-rc1"
-}
 
-plot_formats = {
-    "aa3ee4f": "cur_task",
-    "cd9626e": "cur_task",
-    "bbce3de": "cur_task",
-    "2feab24": "rebalance",
-    "17e3e88": "util_avg",
-    "5068d84": "min_vruntime",
-    "evenIdleCpu": "nr_running"
-}
+@dataclass(frozen=True)
+class Bug:
+    name: str
+    version: str
+    plot_format: str
+    smp: str = "cpus=3,cores=3"
+    mem_mb: int = 256
+    fix_patch_file: Optional[str] = None
 
-fix_patch_files = {
-    "evenIdleCpu": "use_special_topo.patch"
-}
 
-smp = {
-    "aa3ee4f": "cpus=3,cores=3",
-    "cd9626e": "cpus=3,cores=3",
-    "bbce3de": "cpus=3,cores=3",
-    "2feab24": "cpus=3,cores=3",
-    "17e3e88": "cpus=3,cores=3",
-    "5068d84": "cpus=3,cores=3",
-    "evenIdleCpu": "8,dies=4,cores=2,threads=1"
-}
+bugs = [
+    Bug(name="aa3ee4f", version="6.14", plot_format="cur_task"),
+    Bug(name="cd9626e", version="6.12-rc3", plot_format="cur_task"),
+    Bug(name="bbce3de", version="6.14", plot_format="cur_task"),
+    Bug(name="2feab24", version="6.9", plot_format="rebalance", mem_mb=25600),
+    Bug(name="17e3e88", version="6.9", plot_format="util_avg"),
+    Bug(name="5068d84", version="6.7", plot_format="min_vruntime"),
+    Bug(
+        name="evenIdleCpu",
+        version="6.7-rc1",
+        plot_format="nr_running",
+        smp="8,dies=4,cores=2,threads=1",
+        fix_patch_file="use_special_topo.patch",
+    ),
+]
 
 def patch_linux(linux_dir: Path, patch_file: Path):
     system(f"cd {linux_dir} && git apply {patch_file} && cd -")
@@ -49,67 +44,63 @@ def patch_linux(linux_dir: Path, patch_file: Path):
 def reset_git(linux_dir: Path):
     system(f"cd {linux_dir} && git restore . && cd -")
 
+
 def plot_data(python_script: str, controller: str):
     system(f"{PROJ_DIR}/plot/plot_{python_script}.py --controller={controller}")
 
-def main(version: str, controller: str, clean: bool = False):
-    linux_dir = get_linux_dir(version)
 
-    # Clean up old kmod build as it may conflicts with the new kernel build
-    if clean:
-        system(f"make -C {PROJ_DIR} clean")
+def main(bug: Bug):
+    linux_dir = get_linux_dir(bug.version)
 
-    checkout_linux(version, linux_dir=linux_dir)
+    checkout_linux(bug.version, linux_dir=linux_dir)
     reset_git(linux_dir)
 
     # patched initial min_vruntime
     # Select appropriate patch file based on plot format type
-    if plot_formats[controller] == "rebalance":
+    if bug.plot_format == "rebalance":
         suffix = "-vruntime_min_init-trace_rebalance.patch"
     else:
         suffix = "-vruntime_min_init.patch"
-    patch_file = f"{PROJ_DIR}/linux/{version}{suffix}"
+    patch_file = f"{PROJ_DIR}/linux/{bug.version}{suffix}"
     patch_linux(linux_dir, patch_file)
 
     # Run the buggy version
     make_linux(linux_dir)
     run_qemu(
         linux_dir=linux_dir,
-        params=[f"controller={controller}"],
-        log_file=LOGS_DIR / f"{controller}_buggy.log",
-        smp=smp[controller],
+        params=[f"controller={bug.name}"],
+        log_file=LOGS_DIR / f"{bug.name}_buggy.log",
+        smp=bug.smp,
+        mem_mb=bug.mem_mb,
     )
 
-    # Run the fixed version 
+    # Run the fixed version
     # for the new bug evenIdleCpu, we use the patch that generate special topo trigger the bug.
-    if controller not in fix_patch_files:
-        patch_file = f"{PROJ_DIR}/linux/{version}-{controller}_fix.patch"
+    if not bug.fix_patch_file:
+        patch_file = f"{PROJ_DIR}/linux/{bug.version}-{bug.name}_fix.patch"
     else:
-        patch_file = f"{PROJ_DIR}/linux/{version}-{fix_patch_files[controller]}"
+        patch_file = f"{PROJ_DIR}/linux/{bug.version}-{bug.fix_patch_file}"
     patch_linux(linux_dir, patch_file)
 
     make_linux(linux_dir)
     run_qemu(
         linux_dir=linux_dir,
-        params=[f"controller={controller}"],
-        log_file=LOGS_DIR / f"{controller}_fixed.log",
-        smp=smp[controller],
+        params=[f"controller={bug.name}"],
+        log_file=LOGS_DIR / f"{bug.name}_fixed.log",
+        smp=bug.smp,
+        mem_mb=bug.mem_mb,
     )
 
     # plot the logs
-    plot_data(plot_formats[controller], controller)
+    plot_data(bug.plot_format, bug.name)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--controller", type=str, default="aa3ee4f")
-    parser.add_argument("--clean", action="store_true", default=False)
-
     args = parser.parse_args()
 
-    version = versions_map.get(args.controller)
-    if not version:
-        parser.error(
-            f"controller '{args.controller}' not found in versions_map. Valid options are: {list(versions_map.keys())}"
-        )
-    main(version=version, controller=args.controller, clean=args.clean)
+    bug = next((bug for bug in bugs if bug.name == args.controller), None)
+    if not bug:
+        raise ValueError(f"controller '{args.controller}' not found in bugs.")
+    main(bug)
