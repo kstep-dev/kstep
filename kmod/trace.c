@@ -184,6 +184,9 @@ void print_sched_state_json(void) {
 #undef ftrace_override_function_with_return
 #define ftrace_override_function_with_return(fregs)                            \
   ksym.override_function_with_return(&arch_ftrace_regs(fregs)->regs)
+#else
+#undef ftrace_override_function_with_return
+#define ftrace_override_function_with_return(fregs) do { } while(0)
 #endif
 
 // do not call the original function, and directly return to the caller
