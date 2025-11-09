@@ -65,7 +65,11 @@ void reset_task_stats(struct task_struct *p) {
   p->se.nr_migrations = 0;
   p->se.vruntime = INIT_TIME_NS;
   // p->se.deadline = INIT_TIME_NS;
+
+// https://github.com/torvalds/linux/commit/86bfbb7ce4f67a88df2639198169b685668e7349
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
   p->se.vlag = 0;
+#endif
 
   // reset sched avg stats
   memset(&p->se.avg, 0, sizeof(struct sched_avg));
@@ -88,11 +92,21 @@ void print_tasks(void) {
     h_nr_queued_val = rq->cfs.h_nr_queued;
 #endif
 
-    TRACE_INFO("- CPU %d running=%d, switches=%3lld, avg_load=%lld, avg_util=%lu, min_vruntime=%lld, avg_vruntime=%lld", cpu,
-               rq->nr_running - (h_nr_queued_val - h_nr_runnable_val),
-               rq->nr_switches, rq->cfs.avg_load, 
+// https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+    u64 avg_load = rq->cfs.avg_load;
+    u64 avg_vruntime = ksym.avg_vruntime(&rq->cfs) - INIT_TIME_NS;
+#else
+    u64 avg_load = 0;
+    u64 avg_vruntime = 0;
+#endif
+
+    TRACE_INFO("- CPU %d running=%d, switches=%3lld, avg_load=%lld, "
+               "avg_util=%lu, min_vruntime=%lld, avg_vruntime=%lld",
+               cpu, rq->nr_running - (h_nr_queued_val - h_nr_runnable_val),
+               rq->nr_switches, avg_load,
                rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg,
-               rq->cfs.min_vruntime - INIT_TIME_NS, ksym.avg_vruntime(&rq->cfs) - INIT_TIME_NS);
+               rq->cfs.min_vruntime - INIT_TIME_NS, avg_vruntime);
   }
 
   int min_pid = INT_MAX;

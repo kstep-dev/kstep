@@ -28,7 +28,8 @@
   X(void, dequeue_entities,                                                    \
     (struct cfs_rq * cfs_rq, struct sched_entity * se, int flags))             \
   X(u64, avg_vruntime, (struct cfs_rq * cfs_rq))                               \
-  X(struct tick_sched *, tick_get_tick_sched, (int cpu))
+  X(struct tick_sched *, tick_get_tick_sched, (int cpu))                       \
+  X(void, override_function_with_return, (struct pt_regs * regs))
 
 // Define variable symbols
 // Format: X(type, var_name)

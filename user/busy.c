@@ -121,6 +121,7 @@ int main() {
     return 1;
   } else if (pid == 0) {
     // Child process
+    printf("test-proc started\n");
     set_proc_affinity();
     prctl(PR_SET_NAME, "test-proc");
     pause();
