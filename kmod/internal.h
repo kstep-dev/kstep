@@ -15,11 +15,6 @@ struct cpumask;
 struct rq;
 struct sched_domain;
 
-// trace.c
-int kstep_trace_init(void);
-void kstep_trace_exit(void);
-void kstep_make_function_noop(char *name);
-
 // sched_clock.c
 void sched_clock_init(void);
 void sched_clock_exit(void);
@@ -41,4 +36,9 @@ void cpu_controlled_mask_init(void);
 
 int is_sys_kthread(struct task_struct *p);
 
+// trace.c
+int kstep_trace_init(void);
+void kstep_trace_exit(void);
+void kstep_make_function_noop(char *name);
+void kstep_trace_rq_clock(void);
 #endif
