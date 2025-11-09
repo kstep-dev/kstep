@@ -155,6 +155,12 @@ void print_sched_state_json(void) {
 }
 #endif
 
+// do not call the original function, and directly return to the caller
+static void noop_cb(unsigned long ip, unsigned long parent_ip,
+                    struct ftrace_ops *op, struct ftrace_regs *fregs) {
+  ftrace_override_function_with_return(fregs);
+}
+
 static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
                           struct ftrace_ops *op, struct ftrace_regs *fregs) {
   int cpu = smp_processor_id();
@@ -248,7 +254,15 @@ static struct trace_func_info *trace_func_find(char *name) {
   return NULL;
 }
 
-int sched_trace_init(void) {
+void kstep_make_function_noop(char *name) {
+  struct trace_func_info *info =
+      kcalloc(1, sizeof(struct trace_func_info), GFP_KERNEL);
+  info->callback = &noop_cb;
+  info->name = name;
+  trace_func_enable(info);
+}
+
+int kstep_trace_init(void) {
   for (int i = 0; i < trace_func_count; i++) {
     char *name = trace_funcs[i];
     struct trace_func_info *info = trace_func_find(name);
@@ -263,7 +277,7 @@ int sched_trace_init(void) {
   return 0;
 }
 
-void sched_trace_exit(void) {
+void kstep_trace_exit(void) {
   for (int i = 0; i < ARRAY_SIZE(trace_func_infos); i++) {
     struct trace_func_info *info = &trace_func_infos[i];
     trace_func_disable(info);

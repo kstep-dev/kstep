@@ -16,8 +16,9 @@ struct rq;
 struct sched_domain;
 
 // trace.c
-int sched_trace_init(void);
-void sched_trace_exit(void);
+int kstep_trace_init(void);
+void kstep_trace_exit(void);
+void kstep_make_function_noop(char *name);
 void print_sched_state_json(void);
 void print_task_json(struct task_struct *p);
 void print_rq_json(struct rq *rq);

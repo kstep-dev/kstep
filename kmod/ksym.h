@@ -39,7 +39,8 @@
   X(unsigned int, sysctl_sched_migration_cost)                                 \
   X(bool, pm_freezing)                                                         \
   X(unsigned long, arch_freq_scale)                                            \
-  X(const struct sched_class, rt_sched_class)
+  X(const struct sched_class, rt_sched_class)                                  \
+  X(int, tick_do_timer_cpu)
 
 struct ksym_t {
   void *(*kallsyms_lookup_name)(const char *name);
