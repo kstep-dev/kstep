@@ -1,0 +1,28 @@
+From b868962cf86f2d6e3303dedb1bd30cbacf5d7e52 Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Sun, 9 Nov 2025 16:04:19 -0600
+Subject: [PATCH] 6.7-rc1-6d7e478_fix
+
+---
+ kernel/sched/fair.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index bcd8df4aa6b6..04243cc9d518 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -11086,8 +11086,9 @@ static int should_we_balance(struct lb_env *env)
+ 		return cpu == env->dst_cpu;
+ 	}
+ 
+-	if (idle_smt == env->dst_cpu)
+-		return true;
++	/* Are we the first idle CPU with busy siblings? */
++	if (idle_smt != -1)
++		return idle_smt == env->dst_cpu;
+ 
+ 	/* Are we the first CPU of this group ? */
+ 	return group_balance_cpu(sg) == env->dst_cpu;
+-- 
+2.43.0
+

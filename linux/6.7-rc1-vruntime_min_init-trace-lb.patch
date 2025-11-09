@@ -1,0 +1,51 @@
+From 09de76fe35ba8b18a4f6b8ddafe6230a1ef869b8 Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Sun, 9 Nov 2025 16:02:57 -0600
+Subject: [PATCH] 6.7-rc1-vruntime_min_init-trace-lb
+
+---
+ kernel/sched/fair.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 2048138ce54b..bcd8df4aa6b6 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -11057,6 +11057,9 @@ static int should_we_balance(struct lb_env *env)
+ 	cpumask_copy(swb_cpus, group_balance_mask(sg));
+ 	/* Try to find first idle CPU */
+ 	for_each_cpu_and(cpu, swb_cpus, env->cpus) {
++		// if (env->dst_cpu >= 4 && env->dst_cpu <= 7 && env->sd->span_weight == 4) {
++		// 	printk(KERN_DEBUG "SGMASK %d %d %d\n", env->dst_cpu, cpu, cpumask_weight(swb_cpus));
++		// }
+ 		if (!idle_cpu(cpu))
+ 			continue;
+ 
+@@ -11126,6 +11129,15 @@ static int load_balance(int this_cpu, struct rq *this_rq,
+ 		goto out_balanced;
+ 	}
+ 
++	if (this_cpu >= 4 && this_cpu <= 7) {
++		printk("LB %d %d %d %d %d\n", 
++			this_cpu, 
++			env.sd->span_weight, 
++			env.sd->groups->group_weight,
++			cpumask_first(sched_domain_span(env.sd)), 
++			cpumask_last(sched_domain_span(env.sd)));
++	}
++
+ 	group = find_busiest_group(&env);
+ 	if (!group) {
+ 		schedstat_inc(sd->lb_nobusyg[idle]);
+@@ -12644,7 +12656,7 @@ static void set_next_task_fair(struct rq *rq, struct task_struct *p, bool first)
+ void init_cfs_rq(struct cfs_rq *cfs_rq)
+ {
+ 	cfs_rq->tasks_timeline = RB_ROOT_CACHED;
+-	u64_u32_store(cfs_rq->min_vruntime, (u64)(-(1LL << 20)));
++	cfs_rq->min_vruntime = 10ULL * NSEC_PER_SEC;
+ #ifdef CONFIG_SMP
+ 	raw_spin_lock_init(&cfs_rq->removed.lock);
+ #endif
+-- 
+2.43.0
+
