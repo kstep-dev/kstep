@@ -17,7 +17,10 @@ jobs:
       run: sudo apt update && sudo apt install -y libelf-dev
 
     - name: Download Linux
-      run: ./fetch_linux.py --tarball
+      run: |
+        mkdir -p linux/current
+        wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.14.tar.xz -O linux.tar.xz
+        tar -xvf linux.tar.xz -C linux/current --strip-components=1
 
     - name: Prepare Linux
       run: ./make_linux.py --modules_prepare

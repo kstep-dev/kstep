@@ -3,7 +3,7 @@ kSTEP
 
 - Install dependencies: `./install_deps.sh`
 
-- Download Linux kernel: `./fetch_linux.py [--version <version>] [--tarball]`
+- Download Linux kernel: `./checkout_linux.py [--version <version>]`
 
 - Build Linux kernel: `./make_linux.py [--clean]`
 
@@ -13,7 +13,6 @@ kSTEP
 
     - `controller`: Controller name to run, see `kmod/controller.h` for available controllers
     - `trace_funcs`: Function names to trace, see `kmod/trace.c` for available functions
-    - `json`: Output in JSON format
     - Example: `./run_qemu.py --params controller=cd9626e`
 
 - Debug kernel: `./run_gdb.py`

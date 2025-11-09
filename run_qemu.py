@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import List, Optional
 
-from scripts import PROJ_DIR, ROOTFS_IMG, Arch, get_linux_dir, get_log_path, system
+from scripts import LINUX_CURR_DIR, PROJ_DIR, ROOTFS_IMG, Arch, get_log_path, system
 
 
 def run_qemu(
@@ -92,7 +92,7 @@ def run_qemu(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--linux_dir", type=Path, default=get_linux_dir())
+    parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--params", nargs="+", default=[])
     parser.add_argument("--log_file", type=Path, default=get_log_path(create=True))
