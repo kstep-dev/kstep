@@ -33,6 +33,13 @@ void print_rq_json(struct rq *rq) {
   unsigned int util_est = rq->cfs.avg.util_est.enqueued;
 #endif
 
+// https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+  u64 avg_vruntime = rq->cfs.avg_vruntime;
+#else
+  u64 avg_vruntime = 0;
+#endif
+
   pr_info("{"
           "\"rq[%d]\": "
           "{"
@@ -71,7 +78,7 @@ void print_rq_json(struct rq *rq) {
           "\"tg_load_avg\": %ld"
           "}"
           "}",
-          rq->cpu, rq->cfs.min_vruntime, rq->cfs.avg_vruntime, nr_queued_val,
+          rq->cpu, rq->cfs.min_vruntime, avg_vruntime, nr_queued_val,
           h_nr_runnable_val, h_nr_queued_val, h_nr_idle_val,
           rq->cfs.load.weight, rq->cfs.avg.load_avg, rq->cfs.avg.runnable_avg,
           rq->cfs.avg.util_avg, util_est, rq->cfs.removed.load_avg,
@@ -86,6 +93,16 @@ void print_rq_json(struct rq *rq) {
 }
 
 void print_task_json(struct task_struct *p) {
+
+// https://github.com/torvalds/linux/commit/147f3efaa24182a21706bca15eab2f3f4630b5fe
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+  u64 deadline = p->se.deadline;
+  u64 slice = p->se.slice;
+#else
+  u64 deadline = 0;
+  u64 slice = 0;
+#endif
+
   pr_info("{"
           "\"tasks[%d]\": "
           "{"
@@ -105,9 +122,8 @@ void print_task_json(struct task_struct *p) {
           "}"
           "}",
           task_pid_nr(p), p->comm, task_pid_nr(p), task_ppid_nr(p), task_cpu(p),
-          p->on_cpu, task_state_to_char(p), p->se.vruntime, p->se.deadline,
-          p->se.slice, p->se.sum_exec_runtime, p->nvcsw + p->nivcsw, p->prio,
-          task_node(p));
+          p->on_cpu, task_state_to_char(p), p->se.vruntime, deadline, slice,
+          p->se.sum_exec_runtime, p->nvcsw + p->nivcsw, p->prio, task_node(p));
 }
 
 void print_sd_json(struct sched_domain *sd) {
@@ -153,6 +169,14 @@ void print_sched_state_json(void) {
     print_task_json(p);
   }
 }
+#endif
+
+// https://github.com/torvalds/linux/commit/94d095ffa0e16bb7f161a2b73bbe5c2795d499a8
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0)
+#define ftrace_override_function_with_return(fregs)                            \
+  ksym.override_function_with_return(arch_ftrace_get_regs(fregs))
+#define ftrace_regs_get_argument(fregs, n)                                     \
+  regs_get_kernel_argument(arch_ftrace_get_regs(fregs), n)
 #endif
 
 // do not call the original function, and directly return to the caller

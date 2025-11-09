@@ -69,7 +69,7 @@ static void disable_jiffies_update(void) {
 static void disable_workqueue(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     smp_call_function_single(cpu, (void *)ksym.workqueue_offline_cpu,
-                             (void *)(intptr_t)cpu, 1);
+                             (void *)(uintptr_t)cpu, 1);
   }
 }
 
@@ -110,8 +110,12 @@ static void reset_rq(void) {
 
     // reset cfs rq
     rq->cfs.min_vruntime = INIT_TIME_NS;
+
+// https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
     rq->cfs.avg_vruntime = 0;
     rq->cfs.avg_load = 0;
+#endif
     memset(&rq->cfs.avg, 0, sizeof(struct sched_avg));
     rq->cfs.avg.last_update_time = INIT_TIME_NS;
 

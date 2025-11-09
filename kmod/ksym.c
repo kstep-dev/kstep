@@ -29,12 +29,17 @@ static void *get_addr(const char *name, void *default_addr) {
   }
 }
 
-static void fn_stub(void) { panic("Uninitialized kernel function called"); }
+#define X(type, name, ...)                                                     \
+  static void stub_##name(void) {                                              \
+    panic("Uninitialized ksym " #name " called");                              \
+  }
+KSYM_FUNC_LIST
+#undef X
 
 void ksym_init(void) {
   ksym.kallsyms_lookup_name = get_kallsyms_lookup_name();
 
-#define X(type, name, ...) ksym.name = get_addr(#name, (void *)&fn_stub);
+#define X(type, name, ...) ksym.name = get_addr(#name, (void *)&stub_##name);
   KSYM_FUNC_LIST
 #undef X
 
