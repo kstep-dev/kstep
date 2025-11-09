@@ -7,9 +7,13 @@ on:
 
 jobs:
   build:
-    name: Build
+    name: Build on Linux ${{ matrix.linux_version }}
     runs-on: ubuntu-latest
-    
+
+    strategy:
+      matrix:
+        linux_version: [6.0, 6.6, 6.14]
+
     steps:
     - uses: actions/checkout@v4
 
@@ -19,7 +23,7 @@ jobs:
     - name: Download Linux
       run: |
         mkdir -p linux/current
-        wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.14.tar.xz -O linux.tar.xz
+        wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ matrix.linux_version }}.tar.xz -O linux.tar.xz
         tar -xvf linux.tar.xz -C linux/current --strip-components=1
 
     - name: Prepare Linux
