@@ -122,6 +122,12 @@ static void reset_rq(void) {
     // reset sched domain
     for (struct sched_domain *sd = rcu_dereference_check_sched_domain(rq->sd);
          sd; sd = sd->parent) {
+      // TRACE_INFO("sd: %d, %d, %d, %d", sd->span_weight, cpumask_first(sched_domain_span(sd)), cpumask_last(sched_domain_span(sd)), cpu);
+      // TRACE_INFO("sd->prefer_sibling: %d", sd->flags & SD_PREFER_SIBLING);
+      // TRACE_INFO("sd->share_pkg_resources: %d", sd->flags & SD_SHARE_PKG_RESOURCES);
+      // TRACE_INFO("sd->groups->prefer_sibling: %d", sd->groups->flags & SD_PREFER_SIBLING);
+      // TRACE_INFO("sd->groups->share_pkg_resources: %d\n", sd->groups->flags & SD_SHARE_PKG_RESOURCES);
+
       sd->last_balance = jiffies;
       sd->balance_interval = sd->min_interval;
       sd->nr_balance_failed = 0;
