@@ -37,12 +37,5 @@ jobs:
         sudo apt update && sudo apt install -y libelf-dev
         ./make_linux.py --modules_prepare
 
-    - name: Save Linux cache
-      if: steps.restore-cache.outputs.cache-hit != 'true'
-      uses: actions/cache@v4
-      with:
-        path: linux/current
-        key: test-${{ matrix.linux_version }}
-
     - name: Build kernel module
       run: make -C kmod obj
