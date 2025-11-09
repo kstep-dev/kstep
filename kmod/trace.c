@@ -9,13 +9,13 @@
 #include "ksym.h"
 #include "logging.h"
 
-#ifdef KSTEP_TRACE_SCHED
 // Module parameters
 static char *trace_funcs[32] = {};
 static int trace_func_count = 0;
 module_param_array(trace_funcs, charp, &trace_func_count, 0644);
 MODULE_PARM_DESC(trace_funcs, "Function names to trace");
 
+#if 0
 void print_rq_json(struct rq *rq) {
   int h_nr_runnable_val = 0, h_nr_queued_val = 0, h_nr_idle_val = 0,
       nr_queued_val = 0;
@@ -25,6 +25,14 @@ void print_rq_json(struct rq *rq) {
   h_nr_idle_val = rq->cfs.h_nr_idle;
   nr_queued_val = rq->cfs.nr_queued;
 #endif
+
+// https://github.com/torvalds/linux/commit/11137d384996bb05cf33c8163db271e1bac3f4bf
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+  unsigned int util_est = rq->cfs.avg.util_est;
+#else
+  unsigned int util_est = rq->cfs.avg.util_est.enqueued;
+#endif
+
   pr_info("{"
           "\"rq[%d]\": "
           "{"
@@ -66,7 +74,7 @@ void print_rq_json(struct rq *rq) {
           rq->cpu, rq->cfs.min_vruntime, rq->cfs.avg_vruntime, nr_queued_val,
           h_nr_runnable_val, h_nr_queued_val, h_nr_idle_val,
           rq->cfs.load.weight, rq->cfs.avg.load_avg, rq->cfs.avg.runnable_avg,
-          rq->cfs.avg.util_avg, rq->cfs.avg.util_est, rq->cfs.removed.load_avg,
+          rq->cfs.avg.util_avg, util_est, rq->cfs.removed.load_avg,
           rq->cfs.removed.util_avg, rq->cfs.removed.runnable_avg,
           rq->cfs.tg_load_avg_contrib, atomic_long_read(&rq->cfs.tg->load_avg));
   pr_info("{\"rt_rq[%d]\": {\"rt_nr_running\": %u}}", rq->cpu,
@@ -145,6 +153,7 @@ void print_sched_state_json(void) {
     print_task_json(p);
   }
 }
+#endif
 
 static void sched_tick_cb(unsigned long ip, unsigned long parent_ip,
                           struct ftrace_ops *op, struct ftrace_regs *fregs) {
@@ -204,6 +213,7 @@ struct trace_func_info {
 
 static struct trace_func_info trace_func_infos[] = {
     {.callback = &sched_tick_cb, .name = "sched_tick"},
+    {.callback = &sched_tick_cb, .name = "scheduler_tick"},
     {.callback = &update_rq_clock_cb, .name = "update_rq_clock"},
     {.callback = &sched_balance_domains_cb, .name = "sched_balance_domains"},
     {.callback = &sched_balance_rq_cb, .name = "sched_balance_rq"},
@@ -260,11 +270,3 @@ void sched_trace_exit(void) {
   }
   TRACE_INFO("Scheduler trace uninitialized");
 }
-#else
-int sched_trace_init(void) {
-  return 0;
-}
-
-void sched_trace_exit(void) {
-}
-#endif
