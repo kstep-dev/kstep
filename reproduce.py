@@ -3,7 +3,7 @@
 import argparse
 from pathlib import Path
 
-from fetch_linux import fetch_linux
+from checkout_linux import checkout_linux
 from make_linux import make_linux
 from run_qemu import run_qemu
 from scripts import LOGS_DIR, PROJ_DIR, get_linux_dir, system
@@ -43,7 +43,7 @@ def main(version: str, controller: str, clean: bool = False):
     if clean:
         system(f"make -C {PROJ_DIR} clean")
 
-    fetch_linux(version, linux_dir=linux_dir)
+    checkout_linux(version, linux_dir=linux_dir)
     reset_git(linux_dir)
 
     # patched initial min_vruntime

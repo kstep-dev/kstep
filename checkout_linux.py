@@ -21,7 +21,6 @@ def add_worktree(version: str, linux_dir: Path):
         system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} v{version}")
 
 
-
 def set_current_linux(linux_dir: Path):
     """Set symlink for default version"""
     LINUX_CURR_DIR.unlink(missing_ok=True)
@@ -29,7 +28,7 @@ def set_current_linux(linux_dir: Path):
     logging.info(f"Current Linux now points to {linux_dir}")
 
 
-def fetch_linux(version: str, linux_dir: Path):
+def checkout_linux(version: str, linux_dir: Path):
     clone_master()
     add_worktree(version, linux_dir)
     set_current_linux(linux_dir)
@@ -40,7 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("--version", type=str, default="6.14")
     args = parser.parse_args()
 
-    fetch_linux(
+    checkout_linux(
         version=args.version,
         linux_dir=get_linux_dir(args.version),
     )

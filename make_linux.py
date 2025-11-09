@@ -4,7 +4,7 @@ import argparse
 import shutil
 from pathlib import Path
 
-from scripts import LINUX_CONFIG, PROJ_DIR, get_linux_dir, system
+from scripts import LINUX_CONFIG, LINUX_CURR_DIR, PROJ_DIR, system
 
 BEAR_CMD = f"bear --append --output {PROJ_DIR}/compile_commands.json --"
 
@@ -35,7 +35,7 @@ def make_linux(linux_dir: Path, clean: bool = False, modules_prepare: bool = Fal
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--linux_dir", type=Path, default=get_linux_dir())
+    parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
     parser.add_argument("--clean", action="store_true", default=False)
     parser.add_argument("--modules_prepare", action="store_true", default=False)
     args = parser.parse_args()
