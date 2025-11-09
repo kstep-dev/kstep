@@ -55,12 +55,14 @@ static void disable_jiffies_update(void) {
   // `tick_sched_do_timer`:https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L206
   // `tick_periodic`:https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-common.c#L86
   // `tick_do_timer_cpu`:https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-common.c#L51
+
+  // Setting an invalid timerkeeper CPU to avoid (most of) jiffies updates.
   *ksym.tick_do_timer_cpu = -1;
 
   // Unfortunate workaround:
-  // Commit a1ff03c allows non-timekeeper CPU to update jiffies.
-  // We disable the function to avoid the update.
   // https://github.com/torvalds/linux/commit/a1ff03cd6fb9c501fff63a4a2bface9adcfa81cd
+  // allows a non-timekeeper CPU to update jiffies. We force
+  // `tick_do_update_jiffies64` to be a noop function to avoid the update.
   kstep_make_function_noop("tick_do_update_jiffies64");
 }
 
