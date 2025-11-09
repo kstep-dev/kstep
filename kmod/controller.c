@@ -46,11 +46,22 @@ static void enable_timer_ticks(void) {
   }
 }
 
-static void disable_ticks(void) {
-  // disable ticks on all cpus to avoid jiffies from being updated
-  for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
-    ksym.tick_offline_cpu(cpu);
-  }
+static void disable_jiffies_update(void) {
+  // Avoid calling `tick_do_update_jiffies64` and `do_timer` to update jiffies.
+  // They are called by `tick_sched_do_timer` and `tick_periodic` respectively,
+  // and guarded by `tick_do_timer_cpu == cpu` to check if the current CPU is
+  // the timekeeper CPU for updating jiffies.
+  // References:
+  // `tick_sched_do_timer`:https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L206
+  // `tick_periodic`:https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-common.c#L86
+  // `tick_do_timer_cpu`:https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-common.c#L51
+  *ksym.tick_do_timer_cpu = -1;
+
+  // Unfortunate workaround:
+  // Commit a1ff03c allows non-timekeeper CPU to update jiffies.
+  // We disable the function to avoid the update.
+  // https://github.com/torvalds/linux/commit/a1ff03cd6fb9c501fff63a4a2bface9adcfa81cd
+  kstep_make_function_noop("tick_do_update_jiffies64");
 }
 
 static void disable_workqueue(void) {
@@ -114,7 +125,7 @@ static void reset_rq(void) {
 
 void controller_run(struct controller_ops *ops) {
   disable_timer_ticks();
-  disable_ticks();
+  disable_jiffies_update();
   disable_workqueue();
   sched_clock_init();
   sched_clock_set(INIT_TIME_NS);
