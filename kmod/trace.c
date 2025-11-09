@@ -17,17 +17,29 @@ static LIST_HEAD(trace_func_list);
 static void kstep_trace_function(char *name, ftrace_func_t callback) {
   struct trace_func_info *info =
       kcalloc(1, sizeof(struct trace_func_info), GFP_KERNEL);
+  if (info == NULL) {
+    TRACE_ERR("Failed to allocate memory for trace function %s", name);
+    return;
+  }
+
   info->op.func = callback;
-  info->op.flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED |
-                   FTRACE_OPS_FL_DYNAMIC | FTRACE_OPS_FL_RECURSION;
-  ftrace_set_filter(&info->op, name, strlen(name), 1);
+  info->op.flags =
+      FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED | FTRACE_OPS_FL_RECURSION;
+
+  if (ftrace_set_filter(&info->op, name, strlen(name), 1)) {
+    TRACE_ERR("Failed to set filter for %s", name);
+    kfree(info);
+    return;
+  }
+
   if (register_ftrace_function(&info->op)) {
     TRACE_ERR("Failed to trace %s", name);
     kfree(info);
-  } else {
-    TRACE_INFO("Tracing %s", name);
-    list_add(&info->list, &trace_func_list);
+    return;
   }
+
+  TRACE_INFO("Tracing %s", name);
+  list_add(&info->list, &trace_func_list);
 }
 
 // https://github.com/torvalds/linux/commit/94d095ffa0e16bb7f161a2b73bbe5c2795d499a8
@@ -45,7 +57,9 @@ static void kstep_trace_function(char *name, ftrace_func_t callback) {
   ksym.override_function_with_return(&arch_ftrace_regs(fregs)->regs)
 #else
 #undef ftrace_override_function_with_return
-#define ftrace_override_function_with_return(fregs) do { } while(0)
+#define ftrace_override_function_with_return(fregs)                            \
+  do {                                                                         \
+  } while (0)
 #endif
 
 // do not call the original function, and directly return to the caller
@@ -83,10 +97,11 @@ int kstep_trace_init(void) {
 }
 
 void kstep_trace_exit(void) {
-  TRACE_INFO("Scheduler trace uninitialized");
-  struct trace_func_info *info;
-  list_for_each_entry(info, &trace_func_list, list) {
+  struct trace_func_info *info, *tmp;
+  list_for_each_entry_safe(info, tmp, &trace_func_list, list) {
     unregister_ftrace_function(&info->op);
+    list_del(&info->list);
     kfree(info);
   }
+  TRACE_INFO("Scheduler trace uninitialized");
 }
