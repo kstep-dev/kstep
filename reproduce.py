@@ -14,7 +14,8 @@ versions_map = {
     "bbce3de": "6.14",
     "2feab24": "6.9",
     "17e3e88": "6.9",
-    "5068d84": "6.7"
+    "5068d84": "6.7",
+    "evenIdleCpu": "6.7-rc1"
 }
 
 plot_formats = {
@@ -23,7 +24,22 @@ plot_formats = {
     "bbce3de": "cur_task",
     "2feab24": "rebalance",
     "17e3e88": "util_avg",
-    "5068d84": "min_vruntime"
+    "5068d84": "min_vruntime",
+    "evenIdleCpu": "nr_running"
+}
+
+fix_patch_files = {
+    "evenIdleCpu": "use_special_topo.patch"
+}
+
+smp = {
+    "aa3ee4f": "cpus=3,cores=3",
+    "cd9626e": "cpus=3,cores=3",
+    "bbce3de": "cpus=3,cores=3",
+    "2feab24": "cpus=3,cores=3",
+    "17e3e88": "cpus=3,cores=3",
+    "5068d84": "cpus=3,cores=3",
+    "evenIdleCpu": "8,dies=4,cores=2,threads=1"
 }
 
 def patch_linux(linux_dir: Path, patch_file: Path):
@@ -61,10 +77,15 @@ def main(version: str, controller: str, clean: bool = False):
         linux_dir=linux_dir,
         params=[f"controller={controller}"],
         log_file=LOGS_DIR / f"{controller}_buggy.log",
+        smp=smp[controller],
     )
 
-    # Run the fixed version
-    patch_file = f"{PROJ_DIR}/linux/{version}-{controller}_fix.patch"
+    # Run the fixed version 
+    # for the new bug evenIdleCpu, we use the patch that generate special topo trigger the bug.
+    if controller not in fix_patch_files:
+        patch_file = f"{PROJ_DIR}/linux/{version}-{controller}_fix.patch"
+    else:
+        patch_file = f"{PROJ_DIR}/linux/{version}-{fix_patch_files[controller]}"
     patch_linux(linux_dir, patch_file)
 
     make_linux(linux_dir)
@@ -72,6 +93,7 @@ def main(version: str, controller: str, clean: bool = False):
         linux_dir=linux_dir,
         params=[f"controller={controller}"],
         log_file=LOGS_DIR / f"{controller}_fixed.log",
+        smp=smp[controller],
     )
 
     # plot the logs
