@@ -1,3 +1,5 @@
+# Do not treat warnings as errors, avoid build errors when compiling older kernel with newer compiler
+CONFIG_WERROR=n
 # Avoid adding "-dirty" to the version string, which results in kernel module version magic mismatch
 CONFIG_LOCALVERSION_AUTO=n
 
