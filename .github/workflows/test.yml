@@ -1,4 +1,4 @@
-name: Test
+name: CI
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build on Linux ${{ matrix.linux_version }}
+    name: Linux ${{ matrix.linux_version }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -39,3 +39,9 @@ jobs:
 
     - name: Build kernel module
       run: make -C kmod
+
+    - name: Install QEMU
+      run: sudo apt update && sudo apt install -y qemu-kvm
+
+    - name: Run QEMU
+      run: ./run_qemu.py
