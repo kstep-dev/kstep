@@ -38,7 +38,7 @@ bugs = [
     Bug(
         name="6d7e478", 
         version="6.7-rc1", 
-        plot_format="lb_event", 
+        plot_format="lb_nr_running", 
         smp="8,sockets=2,cores=2,threads=2"
     ),
 ]
@@ -65,7 +65,7 @@ def main(bug: Bug):
     # Select appropriate patch file based on plot format type
     if bug.plot_format == "rebalance":
         suffix = "-vruntime_min_init-trace_rebalance.patch"
-    elif bug.plot_format == "lb_event":
+    elif bug.plot_format == "lb_nr_running":
         suffix = "-vruntime_min_init-trace-lb.patch"
     else:
         suffix = "-vruntime_min_init.patch"
