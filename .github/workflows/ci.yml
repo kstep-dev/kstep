@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -15,42 +15,43 @@ jobs:
         linux_version: ["6.0", "6.6", "6.14"]
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: Restore Linux cache
-      id: restore-cache
-      uses: actions/cache/restore@v4
-      with:
-        path: linux/current
-        key: ${{ matrix.linux_version }}
+      - name: Restore Linux cache
+        id: restore-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: linux/current
+          key: ${{ matrix.linux_version }}
 
-    - name: Download Linux
-      if: steps.restore-cache.outputs.cache-hit != 'true'
-      run: |
-        mkdir -p linux/current
-        wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ matrix.linux_version }}.tar.xz -O linux.tar.xz
-        tar -xvf linux.tar.xz -C linux/current --strip-components=1
+      - name: Download Linux
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p linux/current
+          wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ matrix.linux_version }}.tar.xz -O linux.tar.xz
+          tar -xvf linux.tar.xz -C linux/current --strip-components=1
 
-    - name: Build Linux
-      if: steps.restore-cache.outputs.cache-hit != 'true'
-      run: |
-        sudo apt update && sudo apt install -y libelf-dev
-        ./make_linux.py
+      - name: Build Linux
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt update && sudo apt install -y libelf-dev
+          ./make_linux.py
 
-    - name: Save Linux cache
-      uses: actions/cache/save@v4
-      with:
-        path: linux/current
-        key: ${{ matrix.linux_version }}
+      - name: Save Linux cache
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: linux/current
+          key: ${{ matrix.linux_version }}
 
-    - name: Build kernel module
-      run: make -C kmod
+      - name: Build kernel module
+        run: make -C kmod
 
-    - name: Install QEMU
-      if: ${{ matrix.linux_version }} == "6.14"
-      run: sudo apt update && sudo apt install -y qemu-kvm
+      - name: Install QEMU
+        if: matrix.linux_version == '6.14'
+        run: sudo apt update && sudo apt install -y qemu-kvm
 
-    - name: Run QEMU
-      if: ${{ matrix.linux_version }} == "6.14"
-      timeout-minutes: 1
-      run: ./run_qemu.py
+      - name: Run QEMU
+        if: matrix.linux_version == '6.14'
+        timeout-minutes: 1
+        run: ./run_qemu.py
