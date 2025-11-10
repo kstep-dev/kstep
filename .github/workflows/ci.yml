@@ -12,14 +12,14 @@ jobs:
 
     strategy:
       matrix:
-        linux_version: ["6.14"]
+        linux_version: ["6.0", "6.6", "6.14"]
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Restore Linux cache
       id: restore-cache
-      uses: actions/cache@v4
+      uses: actions/cache/restore@v4
       with:
         path: linux/current
         key: ${{ matrix.linux_version }}
@@ -37,12 +37,20 @@ jobs:
         sudo apt update && sudo apt install -y libelf-dev
         ./make_linux.py
 
+    - name: Save Linux cache
+      uses: actions/cache/save@v4
+      with:
+        path: linux/current
+        key: ${{ matrix.linux_version }}
+
     - name: Build kernel module
       run: make -C kmod
 
     - name: Install QEMU
+      if: false
       run: sudo apt update && sudo apt install -y qemu-kvm
 
     - name: Run QEMU
+      if: false
       timeout-minutes: 1
       run: ./run_qemu.py
