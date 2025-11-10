@@ -38,4 +38,4 @@ jobs:
         ./make_linux.py
 
     - name: Build kernel module
-      run: make -C kmod obj
+      run: make -C kmod
