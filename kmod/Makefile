@@ -20,10 +20,6 @@ $(kmod-name).ko: $(kmod-srcs) $(wildcard $(src)/*.h)
 	$(MAKE) -C $(kern-src) M=$(src) modules
 	cp $(kmod-name).ko $(OUT)/kmod.ko
 
-.PHONY: obj
-obj:
-	$(MAKE) -C $(kern-src) M=$(src) $(obj-m)
-
 .PHONY: clean
 clean:
 	$(MAKE) -C $(kern-src) M=$(src) clean

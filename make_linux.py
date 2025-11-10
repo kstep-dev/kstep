@@ -9,7 +9,7 @@ from scripts import LINUX_CONFIG, LINUX_CURR_DIR, PROJ_DIR, system
 BEAR_CMD = f"bear --append --output {PROJ_DIR}/compile_commands.json --"
 
 
-def make_linux(linux_dir: Path, clean: bool = False, modules_prepare: bool = False):
+def make_linux(linux_dir: Path, clean: bool = False):
     # Clean up old build
     if clean:
         system(f"make -C {linux_dir} -j$(nproc) mrproper")
@@ -26,8 +26,6 @@ def make_linux(linux_dir: Path, clean: bool = False, modules_prepare: bool = Fal
 
     # Build kernel
     cmd = f"make -C {linux_dir} -j$(nproc) LOCALVERSION=-kstep"
-    if modules_prepare:
-        cmd += " modules_prepare"
     if shutil.which("bear"):
         cmd = f"{BEAR_CMD} {cmd}"
     system(cmd)
@@ -37,6 +35,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
     parser.add_argument("--clean", action="store_true", default=False)
-    parser.add_argument("--modules_prepare", action="store_true", default=False)
     args = parser.parse_args()
     make_linux(**vars(args))
