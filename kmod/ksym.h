@@ -10,7 +10,7 @@
 #pragma GCC diagnostic pop
 
 // Define function symbols
-// Format: X(ret_type, func_name, args)
+// X(ret_type, func_name, args) declares function `ksym.func_name`
 #define KSYM_FUNC_LIST                                                         \
   X(void, tick_sched_timer_dying, (int cpu))                                   \
   X(void, sched_tick, (void))                                                  \
@@ -35,7 +35,7 @@
   X(void, override_function_with_return, (struct pt_regs * regs))
 
 // Define variable symbols
-// Format: X(type, var_name)
+// X(type, var_name) declares `ksym.var_name` as a *pointer* to the variable
 #define KSYM_VAR_LIST                                                          \
   X(struct rq, runqueues)                                                      \
   X(void, cd)                                                                  \
@@ -44,7 +44,8 @@
   X(bool, pm_freezing)                                                         \
   X(unsigned long, arch_freq_scale)                                            \
   X(const struct sched_class, rt_sched_class)                                  \
-  X(int, tick_do_timer_cpu)
+  X(int, tick_do_timer_cpu)                                                    \
+  X(int, distribute_cpu_mask_prev)
 
 struct ksym_t {
   // Used for dynamic symbol lookup

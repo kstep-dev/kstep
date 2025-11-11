@@ -135,6 +135,16 @@ static void reset_rq(void) {
   }
 }
 
+static void reset_distribute_cpu_mask_prev(void) {
+// https://github.com/torvalds/linux/commit/46a87b3851f0d6eb05e6d83d5c5a30df0eca8f76
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    int *ptr = per_cpu_ptr(ksym.distribute_cpu_mask_prev, cpu);
+    *ptr = 0;
+  }
+#endif
+}
+
 void controller_run(struct controller_ops *ops) {
   kstep_trace_init();
   disable_timer_ticks();
@@ -144,6 +154,7 @@ void controller_run(struct controller_ops *ops) {
   sched_clock_set(INIT_TIME_NS);
   move_kthreads();
   reset_rq();
+  reset_distribute_cpu_mask_prev();
 
   TRACE_INFO("Initializing controller %s", ops->name);
   ops->init();
