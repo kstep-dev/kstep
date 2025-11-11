@@ -1,2 +1,2 @@
 CompileFlags:       
-  Remove: [-m*, -f*]
+  Remove: [-m*, -f*, -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang]
