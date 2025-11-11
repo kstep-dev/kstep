@@ -7,12 +7,16 @@ on:
 
 jobs:
   build:
-    name: Linux ${{ matrix.linux_version }}
-    runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        linux_version: ["6.0", "6.6", "6.14"]
+        version: [
+          {major: 5, minor: 15},
+          {major: 6, minor: 6},
+          {major: 6, minor: 14},
+        ]
+
+    name: Linux ${{matrix.version.major}}.${{matrix.version.minor}}
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -22,13 +26,13 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: linux/current
-          key: ${{ matrix.linux_version }}
+          key: ${{matrix.version.major}}.${{matrix.version.minor}}
 
       - name: Download Linux
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p linux/current
-          wget https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${{ matrix.linux_version }}.tar.xz -O linux.tar.xz
+          wget https://cdn.kernel.org/pub/linux/kernel/v${{matrix.version.major}}.x/linux-${{matrix.version.major}}.${{matrix.version.minor}}.tar.xz -O linux.tar.xz
           tar -xvf linux.tar.xz -C linux/current --strip-components=1
 
       - name: Build Linux
@@ -42,7 +46,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: linux/current
-          key: ${{ matrix.linux_version }}
+          key: ${{matrix.version.major}}.${{matrix.version.minor}}
 
       - name: Build kernel module
         run: make -C kmod

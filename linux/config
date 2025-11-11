@@ -2,6 +2,14 @@
 CONFIG_WERROR=n
 # Avoid adding "-dirty" to the version string, which results in kernel module version magic mismatch
 CONFIG_LOCALVERSION_AUTO=n
+# Include all symbols in kallsyms, including variables
+CONFIG_KALLSYMS_ALL=y
+
+# Basic virtualization support
+CONFIG_HYPERVISOR_GUEST=y
+CONFIG_PARAVIRT=y
+CONFIG_VIRTIO_BLK=y
+CONFIG_VIRTIO_PCI=y
 
 # Debugging and tracing
 CONFIG_DEBUG_KERNEL=y
@@ -17,7 +25,7 @@ CONFIG_FUNCTION_ERROR_INJECTION=y  # for function overriding
 # CONFIG_NO_HZ_FULL=y
 # CONFIG_RCU_NOCB_CPU=y
 # CONFIG_SCHEDSTATS=y
-CONFIG_SCHED_DEBUG=y # needed for sd->name in kmod/trace.c in some versions
+CONFIG_SCHED_DEBUG=y
 CONFIG_HZ_1000=y
 CONFIG_NO_HZ_COMMON=n
 CONFIG_NO_HZ_IDLE=n

@@ -13,8 +13,12 @@ kmod-name := kstep-$(kern-ver)
 obj-m := $(kmod-name).o
 $(kmod-name)-y := $(kmod-srcs:.c=.o)
 
-# Allow the use of private headers
-ccflags-y := -I$(kern-src) -Wno-unused-variable -Wno-unused-function -Wno-declaration-after-statement
+ccflags-y := \
+  -I$(kern-src) \
+  -Wno-unused-variable \
+  -Wno-unused-function \
+  -Wno-declaration-after-statement \
+  -std=gnu11
 
 $(kmod-name).ko: $(kmod-srcs) $(wildcard $(src)/*.h)
 	$(MAKE) -C $(kern-src) M=$(src) modules
