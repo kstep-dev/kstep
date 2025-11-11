@@ -22,10 +22,12 @@ def make_linux(linux_dir: Path, clean: bool = False):
             f"cd {linux_dir} && ./scripts/kconfig/merge_config.sh -m {config_path} {LINUX_CONFIG}"
         )
         system(f"make -C {linux_dir} -j$(nproc) olddefconfig")
-        system(f"make -C {linux_dir} -j$(nproc) mod2noconfig")
+        # mod2noconfig introduced in Linux 5.17 to avoid building modules
+        # https://github.com/torvalds/linux/commit/c39afe624853e39af243dd9832640bf9c80b6554
+        system(f"make -C {linux_dir} -j$(nproc) mod2noconfig || true")
 
     # Build kernel
-    cmd = f"make -C {linux_dir} -j$(nproc) LOCALVERSION=-kstep"
+    cmd = f"make -C {linux_dir} -j$(nproc) LOCALVERSION=-kstep WERROR=0"
     if shutil.which("bear"):
         cmd = f"{BEAR_CMD} {cmd}"
     system(cmd)

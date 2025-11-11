@@ -1,3 +1,4 @@
+#include <linux/kernel.h>
 #include <linux/sched_clock.h>
 #include <linux/seqlock.h>
 

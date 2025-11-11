@@ -3,8 +3,11 @@
 #include <linux/types.h>
 
 // private headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
 #include <kernel/sched/sched.h>
 #include <kernel/time/tick-sched.h>
+#pragma GCC diagnostic pop
 
 // Define function symbols
 // Format: X(ret_type, func_name, args)
@@ -44,6 +47,7 @@
   X(int, tick_do_timer_cpu)
 
 struct ksym_t {
+  // Used for dynamic symbol lookup
   void *(*kallsyms_lookup_name)(const char *name);
 
 #define X(ret_type, name, args) ret_type(*name) args;

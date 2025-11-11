@@ -6,7 +6,7 @@
 
 struct ksym_t ksym;
 
-static void *get_kallsyms_lookup_name(void) {
+static void *ksym_get_kallsyms_lookup_name(void) {
   struct kprobe kp = {.symbol_name = "kallsyms_lookup_name"};
   int ret = register_kprobe(&kp);
   if (ret < 0) {
@@ -18,13 +18,13 @@ static void *get_kallsyms_lookup_name(void) {
   return (void *)kp.addr;
 }
 
-static void *get_addr(const char *name, void *default_addr) {
+static void *ksym_get_addr(const char *name, void *default_addr) {
   void *addr = (void *)ksym.kallsyms_lookup_name(name);
   if (addr == NULL) {
-    TRACE_ERR("Symbol %s not found", name);
+    TRACE_INFO("Symbol %s not found", name);
     return default_addr;
   } else {
-    TRACE_INFO("Symbol %-32s -> %px", name, addr);
+    TRACE_DEBUG("Symbol %-32s -> %px", name, addr);
     return addr;
   }
 }
@@ -37,13 +37,16 @@ KSYM_FUNC_LIST
 #undef X
 
 void ksym_init(void) {
-  ksym.kallsyms_lookup_name = get_kallsyms_lookup_name();
+  ksym.kallsyms_lookup_name = ksym_get_kallsyms_lookup_name();
 
-#define X(type, name, ...) ksym.name = get_addr(#name, (void *)&stub_##name);
+#define X(type, name, ...)                                                     \
+  ksym.name = ksym_get_addr(#name, (void *)&stub_##name);
   KSYM_FUNC_LIST
 #undef X
 
-#define X(type, name) ksym.name = get_addr(#name, (void *)0xdeadbeef);
+#define X(type, name) ksym.name = ksym_get_addr(#name, (void *)0xdeadbeef);
   KSYM_VAR_LIST
 #undef X
+
+  TRACE_INFO("ksym initialized");
 }
