@@ -28,10 +28,10 @@ void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
 
 struct task_struct *poll_task(const char *comm) {
   struct task_struct *p;
-  for_each_process(p) {
-    TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm,
-                p->__state, p->on_cpu);
-  }
+  // for_each_process(p) {
+  //   TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm,
+  //               p->__state, p->on_cpu);
+  // }
   while (1) {
     for_each_process(p) {
       if (strcmp(p->comm, comm) == 0)

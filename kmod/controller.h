@@ -2,6 +2,7 @@
 
 struct controller_ops {
   const char *name;
+  void (*pre_init)(void);
   void (*init)(void);
   void (*body)(void);
 };

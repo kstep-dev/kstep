@@ -42,9 +42,6 @@ def run_qemu(
         "irqaffinity=0",
         "rcu_nocbs=1,2",
         "nohz_full=1,2",
-        # "notsc",
-        # "initcall_blacklist=spawn_ksoftirqd",
-        # "noapictimer",
     ]
 
     if Arch.get() == Arch.X86_64:
@@ -98,6 +95,5 @@ if __name__ == "__main__":
     parser.add_argument("--params", nargs="+", default=[])
     parser.add_argument("--log_file", type=Path, default=get_log_path(create=True))
     parser.add_argument("--smp", type=str, default="cpus=3,cores=3")
-    # 8,dies=4,cores=2,threads=1
     args = parser.parse_args()
     run_qemu(**vars(args))

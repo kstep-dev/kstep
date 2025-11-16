@@ -60,8 +60,6 @@ def main(bug: Bug, run: List[str]):
     # Select appropriate patch file based on plot format type
     if bug.plot_format == "rebalance":
         suffix = "-vruntime_min_init-trace_rebalance.patch"
-    elif bug.plot_format == "lb_nr_running":
-        suffix = "-vruntime_min_init-trace-lb.patch"
     else:
         suffix = "-vruntime_min_init.patch"
     patch_file_init = LINUX_ROOT_DIR / f"{bug.version}{suffix}"
