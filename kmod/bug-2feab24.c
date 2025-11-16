@@ -9,6 +9,8 @@
 
 static struct task_struct *busy_task;
 
+static void controller_pre_init(void) { kstep_trace_rebalance(); }
+
 static void controller_init(void) {
   busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);
@@ -27,6 +29,7 @@ static void controller_body(void) {
 
 struct controller_ops controller_2feab24 = {
     .name = "2feab24",
+    .pre_init = controller_pre_init,
     .init = controller_init,
     .body = controller_body,
 };

@@ -57,12 +57,7 @@ def plot_data(python_script: str, controller: str):
 
 def main(bug: Bug, run: List[str]):
     # patched initial min_vruntime
-    # Select appropriate patch file based on plot format type
-    if bug.plot_format == "rebalance":
-        suffix = "-vruntime_min_init-trace_rebalance.patch"
-    else:
-        suffix = "-vruntime_min_init.patch"
-    patch_file_init = LINUX_ROOT_DIR / f"{bug.version}{suffix}"
+    patch_file_init = LINUX_ROOT_DIR / f"{bug.version}-vruntime_min_init.patch"
 
     # for the new bug evenIdleCpu, we use the patch that generate special topo trigger the bug.
     if not bug.fix_patch_file:
