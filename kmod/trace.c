@@ -127,11 +127,18 @@ void kstep_trace_lb(void) {
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
+typedef struct ftrace_regs fprobe_regs;
+#else
+typedef struct pt_regs fprobe_regs;
+#endif
+
 static DEFINE_PER_CPU(ktime_t, rebalance_domains_starttime);
 static int run_rebalance_domains_entry(struct fprobe *fp,
                                        unsigned long entry_ip,
-                                       unsigned long ret_ip,
-                                       struct pt_regs *regs, void *entry_data) {
+                                       unsigned long ret_ip, fprobe_regs *regs,
+                                       void *entry_data) {
   if (smp_processor_id() == 0)
     return 0;
   this_cpu_write(rebalance_domains_starttime, ktime_get());
@@ -140,8 +147,8 @@ static int run_rebalance_domains_entry(struct fprobe *fp,
 
 static void run_rebalance_domains_exit(struct fprobe *fp,
                                        unsigned long entry_ip,
-                                       unsigned long ret_ip,
-                                       struct pt_regs *regs, void *entry_data) {
+                                       unsigned long ret_ip, fprobe_regs *regs,
+                                       void *entry_data) {
   if (smp_processor_id() == 0)
     return;
   ktime_t endtime = ktime_get();
