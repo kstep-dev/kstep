@@ -18,9 +18,6 @@ ROOTFS_IMG = DATA_DIR / "rootfs.ext4"
 LOGS_DIR = DATA_DIR / "logs"
 
 
-def get_linux_dir(version: str):
-    return LINUX_ROOT_DIR / f"linux-{version}"
-
 
 def get_log_path(create: bool) -> Path:
     symlink = LOGS_DIR / "latest.log"

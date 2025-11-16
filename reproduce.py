@@ -8,7 +8,7 @@ from typing import Optional
 from checkout_linux import checkout_linux
 from make_linux import make_linux
 from run_qemu import run_qemu
-from scripts import LOGS_DIR, PROJ_DIR, get_linux_dir, system
+from scripts import LINUX_ROOT_DIR, LOGS_DIR, PROJ_DIR, system
 
 
 @dataclass(frozen=True)
@@ -22,33 +22,33 @@ class Bug:
 
 
 bugs = [
-    Bug(name="aa3ee4f", version="6.14", plot_format="cur_task"),
-    Bug(name="cd9626e", version="6.12-rc3", plot_format="cur_task"),
-    Bug(name="bbce3de", version="6.14", plot_format="cur_task"),
-    Bug(name="2feab24", version="6.9", plot_format="rebalance", mem_mb=25600),
-    Bug(name="17e3e88", version="6.9", plot_format="util_avg"),
-    Bug(name="5068d84", version="6.7", plot_format="min_vruntime"),
+    Bug(name="aa3ee4f", version="v6.14", plot_format="cur_task"),
+    Bug(name="cd9626e", version="v6.12-rc3", plot_format="cur_task"),
+    Bug(name="bbce3de", version="v6.14", plot_format="cur_task"),
+    Bug(name="2feab24", version="v6.9", plot_format="rebalance", mem_mb=25600),
+    Bug(name="17e3e88", version="v6.9", plot_format="util_avg"),
+    Bug(name="5068d84", version="v6.7", plot_format="min_vruntime"),
     Bug(
         name="evenIdleCpu",
-        version="6.7-rc1",
+        version="v6.7-rc1",
         plot_format="nr_running",
         smp="8,dies=4,cores=2,threads=1",
         fix_patch_file="use_special_topo.patch",
     ),
     Bug(
-        name="6d7e478", 
-        version="6.7-rc1", 
-        plot_format="lb_nr_running", 
-        smp="8,sockets=2,cores=2,threads=2"
+        name="6d7e478",
+        version="v6.7-rc1",
+        plot_format="lb_nr_running",
+        smp="8,sockets=2,cores=2,threads=2",
     ),
 ]
 
 def patch_linux(linux_dir: Path, patch_file: Path):
-    system(f"cd {linux_dir} && git apply {patch_file} && cd -")
+    system(f"cd {linux_dir} && git apply {patch_file}")
 
 
 def reset_git(linux_dir: Path):
-    system(f"cd {linux_dir} && git restore . && cd -")
+    system(f"cd {linux_dir} && git restore .")
 
 
 def plot_data(python_script: str, controller: str):
@@ -56,7 +56,7 @@ def plot_data(python_script: str, controller: str):
 
 
 def main(bug: Bug):
-    linux_dir = get_linux_dir(bug.version)
+    linux_dir = LINUX_ROOT_DIR / bug.version
 
     checkout_linux(bug.version, linux_dir=linux_dir)
     reset_git(linux_dir)

@@ -4,7 +4,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from scripts import LINUX_CURR_DIR, LINUX_MASTER_DIR, get_linux_dir, system
+from scripts import LINUX_CURR_DIR, LINUX_MASTER_DIR, LINUX_ROOT_DIR, system
 
 
 def clone_master():
@@ -18,7 +18,7 @@ def add_worktree(version: str, linux_dir: Path):
     if linux_dir.exists():
         logging.info(f"Linux {version} already cloned to {linux_dir}")
     else:
-        system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} v{version}")
+        system(f"cd {LINUX_MASTER_DIR} && git worktree add -f {linux_dir} {version}")
 
 
 def set_current_linux(linux_dir: Path):
@@ -36,10 +36,12 @@ def checkout_linux(version: str, linux_dir: Path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", type=str, default="6.14")
+    parser.add_argument(
+        "--version",
+        type=str,
+        default="v6.14",
+        help="Linux branch/tag/commit to checkout",
+    )
     args = parser.parse_args()
 
-    checkout_linux(
-        version=args.version,
-        linux_dir=get_linux_dir(args.version),
-    )
+    checkout_linux(version=args.version, linux_dir=LINUX_ROOT_DIR / args.version)
