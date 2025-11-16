@@ -20,6 +20,8 @@ def add_worktree(version: str, linux_dir: Path):
     else:
         system(f"cd {LINUX_MASTER_DIR} && git worktree add -f {linux_dir} {version}")
 
+def reset_git(linux_dir: Path):
+    system(f"cd {linux_dir} && git restore .")
 
 def set_current_linux(linux_dir: Path):
     """Set symlink for default version"""
@@ -28,9 +30,11 @@ def set_current_linux(linux_dir: Path):
     logging.info(f"Current Linux now points to {linux_dir}")
 
 
-def checkout_linux(version: str, linux_dir: Path):
+def checkout_linux(version: str, linux_dir: Path, reset: bool = False):
     clone_master()
     add_worktree(version, linux_dir)
+    if reset:
+        reset_git(linux_dir)
     set_current_linux(linux_dir)
 
 
@@ -42,6 +46,11 @@ if __name__ == "__main__":
         default="v6.14",
         help="Linux branch/tag/commit to checkout",
     )
+    parser.add_argument("--reset", action="store_true", default=False)
     args = parser.parse_args()
 
-    checkout_linux(version=args.version, linux_dir=LINUX_ROOT_DIR / args.version)
+    checkout_linux(
+        version=args.version,
+        linux_dir=LINUX_ROOT_DIR / args.version,
+        reset=args.reset,
+    )
