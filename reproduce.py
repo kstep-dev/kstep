@@ -3,7 +3,7 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from checkout_linux import checkout_linux
 from make_linux import make_linux
@@ -43,24 +43,19 @@ bugs = [
     ),
 ]
 
+
 def patch_linux(linux_dir: Path, patch_file: Path):
-    system(f"cd {linux_dir} && git apply {patch_file}")
-
-
-def reset_git(linux_dir: Path):
-    system(f"cd {linux_dir} && git restore .")
+    system(
+        f"(cd {linux_dir} && git apply {patch_file}) || "
+        f"(cd {linux_dir} && git apply {patch_file} --reverse --check && echo '{patch_file} already applied')"
+    )
 
 
 def plot_data(python_script: str, controller: str):
     system(f"{PROJ_DIR}/plot/plot_{python_script}.py --controller={controller}")
 
 
-def main(bug: Bug):
-    linux_dir = LINUX_ROOT_DIR / bug.version
-
-    checkout_linux(bug.version, linux_dir=linux_dir)
-    reset_git(linux_dir)
-
+def main(bug: Bug, run: List[str]):
     # patched initial min_vruntime
     # Select appropriate patch file based on plot format type
     if bug.plot_format == "rebalance":
@@ -69,46 +64,61 @@ def main(bug: Bug):
         suffix = "-vruntime_min_init-trace-lb.patch"
     else:
         suffix = "-vruntime_min_init.patch"
-    patch_file = f"{PROJ_DIR}/linux/{bug.version}{suffix}"
-    patch_linux(linux_dir, patch_file)
+    patch_file_init = LINUX_ROOT_DIR / f"{bug.version}{suffix}"
 
-    # Run the buggy version
-    make_linux(linux_dir)
-    run_qemu(
-        linux_dir=linux_dir,
-        params=[f"controller={bug.name}"],
-        log_file=LOGS_DIR / f"{bug.name}_buggy.log",
-        smp=bug.smp,
-        mem_mb=bug.mem_mb,
-    )
-
-    # Run the fixed version
     # for the new bug evenIdleCpu, we use the patch that generate special topo trigger the bug.
     if not bug.fix_patch_file:
-        patch_file = f"{PROJ_DIR}/linux/{bug.version}-{bug.name}_fix.patch"
+        patch_file_fix = LINUX_ROOT_DIR / f"{bug.version}-{bug.name}_fix.patch"
     else:
-        patch_file = f"{PROJ_DIR}/linux/{bug.version}-{bug.fix_patch_file}"
-    patch_linux(linux_dir, patch_file)
+        patch_file_fix = LINUX_ROOT_DIR / f"{bug.version}-{bug.fix_patch_file}"
 
-    make_linux(linux_dir)
-    run_qemu(
-        linux_dir=linux_dir,
-        params=[f"controller={bug.name}"],
-        log_file=LOGS_DIR / f"{bug.name}_fixed.log",
-        smp=bug.smp,
-        mem_mb=bug.mem_mb,
-    )
+    # Run the buggy version
+    if "buggy" in run:
+        linux_dir = LINUX_ROOT_DIR / f"{bug.name}_buggy"
+        checkout_linux(bug.version, linux_dir=linux_dir)
+        patch_linux(linux_dir, patch_file_init)
+        make_linux(linux_dir)
+        run_qemu(
+            linux_dir=linux_dir,
+            params=[f"controller={bug.name}"],
+            log_file=LOGS_DIR / f"{bug.name}_buggy.log",
+            smp=bug.smp,
+            mem_mb=bug.mem_mb,
+        )
+
+    # Run the fixed version
+    if "fixed" in run:
+        linux_dir = LINUX_ROOT_DIR / f"{bug.name}_fixed"
+        checkout_linux(bug.version, linux_dir=linux_dir)
+        patch_linux(linux_dir, patch_file_init)
+        patch_linux(linux_dir, patch_file_fix)
+        make_linux(linux_dir)
+        run_qemu(
+            linux_dir=linux_dir,
+            params=[f"controller={bug.name}"],
+            log_file=LOGS_DIR / f"{bug.name}_fixed.log",
+            smp=bug.smp,
+            mem_mb=bug.mem_mb,
+        )
 
     # plot the logs
-    plot_data(bug.plot_format, bug.name)
+    if "plot" in run:
+        plot_data(bug.plot_format, bug.name)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--controller", type=str, default="aa3ee4f")
+    parser.add_argument(
+        "--run",
+        type=str,
+        default=["buggy", "fixed", "plot"],
+        choices=["buggy", "fixed", "plot"],
+        nargs="+",
+    )
     args = parser.parse_args()
 
     bug = next((bug for bug in bugs if bug.name == args.controller), None)
     if not bug:
         raise ValueError(f"controller '{args.controller}' not found in bugs.")
-    main(bug)
+    main(bug=bug, run=args.run)
