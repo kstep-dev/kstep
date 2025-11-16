@@ -146,6 +146,9 @@ static void reset_distribute_cpu_mask_prev(void) {
 }
 
 void controller_run(struct controller_ops *ops) {
+  if (ops->pre_init) {
+    ops->pre_init();
+  }
   kstep_trace_init();
   disable_timer_ticks();
   disable_jiffies_update();

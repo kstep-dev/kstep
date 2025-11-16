@@ -90,6 +90,37 @@ void kstep_trace_rq_clock(void) {
   kstep_trace_function("update_rq_clock", &update_rq_clock_cb);
 }
 
+static void find_busiest_group_cb(unsigned long ip, unsigned long parent_ip,
+                                  struct ftrace_ops *op,
+                                  struct ftrace_regs *fregs) {
+  struct lb_env {
+    struct sched_domain *sd;
+
+    struct rq *src_rq;
+    int src_cpu;
+
+    int dst_cpu;
+    struct rq *dst_rq;
+
+    // other fields are not needed
+  };
+
+  struct lb_env *env = (void *)ftrace_regs_get_argument(fregs, 0);
+  if (env->dst_cpu >= 4 && env->dst_cpu <= 7) {
+    printk("LB %d %d %d %d %d\n", env->dst_cpu, env->sd->span_weight,
+           env->sd->groups->group_weight,
+           cpumask_first(sched_domain_span(env->sd)),
+           cpumask_last(sched_domain_span(env->sd)));
+  }
+}
+
+void kstep_trace_lb(void) {
+  // Instead of tracing in the middle of load_balance (in between
+  // should_we_balance and find_busiest_group), we trace find_busiest_group
+  // instead to check if the load balance is happening.
+  kstep_trace_function("find_busiest_group", &find_busiest_group_cb);
+}
+
 int kstep_trace_init(void) {
   // kstep_trace_rq_clock();
   TRACE_INFO("Scheduler trace initialized");

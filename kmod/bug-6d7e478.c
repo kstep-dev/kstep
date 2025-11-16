@@ -13,6 +13,8 @@
 static struct task_struct *busy_task;
 static struct task_struct *cgroup_task;
 
+static void controller_pre_init(void) { kstep_trace_lb(); }
+
 static void controller_init(void) {
   busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);
@@ -49,6 +51,7 @@ static void controller_body(void) {
 // smp 8,sockets=2,cores=2,threads=2
 struct controller_ops controller_6d7e478 = {
     .name = "6d7e478",
+    .pre_init = controller_pre_init,
     .init = controller_init,
     .body = controller_body,
 };
