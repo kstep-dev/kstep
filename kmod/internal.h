@@ -42,4 +42,5 @@ void kstep_trace_exit(void);
 void kstep_make_function_noop(char *name);
 void kstep_trace_rq_clock(void);
 void kstep_trace_lb(void);
+void kstep_trace_rebalance(void);
 #endif

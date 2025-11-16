@@ -1,7 +1,12 @@
 #include <linux/ftrace.h>
 #include <linux/kernel.h>
+#include <linux/percpu.h>
 #include <linux/sched/clock.h>
 #include <linux/version.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+#include <linux/fprobe.h>
+#endif
 
 #include "internal.h"
 #include "ksym.h"
@@ -120,6 +125,50 @@ void kstep_trace_lb(void) {
   // instead to check if the load balance is happening.
   kstep_trace_function("find_busiest_group", &find_busiest_group_cb);
 }
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+static DEFINE_PER_CPU(ktime_t, rebalance_domains_starttime);
+static int run_rebalance_domains_entry(struct fprobe *fp,
+                                       unsigned long entry_ip,
+                                       unsigned long ret_ip,
+                                       struct pt_regs *regs, void *entry_data) {
+  if (smp_processor_id() == 0)
+    return 0;
+  this_cpu_write(rebalance_domains_starttime, ktime_get());
+  return 0;
+}
+
+static void run_rebalance_domains_exit(struct fprobe *fp,
+                                       unsigned long entry_ip,
+                                       unsigned long ret_ip,
+                                       struct pt_regs *regs, void *entry_data) {
+  if (smp_processor_id() == 0)
+    return;
+  ktime_t endtime = ktime_get();
+  ktime_t starttime = this_cpu_read(rebalance_domains_starttime);
+  ktime_t duration = ktime_sub(endtime, starttime);
+  printk(KERN_INFO "run_rebalance_domains on CPU %d, latency: %lld ns\n",
+         smp_processor_id(), ktime_to_ns(duration));
+  return;
+}
+
+static struct fprobe fp_rebalance = {
+    .entry_handler = run_rebalance_domains_entry,
+    .exit_handler = run_rebalance_domains_exit,
+};
+
+void kstep_trace_rebalance(void) {
+  if (register_fprobe(&fp_rebalance, "run_rebalance_domains", NULL) < 0) {
+    TRACE_ERR("Failed to register fprobe for run_rebalance_domains");
+  } else {
+    TRACE_INFO("Registered fprobe for run_rebalance_domains");
+  }
+}
+#else
+void kstep_trace_rebalance(void) {
+  TRACE_INFO("Fprobe not supported in this kernel version");
+}
+#endif
 
 int kstep_trace_init(void) {
   // kstep_trace_rq_clock();
