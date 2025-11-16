@@ -40,11 +40,8 @@ if __name__ == "__main__":
         "--version",
         type=str,
         default="v6.14",
-        help="Linux branch, tag, or commit hash to checkout",
+        help="Linux branch/tag/commit to checkout",
     )
     args = parser.parse_args()
 
-    checkout_linux(
-        version=args.version,
-        linux_dir=LINUX_ROOT_DIR / args.version,
-    )
+    checkout_linux(version=args.version, linux_dir=LINUX_ROOT_DIR / args.version)

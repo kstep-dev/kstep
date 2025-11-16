@@ -3,7 +3,7 @@ kSTEP
 
 - Install dependencies: `./install_deps.sh`
 
-- Download Linux kernel: `./checkout_linux.py [--version <version>]`
+- Download Linux kernel: `./checkout_linux.py [--version <branch/tag/commit>]`
 
 - Build Linux kernel: `./make_linux.py [--clean]`
 
