@@ -2,7 +2,7 @@ OUT ?= $(abspath ../data/rootfs)
 src ?= $(shell pwd)
 
 kern-src ?= $(realpath $(src)/../linux/current)
-kern-ver := $(patsubst linux-%,%,$(notdir $(kern-src)))
+kern-ver := $(notdir $(kern-src))
 ifeq ($(kern-src),)
     $(error kern-src does not exist)
 endif
