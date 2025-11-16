@@ -16,7 +16,7 @@ def run_qemu(
     smp: str = "cpus=3,cores=3",
     mem_mb: int = 256,
 ):
-    system(f"make -C {PROJ_DIR} -j$(nproc)")
+    system(f"make kern-src={linux_dir} -C {PROJ_DIR} -j$(nproc)")
 
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
