@@ -14,6 +14,7 @@ extern struct controller_ops controller_17e3e88;
 extern struct controller_ops controller_5068d84;
 extern struct controller_ops controller_evenIdleCpu;
 extern struct controller_ops controller_6d7e478;
+extern struct controller_ops controller_case_time_sensitive;
 extern struct controller_ops controller_noop;
 
 static struct controller_ops *controller_ops_list[] = {
@@ -25,6 +26,7 @@ static struct controller_ops *controller_ops_list[] = {
     &controller_5068d84,
     &controller_evenIdleCpu,
     &controller_6d7e478,
+    &controller_case_time_sensitive,
     &controller_noop,
 };
 

@@ -101,9 +101,10 @@ void print_tasks(void) {
     u64 avg_vruntime = 0;
 #endif
 
-    TRACE_INFO("- CPU %d running=%d, switches=%3lld, avg_load=%lld, "
+    TRACE_INFO("- CPU %d running=%d, queued=%d, switches=%3lld, avg_load=%lld, "
                "avg_util=%lu, min_vruntime=%lld, avg_vruntime=%lld",
                cpu, rq->nr_running - (h_nr_queued_val - h_nr_runnable_val),
+               rq->nr_running,
                rq->nr_switches, avg_load,
                rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg,
                rq->cfs.min_vruntime - INIT_TIME_NS, avg_vruntime);
