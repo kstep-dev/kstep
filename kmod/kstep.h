@@ -1,12 +1,12 @@
-#ifndef INTERNAL_H
-#define INTERNAL_H
+#ifndef KSTEP_H
+#define KSTEP_H
 
 #include <linux/types.h>
 
+#include "ksym.h"
+#include "logging.h"
 #include "sigcode.h"
 
-// Cannot be larger than DELAY_CONST_MAX
-#define SIM_INTERVAL_US (19000ULL)
 #define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 
 // Forward declarations
@@ -14,6 +14,25 @@ struct task_struct;
 struct cpumask;
 struct rq;
 struct sched_domain;
+
+// main.c
+struct kstep_params_t {
+  char controller[32];                 // Name of the controller to run
+  unsigned long long step_interval_us; // Interval between steps in us
+};
+extern struct kstep_params_t kstep_params;
+
+// controller.c
+struct controller_ops {
+  const char *name;
+  void (*pre_init)(void);
+  void (*init)(void);
+  void (*body)(void);
+};
+void kstep_sleep(void);
+struct controller_ops *kstep_controller_get(const char *name);
+void kstep_controller_run(struct controller_ops *ops);
+void call_tick_once(bool print_tasks_flag);
 
 // clock.c
 void kstep_clock_init(u64 init_time_ns);

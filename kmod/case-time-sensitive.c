@@ -1,13 +1,10 @@
-#include "sigcode.h"
 #define TRACE_LEVEL LOGLEVEL_DEBUG
 
 #include <linux/delay.h>
 #include <linux/kthread.h>
 #include <linux/random.h>
-#include "controller.h"
-#include "internal.h"
-#include "ksym.h"
-#include "logging.h"
+
+#include "kstep.h"
 
 #define TARGET_TASK "test-proc"
 
@@ -16,7 +13,7 @@
 static struct task_struct *busy_task;
 
 static void controller_init(void) {
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
 
   busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);

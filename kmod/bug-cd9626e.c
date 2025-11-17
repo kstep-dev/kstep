@@ -5,10 +5,7 @@
 #include <linux/kthread.h>
 #include <linux/version.h>
 
-#include "controller.h"
-#include "internal.h"
-#include "ksym.h"
-#include "logging.h"
+#include "kstep.h"
 
 #define TARGET_TASK "test-proc"
 
@@ -16,13 +13,13 @@ static struct task_struct *busy_task;
 
 static void controller_init(void) {
   // set_cpus_allowed_ptr(busy_kthread, &mask);
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
 
   busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);
 
   send_sigcode(busy_task, SIGCODE_FORK, 3);
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
 }
 
 static struct task_struct *find_not_eligible_task(void) {
@@ -80,14 +77,14 @@ static void controller_body(void) {
 #else
   atomic_dec(&system_freezing_cnt);
 #endif
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
 
   call_tick_once(true);
   call_tick_once(true);
 
   send_sigcode(pause_task, SIGCODE_UNKNOWN, 0);
   print_tasks();
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
 
   for (int i = 0; i < 20; i++) {
     call_tick_once(true);

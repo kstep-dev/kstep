@@ -3,10 +3,7 @@
 #include <linux/delay.h>
 #include <linux/kthread.h>
 
-#include "controller.h"
-#include "internal.h"
-#include "ksym.h"
-#include "logging.h"
+#include "kstep.h"
 
 #define TARGET_TASK "test-proc"
 
@@ -33,7 +30,7 @@ static void controller_init(void) {
   set_cpus_allowed_ptr(busy_kthread_children, &mask);
   busy_kthread_children->wake_cpu = 2;
 
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
 
   busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);

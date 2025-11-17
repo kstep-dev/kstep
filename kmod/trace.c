@@ -8,9 +8,7 @@
 #include <linux/fprobe.h>
 #endif
 
-#include "internal.h"
-#include "ksym.h"
-#include "logging.h"
+#include "kstep.h"
 
 struct trace_func_info {
   struct list_head list;

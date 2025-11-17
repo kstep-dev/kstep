@@ -1,11 +1,7 @@
 #include <linux/delay.h>
 #include <linux/kthread.h>
 
-#include "controller.h"
-#include "internal.h"
-#include "ksym.h"
-#include "logging.h"
-#include "sigcode.h"
+#include "kstep.h"
 
 #define TARGET_TASK "test-proc"
 #define CGROUP_TASK "cgroup-proc"
@@ -18,7 +14,7 @@ static void controller_pre_init(void) { kstep_trace_lb(); }
 static void controller_init(void) {
   busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
   send_sigcode(busy_task, SIGCODE_PIN, 1);
   cgroup_task = poll_task(CGROUP_TASK);
 }

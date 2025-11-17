@@ -2,9 +2,7 @@
 #include <linux/sched_clock.h>
 #include <linux/seqlock.h>
 
-#include "internal.h"
-#include "ksym.h"
-#include "logging.h"
+#include "kstep.h"
 
 static u64 clock_value = 0;
 static u64 kstep_sched_clock(void) { return clock_value; }
