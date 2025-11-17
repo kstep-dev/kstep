@@ -11,6 +11,7 @@ jobs:
       matrix:
         version: [
           {major: 5, minor: 15},
+          {major: 6, minor: 1},
           {major: 6, minor: 6},
           {major: 6, minor: 14},
         ]
@@ -52,10 +53,8 @@ jobs:
         run: make -C kmod
 
       - name: Install QEMU
-        # if: false
         run: sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y qemu-kvm
 
       - name: Run QEMU
-        # if: false
         timeout-minutes: 1
         run: ./run_qemu.py
