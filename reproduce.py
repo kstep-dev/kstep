@@ -73,7 +73,7 @@ def main(bug: Bug, run: List[str]):
         make_linux(linux_dir)
         run_qemu(
             linux_dir=linux_dir,
-            params=[f"controller={bug.name}"],
+            controller=bug.name,
             log_file=LOGS_DIR / f"{bug.name}_buggy.log",
             smp=bug.smp,
             mem_mb=bug.mem_mb,
@@ -88,7 +88,7 @@ def main(bug: Bug, run: List[str]):
         make_linux(linux_dir)
         run_qemu(
             linux_dir=linux_dir,
-            params=[f"controller={bug.name}"],
+            controller=bug.name,
             log_file=LOGS_DIR / f"{bug.name}_fixed.log",
             smp=bug.smp,
             mem_mb=bug.mem_mb,
@@ -101,7 +101,13 @@ def main(bug: Bug, run: List[str]):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="aa3ee4f")
+    parser.add_argument(
+        "--controller",
+        type=str,
+        default="all",
+        choices=["all", *[bug.name for bug in bugs]],
+        help="The name of the bug to reproduce, or 'all' to reproduce all bugs.",
+    )
     parser.add_argument(
         "--run",
         type=str,
@@ -111,7 +117,11 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    bug = next((bug for bug in bugs if bug.name == args.controller), None)
-    if not bug:
-        raise ValueError(f"controller '{args.controller}' not found in bugs.")
-    main(bug=bug, run=args.run)
+    if args.controller == "all":
+        for bug in bugs:
+            main(bug=bug, run=args.run)
+    else:
+        bug = next((bug for bug in bugs if bug.name == args.controller), None)
+        if not bug:
+            raise ValueError(f"controller '{args.controller}' not found in bugs.")
+        main(bug=bug, run=args.run)
