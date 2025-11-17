@@ -128,27 +128,15 @@ void kstep_trace_lb(void) {
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
-typedef struct ftrace_regs fprobe_regs;
-#else
-typedef struct pt_regs fprobe_regs;
-#endif
-
 static DEFINE_PER_CPU(ktime_t, rebalance_domains_starttime);
-static int run_rebalance_domains_entry(struct fprobe *fp,
-                                       unsigned long entry_ip,
-                                       unsigned long ret_ip, fprobe_regs *regs,
-                                       void *entry_data) {
+
+static void run_rebalance_domains_entry(void) {
   if (smp_processor_id() == 0)
-    return 0;
+    return;
   this_cpu_write(rebalance_domains_starttime, ktime_get());
-  return 0;
 }
 
-static void run_rebalance_domains_exit(struct fprobe *fp,
-                                       unsigned long entry_ip,
-                                       unsigned long ret_ip, fprobe_regs *regs,
-                                       void *entry_data) {
+static void run_rebalance_domains_exit(void) {
   if (smp_processor_id() == 0)
     return;
   ktime_t endtime = ktime_get();
@@ -156,12 +144,11 @@ static void run_rebalance_domains_exit(struct fprobe *fp,
   ktime_t duration = ktime_sub(endtime, starttime);
   printk(KERN_INFO "run_rebalance_domains on CPU %d, latency: %lld ns\n",
          smp_processor_id(), ktime_to_ns(duration));
-  return;
 }
 
 static struct fprobe fp_rebalance = {
-    .entry_handler = run_rebalance_domains_entry,
-    .exit_handler = run_rebalance_domains_exit,
+    .entry_handler = (void *)run_rebalance_domains_entry,
+    .exit_handler = (void *)run_rebalance_domains_exit,
 };
 
 void kstep_trace_rebalance(void) {
