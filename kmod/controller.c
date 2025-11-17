@@ -123,8 +123,8 @@ static void reset_rq(void) {
     rq->cfs.avg.last_update_time = INIT_TIME_NS;
 
     // reset sched domain
-    for (struct sched_domain *sd = rcu_dereference_check_sched_domain(rq->sd);
-         sd; sd = sd->parent) {
+    struct sched_domain *sd;
+    for_each_domain(rq->cpu, sd) {
       // TRACE_INFO("sd: %d, %d, %d, %d", sd->span_weight, cpumask_first(sched_domain_span(sd)), cpumask_last(sched_domain_span(sd)), cpu);
       // TRACE_INFO("sd->prefer_sibling: %d", sd->flags & SD_PREFER_SIBLING);
       // TRACE_INFO("sd->share_pkg_resources: %d", sd->flags & SD_SHARE_PKG_RESOURCES);
