@@ -1,9 +1,7 @@
 #include <linux/delay.h>
 #include <linux/kthread.h>
 
-#include "controller.h"
-#include "internal.h"
-#include "ksym.h"
+#include "kstep.h"
 
 #define TARGET_TASK "test-proc"
 
@@ -14,7 +12,7 @@ static void controller_pre_init(void) { kstep_trace_rebalance(); }
 static void controller_init(void) {
   busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
 }
 
 static void controller_body(void) {

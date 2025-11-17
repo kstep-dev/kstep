@@ -8,9 +8,7 @@
 #include <linux/signal.h>
 #include <linux/version.h>
 
-#include "internal.h"
-#include "ksym.h"
-#include "logging.h"
+#include "kstep.h"
 
 void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
                    int val3) {
@@ -21,7 +19,7 @@ void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
   send_sig_info(SIGUSR1, &info, p);
   TRACE_INFO("Sent %s (val1=%d, val2=%d, val3=%d) to pid %d",
              sigcode_to_str[code], val1, val2, val3, p->pid);
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
   yield(); // yield to let the task (e.g. busy during its init, cgroup
            // controller uthread) run
 }
@@ -37,7 +35,7 @@ struct task_struct *poll_task(const char *comm) {
       if (strcmp(p->comm, comm) == 0)
         return p;
     }
-    udelay(SIM_INTERVAL_US);
+    kstep_sleep();
     yield(); // busy might be blocked by the busy controller, yield to let it
              // run
     TRACE_INFO("Waiting for process %s to be created", comm);

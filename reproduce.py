@@ -21,6 +21,7 @@ class Bug:
     patch_files_buggy: Iterable[Path] = ()
     smp: str = "cpus=3,cores=3"
     mem_mb: int = 256
+    params: Iterable[str] = ()
 
     def __post_init__(self):
         # Default to the previous one of the fixed version
@@ -43,6 +44,7 @@ bugs = [
         smp="8,dies=4,cores=2,threads=1",
         # We use the patch that generate special topo to trigger the bug.
         patch_files_buggy=(LINUX_ROOT_DIR / "v6.7-rc1-use_special_topo.patch",),
+        params=["step_interval_us=1000"],
     ),
     Bug(
         name="6d7e478",
@@ -75,6 +77,7 @@ def main(bug: Bug, run: List[str], reset: bool):
         run_qemu(
             linux_dir=linux_dir,
             controller=bug.name,
+            params=bug.params,
             log_file=LOGS_DIR / f"{bug.name}_buggy.log",
             smp=bug.smp,
             mem_mb=bug.mem_mb,
@@ -90,6 +93,7 @@ def main(bug: Bug, run: List[str], reset: bool):
         run_qemu(
             linux_dir=linux_dir,
             controller=bug.name,
+            params=bug.params,
             log_file=LOGS_DIR / f"{bug.name}_fixed.log",
             smp=bug.smp,
             mem_mb=bug.mem_mb,

@@ -3,10 +3,7 @@
 #include <linux/delay.h>
 #include <linux/kthread.h>
 
-#include "controller.h"
-#include "internal.h"
-#include "ksym.h"
-#include "logging.h"
+#include "kstep.h"
 
 #define TARGET_TASK "test-proc"
 #define CGROUP_TASK "cgroup-proc"
@@ -31,7 +28,7 @@ static void record_task_to_groups(int expected_count, int level_id, int id_in_le
         }
       }
     }
-    udelay(SIM_INTERVAL_US);
+    kstep_sleep();
     TRACE_INFO("Waiting for recording task_to_cgroup_id: %d level_id: %d "
                "id_in_level: %d",
                expected_count, level_id, id_in_level);

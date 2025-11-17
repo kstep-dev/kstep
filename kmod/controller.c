@@ -6,10 +6,42 @@
 #include <linux/reboot.h>
 #include <linux/version.h>
 
-#include "controller.h"
-#include "internal.h"
-#include "ksym.h"
-#include "logging.h"
+#include "kstep.h"
+
+extern struct controller_ops controller_aa3ee4f;
+extern struct controller_ops controller_bbce3de;
+extern struct controller_ops controller_cd9626e;
+extern struct controller_ops controller_2feab24;
+extern struct controller_ops controller_17e3e88;
+extern struct controller_ops controller_5068d84;
+extern struct controller_ops controller_evenIdleCpu;
+extern struct controller_ops controller_6d7e478;
+extern struct controller_ops controller_case_time_sensitive;
+extern struct controller_ops controller_noop;
+
+static struct controller_ops *controller_ops_list[] = {
+    &controller_aa3ee4f,
+    &controller_bbce3de,
+    &controller_cd9626e,
+    &controller_2feab24,
+    &controller_17e3e88,
+    &controller_5068d84,
+    &controller_evenIdleCpu,
+    &controller_6d7e478,
+    &controller_case_time_sensitive,
+    &controller_noop,
+};
+
+struct controller_ops *kstep_controller_get(const char *name) {
+  for (int i = 0; i < ARRAY_SIZE(controller_ops_list); i++) {
+    if (strcmp(controller_ops_list[i]->name, name) == 0) {
+      return controller_ops_list[i];
+    }
+  }
+  panic("Controller %s not found", name);
+}
+
+void kstep_sleep(void) { udelay(kstep_params.step_interval_us); }
 
 void call_tick_once(bool print_tasks_flag) {
   if (print_tasks_flag) {
@@ -24,7 +56,7 @@ void call_tick_once(bool print_tasks_flag) {
 #else
     smp_call_function_single(cpu, (void *)ksym.scheduler_tick, NULL, 0);
 #endif
-    udelay(SIM_INTERVAL_US);
+    kstep_sleep();
   }
 }
 
@@ -73,8 +105,8 @@ static void move_kthreads(void) {
     }
     set_cpus_allowed_ptr(p, cpumask_of(0));
     wake_up_process(p);
-    udelay(SIM_INTERVAL_US); // sometimes kworker/1:2H can be started very late
-                             // and miss the move_kthreads
+    kstep_sleep(); // sometimes kworker/1:2H can be started very late
+                   // and miss the move_kthreads
   }
   TRACE_INFO("Moved kthreads to CPU 0");
 }
@@ -127,7 +159,7 @@ static void reset_distribute_cpu_mask_prev(void) {
 #endif
 }
 
-void controller_run(struct controller_ops *ops) {
+void kstep_controller_run(struct controller_ops *ops) {
   if (ops->pre_init) {
     ops->pre_init();
   }
@@ -147,7 +179,7 @@ void controller_run(struct controller_ops *ops) {
 
   TRACE_INFO("Initializing controller %s", ops->name);
   ops->init();
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
   TRACE_INFO("Running controller %s", ops->name);
   ops->body();
   TRACE_INFO("Exiting controller %s", ops->name);

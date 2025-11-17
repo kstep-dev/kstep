@@ -1,34 +1,27 @@
 #include <linux/kthread.h>
 #include <linux/module.h>
 
-#include "controller.h"
-#include "internal.h"
-#include "ksym.h"
-#include "logging.h"
+#include "kstep.h"
 
-static char controller_name[32] = "noop";
-module_param_string(controller, controller_name, sizeof(controller_name), 0644);
-MODULE_PARM_DESC(controller, "Controller name to run");
+struct kstep_params_t kstep_params = {
+    .controller = "noop",
+    .step_interval_us = 19000ULL, // Cannot be larger than DELAY_CONST_MAX
+};
+module_param_string(controller, kstep_params.controller,
+                    sizeof(kstep_params.controller), 0644);
+module_param_named(step_interval_us, kstep_params.step_interval_us, ullong,
+                   0644);
 
 static struct task_struct *controller_task;
 
-static struct controller_ops *get_controller_ops(const char *name) {
-  for (int i = 0; i < ARRAY_SIZE(controller_ops_list); i++) {
-    if (strcmp(controller_ops_list[i]->name, name) == 0) {
-      return controller_ops_list[i];
-    }
-  }
-  return NULL;
-}
-
 static int __init kmod_init(void) {
   ksym_init();
-  struct controller_ops *ops = get_controller_ops(controller_name);
-  if (ops == NULL) {
-    TRACE_ERR("Controller %s not found", controller_name);
-    return -EINVAL;
+  struct controller_ops *ops = kstep_controller_get(kstep_params.controller);
+  controller_task =
+      kthread_create((void *)kstep_controller_run, ops, ops->name);
+  if (IS_ERR(controller_task)) {
+    panic("Failed to create controller task");
   }
-  controller_task = kthread_create((void *)controller_run, ops, ops->name);
   set_cpus_allowed_ptr(controller_task, cpumask_of(0));
   wake_up_process(controller_task);
   return 0;

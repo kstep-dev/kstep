@@ -1,8 +1,6 @@
 #include <linux/delay.h>
 
-#include "controller.h"
-#include "internal.h"
-#include "logging.h"
+#include "kstep.h"
 
 #define TARGET_TASK "test-proc"
 
@@ -13,7 +11,7 @@ static void controller_body(void) {
   busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);
 
-  udelay(SIM_INTERVAL_US);
+  kstep_sleep();
 
   for (int i = 0; i < 10; i++) {
     TRACE_INFO("Noop controller step %d", i);
