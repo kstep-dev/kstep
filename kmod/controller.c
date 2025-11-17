@@ -150,12 +150,18 @@ void controller_run(struct controller_ops *ops) {
     ops->pre_init();
   }
   kstep_trace_init();
+
+  // Isolate the CPUs to avoid interference
+  disable_workqueue();
+  move_kthreads();
+
+  // Control timer ticks and clock
   disable_timer_ticks();
   disable_jiffies_update();
-  disable_workqueue();
   sched_clock_init();
   sched_clock_set(INIT_TIME_NS);
-  move_kthreads();
+
+  // Reset the scheduler state to initial state
   reset_rq();
   reset_distribute_cpu_mask_prev();
 
