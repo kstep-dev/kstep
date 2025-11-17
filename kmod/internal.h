@@ -36,10 +36,10 @@ void cpu_controlled_mask_init(void);
 int is_sys_kthread(struct task_struct *p);
 
 // trace.c
-int kstep_trace_init(void);
 void kstep_trace_exit(void);
 void kstep_patch_func_noop(char *name);
 void kstep_trace_rq_clock(void);
 void kstep_trace_lb(void);
 void kstep_trace_rebalance(void);
+void kstep_patch_min_vruntime(void);
 #endif

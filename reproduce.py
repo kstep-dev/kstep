@@ -11,35 +11,42 @@ from run_qemu import run_qemu
 from scripts import LINUX_ROOT_DIR, LOGS_DIR, PROJ_DIR, system
 
 
-@dataclass(frozen=True)
+@dataclass
 class Bug:
     name: str
-    version: str
     plot_format: str
-    smp: str = "cpus=3,cores=3"
-    mem_mb: int = 256
+    version_fixed: str
+    version_buggy: str = ""
     patch_file_fixed: Optional[Path] = None
     patch_file_buggy: Optional[Path] = None
+    smp: str = "cpus=3,cores=3"
+    mem_mb: int = 256
+
+    def __post_init__(self):
+        # Default to the previous one of the fixed version
+        if self.version_buggy == "":
+            self.version_buggy = f"{self.version_fixed}~1"
 
 
 bugs = [
-    Bug(name="aa3ee4f", version="v6.14", plot_format="cur_task"),
-    Bug(name="cd9626e", version="v6.12-rc3", plot_format="cur_task"),
-    Bug(name="bbce3de", version="v6.14", plot_format="cur_task"),
-    Bug(name="2feab24", version="v6.9", plot_format="rebalance", mem_mb=25600),
-    Bug(name="17e3e88", version="v6.9", plot_format="util_avg"),
-    Bug(name="5068d84", version="v6.7", plot_format="min_vruntime"),
+    Bug(name="aa3ee4f", version_fixed="aa3ee4f", plot_format="cur_task"),
+    Bug(name="cd9626e", version_fixed="cd9626e", plot_format="cur_task"),
+    Bug(name="bbce3de", version_fixed="bbce3de", plot_format="cur_task"),
+    Bug(name="2feab24", version_fixed="2feab24", plot_format="rebalance", mem_mb=25600),
+    Bug(name="17e3e88", version_fixed="17e3e88", plot_format="util_avg"),
+    Bug(name="5068d84", version_fixed="5068d84", plot_format="min_vruntime"),
     Bug(
         name="evenIdleCpu",
-        version="v6.7-rc1",
+        version_fixed="v6.7-rc1",
+        version_buggy="v6.7-rc1",
         plot_format="nr_running",
         smp="8,dies=4,cores=2,threads=1",
-        # for the new bug evenIdleCpu, we use the patch that generate special topo trigger the bug.
-        patch_file_fixed=LINUX_ROOT_DIR / "v6.7-rc1-use_special_topo.patch",
+        # We use the patch that generate special topo to trigger the bug.
+        patch_file_buggy=LINUX_ROOT_DIR / "v6.7-rc1-use_special_topo.patch",
     ),
     Bug(
         name="6d7e478",
-        version="v6.7-rc1",
+        version_fixed="6d7e478",
         plot_format="lb_nr_running",
         smp="8,sockets=2,cores=2,threads=2",
     ),
@@ -61,7 +68,7 @@ def main(bug: Bug, run: List[str]):
     # Run the buggy version
     if "buggy" in run:
         linux_dir = LINUX_ROOT_DIR / f"{bug.name}_buggy"
-        checkout_linux(bug.version, linux_dir=linux_dir, reset=True)
+        checkout_linux(bug.version_buggy, linux_dir=linux_dir, reset=True)
         if bug.patch_file_buggy:
             patch_linux(linux_dir, bug.patch_file_buggy)
         make_linux(linux_dir)
@@ -76,12 +83,9 @@ def main(bug: Bug, run: List[str]):
     # Run the fixed version
     if "fixed" in run:
         linux_dir = LINUX_ROOT_DIR / f"{bug.name}_fixed"
-        checkout_linux(bug.version, linux_dir=linux_dir, reset=True)
-        patch_file_fix = (
-            bug.patch_file_fixed
-            or LINUX_ROOT_DIR / f"{bug.version}-{bug.name}_fix.patch"
-        )
-        patch_linux(linux_dir, patch_file_fix)
+        checkout_linux(bug.version_fixed, linux_dir=linux_dir, reset=True)
+        if bug.patch_file_fixed:
+            patch_linux(linux_dir, bug.patch_file_fixed)
         make_linux(linux_dir)
         run_qemu(
             linux_dir=linux_dir,

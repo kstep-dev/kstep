@@ -171,16 +171,9 @@ void kstep_trace_rebalance(void) {
 }
 #else
 void kstep_trace_rebalance(void) {
-  TRACE_INFO("Fprobe not supported in this kernel version");
+  TRACE_ERR("Fprobe not supported in this kernel version");
 }
 #endif
-
-int kstep_trace_init(void) {
-  // kstep_trace_rq_clock();
-  kstep_patch_min_vruntime();
-  TRACE_INFO("Scheduler trace initialized");
-  return 0;
-}
 
 void kstep_trace_exit(void) {
   struct trace_func_info *info, *tmp;
