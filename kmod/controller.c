@@ -15,7 +15,7 @@ void call_tick_once(bool print_tasks_flag) {
   if (print_tasks_flag) {
     print_tasks();
   }
-  sched_clock_tick();
+  kstep_clock_tick();
 
   // Call tick function
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
@@ -46,30 +46,11 @@ static void enable_timer_ticks(void) {
   }
 }
 
-static void disable_jiffies_update(void) {
-  // Avoid calling `tick_do_update_jiffies64` and `do_timer` to update jiffies.
-  // They are called by `tick_sched_do_timer` and `tick_periodic` respectively,
-  // and guarded by `tick_do_timer_cpu == cpu` to check if the current CPU is
-  // the timekeeper CPU for updating jiffies.
-  // References:
-  // `tick_sched_do_timer`:https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L206
-  // `tick_periodic`:https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-common.c#L86
-  // `tick_do_timer_cpu`:https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-common.c#L51
-
-  // Setting an invalid timerkeeper CPU to avoid (most of) jiffies updates.
-  *ksym.tick_do_timer_cpu = -1;
-
-  // Unfortunate workaround:
-  // https://github.com/torvalds/linux/commit/a1ff03cd6fb9c501fff63a4a2bface9adcfa81cd
-  // allows a non-timekeeper CPU to update jiffies. We force
-  // `tick_do_update_jiffies64` to be a noop function to avoid the update.
-  // kstep_make_function_noop("tick_do_update_jiffies64");
-}
-
 static void disable_workqueue(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     smp_call_function_single(cpu, (void *)ksym.workqueue_offline_cpu,
                              (void *)(uintptr_t)cpu, 1);
+    TRACE_INFO("Disabled workqueue on CPU %d", cpu);
   }
 }
 
@@ -95,6 +76,7 @@ static void move_kthreads(void) {
     udelay(SIM_INTERVAL_US); // sometimes kworker/1:2H can be started very late
                              // and miss the move_kthreads
   }
+  TRACE_INFO("Moved kthreads to CPU 0");
 }
 
 static void reset_rq(void) {
@@ -120,8 +102,8 @@ static void reset_rq(void) {
     rq->cfs.avg.last_update_time = INIT_TIME_NS;
 
     // reset sched domain
-    for (struct sched_domain *sd = rcu_dereference_check_sched_domain(rq->sd);
-         sd; sd = sd->parent) {
+    struct sched_domain *sd;
+    for_each_domain(rq->cpu, sd) {
       // TRACE_INFO("sd: %d, %d, %d, %d", sd->span_weight, cpumask_first(sched_domain_span(sd)), cpumask_last(sched_domain_span(sd)), cpu);
       // TRACE_INFO("sd->prefer_sibling: %d", sd->flags & SD_PREFER_SIBLING);
       // TRACE_INFO("sd->share_pkg_resources: %d", sd->flags & SD_SHARE_PKG_RESOURCES);
@@ -157,9 +139,7 @@ void controller_run(struct controller_ops *ops) {
 
   // Control timer ticks and clock
   disable_timer_ticks();
-  disable_jiffies_update();
-  sched_clock_init();
-  sched_clock_set(INIT_TIME_NS);
+  kstep_clock_init(INIT_TIME_NS);
 
   // Reset the scheduler state to initial state
   reset_rq();
@@ -173,7 +153,7 @@ void controller_run(struct controller_ops *ops) {
   TRACE_INFO("Exiting controller %s", ops->name);
   kernel_power_off();
 
-  sched_clock_exit();
+  kstep_clock_exit();
   enable_timer_ticks();
   kstep_trace_exit();
 }

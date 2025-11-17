@@ -47,35 +47,13 @@ static void kstep_trace_function(char *name, ftrace_func_t callback) {
   list_add(&info->list, &trace_func_list);
 }
 
-// https://github.com/torvalds/linux/commit/94d095ffa0e16bb7f161a2b73bbe5c2795d499a8
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 0)
-#define ftrace_override_function_with_return(fregs)                            \
-  ksym.override_function_with_return(arch_ftrace_get_regs(fregs))
-#define ftrace_regs_get_argument(fregs, n)                                     \
-  regs_get_kernel_argument(arch_ftrace_get_regs(fregs), n)
-#endif
-
-// https://github.com/torvalds/linux/commit/e4cf33ca48128d580e25ebe779b7ba7b4b4cf733
-#ifdef arch_ftrace_regs
-#undef ftrace_override_function_with_return
-#define ftrace_override_function_with_return(fregs)                            \
-  ksym.override_function_with_return(&arch_ftrace_regs(fregs)->regs)
-#else
-#undef ftrace_override_function_with_return
-#define ftrace_override_function_with_return(fregs)                            \
-  do {                                                                         \
-  } while (0)
-#endif
-
 // do not call the original function, and directly return to the caller
 static void noop_cb(unsigned long ip, unsigned long parent_ip,
                     struct ftrace_ops *op, struct ftrace_regs *fregs) {
-  ftrace_override_function_with_return(fregs);
+  ksym.override_function_with_return((void *)fregs);
 }
 
-void kstep_make_function_noop(char *name) {
-  kstep_trace_function(name, &noop_cb);
-}
+void kstep_patch_func_noop(char *name) { kstep_trace_function(name, &noop_cb); }
 
 static void update_rq_clock_cb(unsigned long ip, unsigned long parent_ip,
                                struct ftrace_ops *op,
@@ -83,7 +61,7 @@ static void update_rq_clock_cb(unsigned long ip, unsigned long parent_ip,
   if (smp_processor_id() == 0)
     return;
 
-  struct rq *rq = (void *)ftrace_regs_get_argument(fregs, 0);
+  struct rq *rq = (void *)regs_get_kernel_argument((void *)fregs, 0);
   u64 clock = sched_clock();
   s64 delta = (s64)clock - rq->clock;
   TRACE_INFO("update_rq_clock called on CPU %d, clock=%llu, rq->clock=%llu, "
@@ -110,7 +88,7 @@ static void find_busiest_group_cb(unsigned long ip, unsigned long parent_ip,
     // other fields are not needed
   };
 
-  struct lb_env *env = (void *)ftrace_regs_get_argument(fregs, 0);
+  struct lb_env *env = (void *)regs_get_kernel_argument((void *)fregs, 0);
   if (env->dst_cpu >= 4 && env->dst_cpu <= 7) {
     printk("LB %d %d %d %d %d\n", env->dst_cpu, env->sd->span_weight,
            env->sd->groups->group_weight,
