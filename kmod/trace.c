@@ -163,8 +163,11 @@ static struct fprobe fp_rebalance = {
 };
 
 void kstep_trace_rebalance(void) {
-  if (register_fprobe(&fp_rebalance, "run_rebalance_domains", NULL) < 0) {
-    TRACE_ERR("Failed to register fprobe for run_rebalance_domains");
+  // Renamed in
+  // https://github.com/torvalds/linux/commit/70a27d6d1b19392a23bb4a41de7788fbc539f18d
+  if (register_fprobe(&fp_rebalance, "run_rebalance_domains", NULL) < 0 &&
+      register_fprobe(&fp_rebalance, "sched_balance_softirq", NULL) < 0) {
+    TRACE_ERR("Failed to register fprobe to trace rebalance duration");
   } else {
     TRACE_INFO("Traced rebalance duration");
   }
