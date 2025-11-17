@@ -11,7 +11,7 @@ jobs:
       matrix:
         version: [
           {major: 5, minor: 15},
-          {major: 6, minor: 1},
+          {major: 6, minor: 0},
           {major: 6, minor: 6},
           {major: 6, minor: 14},
         ]
