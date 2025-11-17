@@ -3,7 +3,7 @@
 import argparse
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from scripts import LINUX_CURR_DIR, PROJ_DIR, ROOTFS_IMG, Arch, get_log_path, system
 
@@ -12,7 +12,7 @@ def run_qemu(
     linux_dir: Path,
     debug: bool = False,
     log_file: Optional[Path] = None,
-    params: Optional[List[str]] = None,
+    controller: Optional[str] = None,
     smp: str = "cpus=3,cores=3",
     mem_mb: int = 256,
 ):
@@ -47,11 +47,11 @@ def run_qemu(
     if Arch.get() == Arch.X86_64:
         boot_args += ["console=ttyS0", "tsc=nowatchdog"]
 
-    if params:
-        # Everything after the `-` is passed to init
-        # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
-        boot_args += ["-"]
-        boot_args += params
+    # Everything after the `-` is passed to init
+    # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
+    boot_args += ["-"]
+    if controller:
+        boot_args += [f"controller={controller}"]
 
     cmd = [
         exe,
@@ -92,7 +92,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--params", nargs="+", default=[])
+    parser.add_argument("--controller", type=str, default=None)
     parser.add_argument("--log_file", type=Path, default=get_log_path(create=True))
     parser.add_argument("--smp", type=str, default="cpus=3,cores=3")
     args = parser.parse_args()
