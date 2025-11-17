@@ -32,7 +32,7 @@ struct task_struct *poll_task(const char *comm) {
   //   TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm,
   //               p->__state, p->on_cpu);
   // }
-  while (1) {
+  for (int i = 0; i < 1000; i++) {
     for_each_process(p) {
       if (strcmp(p->comm, comm) == 0)
         return p;
@@ -42,15 +42,7 @@ struct task_struct *poll_task(const char *comm) {
              // run
     TRACE_INFO("Waiting for process %s to be created", comm);
   }
-}
-
-const struct cpumask *cpu_controlled_mask;
-static struct cpumask cpu_controlled_mask_data;
-
-void cpu_controlled_mask_init(void) {
-  cpumask_copy(&cpu_controlled_mask_data, cpu_active_mask);
-  cpumask_clear_cpu(0, &cpu_controlled_mask_data);
-  cpu_controlled_mask = &cpu_controlled_mask_data;
+  panic("Failed to find process %s", comm);
 }
 
 void reset_task_stats(struct task_struct *p) {

@@ -27,7 +27,10 @@ static void controller_init(void) {
   // don't wake up the children immediately
   busy_kthread_children =
       kthread_create(loopBusy, NULL, "busy_kthread_children");
-  set_cpus_allowed_ptr(busy_kthread_children, cpu_controlled_mask);
+  struct cpumask mask;
+  cpumask_copy(&mask, cpu_active_mask);
+  cpumask_clear_cpu(0, &mask);
+  set_cpus_allowed_ptr(busy_kthread_children, &mask);
   busy_kthread_children->wake_cpu = 2;
 
   udelay(SIM_INTERVAL_US);

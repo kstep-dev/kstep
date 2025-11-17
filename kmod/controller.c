@@ -131,7 +131,7 @@ void controller_run(struct controller_ops *ops) {
   if (ops->pre_init) {
     ops->pre_init();
   }
-  kstep_trace_init();
+  kstep_patch_min_vruntime();
 
   // Isolate the CPUs to avoid interference
   disable_workqueue();

@@ -141,10 +141,11 @@ void kstep_trace_lb(void) {
 
 static DEFINE_PER_CPU(ktime_t, rebalance_domains_starttime);
 
-static void run_rebalance_domains_entry(void) {
+static int run_rebalance_domains_entry(void) {
   if (smp_processor_id() == 0)
-    return;
+    return 1; // skip exit handler
   this_cpu_write(rebalance_domains_starttime, ktime_get());
+  return 0;
 }
 
 static void run_rebalance_domains_exit(void) {
@@ -163,24 +164,23 @@ static struct fprobe fp_rebalance = {
 };
 
 void kstep_trace_rebalance(void) {
-  if (register_fprobe(&fp_rebalance, "run_rebalance_domains", NULL) < 0) {
-    TRACE_ERR("Failed to register fprobe for run_rebalance_domains");
+// https://github.com/torvalds/linux/commit/70a27d6d1b19392a23bb4a41de7788fbc539f18d
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+  const char *name = "sched_balance_softirq";
+#else
+  const char *name = "run_rebalance_domains";
+#endif
+  if (register_fprobe(&fp_rebalance, name, NULL) < 0) {
+    TRACE_ERR("Failed to register fprobe %s to trace rebalance duration", name);
   } else {
-    TRACE_INFO("Traced rebalance duration");
+    TRACE_INFO("Traced rebalance duration with fprobe %s", name);
   }
 }
 #else
 void kstep_trace_rebalance(void) {
-  TRACE_INFO("Fprobe not supported in this kernel version");
+  TRACE_ERR("Fprobe not supported in this kernel version");
 }
 #endif
-
-int kstep_trace_init(void) {
-  // kstep_trace_rq_clock();
-  kstep_patch_min_vruntime();
-  TRACE_INFO("Scheduler trace initialized");
-  return 0;
-}
 
 void kstep_trace_exit(void) {
   struct trace_func_info *info, *tmp;
