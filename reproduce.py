@@ -18,7 +18,8 @@ class Bug:
     plot_format: str
     smp: str = "cpus=3,cores=3"
     mem_mb: int = 256
-    fix_patch_file: Optional[str] = None
+    patch_file_fixed: Optional[Path] = None
+    patch_file_buggy: Optional[Path] = None
 
 
 bugs = [
@@ -33,7 +34,8 @@ bugs = [
         version="v6.7-rc1",
         plot_format="nr_running",
         smp="8,dies=4,cores=2,threads=1",
-        fix_patch_file="use_special_topo.patch",
+        # for the new bug evenIdleCpu, we use the patch that generate special topo trigger the bug.
+        patch_file_fixed=LINUX_ROOT_DIR / "v6.7-rc1-use_special_topo.patch",
     ),
     Bug(
         name="6d7e478",
@@ -56,20 +58,12 @@ def plot_data(python_script: str, controller: str):
 
 
 def main(bug: Bug, run: List[str]):
-    # patched initial min_vruntime
-    patch_file_init = LINUX_ROOT_DIR / f"{bug.version}-vruntime_min_init.patch"
-
-    # for the new bug evenIdleCpu, we use the patch that generate special topo trigger the bug.
-    if not bug.fix_patch_file:
-        patch_file_fix = LINUX_ROOT_DIR / f"{bug.version}-{bug.name}_fix.patch"
-    else:
-        patch_file_fix = LINUX_ROOT_DIR / f"{bug.version}-{bug.fix_patch_file}"
-
     # Run the buggy version
     if "buggy" in run:
         linux_dir = LINUX_ROOT_DIR / f"{bug.name}_buggy"
-        checkout_linux(bug.version, linux_dir=linux_dir)
-        patch_linux(linux_dir, patch_file_init)
+        checkout_linux(bug.version, linux_dir=linux_dir, reset=True)
+        if bug.patch_file_buggy:
+            patch_linux(linux_dir, bug.patch_file_buggy)
         make_linux(linux_dir)
         run_qemu(
             linux_dir=linux_dir,
@@ -82,8 +76,11 @@ def main(bug: Bug, run: List[str]):
     # Run the fixed version
     if "fixed" in run:
         linux_dir = LINUX_ROOT_DIR / f"{bug.name}_fixed"
-        checkout_linux(bug.version, linux_dir=linux_dir)
-        patch_linux(linux_dir, patch_file_init)
+        checkout_linux(bug.version, linux_dir=linux_dir, reset=True)
+        patch_file_fix = (
+            bug.patch_file_fixed
+            or LINUX_ROOT_DIR / f"{bug.version}-{bug.name}_fix.patch"
+        )
         patch_linux(linux_dir, patch_file_fix)
         make_linux(linux_dir)
         run_qemu(

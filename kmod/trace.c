@@ -43,7 +43,6 @@ static void kstep_trace_function(char *name, ftrace_func_t callback) {
     return;
   }
 
-  TRACE_INFO("Tracing %s", name);
   list_add(&info->list, &trace_func_list);
 }
 
@@ -53,7 +52,14 @@ static void noop_cb(unsigned long ip, unsigned long parent_ip,
   ksym.override_function_with_return((void *)fregs);
 }
 
-void kstep_patch_func_noop(char *name) { kstep_trace_function(name, &noop_cb); }
+void kstep_patch_func_noop(char *name) {
+  kstep_trace_function(name, &noop_cb);
+  TRACE_INFO("Patched %s to noop", name);
+}
+
+//
+// Trace update_rq_clock
+//
 
 static void update_rq_clock_cb(unsigned long ip, unsigned long parent_ip,
                                struct ftrace_ops *op,
@@ -71,7 +77,29 @@ static void update_rq_clock_cb(unsigned long ip, unsigned long parent_ip,
 
 void kstep_trace_rq_clock(void) {
   kstep_trace_function("update_rq_clock", &update_rq_clock_cb);
+  TRACE_INFO("Traced update_rq_clock");
 }
+
+//
+// Set min vruntime for newly created cfs_rq
+//
+
+static void init_tg_cfs_entry_cb(unsigned long ip, unsigned long parent_ip,
+                                 struct ftrace_ops *op,
+                                 struct ftrace_regs *fregs) {
+  struct cfs_rq *cfs_rq = (void *)regs_get_kernel_argument((void *)fregs, 1);
+  cfs_rq->min_vruntime = INIT_TIME_NS;
+  TRACE_INFO("Set min vruntime to %llu ns", INIT_TIME_NS);
+}
+
+void kstep_patch_min_vruntime(void) {
+  kstep_trace_function("init_tg_cfs_entry", &init_tg_cfs_entry_cb);
+  TRACE_INFO("Patched init_tg_cfs_entry to set min vruntime");
+}
+
+//
+// Trace load balancing
+//
 
 static void find_busiest_group_cb(unsigned long ip, unsigned long parent_ip,
                                   struct ftrace_ops *op,
@@ -102,9 +130,14 @@ void kstep_trace_lb(void) {
   // should_we_balance and find_busiest_group), we trace find_busiest_group
   // instead to check if the load balance is happening.
   kstep_trace_function("find_busiest_group", &find_busiest_group_cb);
+  TRACE_INFO("Traced find_busiest_group for load balancing");
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
+
+//
+// Trace rebalance duration
+//
 
 static DEFINE_PER_CPU(ktime_t, rebalance_domains_starttime);
 
@@ -133,7 +166,7 @@ void kstep_trace_rebalance(void) {
   if (register_fprobe(&fp_rebalance, "run_rebalance_domains", NULL) < 0) {
     TRACE_ERR("Failed to register fprobe for run_rebalance_domains");
   } else {
-    TRACE_INFO("Registered fprobe for run_rebalance_domains");
+    TRACE_INFO("Traced rebalance duration");
   }
 }
 #else
@@ -144,6 +177,7 @@ void kstep_trace_rebalance(void) {
 
 int kstep_trace_init(void) {
   // kstep_trace_rq_clock();
+  kstep_patch_min_vruntime();
   TRACE_INFO("Scheduler trace initialized");
   return 0;
 }
