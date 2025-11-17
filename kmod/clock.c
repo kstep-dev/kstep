@@ -86,12 +86,12 @@ static void kstep_jiffies_exit(void) {
   TRACE_INFO("Enabled jiffies update");
 }
 
-void kstep_clock_init(u64 value) {
+void kstep_clock_init(u64 init_time_ns) {
   kstep_jiffies_init();
   kstep_sched_clock_init();
 
-  clock_value = value;
-  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(clock_value);
+  clock_value = init_time_ns;
+  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(init_time_ns);
   smp_mb();
   TRACE_INFO("Initialized clock to %llu ns and jiffies to %lu", clock_value,
              (jiffies - INITIAL_JIFFIES));

@@ -16,7 +16,7 @@ struct rq;
 struct sched_domain;
 
 // clock.c
-void kstep_clock_init(u64 value);
+void kstep_clock_init(u64 init_time_ns);
 void kstep_clock_tick(void);
 void kstep_clock_exit(void);
 
@@ -28,11 +28,6 @@ void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
 struct task_struct *poll_task(const char *comm);
 void reset_task_stats(struct task_struct *p);
 void print_tasks(void);
-
-extern const struct cpumask *cpu_controlled_mask;
-void cpu_controlled_mask_init(void);
-#define for_each_controlled_cpu(cpu) for_each_cpu(cpu, cpu_controlled_mask)
-
 int is_sys_kthread(struct task_struct *p);
 
 // trace.c

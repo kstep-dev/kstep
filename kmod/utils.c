@@ -45,15 +45,6 @@ struct task_struct *poll_task(const char *comm) {
   panic("Failed to find process %s", comm);
 }
 
-const struct cpumask *cpu_controlled_mask;
-static struct cpumask cpu_controlled_mask_data;
-
-void cpu_controlled_mask_init(void) {
-  cpumask_copy(&cpu_controlled_mask_data, cpu_active_mask);
-  cpumask_clear_cpu(0, &cpu_controlled_mask_data);
-  cpu_controlled_mask = &cpu_controlled_mask_data;
-}
-
 void reset_task_stats(struct task_struct *p) {
   // reset generic task stats
   p->nivcsw = 0;

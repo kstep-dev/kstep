@@ -30,7 +30,7 @@ def set_current_linux(linux_dir: Path):
     logging.info(f"Current Linux now points to {linux_dir}")
 
 
-def checkout_linux(version: str, linux_dir: Path, reset: bool = False):
+def checkout_linux(version: str, linux_dir: Path, reset: bool):
     clone_master()
     add_worktree(version, linux_dir)
     if reset:

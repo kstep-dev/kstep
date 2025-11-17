@@ -23,7 +23,6 @@ static struct controller_ops *get_controller_ops(const char *name) {
 
 static int __init kmod_init(void) {
   ksym_init();
-  cpu_controlled_mask_init();
   struct controller_ops *ops = get_controller_ops(controller_name);
   if (ops == NULL) {
     TRACE_ERR("Controller %s not found", controller_name);
