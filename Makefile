@@ -1,3 +1,5 @@
+MAKEFLAGS += -j$(shell nproc)
+
 BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.json --,)
 
 ROOTFS_DATA := $(abspath data/rootfs)

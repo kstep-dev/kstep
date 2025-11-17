@@ -6,18 +6,15 @@
 #include "ksym.h"
 
 static u64 clock_value = 0;
-static u64 sched_clock_mock(void) {
-  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(clock_value);
-  return clock_value; 
-}
+static u64 kstep_sched_clock(void) { return clock_value; }
 
-void sched_clock_set(u64 value) {
+void kstep_clock_set(u64 value) {
   clock_value = value;
   jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(clock_value);
   smp_mb();
 }
 
-void sched_clock_tick(void) {
+void kstep_clock_tick(void) {
   clock_value += TICK_NSEC;
   jiffies += 1;
   smp_mb();
@@ -28,12 +25,12 @@ void sched_clock_tick(void) {
 // is a wrapper of `paravirt_sched_clock` which can be changed with
 // `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
 
-void sched_clock_init(void) {
+void kstep_clock_init(void) {
   *ksym.__sched_clock_offset = 0;
-  ksym.paravirt_set_sched_clock(sched_clock_mock);
+  ksym.paravirt_set_sched_clock(kstep_sched_clock);
 }
 
-void sched_clock_exit(void) {
+void kstep_clock_exit(void) {
   ksym.paravirt_set_sched_clock(ksym.kvm_sched_clock_read);
 }
 
@@ -52,13 +49,13 @@ struct clock_data {
 
 static struct clock_data cd_backup;
 
-void sched_clock_init(void) {
+void kstep_clock_init(void) {
   struct clock_data *cd = ksym.cd;
   memcpy(&cd_backup, cd, sizeof(struct clock_data));
-  cd->actual_read_sched_clock = sched_clock_mock;
+  cd->actual_read_sched_clock = kstep_sched_clock;
   for (int i = 0; i < 2; i++) {
     struct clock_read_data *rd = &cd->read_data[i];
-    rd->read_sched_clock = sched_clock_mock;
+    rd->read_sched_clock = kstep_sched_clock;
     rd->mult = 1;
     rd->shift = 0;
     rd->epoch_ns = 0;
@@ -66,7 +63,7 @@ void sched_clock_init(void) {
   }
 }
 
-void sched_clock_exit(void) {
+void kstep_clock_exit(void) {
   memcpy(ksym.cd, &cd_backup, sizeof(struct clock_data));
 }
 

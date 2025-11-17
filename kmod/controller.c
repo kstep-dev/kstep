@@ -15,7 +15,7 @@ void call_tick_once(bool print_tasks_flag) {
   if (print_tasks_flag) {
     print_tasks();
   }
-  sched_clock_tick();
+  kstep_clock_tick();
 
   // Call tick function
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
@@ -63,13 +63,15 @@ static void disable_jiffies_update(void) {
   // https://github.com/torvalds/linux/commit/a1ff03cd6fb9c501fff63a4a2bface9adcfa81cd
   // allows a non-timekeeper CPU to update jiffies. We force
   // `tick_do_update_jiffies64` to be a noop function to avoid the update.
-  // kstep_make_function_noop("tick_do_update_jiffies64");
+  kstep_patch_func_noop("tick_do_update_jiffies64");
+  TRACE_INFO("Disabled jiffies update");
 }
 
 static void disable_workqueue(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     smp_call_function_single(cpu, (void *)ksym.workqueue_offline_cpu,
                              (void *)(uintptr_t)cpu, 1);
+    TRACE_INFO("Disabled workqueue on CPU %d", cpu);
   }
 }
 
@@ -95,6 +97,7 @@ static void move_kthreads(void) {
     udelay(SIM_INTERVAL_US); // sometimes kworker/1:2H can be started very late
                              // and miss the move_kthreads
   }
+  TRACE_INFO("Moved kthreads to CPU 0");
 }
 
 static void reset_rq(void) {
@@ -158,8 +161,8 @@ void controller_run(struct controller_ops *ops) {
   // Control timer ticks and clock
   disable_timer_ticks();
   disable_jiffies_update();
-  sched_clock_init();
-  sched_clock_set(INIT_TIME_NS);
+  kstep_clock_init();
+  kstep_clock_set(INIT_TIME_NS);
 
   // Reset the scheduler state to initial state
   reset_rq();
@@ -173,7 +176,7 @@ void controller_run(struct controller_ops *ops) {
   TRACE_INFO("Exiting controller %s", ops->name);
   kernel_power_off();
 
-  sched_clock_exit();
+  kstep_clock_exit();
   enable_timer_ticks();
   kstep_trace_exit();
 }

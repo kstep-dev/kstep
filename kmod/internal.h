@@ -16,10 +16,10 @@ struct rq;
 struct sched_domain;
 
 // sched_clock.c
-void sched_clock_init(void);
-void sched_clock_exit(void);
-void sched_clock_set(u64 value);
-void sched_clock_tick(void);
+void kstep_clock_init(void);
+void kstep_clock_exit(void);
+void kstep_clock_set(u64 value);
+void kstep_clock_tick(void);
 
 // utils.c
 #define send_sigcode(p, code, val) send_sigcode3(p, code, val, 0, 0)
@@ -39,7 +39,7 @@ int is_sys_kthread(struct task_struct *p);
 // trace.c
 int kstep_trace_init(void);
 void kstep_trace_exit(void);
-void kstep_make_function_noop(char *name);
+void kstep_patch_func_noop(char *name);
 void kstep_trace_rq_clock(void);
 void kstep_trace_lb(void);
 void kstep_trace_rebalance(void);
