@@ -15,11 +15,10 @@ struct cpumask;
 struct rq;
 struct sched_domain;
 
-// sched_clock.c
-void kstep_clock_init(void);
-void kstep_clock_exit(void);
-void kstep_clock_set(u64 value);
+// clock.c
+void kstep_clock_init(u64 value);
 void kstep_clock_tick(void);
+void kstep_clock_exit(void);
 
 // utils.c
 #define send_sigcode(p, code, val) send_sigcode3(p, code, val, 0, 0)
