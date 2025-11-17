@@ -141,10 +141,11 @@ void kstep_trace_lb(void) {
 
 static DEFINE_PER_CPU(ktime_t, rebalance_domains_starttime);
 
-static void run_rebalance_domains_entry(void) {
+static int run_rebalance_domains_entry(void) {
   if (smp_processor_id() == 0)
-    return;
+    return 1; // skip exit handler
   this_cpu_write(rebalance_domains_starttime, ktime_get());
+  return 0;
 }
 
 static void run_rebalance_domains_exit(void) {
@@ -170,9 +171,9 @@ void kstep_trace_rebalance(void) {
   const char *name = "run_rebalance_domains";
 #endif
   if (register_fprobe(&fp_rebalance, name, NULL) < 0) {
-    TRACE_ERR("Failed to register fprobe to trace rebalance duration");
+    TRACE_ERR("Failed to register fprobe %s to trace rebalance duration", name);
   } else {
-    TRACE_INFO("Traced rebalance duration");
+    TRACE_INFO("Traced rebalance duration with fprobe %s", name);
   }
 }
 #else

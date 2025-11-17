@@ -3,7 +3,7 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Iterable, List
 
 from checkout_linux import checkout_linux
 from make_linux import make_linux
@@ -17,8 +17,8 @@ class Bug:
     plot_format: str
     version_fixed: str
     version_buggy: str = ""
-    patch_file_fixed: Optional[Path] = None
-    patch_file_buggy: Optional[Path] = None
+    patch_files_fixed: Iterable[Path] = ()
+    patch_files_buggy: Iterable[Path] = ()
     smp: str = "cpus=3,cores=3"
     mem_mb: int = 256
 
@@ -42,7 +42,7 @@ bugs = [
         plot_format="nr_running",
         smp="8,dies=4,cores=2,threads=1",
         # We use the patch that generate special topo to trigger the bug.
-        patch_file_buggy=LINUX_ROOT_DIR / "v6.7-rc1-use_special_topo.patch",
+        patch_files_buggy=(LINUX_ROOT_DIR / "v6.7-rc1-use_special_topo.patch",),
     ),
     Bug(
         name="6d7e478",
@@ -64,13 +64,13 @@ def plot_data(python_script: str, controller: str):
     system(f"{PROJ_DIR}/plot/plot_{python_script}.py --controller={controller}")
 
 
-def main(bug: Bug, run: List[str]):
+def main(bug: Bug, run: List[str], reset: bool):
     # Run the buggy version
     if "buggy" in run:
         linux_dir = LINUX_ROOT_DIR / f"{bug.name}_buggy"
-        checkout_linux(bug.version_buggy, linux_dir=linux_dir, reset=True)
-        if bug.patch_file_buggy:
-            patch_linux(linux_dir, bug.patch_file_buggy)
+        checkout_linux(bug.version_buggy, linux_dir=linux_dir, reset=reset)
+        for patch_file in bug.patch_files_buggy:
+            patch_linux(linux_dir, patch_file)
         make_linux(linux_dir)
         run_qemu(
             linux_dir=linux_dir,
@@ -83,9 +83,9 @@ def main(bug: Bug, run: List[str]):
     # Run the fixed version
     if "fixed" in run:
         linux_dir = LINUX_ROOT_DIR / f"{bug.name}_fixed"
-        checkout_linux(bug.version_fixed, linux_dir=linux_dir, reset=True)
-        if bug.patch_file_fixed:
-            patch_linux(linux_dir, bug.patch_file_fixed)
+        checkout_linux(bug.version_fixed, linux_dir=linux_dir, reset=reset)
+        for patch_file in bug.patch_files_fixed:
+            patch_linux(linux_dir, patch_file)
         make_linux(linux_dir)
         run_qemu(
             linux_dir=linux_dir,
@@ -116,13 +116,14 @@ if __name__ == "__main__":
         choices=["buggy", "fixed", "plot"],
         nargs="+",
     )
+    parser.add_argument("--reset", action="store_true", default=False)
     args = parser.parse_args()
 
     if args.controller == "all":
         for bug in bugs:
-            main(bug=bug, run=args.run)
+            main(bug=bug, run=args.run, reset=args.reset)
     else:
         bug = next((bug for bug in bugs if bug.name == args.controller), None)
         if not bug:
             raise ValueError(f"controller '{args.controller}' not found in bugs.")
-        main(bug=bug, run=args.run)
+        main(bug=bug, run=args.run, reset=args.reset)
