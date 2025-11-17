@@ -1,8 +1,6 @@
 #define TRACE_LEVEL LOGLEVEL_DEBUG
 
 #include <linux/delay.h>
-#include <linux/kthread.h>
-#include <linux/module.h>
 #include <linux/reboot.h>
 #include <linux/version.h>
 
