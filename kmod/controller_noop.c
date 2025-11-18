@@ -1,5 +1,3 @@
-#include <linux/delay.h>
-
 #include "kstep.h"
 
 #define TARGET_TASK "test-proc"

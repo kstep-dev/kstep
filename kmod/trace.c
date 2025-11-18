@@ -1,5 +1,4 @@
 #include <linux/ftrace.h>
-#include <linux/kernel.h>
 #include <linux/percpu.h>
 #include <linux/sched/clock.h>
 #include <linux/version.h>
