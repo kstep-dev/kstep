@@ -134,12 +134,6 @@ static void reset_rq(void) {
     // reset sched domain
     struct sched_domain *sd;
     for_each_domain(rq->cpu, sd) {
-      // TRACE_INFO("sd: %d, %d, %d, %d", sd->span_weight, cpumask_first(sched_domain_span(sd)), cpumask_last(sched_domain_span(sd)), cpu);
-      // TRACE_INFO("sd->prefer_sibling: %d", sd->flags & SD_PREFER_SIBLING);
-      // TRACE_INFO("sd->share_pkg_resources: %d", sd->flags & SD_SHARE_PKG_RESOURCES);
-      // TRACE_INFO("sd->groups->prefer_sibling: %d", sd->groups->flags & SD_PREFER_SIBLING);
-      // TRACE_INFO("sd->groups->share_pkg_resources: %d\n", sd->groups->flags & SD_SHARE_PKG_RESOURCES);
-
       sd->last_balance = jiffies;
       sd->balance_interval = sd->min_interval;
       sd->nr_balance_failed = 0;
@@ -160,6 +154,9 @@ static void reset_distribute_cpu_mask_prev(void) {
 void kstep_controller_run(struct controller_ops *ops) {
   if (ops->pre_init) {
     ops->pre_init();
+  }
+  if (kstep_params.special_topo) {
+    kstep_use_special_topo();
   }
   kstep_patch_min_vruntime();
 

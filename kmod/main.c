@@ -6,11 +6,13 @@
 struct kstep_params_t kstep_params = {
     .controller = "noop",
     .step_interval_us = 19000ULL, // Cannot be larger than DELAY_CONST_MAX
+    .special_topo = false,
 };
 module_param_string(controller, kstep_params.controller,
                     sizeof(kstep_params.controller), 0644);
 module_param_named(step_interval_us, kstep_params.step_interval_us, ullong,
                    0644);
+module_param_named(special_topo, kstep_params.special_topo, bool, 0644);
 
 static struct task_struct *controller_task;
 

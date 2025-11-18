@@ -20,8 +20,10 @@ def add_worktree(version: str, linux_dir: Path):
     else:
         system(f"cd {LINUX_MASTER_DIR} && git worktree add -f {linux_dir} {version}")
 
+
 def reset_git(linux_dir: Path):
     system(f"cd {linux_dir} && git restore .")
+
 
 def set_current_linux(linux_dir: Path):
     """Set symlink for default version"""
