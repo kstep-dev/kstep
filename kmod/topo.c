@@ -34,10 +34,9 @@ static void print_sched_domains(void) {
     struct rq *rq = cpu_rq(cpu);
     struct sched_domain *sd;
     for_each_domain(cpu, sd) {
-      TRACE_DEBUG("- CPU %d: %-5s, span: %*pbl, group_capacity: %ld, flags: %s", cpu, sd->name,
-                  cpumask_pr_args(sched_domain_span(sd)), 
-                  sd->groups->sgc->capacity,
-                  sd_flags_to_str(sd->flags));
+      TRACE_DEBUG("- CPU %d: %-5s, span: %*pbl, group_capacity: %ld, flags: %s",
+                  cpu, sd->name, cpumask_pr_args(sched_domain_span(sd)),
+                  sd->groups->sgc->capacity, sd_flags_to_str(sd->flags));
     }
   }
 }
@@ -73,6 +72,12 @@ void kstep_set_cpu_capacity(int cpu, int scale) {
   // https://elixir.bootlin.com/linux/v6.17.8/source/include/linux/topology.h#L332-L339
   per_cpu(cpu_scale, cpu) = scale;
 #else
+  static bool enabled = false;
+  if (!enabled) {
+    enabled = true;
+    // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/cpu/aperfmperf.c#L362-L393
+    ksym.arch_enable_hybrid_capacity_scale();
+  }
   // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/cpu/aperfmperf.c#L395-L422
   ksym.arch_set_cpu_capacity(cpu, scale, SCHED_CAPACITY_SCALE, scale,
                              SCHED_CAPACITY_SCALE);
@@ -80,12 +85,9 @@ void kstep_set_cpu_capacity(int cpu, int scale) {
 }
 
 void kstep_use_special_topo(void) {
-  // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/cpu/aperfmperf.c#L362-L393
-  ksym.arch_enable_hybrid_capacity_scale();
   for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
-    int scale =
-        (cpu % 2 == 0) ? SCHED_CAPACITY_SCALE : SCHED_CAPACITY_SCALE >> 1;
-    kstep_set_cpu_capacity(cpu, scale);
+    kstep_set_cpu_capacity(cpu, (cpu % 2 == 0) ? SCHED_CAPACITY_SCALE
+                                               : SCHED_CAPACITY_SCALE >> 1);
   }
 
   // Qemu x86 does not support cluster CPU topology, simulate with die (i.e.,
