@@ -14,7 +14,6 @@ jobs:
           - v6.0
           - v6.6
           - v6.14
-          - v6.18-rc6
 
     name: Linux ${{matrix.version}}
     runs-on: ubuntu-latest
