@@ -2,7 +2,6 @@
 
 #include <linux/delay.h>
 #include <linux/reboot.h>
-#include <linux/version.h>
 
 #include "kstep.h"
 
