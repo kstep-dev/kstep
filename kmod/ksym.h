@@ -1,79 +1,62 @@
-#include <linux/mmu_context.h>
-#include <linux/sched/cputime.h>
-#include <linux/types.h>
+#include <linux/version.h>
 
-// private headers
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
-#include <kernel/sched/sched.h>
-#include <kernel/time/tick-sched.h>
-#pragma GCC diagnostic pop
+#ifndef KSYM_FUNC
+#define KSYM_FUNC(...)
+#endif
+
+#ifndef KSYM_VAR
+#define KSYM_VAR(...)
+#endif
 
 // Define function symbols
-// X(ret_type, func_name, args) declares function `ksym.func_name`
-#define KSYM_FUNC_LIST                                                         \
-  X(void, sched_tick, (void))                                                  \
-  X(void, scheduler_tick, (void))                                              \
-  X(void, paravirt_set_sched_clock, (u64(*func)(void)))                        \
-  X(u64, kvm_sched_clock_read, (void))                                         \
-  X(void, tick_setup_sched_timer, (bool hrtimer))                              \
-  X(int, workqueue_offline_cpu, (int cpu))                                     \
-  X(void, update_rq_clock, (struct rq * rq))                                   \
-  X(int, entity_eligible, (struct cfs_rq * cfs_rq, struct sched_entity * se))  \
-  X(void, signal_wake_up_state, (struct task_struct * t, int state))           \
-  X(int, try_to_wake_up,                                                       \
-    (struct task_struct * p, unsigned int state, int wake_flags))              \
-  X(void, freeze_task, (struct task_struct * p))                               \
-  X(void, dequeue_entities,                                                    \
-    (struct cfs_rq * cfs_rq, struct sched_entity * se, int flags))             \
-  X(u64, avg_vruntime, (struct cfs_rq * cfs_rq))                               \
-  X(struct tick_sched *, tick_get_tick_sched, (int cpu))                       \
-  X(void, override_function_with_return, (struct pt_regs * regs))              \
-  X(void, rebuild_sched_domains, (void))                                       \
-  X(bool, arch_enable_hybrid_capacity_scale, (void))                           \
-  X(void, arch_set_cpu_capacity,                                               \
-    (int cpu, unsigned long cap, unsigned long max_cap,                        \
-     unsigned long cap_freq, unsigned long base_freq))                         \
-  X(int, cpu_cluster_flags, (void))
+// KSYM_FUNC(ret_type, func_name, args) declares function `ksym.func_name`
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+KSYM_FUNC(void, sched_tick, (void))
+#else
+KSYM_FUNC(void, scheduler_tick, (void))
+#endif
+KSYM_FUNC(void, paravirt_set_sched_clock, (u64(*func)(void)))
+KSYM_FUNC(u64, kvm_sched_clock_read, (void))
+KSYM_FUNC(void, tick_setup_sched_timer, (bool hrtimer))
+KSYM_FUNC(int, workqueue_offline_cpu, (int cpu))
+KSYM_FUNC(void, update_rq_clock, (struct rq * rq))
+KSYM_FUNC(int, entity_eligible,
+          (struct cfs_rq * cfs_rq, struct sched_entity *se))
+KSYM_FUNC(void, signal_wake_up_state, (struct task_struct * t, int state))
+KSYM_FUNC(int, try_to_wake_up,
+          (struct task_struct * p, unsigned int state, int wake_flags))
+KSYM_FUNC(void, freeze_task, (struct task_struct * p))
+KSYM_FUNC(void, dequeue_entities,
+          (struct cfs_rq * cfs_rq, struct sched_entity *se, int flags))
+KSYM_FUNC(u64, avg_vruntime, (struct cfs_rq * cfs_rq))
+KSYM_FUNC(struct tick_sched *, tick_get_tick_sched, (int cpu))
+KSYM_FUNC(void, override_function_with_return, (struct pt_regs * regs))
+KSYM_FUNC(void, rebuild_sched_domains, (void))
+KSYM_FUNC(bool, arch_enable_hybrid_capacity_scale, (void))
+KSYM_FUNC(void, arch_set_cpu_capacity,
+          (int cpu, unsigned long cap, unsigned long max_cap,
+           unsigned long cap_freq, unsigned long base_freq))
+KSYM_FUNC(int, cpu_cluster_flags, (void))
 
 // Define variable symbols
-// X(type, var_name) declares `ksym.var_name` as a *pointer* to the variable
-#define KSYM_VAR_LIST                                                          \
-  X(struct rq, runqueues)                                                      \
-  X(void, cd)                                                                  \
-  X(u64, __sched_clock_offset)                                                 \
-  X(unsigned int, sysctl_sched_migration_cost)                                 \
-  X(bool, pm_freezing)                                                         \
-  X(unsigned long, arch_freq_scale)                                            \
-  X(const struct sched_class, rt_sched_class)                                  \
-  X(int, tick_do_timer_cpu)                                                    \
-  X(int, distribute_cpu_mask_prev)                                             \
-  X(struct sched_domain_topology_level *, sched_domain_topology)               \
-  X(int, update_topology)                                                      \
-  X(bool, x86_topology_update)
+// KSYM_VAR(type, name) declares `ksym.name` as a *pointer* to the variable
+KSYM_VAR(struct rq, runqueues)
+#ifdef CONFIG_GENERIC_SCHED_CLOCK
+KSYM_VAR(void, cd)
+#endif
+KSYM_VAR(u64, __sched_clock_offset)
+KSYM_VAR(unsigned int, sysctl_sched_migration_cost)
+KSYM_VAR(bool, pm_freezing)
+KSYM_VAR(unsigned long, arch_freq_scale)
+KSYM_VAR(const struct sched_class, rt_sched_class)
+KSYM_VAR(int, tick_do_timer_cpu)
+KSYM_VAR(int, distribute_cpu_mask_prev)
+KSYM_VAR(struct sched_domain_topology_level *, sched_domain_topology)
+#ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
+KSYM_VAR(int, update_topology)
+#else
+KSYM_VAR(bool, x86_topology_update)
+#endif
 
-struct ksym_t {
-  // Used for dynamic symbol lookup
-  void *(*kallsyms_lookup_name)(const char *name);
-
-#define X(ret_type, name, args) ret_type(*name) args;
-  KSYM_FUNC_LIST
-#undef X
-
-#define X(type, name) type *name;
-  KSYM_VAR_LIST
-#undef X
-};
-
-extern struct ksym_t ksym;
-
-void ksym_init(void);
-
-#undef cpu_rq
-#define cpu_rq(cpu) (per_cpu_ptr(ksym.runqueues, (cpu)))
-
-#undef this_rq
-#define this_rq() this_cpu_ptr(ksym.runqueues)
-
-#undef raw_rq
-#define raw_rq() raw_cpu_ptr(ksym.runqueues)
+#undef KSYM_FUNC
+#undef KSYM_VAR

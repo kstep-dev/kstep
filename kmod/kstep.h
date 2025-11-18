@@ -2,8 +2,15 @@
 #define KSTEP_H
 
 #include <linux/types.h>
+#include <linux/version.h>
 
-#include "ksym.h"
+// private headers
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
+#include <kernel/sched/sched.h>
+#include <kernel/time/tick-sched.h>
+#pragma GCC diagnostic pop
+
 #include "logging.h"
 #include "sigcode.h"
 
@@ -63,4 +70,23 @@ void kstep_topo_print(void);
 void kstep_use_special_topo(void);
 void kstep_set_cpu_freq(int cpu, int scale);
 void kstep_set_cpu_capacity(int cpu, int scale);
+
+// ksym.c
+struct ksym_t {
+#define KSYM_FUNC(ret_type, name, args) ret_type(*name) args;
+#define KSYM_VAR(type, name) type *name;
+#include "ksym.h"
+#undef KSYM_FUNC
+#undef KSYM_VAR
+};
+extern struct ksym_t ksym;
+void ksym_init(void);
+
+#undef cpu_rq
+#define cpu_rq(cpu) (per_cpu_ptr(ksym.runqueues, (cpu)))
+#undef this_rq
+#define this_rq() this_cpu_ptr(ksym.runqueues)
+#undef raw_rq
+#define raw_rq() raw_cpu_ptr(ksym.runqueues)
+
 #endif
