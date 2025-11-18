@@ -19,6 +19,7 @@ struct sched_domain;
 struct kstep_params_t {
   char controller[32];                 // Name of the controller to run
   unsigned long long step_interval_us; // Interval between steps in us
+  bool special_topo;                   // Whether to use the special topology
 };
 extern struct kstep_params_t kstep_params;
 
@@ -56,4 +57,8 @@ void kstep_trace_rq_clock(void);
 void kstep_trace_lb(void);
 void kstep_trace_rebalance(void);
 void kstep_patch_min_vruntime(void);
+
+// topo.c
+void kstep_topo_print(void);
+void kstep_use_special_topo(void);
 #endif
