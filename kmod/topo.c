@@ -61,16 +61,30 @@ void kstep_topo_print(void) {
 }
 
 void kstep_set_cpu_freq(int cpu, int scale) {
+  // x86:
+  // https://elixir.bootlin.com/linux/v6.14.11/source/arch/x86/include/asm/topology.h#L287-L293
+  // generic:
+  // https://elixir.bootlin.com/linux/v6.14.11/source/include/linux/arch_topology.h#L33-L38
   *per_cpu_ptr(ksym.arch_freq_scale, cpu) = scale;
+}
+
+void kstep_set_cpu_capacity(int cpu, int scale) {
+  // x86:
+  // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/cpu/aperfmperf.c#L395-L422
+  ksym.arch_set_cpu_capacity(cpu, scale, SCHED_CAPACITY_SCALE, scale,
+                             SCHED_CAPACITY_SCALE);
+  // generic:
+  // https://elixir.bootlin.com/linux/v6.17.8/source/include/linux/topology.h#L332-L339
+  per_cpu(cpu_scale, cpu) = scale;
 }
 
 void kstep_use_special_topo(void) {
   // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/cpu/aperfmperf.c#L362-L393
   ksym.arch_enable_hybrid_capacity_scale();
   for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
-    int cap = (cpu % 2 == 0) ? 100 : 50;
-    // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/cpu/aperfmperf.c#L395-L422
-    ksym.arch_set_cpu_capacity(cpu, cap, 100, cap, 100);
+    int scale =
+        (cpu % 2 == 0) ? SCHED_CAPACITY_SCALE : SCHED_CAPACITY_SCALE >> 1;
+    kstep_set_cpu_capacity(cpu, scale);
   }
 
   // Qemu x86 does not support cluster CPU topology, simulate with die (i.e.,
