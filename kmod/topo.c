@@ -69,13 +69,14 @@ void kstep_set_cpu_freq(int cpu, int scale) {
 }
 
 void kstep_set_cpu_capacity(int cpu, int scale) {
-  // x86:
+#ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
+  // https://elixir.bootlin.com/linux/v6.17.8/source/include/linux/topology.h#L332-L339
+  per_cpu(cpu_scale, cpu) = scale;
+#else
   // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/cpu/aperfmperf.c#L395-L422
   ksym.arch_set_cpu_capacity(cpu, scale, SCHED_CAPACITY_SCALE, scale,
                              SCHED_CAPACITY_SCALE);
-  // generic:
-  // https://elixir.bootlin.com/linux/v6.17.8/source/include/linux/topology.h#L332-L339
-  per_cpu(cpu_scale, cpu) = scale;
+#endif
 }
 
 void kstep_use_special_topo(void) {
