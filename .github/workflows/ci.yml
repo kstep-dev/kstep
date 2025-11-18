@@ -9,14 +9,14 @@ jobs:
   build:
     strategy:
       matrix:
-        version: [
-          {major: 5, minor: 15},
-          {major: 6, minor: 0},
-          {major: 6, minor: 6},
-          {major: 6, minor: 14},
-        ]
+        version:
+          - v5.15
+          - v6.0
+          - v6.6
+          - v6.14
+          - v6.18-rc6
 
-    name: Linux ${{matrix.version.major}}.${{matrix.version.minor}}
+    name: Linux ${{matrix.version}}
     runs-on: ubuntu-latest
 
     steps:
@@ -27,14 +27,11 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: linux/current
-          key: ${{matrix.version.major}}.${{matrix.version.minor}}
+          key: ${{matrix.version}}
 
       - name: Download Linux
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p linux/current
-          wget https://cdn.kernel.org/pub/linux/kernel/v${{matrix.version.major}}.x/linux-${{matrix.version.major}}.${{matrix.version.minor}}.tar.xz -O linux.tar.xz
-          tar -xvf linux.tar.xz -C linux/current --strip-components=1
+        run: ./checkout_linux.py --version ${{matrix.version}} --tarball
 
       - name: Build Linux
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -47,7 +44,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: linux/current
-          key: ${{matrix.version.major}}.${{matrix.version.minor}}
+          key: ${{matrix.version}}
 
       - name: Build kernel module
         run: make -C kmod

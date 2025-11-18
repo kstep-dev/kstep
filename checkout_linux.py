@@ -6,19 +6,22 @@ from pathlib import Path
 
 from scripts import LINUX_CURR_DIR, LINUX_MASTER_DIR, LINUX_ROOT_DIR, system
 
+LINUX_GIT_URL = "https://github.com/torvalds/linux.git"
+
 
 def clone_master():
     if LINUX_MASTER_DIR.exists():
         logging.info(f"Linux master already cloned to {LINUX_MASTER_DIR}")
     else:
-        system(f"git clone https://github.com/torvalds/linux.git {LINUX_MASTER_DIR}")
+        system(f"git clone {LINUX_GIT_URL} {LINUX_MASTER_DIR}")
 
 
 def add_worktree(version: str, linux_dir: Path):
     if linux_dir.exists():
         logging.info(f"Linux {version} already cloned to {linux_dir}")
     else:
-        system(f"cd {LINUX_MASTER_DIR} && git worktree add -f {linux_dir} {version}")
+        system(f"cd {LINUX_MASTER_DIR} && git worktree prune -v")
+        system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {version}")
 
 
 def reset_git(linux_dir: Path):
@@ -40,6 +43,16 @@ def checkout_linux(version: str, linux_dir: Path, reset: bool):
     set_current_linux(linux_dir)
 
 
+def download_linux(version: str, linux_dir: Path):
+    version = version.removeprefix("v")
+    major = version.split(".", 1)[0]
+    url = f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
+    path = LINUX_ROOT_DIR / f"{version}.tar.xz"
+    system(f"wget {url} -O {path}")
+    system(f"tar -xvf {path} -C {linux_dir} --strip-components=1")
+    set_current_linux(linux_dir)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -49,10 +62,17 @@ if __name__ == "__main__":
         help="Linux branch/tag/commit to checkout",
     )
     parser.add_argument("--reset", action="store_true", default=False)
+    parser.add_argument("--tarball", action="store_true", default=False)
     args = parser.parse_args()
 
-    checkout_linux(
-        version=args.version,
-        linux_dir=LINUX_ROOT_DIR / args.version,
-        reset=args.reset,
-    )
+    if not args.tarball:
+        checkout_linux(
+            version=args.version,
+            linux_dir=LINUX_ROOT_DIR / args.version,
+            reset=args.reset,
+        )
+    else:
+        download_linux(
+            version=args.version,
+            linux_dir=LINUX_ROOT_DIR / args.version,
+        )
