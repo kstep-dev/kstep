@@ -9,34 +9,33 @@
 #endif
 
 // Define function symbols
-// KSYM_FUNC(ret_type, func_name, args) declares function `ksym.func_name`
+// KSYM_FUNC(ret_type, func_name, arg...) declares function `ksym.func_name`
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
-KSYM_FUNC(void, sched_tick, (void))
+KSYM_FUNC(void, sched_tick, void)
 #else
-KSYM_FUNC(void, scheduler_tick, (void))
+KSYM_FUNC(void, scheduler_tick, void)
 #endif
-KSYM_FUNC(void, paravirt_set_sched_clock, (u64(*func)(void)))
-KSYM_FUNC(u64, kvm_sched_clock_read, (void))
-KSYM_FUNC(void, tick_setup_sched_timer, (bool hrtimer))
-KSYM_FUNC(int, workqueue_offline_cpu, (int cpu))
-KSYM_FUNC(void, update_rq_clock, (struct rq * rq))
-KSYM_FUNC(int, entity_eligible,
-          (struct cfs_rq * cfs_rq, struct sched_entity *se))
-KSYM_FUNC(void, signal_wake_up_state, (struct task_struct * t, int state))
-KSYM_FUNC(int, try_to_wake_up,
-          (struct task_struct * p, unsigned int state, int wake_flags))
-KSYM_FUNC(void, freeze_task, (struct task_struct * p))
-KSYM_FUNC(void, dequeue_entities,
-          (struct cfs_rq * cfs_rq, struct sched_entity *se, int flags))
-KSYM_FUNC(u64, avg_vruntime, (struct cfs_rq * cfs_rq))
-KSYM_FUNC(struct tick_sched *, tick_get_tick_sched, (int cpu))
-KSYM_FUNC(void, override_function_with_return, (struct pt_regs * regs))
-KSYM_FUNC(void, rebuild_sched_domains, (void))
-KSYM_FUNC(bool, arch_enable_hybrid_capacity_scale, (void))
-KSYM_FUNC(void, arch_set_cpu_capacity,
-          (int cpu, unsigned long cap, unsigned long max_cap,
-           unsigned long cap_freq, unsigned long base_freq))
-KSYM_FUNC(int, cpu_cluster_flags, (void))
+KSYM_FUNC(void, paravirt_set_sched_clock, u64 (*func)(void))
+KSYM_FUNC(u64, kvm_sched_clock_read, void)
+KSYM_FUNC(void, tick_setup_sched_timer, bool hrtimer)
+KSYM_FUNC(int, workqueue_offline_cpu, int cpu)
+KSYM_FUNC(void, update_rq_clock, struct rq *rq)
+KSYM_FUNC(int, entity_eligible, struct cfs_rq *cfs_rq, struct sched_entity *se)
+KSYM_FUNC(void, signal_wake_up_state, struct task_struct *t, int state)
+KSYM_FUNC(int, try_to_wake_up, struct task_struct *p, unsigned int state,
+          int wake_flags)
+KSYM_FUNC(void, freeze_task, struct task_struct *p)
+KSYM_FUNC(void, dequeue_entities, struct cfs_rq *cfs_rq,
+          struct sched_entity *se, int flags)
+KSYM_FUNC(u64, avg_vruntime, struct cfs_rq *cfs_rq)
+KSYM_FUNC(struct tick_sched *, tick_get_tick_sched, int cpu)
+KSYM_FUNC(void, override_function_with_return, struct pt_regs *regs)
+KSYM_FUNC(void, rebuild_sched_domains, void)
+KSYM_FUNC(bool, arch_enable_hybrid_capacity_scale, void)
+KSYM_FUNC(void, arch_set_cpu_capacity, int cpu, unsigned long cap,
+          unsigned long max_cap, unsigned long cap_freq,
+          unsigned long base_freq)
+KSYM_FUNC(int, cpu_cluster_flags, void)
 
 // Define variable symbols
 // KSYM_VAR(type, name) declares `ksym.name` as a *pointer* to the variable

@@ -73,7 +73,7 @@ void kstep_set_cpu_capacity(int cpu, int scale);
 
 // ksym.c
 struct ksym_t {
-#define KSYM_FUNC(ret_type, name, args) ret_type(*name) args;
+#define KSYM_FUNC(ret_type, name, ...) ret_type (*name)(__VA_ARGS__);
 #define KSYM_VAR(type, name) type *name;
 #include "ksym.h"
 #undef KSYM_FUNC
