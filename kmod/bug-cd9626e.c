@@ -1,9 +1,4 @@
-#define TRACE_LEVEL LOGLEVEL_DEBUG
-
-#include <linux/delay.h>
 #include <linux/freezer.h>
-#include <linux/kthread.h>
-#include <linux/version.h>
 
 #include "kstep.h"
 

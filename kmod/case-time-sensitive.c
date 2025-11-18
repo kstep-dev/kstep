@@ -1,7 +1,3 @@
-#define TRACE_LEVEL LOGLEVEL_DEBUG
-
-#include <linux/delay.h>
-#include <linux/kthread.h>
 #include <linux/random.h>
 
 #include "kstep.h"

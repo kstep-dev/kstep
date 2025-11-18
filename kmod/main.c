@@ -1,4 +1,3 @@
-#include <linux/kthread.h>
 #include <linux/module.h>
 
 #include "kstep.h"

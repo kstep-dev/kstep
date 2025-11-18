@@ -1,6 +1,7 @@
 #ifndef KSTEP_H
 #define KSTEP_H
 
+#include <linux/cpumask.h>
 #include <linux/types.h>
 #include <linux/version.h>
 
@@ -15,12 +16,6 @@
 #include "sigcode.h"
 
 #define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
-
-// Forward declarations
-struct task_struct;
-struct cpumask;
-struct rq;
-struct sched_domain;
 
 // main.c
 struct kstep_params_t {

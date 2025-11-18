@@ -1,7 +1,5 @@
 #define TRACE_LEVEL LOGLEVEL_DEBUG
 
-#include <linux/cpumask.h>
-
 #include "kstep.h"
 
 static char *sd_flags_to_str(int flags) {
