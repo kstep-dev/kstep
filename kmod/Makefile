@@ -1,6 +1,9 @@
 OUT ?= $(abspath ../data/rootfs)
 src ?= $(shell pwd)
 
+.PHONY: all
+all: $(OUT)/kmod.ko
+
 kern-src ?= $(realpath $(src)/../linux/current)
 kern-ver := $(notdir $(kern-src))
 ifeq ($(kern-src),)
@@ -22,7 +25,9 @@ ccflags-y := \
 
 $(kmod-name).ko: $(kmod-srcs) $(wildcard $(src)/*.h)
 	$(MAKE) -C $(kern-src) M=$(src) modules
-	cp $(kmod-name).ko $(OUT)/kmod.ko
+
+$(OUT)/kmod.ko: $(kmod-name).ko
+	cp $< $@
 
 .PHONY: clean
 clean:

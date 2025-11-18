@@ -14,7 +14,7 @@ USER_DIR = PROJ_DIR / "user"
 KMOD_DIR = PROJ_DIR / "kmod"
 
 DATA_DIR = PROJ_DIR / "data"
-ROOTFS_IMG = DATA_DIR / "rootfs.ext4"
+ROOTFS_IMG = DATA_DIR / "rootfs.cpio"
 LOGS_DIR = DATA_DIR / "logs"
 
 

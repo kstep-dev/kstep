@@ -3,8 +3,7 @@ MAKEFLAGS += -j$(shell nproc)
 BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.json --,)
 
 ROOTFS_DATA := $(abspath data/rootfs)
-ROOTFS_IMG := $(abspath data/rootfs.ext4)
-ROOTFS_MOUNT := $(abspath data/mount)
+ROOTFS_IMG := $(abspath data/rootfs.cpio)
 
 .PHONY: all
 all: $(ROOTFS_IMG)
@@ -21,14 +20,11 @@ kmod:
 
 # Build the root filesystem
 $(ROOTFS_IMG): user kmod $(shell find $(ROOTFS_DATA) -type f)
-	dd if=/dev/zero of=$(ROOTFS_IMG) bs=1M count=64
-	mkfs.ext4 -F $(ROOTFS_IMG)
-	sudo mount -o loop $(ROOTFS_IMG) $(ROOTFS_MOUNT)
-	sudo cp -r $(ROOTFS_DATA)/* $(ROOTFS_MOUNT)/
-	sudo umount $(ROOTFS_MOUNT)
+	cd $(ROOTFS_DATA) && (find . -print0 | cpio -o -H newc --verbose --null > $(ROOTFS_IMG))
 
 .PHONY: clean
 clean:
 	$(MAKE) -C user clean
 	$(MAKE) -C kmod clean
 	rm -f $(ROOTFS_IMG)
+	find $(ROOTFS_DATA) -type f -not -name "README.md" -delete

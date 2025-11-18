@@ -4,6 +4,7 @@
 #include <sched.h>
 #include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/errno.h>
 #include <sys/mount.h>
@@ -17,41 +18,28 @@
 #define MAX_PATH 1024
 #define PROMPT "\033[0;32m# \033[0m"
 
-#define CGROUP_ROOT "/sys/fs/cgroup"
-
-// mount cgroup filesystem
-int mount_cgroup_filesystem() {
-  if (mount("none", CGROUP_ROOT, "cgroup2", 0, NULL) < 0) {
-    if (errno == EBUSY) {
-        printf("cgroup2 already mounted on %s\n", CGROUP_ROOT);
+// Mount filesystems
+int mount_fs(const char *dir, const char *type) {
+  if (mkdir(dir, 0755) != 0) {
+    if (errno == EEXIST) {
+      printf("Directory %s already exists\n", dir);
     } else {
-        perror("mount");
-        return 1;
+      perror("mkdir");
+      return 1;
     }
-  } else {
-    printf("Mounted cgroup2 on %s\n", CGROUP_ROOT);
+  }
+  if (mount("none", dir, type, 0, "") != 0) {
+    perror("mount");
+    return 1;
   }
   return 0;
 }
 
-// Mount filesystems
 int mount_filesystems() {
-  if (mount("none", "/proc", "proc", 0, "") != 0) {
-    perror("mount");
-    return 1;
-  }
-  if (mount("none", "/sys", "sysfs", 0, "") != 0) {
-    perror("mount");
-    return 1;
-  }
-  if (mount("none", "/sys/kernel/debug", "debugfs", 0, "") != 0) {
-    perror("mount");
-    return 1;
-  }
-  if (mount("none", "/sys/fs/cgroup", "cgroup2", 0, "") != 0) {
-    perror("mount");
-    return 1;
-  }
+  mount_fs("/proc", "proc");
+  mount_fs("/sys", "sysfs");
+  mount_fs("/sys/kernel/debug", "debugfs");
+  mount_fs("/sys/fs/cgroup", "cgroup2");
   return 0;
 }
 
@@ -147,6 +135,7 @@ int execute_external(char **args) {
 
   if (pid == 0) {
     // Child process
+    setenv("PATH", "/", 1);
     execvp(args[0], args);
     perror("execvp");
     _exit(1);
@@ -199,7 +188,7 @@ void shell_loop() {
   builtin_exit();
 }
 
-int system(char *cmd) {
+int run(char *cmd) {
   printf(PROMPT "%s\n", cmd);
   char line[MAX_LINE];
   strncpy(line, cmd, MAX_LINE);
@@ -229,7 +218,7 @@ void run_init_sh() {
       continue;
     }
 
-    if (system(cmd) != 0) {
+    if (run(cmd) != 0) {
       fprintf(stderr,
               "init.sh: command `%s` failed, aborting initialization.\n", cmd);
       break;
@@ -260,12 +249,12 @@ int main(int argc, char *argv[], char *envp[]) {
 
   // Basic setup
   mount_filesystems();
-  mount_cgroup_filesystem();
   set_cpu_affinity();
 
   run_sched_test(argc, argv, envp);
   run_init_sh();
-  signal(SIGCHLD, SIG_IGN); // waitpid in init should be called before set SIG_IGN 
+  // waitpid in init should be called before set SIG_IGN
+  signal(SIGCHLD, SIG_IGN);
 
   shell_loop();
   builtin_exit();
