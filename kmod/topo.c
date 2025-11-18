@@ -1,7 +1,6 @@
 #define TRACE_LEVEL LOGLEVEL_DEBUG
 
 #include <linux/cpumask.h>
-#include <linux/find.h>
 
 #include "kstep.h"
 
@@ -61,6 +60,10 @@ void kstep_topo_print(void) {
   print_sched_domains();
 }
 
+void kstep_set_cpu_freq(int cpu, int scale) {
+  *per_cpu_ptr(ksym.arch_freq_scale, cpu) = scale;
+}
+
 void kstep_use_special_topo(void) {
   // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/cpu/aperfmperf.c#L362-L393
   ksym.arch_enable_hybrid_capacity_scale();
@@ -75,7 +78,7 @@ void kstep_use_special_topo(void) {
   for (struct sched_domain_topology_level *tl = *ksym.sched_domain_topology;
        tl->mask; tl++) {
     if (strcmp(tl->name, "PKG") == 0) {
-      tl->sd_flags = cpu_cluster_flags;
+      tl->sd_flags = ksym.cpu_cluster_flags;
     }
   }
   update_topology();

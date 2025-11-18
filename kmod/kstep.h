@@ -61,4 +61,5 @@ void kstep_patch_min_vruntime(void);
 // topo.c
 void kstep_topo_print(void);
 void kstep_use_special_topo(void);
+void kstep_set_cpu_freq(int cpu, int scale);
 #endif

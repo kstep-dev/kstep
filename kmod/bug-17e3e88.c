@@ -30,7 +30,7 @@ static void controller_body(void) {
   send_sigcode(busy_task, SIGCODE_FORK_FF, 1);
 
   // fake the frequency of cpu 2 to 50% of the base frequency
-  *per_cpu_ptr(ksym.arch_freq_scale, 2) = 512L;
+  kstep_set_cpu_freq(2, SCHED_CAPACITY_SCALE >> 1);
 
   // tick until the util_avg becomes 100%
   for (int i = 0; i < 600; i++) {

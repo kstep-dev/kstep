@@ -33,7 +33,8 @@
   X(bool, arch_enable_hybrid_capacity_scale, (void))                           \
   X(void, arch_set_cpu_capacity,                                               \
     (int cpu, unsigned long cap, unsigned long max_cap,                        \
-     unsigned long cap_freq, unsigned long base_freq))
+     unsigned long cap_freq, unsigned long base_freq))                         \
+  X(int, cpu_cluster_flags, (void))
 
 // Define variable symbols
 // X(type, var_name) declares `ksym.var_name` as a *pointer* to the variable
