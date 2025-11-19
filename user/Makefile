@@ -1,6 +1,6 @@
 ROOTFS ?= $(abspath ../data/rootfs)
 EXES = $(patsubst %.c,$(ROOTFS)/%,$(wildcard *.c))
-TARGETS = $(EXES) $(ROOTFS)/init.sh $(ROOTFS)/init
+TARGETS = $(EXES) $(ROOTFS)/init.sh
 
 all: $(TARGETS)
 
