@@ -10,7 +10,7 @@ static void print_sd_flags(int flags) {
 }
 
 static void print_cpumask(const struct cpumask *mask, int width) {
-  static char buf[8];
+  char buf[32];
   snprintf(buf, sizeof(buf), "%*pbl", cpumask_pr_args(mask));
   pr_cont("%*s", width, buf);
 }
