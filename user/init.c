@@ -18,29 +18,31 @@
 #define MAX_PATH 1024
 #define PROMPT "\033[0;32m# \033[0m"
 
+#define panic(msg, ...)                                                        \
+  do {                                                                         \
+    fprintf(stderr, msg "\n", ##__VA_ARGS__);                                  \
+    exit(1);                                                                   \
+  } while (0)
+
 // Mount filesystems
-int mount_fs(const char *dir, const char *type) {
+void mount_fs(const char *dir, const char *type) {
   if (mkdir(dir, 0755) != 0) {
     if (errno == EEXIST) {
       printf("Directory %s already exists\n", dir);
     } else {
-      perror("mkdir");
-      return 1;
+      panic("Failed to create directory %s", dir);
     }
   }
   if (mount("none", dir, type, 0, "") != 0) {
-    perror("mount");
-    return 1;
+    panic("Failed to mount %s as %s", dir, type);
   }
-  return 0;
 }
 
-int mount_filesystems() {
+void mount_filesystems() {
   mount_fs("/proc", "proc");
   mount_fs("/sys", "sysfs");
   mount_fs("/sys/kernel/debug", "debugfs");
   mount_fs("/sys/fs/cgroup", "cgroup2");
-  return 0;
 }
 
 void set_cpu_affinity() {
