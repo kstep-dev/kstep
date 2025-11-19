@@ -1,40 +1,61 @@
-#define TRACE_LEVEL LOGLEVEL_DEBUG
-
 #include "kstep.h"
 
-static char *sd_flags_to_str(int flags) {
-  static char str[256];
-  str[0] = '\0';
+static void print_sd_flags(int flags) {
 #define SD_FLAG(name, meta_flag)                                               \
   if (flags & name) {                                                          \
-    strlcat(str, #name " | ", sizeof(str));                                    \
+    pr_cont("%s, ", &#name[3]);                                                \
   }
 #include <linux/sched/sd_flags.h>
 #undef SD_FLAG
-  if (strlen(str) > 3) { // remove the last " | "
-    str[strlen(str) - 3] = '\0';
-  }
-  return str;
+}
+
+static void print_cpumask(const struct cpumask *mask, int width) {
+  static char buf[8];
+  snprintf(buf, sizeof(buf), "%*pbl", cpumask_pr_args(mask));
+  pr_cont("%*s", width, buf);
 }
 
 static void print_topo_levels(void) {
-  TRACE_DEBUG("Topology levels:");
+  pr_info("Topology levels:\n");
   for (struct sched_domain_topology_level *tl = *ksym.sched_domain_topology;
        tl->mask; tl++) {
-    TRACE_DEBUG("- %-5s, flags: %s", tl->name,
-                sd_flags_to_str(tl->sd_flags ? (tl->sd_flags()) : 0));
+    pr_info("- %-5s| ", tl->name);
+    for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
+      print_cpumask(tl->mask(cpu), 4);
+      pr_cont(" | ");
+    }
+    print_sd_flags(tl->sd_flags ? (tl->sd_flags()) : 0);
+    pr_cont("\n");
   }
 }
 
+static void print_sched_domain(struct sched_domain *sd) {
+  pr_cont("mask=%*pbl, groups={", cpumask_pr_args(sched_domain_span(sd)));
+  struct sched_group *init_sg = sd->groups;
+  for (struct sched_group *sg = init_sg;; sg = sg->next) {
+    print_cpumask(sched_group_span(sg), 0);
+    bool last = sg->next == init_sg;
+    pr_cont(": %lu%s", sg->sgc->capacity, last ? "" : ", ");
+    if (last)
+      break;
+  }
+  pr_cont("}, flags=");
+  print_sd_flags(sd->flags);
+  pr_cont("\n");
+}
+
 static void print_sched_domains(void) {
-  TRACE_DEBUG("Sched domains:");
-  for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
-    struct rq *rq = cpu_rq(cpu);
-    struct sched_domain *sd;
-    for_each_domain(cpu, sd) {
-      TRACE_DEBUG("- CPU %d: %-5s, span: %*pbl, group_capacity: %ld, flags: %s",
-                  cpu, sd->name, cpumask_pr_args(sched_domain_span(sd)),
-                  sd->groups->sgc->capacity, sd_flags_to_str(sd->flags));
+  pr_info("Sched domains:\n");
+  for (struct sched_domain_topology_level *tl = *ksym.sched_domain_topology;
+       tl->mask; tl++) {
+    for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
+      struct sched_domain *sd;
+      for_each_domain(cpu, sd) {
+        if (strcmp(sd->name, tl->name) == 0) {
+          pr_info("- %s[%d]: ", tl->name, cpu);
+          print_sched_domain(sd);
+        }
+      }
     }
   }
 }
@@ -97,5 +118,4 @@ void kstep_use_special_topo(void) {
     }
   }
   update_topology();
-  kstep_topo_print();
 }
