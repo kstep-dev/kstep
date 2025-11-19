@@ -9,5 +9,8 @@
         "**/*.mod.o": true,
         "**/*.o": true,
     },
-    "search.useIgnoreFiles": false
+    "search.useIgnoreFiles": false,
+    "files.associations": {
+        "config.current": "makefile"
+    },
 }
