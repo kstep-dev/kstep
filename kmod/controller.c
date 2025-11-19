@@ -157,6 +157,7 @@ void kstep_controller_run(struct controller_ops *ops) {
   if (kstep_params.special_topo) {
     kstep_use_special_topo();
   }
+  kstep_topo_print();
   kstep_patch_min_vruntime();
 
   // Isolate the CPUs to avoid interference
