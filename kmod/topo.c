@@ -3,7 +3,8 @@
 static void print_sd_flags(int flags) {
 #define SD_FLAG(name, meta_flag)                                               \
   if (flags & name) {                                                          \
-    pr_cont("%s, ", &#name[3]);                                                \
+    flags &= ~name;                                                            \
+    pr_cont("%s%s", &#name[3], flags ? ", " : "");                             \
   }
 #include <linux/sched/sd_flags.h>
 #undef SD_FLAG
