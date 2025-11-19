@@ -35,7 +35,6 @@ KSYM_FUNC(bool, arch_enable_hybrid_capacity_scale, void)
 KSYM_FUNC(void, arch_set_cpu_capacity, int cpu, unsigned long cap,
           unsigned long max_cap, unsigned long cap_freq,
           unsigned long base_freq)
-KSYM_FUNC(int, cpu_cluster_flags, void)
 
 // Define variable symbols
 // KSYM_VAR(type, name) declares `ksym.name` as a *pointer* to the variable

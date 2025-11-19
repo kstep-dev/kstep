@@ -61,7 +61,7 @@ static void print_sched_domains(void) {
   }
 }
 
-static void update_topology(void) {
+static void kstep_topo_apply(void) {
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
   // https://elixir.bootlin.com/linux/v6.17.8/source/drivers/base/arch_topology.c#L205-L222
   *ksym.update_topology = 1;
@@ -104,19 +104,32 @@ void kstep_set_cpu_capacity(int cpu, int scale) {
 #endif
 }
 
+DEFINE_PER_CPU(struct cpumask, cluster_mask) = CPU_MASK_NONE;
+static void cluster_mask_init(int cluster_size) {
+  for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
+    int start = cpu / cluster_size * cluster_size;
+    int end = start + cluster_size;
+    for (int i = start; i < end; i++) {
+      cpumask_set_cpu(i, &per_cpu(cluster_mask, cpu));
+    }
+  }
+}
+static const struct cpumask *cluster_mask_fn(int cpu) {
+  return &per_cpu(cluster_mask, cpu);
+}
+
 void kstep_use_special_topo(void) {
   for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
     kstep_set_cpu_capacity(cpu, (cpu % 2 == 0) ? SCHED_CAPACITY_SCALE
                                                : SCHED_CAPACITY_SCALE >> 1);
   }
 
-  // Qemu x86 does not support cluster CPU topology, simulate with die (i.e.,
-  // PKG) using cluster flags.
+  // qemu-system-x86_64 does not support cluster CPU topology.
+  cluster_mask_init(2);
   for (struct sched_domain_topology_level *tl = *ksym.sched_domain_topology;
        tl->mask; tl++) {
-    if (strcmp(tl->name, "PKG") == 0) {
-      tl->sd_flags = ksym.cpu_cluster_flags;
-    }
+    if (strcmp(tl->name, "CLS") == 0)
+      tl->mask = cluster_mask_fn;
   }
-  update_topology();
+  kstep_topo_apply();
 }

@@ -42,7 +42,7 @@ bugs = [
         version_fixed="v6.14",
         version_buggy="v6.14",
         plot_format="nr_running",
-        smp="8,dies=4,cores=2,threads=1",
+        smp="8",
         params_fixed=["step_interval_us=1000"],
         params_buggy=["step_interval_us=1000", "special_topo=true"],
     ),
