@@ -25,7 +25,7 @@ jobs:
         id: restore-cache
         uses: actions/cache/restore@v4
         with:
-          path: linux/current
+          path: linux
           key: ${{matrix.version}}
 
       - name: Download Linux
@@ -42,7 +42,7 @@ jobs:
         if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: linux/current
+          path: linux
           key: ${{matrix.version}}
 
       - name: Build kernel module

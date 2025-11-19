@@ -35,7 +35,6 @@ def run_qemu(
     }[arch]
 
     boot_args = [
-        "root=/dev/vda",
         "rw",
         "nokaslr",
         "sched_verbose",
@@ -63,8 +62,8 @@ def run_qemu(
         "-cpu max",
         f"-m {mem_mb}M",
         f"-kernel {kernel_image_path}",
+        f"-initrd {ROOTFS_IMG}",
         f'-append "{" ".join(boot_args)}"',
-        f"-drive if=virtio,file={ROOTFS_IMG},format=raw",
         "-nographic",
     ]
 

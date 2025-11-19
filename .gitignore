@@ -13,12 +13,10 @@ compile_commands.events.json
 *.o.d
 
 # Data files
-/data/rootfs.ext4
+/data/rootfs.cpio
+/data/rootfs/*
+!/data/rootfs/README.md
 /data/logs/*
-/data/rootfs/bin/*
-/data/rootfs/init.sh
-!/data/*/README.md
-!/data/*/*/README.md
 
 # Plots
 /plot/*.pdf
