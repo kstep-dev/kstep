@@ -119,6 +119,13 @@ void print_tasks(void) {
   }
 }
 
+void print_nr_running(void) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct rq *rq = cpu_rq(cpu);
+    TRACE_INFO("%d %d", cpu, rq->nr_running);
+  }
+}
+
 static char *sys_kthread_comms[] = {
     "cpuhp/",
     "migration/",

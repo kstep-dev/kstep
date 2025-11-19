@@ -37,7 +37,7 @@ static struct task_struct *find_not_eligible_task(void) {
 static void controller_body(void) {
 
   for (int i = 0; i < 20; i++) {
-    call_tick_once(true);
+    call_tick_once();
   }
 
   struct task_struct *pause_task = NULL;
@@ -49,10 +49,10 @@ static void controller_body(void) {
       send_sigcode(pause_task, SIGCODE_SLEEP, 1);
       break;
     }
-    call_tick_once(true);
+    call_tick_once();
   }
 
-  call_tick_once(true);
+  call_tick_once();
 
   TRACE_INFO("freeze ineligible task %d", pause_task->pid);
 
@@ -74,15 +74,15 @@ static void controller_body(void) {
 #endif
   kstep_sleep();
 
-  call_tick_once(true);
-  call_tick_once(true);
+  call_tick_once();
+  call_tick_once();
 
   send_sigcode(pause_task, SIGCODE_UNKNOWN, 0);
   print_tasks();
   kstep_sleep();
 
   for (int i = 0; i < 20; i++) {
-    call_tick_once(true);
+    call_tick_once();
   }
 }
 

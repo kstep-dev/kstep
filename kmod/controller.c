@@ -40,9 +40,12 @@ struct controller_ops *kstep_controller_get(const char *name) {
 
 void kstep_sleep(void) { udelay(kstep_params.step_interval_us); }
 
-void call_tick_once(bool print_tasks_flag) {
-  if (print_tasks_flag) {
+void call_tick_once(void) {
+  if (kstep_params.print_tasks) {
     print_tasks();
+  }
+  if (kstep_params.print_nr_running) {
+    print_nr_running();
   }
   kstep_clock_tick();
 
@@ -154,6 +157,7 @@ void kstep_controller_run(struct controller_ops *ops) {
   if (ops->pre_init) {
     ops->pre_init();
   }
+  kstep_params_print();
   if (kstep_params.special_topo) {
     kstep_use_special_topo();
   }

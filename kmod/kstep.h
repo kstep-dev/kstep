@@ -22,8 +22,11 @@ struct kstep_params_t {
   char controller[32];                 // Name of the controller to run
   unsigned long long step_interval_us; // Interval between steps in us
   bool special_topo;                   // Whether to use the special topology
+  bool print_tasks;                    // Whether to print tasks
+  bool print_nr_running;               // Whether to print nr_running
 };
 extern struct kstep_params_t kstep_params;
+void kstep_params_print(void);
 
 // controller.c
 struct controller_ops {
@@ -35,7 +38,7 @@ struct controller_ops {
 void kstep_sleep(void);
 struct controller_ops *kstep_controller_get(const char *name);
 void kstep_controller_run(struct controller_ops *ops);
-void call_tick_once(bool print_tasks_flag);
+void call_tick_once(void);
 
 // clock.c
 void kstep_clock_init(u64 init_time_ns);
@@ -50,6 +53,7 @@ void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
 struct task_struct *poll_task(const char *comm);
 void reset_task_stats(struct task_struct *p);
 void print_tasks(void);
+void print_nr_running(void);
 int is_sys_kthread(struct task_struct *p);
 
 // trace.c

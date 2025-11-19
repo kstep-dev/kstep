@@ -35,7 +35,7 @@ static void controller_body(void) {
 
     // Step 1: Let the system advance randomly, building up some queued work
     for (int j = 0; j < rand_iter; j++) {
-      call_tick_once(true);
+      call_tick_once();
     }
 
     // Step 2: Pause a newly-forked task, which will result in it being queued but not running
@@ -48,7 +48,7 @@ static void controller_body(void) {
 
     // Give it a fixed window where queue likely > running
     for (int j = 0; j < 15; j++) {
-      call_tick_once(true);
+      call_tick_once();
     }
 
     // Now, simulate a draining phase: unpause the "queued" task if possible -- here, we resume the busy task
