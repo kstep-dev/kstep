@@ -43,8 +43,7 @@ bugs = [
         version_buggy="v6.14",
         plot_format="nr_running",
         smp="8",
-        params_fixed=["step_interval_us=1000"],
-        params_buggy=["step_interval_us=1000", "special_topo=true"],
+        params_buggy=["special_topo=true"],
     ),
     Bug(
         name="6d7e478",

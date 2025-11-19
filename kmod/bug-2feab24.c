@@ -4,7 +4,10 @@
 
 static struct task_struct *busy_task;
 
-static void controller_pre_init(void) { kstep_trace_rebalance(); }
+static void controller_pre_init(void) {
+  kstep_params.print_tasks = false;
+  kstep_trace_rebalance();
+}
 
 static void controller_init(void) {
   busy_task = poll_task(TARGET_TASK);
@@ -18,7 +21,7 @@ static void controller_body(void) {
   }
 
   for (int i = 0; i < 1000; i++) {
-    call_tick_once(false);
+    call_tick_once();
   }
 }
 

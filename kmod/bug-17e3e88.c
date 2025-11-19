@@ -31,7 +31,7 @@ static void controller_body(void) {
 
   // tick until the util_avg becomes 100%
   for (int i = 0; i < 600; i++) {
-    call_tick_once(true);
+    call_tick_once();
   }
 
   // pause the fifo task for
@@ -45,7 +45,7 @@ static void controller_body(void) {
 
   // wait for another 2 ticks (2ms)
   for (int i = 0; i < 2; i++) {
-    call_tick_once(true);
+    call_tick_once();
   }
 
   // start another fifo task
@@ -53,7 +53,7 @@ static void controller_body(void) {
 
   // tick for another 600 ticks (600ms) to show the impact
   for (int i = 0; i < 600; i++) {
-    call_tick_once(true);
+    call_tick_once();
   }
 }
 

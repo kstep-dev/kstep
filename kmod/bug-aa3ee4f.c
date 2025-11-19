@@ -70,7 +70,7 @@ static void sleep_all_tasks_except(int cpu, struct task_struct *target) {
 
 static void controller_body(void) {
   for (int i = 0; i < 20; i++) {
-    call_tick_once(true);
+    call_tick_once();
   }
 
   struct task_struct *not_eligible_task = NULL;
@@ -80,21 +80,21 @@ static void controller_body(void) {
     if (not_eligible_task && task_cpu(not_eligible_task) == task_cpu(busy_kthread)) {
       break;
     }
-    call_tick_once(true);
+    call_tick_once();
   }
 
   // sleep all colocated tasks 
   TRACE_INFO("Found not eligible task %d on cpu %d", not_eligible_task->pid, task_cpu(not_eligible_task));
   sleep_all_tasks_except(task_cpu(not_eligible_task), not_eligible_task);
-  
-  call_tick_once(true);
-  
+
+  call_tick_once();
+
   // wake up the kthread to call sync wakeup
   shared_data = 0;
   atomic_set(&data_ready, 1);
   wake_up_interruptible(&my_wq);
 
-  call_tick_once(true);
+  call_tick_once();
 
   // tick until the not eligible task is running on the cpu and pause it
   while (1) {
@@ -102,12 +102,12 @@ static void controller_body(void) {
       send_sigcode(not_eligible_task, SIGCODE_PAUSE, 0);
       break;
     }
-    call_tick_once(true);
+    call_tick_once();
   }
 
   // tick to show the impact
   for (int i = 0; i < 20; i++) {
-    call_tick_once(true);
+    call_tick_once();
   }
 }
 

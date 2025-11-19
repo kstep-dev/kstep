@@ -117,7 +117,7 @@ static struct task_struct *get_curr_task(int cpu) {
 static void controller_body(void) {
   // Update clock
   for (int i = 0; i < 20; i++) {
-    call_tick_once(true);
+    call_tick_once();
   }
 
   // tick until there is a not eligible task group with eligible tasks
@@ -129,7 +129,7 @@ static void controller_body(void) {
       sleep_all_tasks_in_ineligible_tg();
       break;
     }
-    call_tick_once(true);
+    call_tick_once();
   }
 
   ksym.dequeue_entities(ineligible_tg_se->cfs_rq, ineligible_tg_se, DEQUEUE_SLEEP);
@@ -139,7 +139,7 @@ static void controller_body(void) {
   send_sigcode(p, SIGCODE_CLONE3_L3_0, 1);
 
   for (int i = 0; i < 60; i++) {
-    call_tick_once(true);
+    call_tick_once();
   }
 }
 
