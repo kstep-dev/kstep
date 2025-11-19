@@ -32,3 +32,4 @@ $(OUT)/kmod.ko: $(kmod-name).ko
 .PHONY: clean
 clean:
 	$(MAKE) -C $(kern-src) M=$(src) clean
+	rm -f $(OUT)/kmod.ko

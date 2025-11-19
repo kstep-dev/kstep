@@ -27,4 +27,3 @@ clean:
 	$(MAKE) -C user clean
 	$(MAKE) -C kmod clean
 	rm -f $(ROOTFS_IMG)
-	find $(ROOTFS_DATA) -type f -not -name "README.md" -delete
