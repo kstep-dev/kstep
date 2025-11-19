@@ -8,6 +8,10 @@ from typing import Iterable, Optional
 from scripts import LINUX_CURR_DIR, PROJ_DIR, ROOTFS_IMG, Arch, get_log_path, system
 
 
+def make_kstep():
+    system(f"make -C {PROJ_DIR} -j$(nproc)")
+
+
 def run_qemu(
     linux_dir: Path,
     debug: bool = False,
@@ -17,8 +21,6 @@ def run_qemu(
     smp: str = "cpus=3,cores=3",
     mem_mb: int = 256,
 ):
-    system(f"make kern-src={linux_dir} -C {PROJ_DIR} -j$(nproc)")
-
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
@@ -100,4 +102,5 @@ if __name__ == "__main__":
     parser.add_argument("--smp", type=str, default="cpus=3,cores=3")
     parser.add_argument("--params", type=str, nargs="+")
     args = parser.parse_args()
+    make_kstep()
     run_qemu(**vars(args))

@@ -7,7 +7,7 @@ from typing import Iterable, List
 
 from checkout_linux import checkout_linux
 from make_linux import make_linux
-from run_qemu import run_qemu
+from run_qemu import make_kstep, run_qemu
 from scripts import LINUX_ROOT_DIR, LOGS_DIR, PROJ_DIR, system
 
 
@@ -66,6 +66,8 @@ def plot_data(python_script: str, controller: str):
 
 
 def main(bug: Bug, run: List[str], reset: bool):
+    make_kstep()
+
     # Run the buggy version
     if "buggy" in run:
         linux_dir = LINUX_ROOT_DIR / f"{bug.name}_buggy"
