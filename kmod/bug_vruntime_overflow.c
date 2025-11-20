@@ -77,18 +77,11 @@ static struct sched_entity *ineligible_tg_se = NULL;
 static int cpu_of_ineligible_task = -1;
 
 static bool is_ineligible(struct task_struct *p) {
-  if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task || p->on_cpu == 0)
-    return false;
   struct sched_entity *se = &p->se;
-  if (ksym.entity_eligible(se->parent->cfs_rq, se->parent) == 0 &&
-      ksym.entity_eligible(se->cfs_rq, se) == 1 &&
-      task_to_cgroup_id[p->pid - busy_task->pid][0] == 3) {
-    ineligible_task = p;
-    ineligible_tg_se = se->parent;
-    cpu_of_ineligible_task = task_cpu(p);
-    return true;
-  }
-  return false;
+  return strcmp(p->comm, TARGET_TASK) == 0 && p != busy_task && p->on_cpu &&
+         ksym.entity_eligible(se->parent->cfs_rq, se->parent) == 0 &&
+         ksym.entity_eligible(se->cfs_rq, se) == 1 &&
+         task_to_cgroup_id[p->pid - busy_task->pid][0] == 3;
 }
 
 static void sleep_all_tasks_in_ineligible_tg(void) {
@@ -118,7 +111,9 @@ static void controller_body(void) {
   }
 
   // tick until there is a not eligible task group with eligible tasks
-  kstep_tick_until_task(is_ineligible);
+  ineligible_task = kstep_tick_until_task(is_ineligible);
+  ineligible_tg_se = ineligible_task->se.parent;
+  cpu_of_ineligible_task = task_cpu(ineligible_task);
   TRACE_INFO("Found not eligible task group");
   // pause all tasks in the not eligible task group
   sleep_all_tasks_in_ineligible_tg();
