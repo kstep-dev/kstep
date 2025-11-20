@@ -3,7 +3,7 @@ kSTEP
 
 - Install dependencies: `./install_deps.sh`
 
-- Reproduce bugs: `./reproduce.py [--controller <bug_name|all>] [--run <buggy|fixed|plot>]`
+- Reproduce bugs: `./reproduce.py <bug_name|all> [--run <buggy|fixed|plot>]`
 
 - Download Linux kernel: `./checkout_linux.py [--version <branch|tag|commit>]`
 

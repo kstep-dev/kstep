@@ -56,6 +56,8 @@ void print_tasks(void);
 void print_nr_running(void);
 int is_sys_kthread(struct task_struct *p);
 
+struct task_struct *kstep_tick_until(bool (*fn)(struct task_struct *));
+
 // trace.c
 void kstep_trace_exit(void);
 void kstep_patch_func_noop(char *name);
