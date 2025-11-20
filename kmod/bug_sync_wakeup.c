@@ -5,6 +5,7 @@
 static struct task_struct *busy_task;
 static struct task_struct *busy_kthread;
 static struct task_struct *busy_kthread_children;
+static struct task_struct *not_eligible_task;
 
 static int loopBusy(void *data);
 static int loop(void *data);
@@ -46,19 +47,6 @@ static int shared_data = 0;
 static atomic_t data_ready = ATOMIC_INIT(0);
 static DECLARE_WAIT_QUEUE_HEAD(my_wq);
 
-static struct task_struct *find_not_eligible_task(void) {
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task || p->on_cpu == 0)
-      continue;
-
-    if (ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0) {
-      return p;
-    }
-  }
-  return NULL;
-}
-
 static void sleep_all_tasks_except(int cpu, struct task_struct *target) {
   struct task_struct *p;
   for_each_process(p) {
@@ -68,20 +56,21 @@ static void sleep_all_tasks_except(int cpu, struct task_struct *target) {
   }
 }
 
+static bool is_ineligible(struct task_struct *p) {
+  return strcmp(p->comm, TARGET_TASK) == 0 && p != busy_task && p->on_cpu &&
+         task_cpu(p) == task_cpu(busy_kthread) &&
+         ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0;
+}
+
+static bool is_running_again(void) { return not_eligible_task->on_cpu == 1; }
+
 static void controller_body(void) {
   for (int i = 0; i < 20; i++) {
     call_tick_once();
   }
 
-  struct task_struct *not_eligible_task = NULL;
   // tick until there is a not eligible task on the same cpu as the busy kthread
-  while (1) {
-    not_eligible_task = find_not_eligible_task();
-    if (not_eligible_task && task_cpu(not_eligible_task) == task_cpu(busy_kthread)) {
-      break;
-    }
-    call_tick_once();
-  }
+  not_eligible_task = kstep_tick_until_task(is_ineligible);
 
   // sleep all colocated tasks 
   TRACE_INFO("Found not eligible task %d on cpu %d", not_eligible_task->pid, task_cpu(not_eligible_task));
@@ -97,13 +86,8 @@ static void controller_body(void) {
   call_tick_once();
 
   // tick until the not eligible task is running on the cpu and pause it
-  while (1) {
-    if (not_eligible_task->on_cpu == 1) {
-      send_sigcode(not_eligible_task, SIGCODE_PAUSE, 0);
-      break;
-    }
-    call_tick_once();
-  }
+  kstep_tick_until(is_running_again);
+  send_sigcode(not_eligible_task, SIGCODE_PAUSE, 0);
 
   // tick to show the impact
   for (int i = 0; i < 20; i++) {

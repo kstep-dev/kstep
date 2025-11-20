@@ -56,7 +56,10 @@ void print_tasks(void);
 void print_nr_running(void);
 int is_sys_kthread(struct task_struct *p);
 
-struct task_struct *kstep_tick_until(bool (*fn)(struct task_struct *));
+// Call tick until the function returns true
+void kstep_tick_until(bool (*fn)(void));
+// Call tick until the function returns true for ANY task in some runqueue
+struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *));
 
 // trace.c
 void kstep_trace_exit(void);

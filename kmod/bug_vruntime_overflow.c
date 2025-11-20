@@ -76,22 +76,19 @@ static struct task_struct *ineligible_task = NULL;
 static struct sched_entity *ineligible_tg_se = NULL;
 static int cpu_of_ineligible_task = -1;
 
-static void find_not_eligible_tg(void) {
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task || p->on_cpu == 0)
-      continue;
-    struct sched_entity *se = &p->se;
-
-    if (ineligible_task == NULL &&
-        ksym.entity_eligible(se->parent->cfs_rq, se->parent) == 0 &&
-        ksym.entity_eligible(se->cfs_rq, se) == 1 &&
-        task_to_cgroup_id[p->pid - busy_task->pid][0] == 3) {
-      ineligible_task = p;
-      ineligible_tg_se = se->parent;
-      cpu_of_ineligible_task = task_cpu(p);
-    }
+static bool is_ineligible(struct task_struct *p) {
+  if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task || p->on_cpu == 0)
+    return false;
+  struct sched_entity *se = &p->se;
+  if (ksym.entity_eligible(se->parent->cfs_rq, se->parent) == 0 &&
+      ksym.entity_eligible(se->cfs_rq, se) == 1 &&
+      task_to_cgroup_id[p->pid - busy_task->pid][0] == 3) {
+    ineligible_task = p;
+    ineligible_tg_se = se->parent;
+    cpu_of_ineligible_task = task_cpu(p);
+    return true;
   }
+  return false;
 }
 
 static void sleep_all_tasks_in_ineligible_tg(void) {
@@ -121,16 +118,10 @@ static void controller_body(void) {
   }
 
   // tick until there is a not eligible task group with eligible tasks
-  while (1) {
-    find_not_eligible_tg();
-    if (ineligible_tg_se != NULL) {
-      TRACE_INFO("Found not eligible task group");
-      // pause all tasks in the not eligible task group
-      sleep_all_tasks_in_ineligible_tg();
-      break;
-    }
-    call_tick_once();
-  }
+  kstep_tick_until_task(is_ineligible);
+  TRACE_INFO("Found not eligible task group");
+  // pause all tasks in the not eligible task group
+  sleep_all_tasks_in_ineligible_tg();
 
   ksym.dequeue_entities(ineligible_tg_se->cfs_rq, ineligible_tg_se, DEQUEUE_SLEEP);
   struct task_struct *p = get_curr_task(cpu_of_ineligible_task);

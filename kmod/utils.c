@@ -6,11 +6,19 @@
 
 #include "kstep.h"
 
-struct task_struct *kstep_tick_until(bool (*predicate)(struct task_struct *)) {
+void kstep_tick_until(bool (*fn)(void)) {
+  while (1) {
+    if (fn())
+      return;
+    call_tick_once();
+  }
+}
+
+struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *)) {
   struct task_struct *p;
   while (1) {
     for_each_process(p) {
-      if (predicate(p))
+      if (fn(p))
         return p;
     }
     call_tick_once();
