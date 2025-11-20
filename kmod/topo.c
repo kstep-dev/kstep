@@ -1,5 +1,7 @@
 #include "kstep.h"
 
+#define for_each_tl(tl) for (tl = *ksym.sched_domain_topology; tl->mask; tl++)
+
 static void print_sd_flags(int flags) {
 #define SD_FLAG(name, meta_flag)                                               \
   if (flags & name) {                                                          \
@@ -18,8 +20,8 @@ static void print_cpumask(const struct cpumask *mask, int width) {
 
 static void print_topo_levels(void) {
   pr_info("Topology levels:\n");
-  for (struct sched_domain_topology_level *tl = *ksym.sched_domain_topology;
-       tl->mask; tl++) {
+  struct sched_domain_topology_level *tl;
+  for_each_tl(tl) {
     pr_info("- %-5s| ", tl->name);
     for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
       print_cpumask(tl->mask(cpu), 4);
@@ -61,6 +63,11 @@ static void print_sched_domains(void) {
   }
 }
 
+void kstep_topo_print(void) {
+  print_topo_levels();
+  print_sched_domains();
+}
+
 static void kstep_topo_apply(void) {
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
   // https://elixir.bootlin.com/linux/v6.17.8/source/drivers/base/arch_topology.c#L205-L222
@@ -72,11 +79,6 @@ static void kstep_topo_apply(void) {
 #endif
 
   ksym.rebuild_sched_domains();
-}
-
-void kstep_topo_print(void) {
-  print_topo_levels();
-  print_sched_domains();
 }
 
 void kstep_set_cpu_freq(int cpu, int scale) {
@@ -104,18 +106,28 @@ void kstep_set_cpu_capacity(int cpu, int scale) {
 #endif
 }
 
-DEFINE_PER_CPU(struct cpumask, cluster_mask) = CPU_MASK_NONE;
-static void cluster_mask_init(int cluster_size) {
-  for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
-    int start = cpu / cluster_size * cluster_size;
-    int end = start + cluster_size;
-    for (int i = start; i < end; i++) {
-      cpumask_set_cpu(i, &per_cpu(cluster_mask, cpu));
+static void parse_cpumasks(int count, const char *cpulists[],
+                           struct cpumask masks[]) {
+  if (count != num_online_cpus()) {
+    panic(
+        "Number of CPUs in cpulists %d does not match number of online CPUs %d",
+        count, num_online_cpus());
+  }
+  for (int i = 0; i < count; i++) {
+    if (cpulist_parse(cpulists[i], &masks[i]) < 0) {
+      panic("Failed to parse cpulist %s", cpulists[i]);
     }
   }
 }
-static const struct cpumask *cluster_mask_fn(int cpu) {
-  return &per_cpu(cluster_mask, cpu);
+
+static struct cpumask cluster_masks[NR_CPUS];
+static const struct cpumask *cluster_masks_fn(
+// https://github.com/torvalds/linux/commit/661f951e371cc134ea31c84238dbdc9a898b8403
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+    struct sched_domain_topology_level *tl,
+#endif
+    int cpu) {
+  return &cluster_masks[cpu];
 }
 
 void kstep_use_special_topo(void) {
@@ -125,11 +137,13 @@ void kstep_use_special_topo(void) {
   }
 
   // qemu-system-x86_64 does not support cluster CPU topology.
-  cluster_mask_init(2);
-  for (struct sched_domain_topology_level *tl = *ksym.sched_domain_topology;
-       tl->mask; tl++) {
+  const char *cpulists[] = {"0-1", "0-1", "2-3", "2-3",
+                            "4-5", "4-5", "6-7", "6-7"};
+  parse_cpumasks(ARRAY_SIZE(cpulists), cpulists, cluster_masks);
+  struct sched_domain_topology_level *tl;
+  for_each_tl(tl) {
     if (strcmp(tl->name, "CLS") == 0)
-      tl->mask = cluster_mask_fn;
+      tl->mask = cluster_masks_fn;
   }
   kstep_topo_apply();
 }
