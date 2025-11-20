@@ -17,40 +17,18 @@ static void controller_init(void) {
   kstep_sleep();
 }
 
-static struct task_struct *find_not_eligible_task(void) {
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task)
-      continue;
-    if (p->on_cpu == 0)
-      continue;
-    TRACE_DEBUG("pid=%d, eligible=%d, on_cpu=%d", p->pid,
-                ksym.entity_eligible(p->se.cfs_rq, &p->se), p->on_cpu);
-
-    if (ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0) {
-      return p;
-    }
-  }
-  return NULL;
+static bool ineligible_fn(struct task_struct *p) {
+  return strcmp(p->comm, TARGET_TASK) == 0 && p != busy_task && p->on_cpu &&
+         ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0;
 }
 
 static void controller_body(void) {
-
   for (int i = 0; i < 20; i++) {
     call_tick_once();
   }
-
-  struct task_struct *pause_task = NULL;
-
-  while (1) {
-    pause_task = find_not_eligible_task();
-    if (pause_task) {
-      TRACE_INFO("dequeue ineligible task %d", pause_task->pid);
-      send_sigcode(pause_task, SIGCODE_SLEEP, 1);
-      break;
-    }
-    call_tick_once();
-  }
+  struct task_struct *pause_task = kstep_tick_until(ineligible_fn);
+  TRACE_INFO("dequeue ineligible task %d", pause_task->pid);
+  send_sigcode(pause_task, SIGCODE_SLEEP, 1);
 
   call_tick_once();
 

@@ -6,6 +6,17 @@
 
 #include "kstep.h"
 
+struct task_struct *kstep_tick_until(bool (*predicate)(struct task_struct *)) {
+  struct task_struct *p;
+  while (1) {
+    for_each_process(p) {
+      if (predicate(p))
+        return p;
+    }
+    call_tick_once();
+  }
+}
+
 void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
                    int val3) {
   struct kernel_siginfo info = {

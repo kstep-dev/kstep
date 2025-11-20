@@ -144,7 +144,7 @@ def main(bug: Bug, run: List[str], reset: bool):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--name",
+        "name",
         type=str,
         default="all",
         choices=["all", *[bug.name for bug in bugs]],
