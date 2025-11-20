@@ -6,11 +6,7 @@
 static struct task_struct *busy_task;
 static struct task_struct *cgroup_task;
 
-static void controller_pre_init(void) {
-  kstep_params.step_interval_us = 1000;
-  kstep_params.print_nr_running = true;
-  kstep_params.print_tasks = false;
-}
+static void controller_pre_init(void) { kstep_trace_lb(); }
 
 static void controller_init(void) {
   busy_task = poll_task(TARGET_TASK);
@@ -26,7 +22,7 @@ static void controller_body(void) {
   send_sigcode3(busy_task, SIGCODE_FORK_PIN_RANGE, 3, 6, 6);
   send_sigcode3(busy_task, SIGCODE_FORK_PIN_RANGE, 1, 7, 7);
   
-  for (int i = 0; i < 200; i++) {
+  for (int i = 0; i < 1000; i++) {
     call_tick_once();
   }
 
@@ -45,8 +41,8 @@ static void controller_body(void) {
 
 }
 
-struct controller_ops controller_evenIdleCpu = {
-    .name = "evenIdleCpu",
+struct controller_ops controller_extra_balance = {
+    .name = "extra_balance",
     .pre_init = controller_pre_init,
     .init = controller_init,
     .body = controller_body,

@@ -5,26 +5,26 @@
 
 #include "kstep.h"
 
-extern struct controller_ops controller_aa3ee4f;
-extern struct controller_ops controller_bbce3de;
-extern struct controller_ops controller_cd9626e;
-extern struct controller_ops controller_2feab24;
-extern struct controller_ops controller_17e3e88;
-extern struct controller_ops controller_5068d84;
-extern struct controller_ops controller_evenIdleCpu;
-extern struct controller_ops controller_6d7e478;
+extern struct controller_ops controller_even_idle_cpu;
+extern struct controller_ops controller_extra_balance;
+extern struct controller_ops controller_freeze;
+extern struct controller_ops controller_lag_vruntime;
+extern struct controller_ops controller_long_balance;
+extern struct controller_ops controller_sync_wakeup;
+extern struct controller_ops controller_util_avg;
+extern struct controller_ops controller_vruntime_overflow;
 extern struct controller_ops controller_case_time_sensitive;
 extern struct controller_ops controller_noop;
 
 static struct controller_ops *controller_ops_list[] = {
-    &controller_aa3ee4f,
-    &controller_bbce3de,
-    &controller_cd9626e,
-    &controller_2feab24,
-    &controller_17e3e88,
-    &controller_5068d84,
-    &controller_evenIdleCpu,
-    &controller_6d7e478,
+    &controller_even_idle_cpu,
+    &controller_extra_balance,
+    &controller_freeze,
+    &controller_lag_vruntime,
+    &controller_long_balance,
+    &controller_sync_wakeup,
+    &controller_util_avg,
+    &controller_vruntime_overflow,
     &controller_case_time_sensitive,
     &controller_noop,
 };

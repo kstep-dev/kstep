@@ -18,7 +18,7 @@ def run_qemu(
     log_file: Optional[Path] = None,
     controller: Optional[str] = None,
     params: Iterable[str] = (),
-    smp: str = "cpus=3,cores=3",
+    smp: str = "3",
     mem_mb: int = 256,
 ):
     kvm_path = Path("/dev/kvm")
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--controller", type=str, default=None)
     parser.add_argument("--log_file", type=Path, default=get_log_path(create=True))
-    parser.add_argument("--smp", type=str, default="cpus=3,cores=3")
+    parser.add_argument("--smp", type=str, default="3")
     parser.add_argument("--params", type=str, nargs="+")
     args = parser.parse_args()
     make_kstep()

@@ -86,8 +86,8 @@ static void controller_body(void) {
   }
 }
 
-struct controller_ops controller_cd9626e = {
-    .name = "cd9626e",
+struct controller_ops controller_freeze = {
+    .name = "freeze",
     .init = controller_init,
     .body = controller_body,
 };

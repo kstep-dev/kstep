@@ -24,7 +24,13 @@ static void print_topo_levels(void) {
   for_each_tl(tl) {
     pr_info("- %-5s| ", tl->name);
     for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
-      print_cpumask(tl->mask(cpu), 4);
+// https://github.com/torvalds/linux/commit/661f951e371cc134ea31c84238dbdc9a898b8403
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+      const struct cpumask *mask = tl->mask(tl, cpu);
+#else
+      const struct cpumask *mask = tl->mask(cpu);
+#endif
+      print_cpumask(mask, 4);
       pr_cont(" | ");
     }
     print_sd_flags(tl->sd_flags ? (tl->sd_flags()) : 0);

@@ -25,8 +25,8 @@ static void controller_body(void) {
   }
 }
 
-struct controller_ops controller_2feab24 = {
-    .name = "2feab24",
+struct controller_ops controller_long_balance = {
+    .name = "long_balance",
     .pre_init = controller_pre_init,
     .init = controller_init,
     .body = controller_body,

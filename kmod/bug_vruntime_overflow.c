@@ -143,8 +143,8 @@ static void controller_body(void) {
   }
 }
 
-struct controller_ops controller_bbce3de = {
-    .name = "bbce3de",
+struct controller_ops controller_vruntime_overflow = {
+    .name = "vruntime_overflow",
     .init = controller_init,
     .body = controller_body,
 };

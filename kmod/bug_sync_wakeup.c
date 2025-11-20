@@ -135,8 +135,8 @@ static int loop(void *data) {
   return 0;
 }
 
-struct controller_ops controller_aa3ee4f = {
-    .name = "aa3ee4f",
+struct controller_ops controller_sync_wakeup = {
+    .name = "sync_wakeup",
     .init = controller_init,
     .body = controller_body,
 };
