@@ -17,7 +17,7 @@ static void controller_init(void) {
   kstep_sleep();
 }
 
-static bool ineligible_fn(struct task_struct *p) {
+static bool is_ineligible(struct task_struct *p) {
   return strcmp(p->comm, TARGET_TASK) == 0 && p != busy_task && p->on_cpu &&
          ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0;
 }
@@ -26,7 +26,7 @@ static void controller_body(void) {
   for (int i = 0; i < 20; i++) {
     call_tick_once();
   }
-  struct task_struct *pause_task = kstep_tick_until(ineligible_fn);
+  struct task_struct *pause_task = kstep_tick_until_task(is_ineligible);
   TRACE_INFO("dequeue ineligible task %d", pause_task->pid);
   send_sigcode(pause_task, SIGCODE_SLEEP, 1);
 
