@@ -13,8 +13,11 @@ from scripts import LINUX_ROOT_DIR, LOGS_DIR, PROJ_DIR, system
 
 @dataclass(frozen=True)
 class Config:
+    # The version/commit of the kernel to use
     version: str
-    patch_files: Iterable[Path] = ()
+    # The patches to apply to the kernel
+    patches: Iterable[Path] = ()
+    # The parameters to pass to the kernel module
     params: Iterable[str] = ()
 
 
@@ -33,8 +36,8 @@ bugs = [
     Bug(
         name="sync_wakeup",
         plot_format="cur_task",
-        fixed=Config(version="aa3ee4f"),
-        buggy=Config(version="aa3ee4f~1"),
+        buggy=Config(version="v6.14"),
+        fixed=Config(version="v6.14", patches=[LINUX_ROOT_DIR / "sync_wakeup.patch"]),
     ),
     # https://github.com/torvalds/linux/commit/cd9626e9ebc77edec33023fe95dab4b04ffc819d
     Bug(
@@ -104,10 +107,10 @@ def plot_data(python_script: str, controller: str):
 def main(bug: Bug, run: List[str], reset: bool):
     # Run the buggy version
     if "buggy" in run:
-        linux_dir = LINUX_ROOT_DIR / bug.buggy.version
+        linux_dir = LINUX_ROOT_DIR / f"{bug.name}_buggy"
         checkout_linux(bug.buggy.version, linux_dir=linux_dir, reset=reset)
-        for patch_file in bug.buggy.patch_files:
-            patch_linux(linux_dir, patch_file)
+        for patch in bug.buggy.patches:
+            patch_linux(linux_dir, patch)
         make_linux(linux_dir)
         make_kstep()
         run_qemu(
@@ -121,10 +124,10 @@ def main(bug: Bug, run: List[str], reset: bool):
 
     # Run the fixed version
     if "fixed" in run:
-        linux_dir = LINUX_ROOT_DIR / bug.fixed.version
+        linux_dir = LINUX_ROOT_DIR / f"{bug.name}_fixed"
         checkout_linux(bug.fixed.version, linux_dir=linux_dir, reset=reset)
-        for patch_file in bug.fixed.patch_files:
-            patch_linux(linux_dir, patch_file)
+        for patch in bug.fixed.patches:
+            patch_linux(linux_dir, patch)
         make_linux(linux_dir)
         make_kstep()
         run_qemu(
