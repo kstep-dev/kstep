@@ -21,32 +21,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Restore Linux cache
+      - name: Linux - Restore cache
         id: restore-cache
         uses: actions/cache/restore@v4
         with:
           path: linux
           key: ${{matrix.version}}
 
-      - name: Download Linux
+      - name: Linux - Download
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: ./checkout_linux.py --version ${{matrix.version}} --tarball
 
-      - name: Build Linux
+      - name: Linux - Build
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
           sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y libelf-dev
           ./make_linux.py --reconfig
 
-      - name: Save Linux cache
+      - name: Linux - Save cache
         if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: linux
           key: ${{matrix.version}}
 
-      - name: Build kernel module
-        run: make -C kmod
+      - name: Build
+        run: make
 
       - name: Install QEMU
         run: sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y qemu-kvm

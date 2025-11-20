@@ -10,8 +10,6 @@ static void controller_init(void) {
   kstep_sleep();
 }
 
-DECLARE_PER_CPU(unsigned long, arch_freq_scale);
-
 static struct task_struct * find_ff_task(void) {
   struct task_struct *p;
   for_each_process(p) {
@@ -57,8 +55,8 @@ static void controller_body(void) {
   }
 }
 
-struct controller_ops controller_17e3e88 = {
-    .name = "17e3e88",
+struct controller_ops controller_util_avg = {
+    .name = "util_avg",
     .init = controller_init,
     .body = controller_body,
 };

@@ -50,8 +50,8 @@ static void controller_body(void) {
 
 }
 
-struct controller_ops controller_5068d84 = {
-    .name = "5068d84",
+struct controller_ops controller_lag_vruntime = {
+    .name = "lag_vruntime",
     .init = controller_init,
     .body = controller_body,
 };
