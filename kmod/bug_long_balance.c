@@ -6,6 +6,7 @@ static struct task_struct *busy_task;
 
 static void controller_pre_init(void) {
   kstep_params.print_tasks = false;
+  kstep_params.print_rq_stats = false;
   kstep_trace_rebalance();
 }
 

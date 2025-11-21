@@ -6,6 +6,7 @@ struct kstep_params_t kstep_params = {
     .controller = "noop",
     .step_interval_us = 19000ULL, // Cannot be larger than DELAY_CONST_MAX
     .special_topo = false,
+    .print_rq_stats = true,
     .print_tasks = true,
     .print_nr_running = false,
 };
@@ -23,6 +24,7 @@ void kstep_params_print(void) {
   TRACE_INFO("- controller: %s", kstep_params.controller);
   TRACE_INFO("- step_interval_us: %llu", kstep_params.step_interval_us);
   TRACE_INFO("- special_topo: %d", kstep_params.special_topo);
+  TRACE_INFO("- print_rq_stats: %d", kstep_params.print_rq_stats);
   TRACE_INFO("- print_tasks: %d", kstep_params.print_tasks);
   TRACE_INFO("- print_nr_running: %d", kstep_params.print_nr_running);
   TRACE_INFO("- print_lb_events: %d", kstep_params.print_lb_events);
