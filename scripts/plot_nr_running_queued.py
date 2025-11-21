@@ -6,8 +6,7 @@ from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-from . import LOGS_DIR, RESULTS_DIR
+from consts import LOGS_DIR, RESULTS_DIR
 
 # Parse both nr_running and nr_queued from a caseSensitiveTime.log file.
 # Plot both, for CPUs 4,5,6,7, on the same figure.

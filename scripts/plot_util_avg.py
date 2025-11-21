@@ -7,8 +7,7 @@ import argparse
 import re
 
 import matplotlib.pyplot as plt
-
-from . import LOGS_DIR, RESULTS_DIR
+from consts import LOGS_DIR, RESULTS_DIR
 
 init_timestamp = 10.0
 def parse_log_file(log_file):

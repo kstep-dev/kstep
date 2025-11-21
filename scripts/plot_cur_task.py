@@ -6,10 +6,9 @@ from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
+from consts import LOGS_DIR, RESULTS_DIR
 from matplotlib import colors
 from matplotlib.patches import Patch
-
-from . import LOGS_DIR, RESULTS_DIR
 
 cmap = plt.cm.tab20
 overall_color_matrix = []

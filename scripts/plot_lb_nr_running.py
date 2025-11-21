@@ -6,9 +6,8 @@ from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
+from consts import LOGS_DIR, RESULTS_DIR
 from matplotlib import colors
-
-from . import LOGS_DIR, RESULTS_DIR
 
 all_cpus = [4, 5, 6, 7]
 N_COLORS = 7

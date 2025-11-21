@@ -8,8 +8,7 @@ import re
 
 import matplotlib.pyplot as plt
 import numpy as np
-
-from . import LOGS_DIR, RESULTS_DIR
+from consts import LOGS_DIR, RESULTS_DIR
 
 
 def parse_log_file(log_file_path, min_time=10.0):

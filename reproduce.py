@@ -8,7 +8,7 @@ from typing import Iterable, List
 from checkout_linux import checkout_linux
 from make_linux import make_linux
 from run_qemu import make_kstep, run_qemu
-from scripts import LINUX_ROOT_DIR, LOGS_DIR, PROJ_DIR, RESULTS_DIR, system
+from scripts import LINUX_ROOT_DIR, PROJ_DIR, RESULTS_DIR, system
 
 
 @dataclass(frozen=True)
@@ -101,7 +101,7 @@ def patch_linux(linux_dir: Path, patch_file: Path):
 
 
 def plot_data(python_script: str, controller: str):
-    system(f"{PROJ_DIR}/plot/plot_{python_script}.py --controller={controller}")
+    system(f"{PROJ_DIR}/scripts/plot_{python_script}.py --controller={controller}")
 
 
 def main(bug: Bug, run: List[str], reset: bool):

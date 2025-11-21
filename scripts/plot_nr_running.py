@@ -6,9 +6,8 @@ from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
+from consts import LOGS_DIR, RESULTS_DIR
 from matplotlib import colors
-
-from . import LOGS_DIR, RESULTS_DIR
 
 # Adapted to allow color-matrix style plot, like plot_cur_task.py.
 # Only plot CPUs 4,5,6,7 -- CPUs 0,1,2,3 are not displayed or included

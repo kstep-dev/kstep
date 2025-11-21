@@ -7,9 +7,8 @@ import argparse
 import re
 
 import matplotlib.pyplot as plt
+from consts import LOGS_DIR, RESULTS_DIR
 from matplotlib.ticker import MaxNLocator
-
-from . import LOGS_DIR, RESULTS_DIR
 
 init_timestamp = 10.0
 
