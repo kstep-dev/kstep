@@ -24,6 +24,7 @@ struct kstep_params_t {
   bool special_topo;                   // Whether to use the special topology
   bool print_tasks;                    // Whether to print tasks
   bool print_nr_running;               // Whether to print nr_running
+  bool print_lb_events;                // Whether to print LB events
 };
 extern struct kstep_params_t kstep_params;
 void kstep_params_print(void);

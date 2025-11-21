@@ -16,6 +16,7 @@ module_param_named(step_interval_us, kstep_params.step_interval_us, ullong,
 module_param_named(special_topo, kstep_params.special_topo, bool, 0644);
 module_param_named(print_tasks, kstep_params.print_tasks, bool, 0644);
 module_param_named(print_nr_running, kstep_params.print_nr_running, bool, 0644);
+module_param_named(print_lb_events, kstep_params.print_lb_events, bool, 0644);
 
 void kstep_params_print(void) {
   TRACE_INFO("Kstep params:");
@@ -24,6 +25,7 @@ void kstep_params_print(void) {
   TRACE_INFO("- special_topo: %d", kstep_params.special_topo);
   TRACE_INFO("- print_tasks: %d", kstep_params.print_tasks);
   TRACE_INFO("- print_nr_running: %d", kstep_params.print_nr_running);
+  TRACE_INFO("- print_lb_events: %d", kstep_params.print_lb_events);
 }
 
 static struct task_struct *controller_task;

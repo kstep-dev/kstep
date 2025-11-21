@@ -6,7 +6,12 @@
 static struct task_struct *busy_task;
 static struct task_struct *cgroup_task;
 
-static void controller_pre_init(void) { kstep_trace_lb(); }
+static void controller_pre_init(void) {
+  kstep_params.print_lb_events = true;
+  kstep_params.print_nr_running = true;
+  kstep_params.print_tasks = false;
+  kstep_params.step_interval_us = 1000;
+}
 
 static void controller_init(void) {
   busy_task = poll_task(TARGET_TASK);

@@ -163,6 +163,9 @@ void kstep_controller_run(struct controller_ops *ops) {
   }
   kstep_topo_print();
   kstep_patch_min_vruntime();
+  if (kstep_params.print_lb_events) {
+    kstep_trace_lb();
+  }
 
   // Isolate the CPUs to avoid interference
   disable_workqueue();
