@@ -1,18 +1,14 @@
 #!/usr/bin/env python3
 
+import argparse
 import re
 from collections import defaultdict
-import sys
-import os
-import argparse
+
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.patches import Patch
+from consts import RESULTS_DIR
 from matplotlib import colors
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from scripts import PROJ_DIR, LOGS_DIR
+from matplotlib.patches import Patch
 
 cmap = plt.cm.tab20
 overall_color_matrix = []
@@ -104,13 +100,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     bugId = args.controller
-    log_file_buggy  = f"{LOGS_DIR}/{bugId}_buggy.log"
+    log_file_buggy = RESULTS_DIR / f"{bugId}_buggy.log"
     title_buggy = f"{bugId} (buggy)"
 
-    log_file_fixed = f"{LOGS_DIR}/{bugId}_fixed.log"
+    log_file_fixed = RESULTS_DIR / f"{bugId}_fixed.log"
     title_fixed = f"{bugId} (fixed)"
 
-    output_file = f"{PROJ_DIR}/plot/{bugId}.pdf"
+    output_file = RESULTS_DIR / f"{bugId}.pdf"
 
     start_timestamp = 10.000000
 

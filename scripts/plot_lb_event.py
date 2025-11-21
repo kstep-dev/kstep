@@ -3,22 +3,17 @@
 Plot load balancing events from log files
 """
 
-import re
-import matplotlib.pyplot as plt
-import sys
-import os
 import argparse
-import math
+import re
 
+import matplotlib.pyplot as plt
+from consts import RESULTS_DIR
 from matplotlib.ticker import MaxNLocator
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from scripts import PROJ_DIR, LOGS_DIR
 
 init_timestamp = 10.0
 
-all_cpus = [ 4, 5, 6, 7]
+all_cpus = [4, 5, 6, 7]
+
 
 def parse_lb_events(log_file):
     """
@@ -32,9 +27,9 @@ def parse_lb_events(log_file):
     lb_events = []
 
     # Pattern to match LB lines
-    pattern = r'\[\s*([\d\.]+)\]\s+LB\s+(\d+)\s+(\d+)'
+    pattern = r"\[\s*([\d\.]+)\]\s+LB\s+(\d+)\s+(\d+)"
 
-    with open(log_file, 'r') as f:
+    with open(log_file, "r") as f:
         for line in f:
             match = re.search(pattern, line)
             if match:
@@ -51,12 +46,14 @@ def parse_lb_events(log_file):
 
     return lb_events
 
+
 def get_cpu_colors(cpus):
     """
     Returns a dict mapping each cpu to a distinct color.
     Uses matplotlib's tab10/xkcd colors.
     """
     import matplotlib
+
     unique_cpus = sorted(set(cpus))
     num_cpus = len(unique_cpus)
     cmap = plt.get_cmap("tab10") if num_cpus <= 10 else plt.get_cmap("tab20")
@@ -65,12 +62,13 @@ def get_cpu_colors(cpus):
         color_map[cpu] = cmap(idx % cmap.N)
     return color_map
 
+
 def plot_lb_events(events_buggy, events_fixed, bugId, output_file):
     """
     Plot LB events with weight == 4, using different color per CPU.
     """
-    marker = 'o'
-    size   = 90
+    marker = "o"
+    size = 90
 
     # Get all CPUs to build mapping
     cpus_buggy = [cpu for (time_ms, cpu, weight) in events_buggy if weight == 4]
@@ -81,8 +79,8 @@ def plot_lb_events(events_buggy, events_fixed, bugId, output_file):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 3.8))
 
     # ---- Plot for buggy version ----
-    ax1.set_title(f'{bugId} (buggy)')
-    ax1.set_ylabel('CPU')
+    ax1.set_title(f"{bugId} (buggy)")
+    ax1.set_ylabel("CPU")
     ax1.set_xticklabels([])
     ax1.grid(True, alpha=0.3)
 
@@ -92,7 +90,11 @@ def plot_lb_events(events_buggy, events_fixed, bugId, output_file):
     # Plot each CPU's events in its own color
     if times_buggy and cpus_buggy:
         for cpu in sorted(set(cpus_buggy)):
-            times = [time_ms for (time_ms, c, weight) in events_buggy if weight == 4 and c == cpu]
+            times = [
+                time_ms
+                for (time_ms, c, weight) in events_buggy
+                if weight == 4 and c == cpu
+            ]
             y_cpus = [cpu] * len(times)
             if times:
                 ax1.scatter(
@@ -100,18 +102,18 @@ def plot_lb_events(events_buggy, events_fixed, bugId, output_file):
                     y_cpus,
                     marker=marker,
                     c=[cpu_colors[cpu]],
-                    label=f'CPU {cpu}',
+                    label=f"CPU {cpu}",
                     s=size,
                     lw=1,
                     alpha=0.85,
-                    edgecolor='black'
+                    edgecolor="black",
                 )
-        ax1.legend(loc='upper right', ncol=1, title='CPU')
+        ax1.legend(loc="upper right", ncol=1, title="CPU")
 
     # ---- Plot for fixed version ----
-    ax2.set_title(f'{bugId} (fixed)')
-    ax2.set_ylabel('CPU')
-    ax2.set_xlabel('Time (ms)')
+    ax2.set_title(f"{bugId} (fixed)")
+    ax2.set_ylabel("CPU")
+    ax2.set_xlabel("Time (ms)")
     ax2.grid(True, alpha=0.3)
 
     times_fixed = [time_ms for (time_ms, cpu, weight) in events_fixed if weight == 4]
@@ -119,7 +121,11 @@ def plot_lb_events(events_buggy, events_fixed, bugId, output_file):
 
     if times_fixed and cpus_fixed:
         for cpu in sorted(set(cpus_fixed)):
-            times = [time_ms for (time_ms, c, weight) in events_fixed if weight == 4 and c == cpu]
+            times = [
+                time_ms
+                for (time_ms, c, weight) in events_fixed
+                if weight == 4 and c == cpu
+            ]
             y_cpus = [cpu] * len(times)
             if times:
                 ax2.scatter(
@@ -127,13 +133,13 @@ def plot_lb_events(events_buggy, events_fixed, bugId, output_file):
                     y_cpus,
                     marker=marker,
                     c=[cpu_colors[cpu]],
-                    label=f'CPU {cpu}',
+                    label=f"CPU {cpu}",
                     s=size,
                     lw=1,
                     alpha=0.85,
-                    edgecolor='black'
+                    edgecolor="black",
                 )
-        ax2.legend(loc='upper right', ncol=1, title='CPU')
+        ax2.legend(loc="upper right", ncol=1, title="CPU")
 
     # Set same x/y limits
     all_times = times_buggy + times_fixed
@@ -148,23 +154,26 @@ def plot_lb_events(events_buggy, events_fixed, bugId, output_file):
         ax2.yaxis.set_major_locator(MaxNLocator(integer=True))
 
     plt.tight_layout()
-    plt.savefig(output_file, dpi=150, bbox_inches='tight')
+    plt.savefig(output_file, dpi=150, bbox_inches="tight")
     print(f"Plot saved to {output_file}")
 
+
 def main():
-    parser = argparse.ArgumentParser(description='Plot load balancing events (weight == 4 only)')
-    parser.add_argument("--controller", type=str, default="6d7e478",
-                       help="Bug ID / controller name")
+    parser = argparse.ArgumentParser(
+        description="Plot load balancing events (weight == 4 only)"
+    )
+    parser.add_argument(
+        "--controller", type=str, default="6d7e478", help="Bug ID / controller name"
+    )
     args = parser.parse_args()
 
     bugId = args.controller
 
     # Paths to the log files
-    log_dir = LOGS_DIR
-    buggy_log = log_dir / f'{bugId}_buggy.log'
-    fixed_log = log_dir / f'{bugId}_fixed.log'
+    buggy_log = RESULTS_DIR / f"{bugId}_buggy.log"
+    fixed_log = RESULTS_DIR / f"{bugId}_fixed.log"
 
-    output_file = f"{PROJ_DIR}/plot/{bugId}.pdf"
+    output_file = RESULTS_DIR / f"{bugId}.pdf"
 
     print(f"Parsing buggy log: {buggy_log}")
     events_buggy = parse_lb_events(buggy_log)
@@ -180,5 +189,6 @@ def main():
 
     plot_lb_events(events_buggy, events_fixed, bugId, output_file)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

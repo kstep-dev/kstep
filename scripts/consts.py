@@ -16,6 +16,7 @@ KMOD_DIR = PROJ_DIR / "kmod"
 DATA_DIR = PROJ_DIR / "data"
 ROOTFS_IMG = DATA_DIR / "rootfs.cpio"
 LOGS_DIR = DATA_DIR / "logs"
+RESULTS_DIR = DATA_DIR / "results"
 
 
 
