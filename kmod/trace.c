@@ -45,7 +45,12 @@ static void kstep_trace_function(char *name, ftrace_func_t callback) {
 // do not call the original function, and directly return to the caller
 static void noop_cb(unsigned long ip, unsigned long parent_ip,
                     struct ftrace_ops *op, struct ftrace_regs *fregs) {
+// https://github.com/torvalds/linux/commit/e4cf33ca48128d580e25ebe779b7ba7b4b4cf733
+#ifdef HAVE_ARCH_FTRACE_REGS
+  ftrace_override_function_with_return(fregs);
+#else
   ksym.override_function_with_return((void *)fregs);
+#endif
 }
 
 void kstep_patch_func_noop(char *name) {
