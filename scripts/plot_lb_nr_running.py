@@ -6,7 +6,7 @@ from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
-from consts import LOGS_DIR, RESULTS_DIR
+from consts import RESULTS_DIR
 from matplotlib import colors
 
 all_cpus = [4, 5, 6, 7]
@@ -138,11 +138,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     bugId = args.controller
-    log_file_buggy = f"{LOGS_DIR}/{bugId}_buggy.log"
+    log_file_buggy = RESULTS_DIR / f"{bugId}_buggy.log"
     title_buggy = f"{bugId} (buggy)"
-    log_file_fixed = f"{LOGS_DIR}/{bugId}_fixed.log"
+    log_file_fixed = RESULTS_DIR / f"{bugId}_fixed.log"
     title_fixed = f"{bugId} (fixed)"
-    output_file = f"{RESULTS_DIR}/{bugId}.pdf"
+    output_file = RESULTS_DIR / f"{bugId}.pdf"
 
     matrix_buggy, cpu_count, time_count, t_buggy, min_buggy, max_buggy = build_nr_running_matrix(log_file_buggy, time_start=args.time_start)
     matrix_fixed, _, _, t_fixed, min_fixed, max_fixed = build_nr_running_matrix(log_file_fixed, time_start=args.time_start)

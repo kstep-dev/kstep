@@ -6,7 +6,7 @@ from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
-from consts import LOGS_DIR, RESULTS_DIR
+from consts import RESULTS_DIR
 
 # Parse both nr_running and nr_queued from a caseSensitiveTime.log file.
 # Plot both, for CPUs 4,5,6,7, on the same figure.
@@ -200,9 +200,7 @@ if __name__ == "__main__":
 
     # Default log file: data/logs/caseSensitiveTime.log
     if args.log is None:
-        root_dir = os.path.dirname(os.path.abspath(__file__))
-        log_path = os.path.join(LOGS_DIR, 'caseSensitiveTime.log')
-        log_path = os.path.abspath(log_path)
+        log_path = RESULTS_DIR / "caseSensitiveTime.log"
     else:
         log_path = args.log
 

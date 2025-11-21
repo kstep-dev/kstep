@@ -7,7 +7,7 @@ import argparse
 import re
 
 import matplotlib.pyplot as plt
-from consts import LOGS_DIR, RESULTS_DIR
+from consts import RESULTS_DIR
 
 init_timestamp = 10.0
 def parse_log_file(log_file):
@@ -70,11 +70,10 @@ def main():
     bugId = args.controller
     
     # Paths to the log files
-    log_dir = LOGS_DIR
-    buggy_log = log_dir / f'{bugId}_buggy.log'
-    fixed_log = log_dir / f'{bugId}_fixed.log'
+    buggy_log = RESULTS_DIR / f"{bugId}_buggy.log"
+    fixed_log = RESULTS_DIR / f"{bugId}_fixed.log"
 
-    output_file = f"{RESULTS_DIR}/{bugId}.pdf"
+    output_file = RESULTS_DIR / f"{bugId}.pdf"
     
     print(f"Parsing log file: {buggy_log}")
     timestamps_buggy, util_avg_values_buggy = parse_log_file(buggy_log)
