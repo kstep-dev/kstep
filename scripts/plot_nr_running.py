@@ -24,7 +24,7 @@ def build_nr_running_matrix(filename, time_start=0.0):
     Only considers CPUs in all_cpus (e.g., 4,5,6,7) for plotting/matrix.
     """
     pattern_nr_running = re.compile(r"\[\s*(\d+\.\d+)\].*?print_nr_running:\s+(\d+)\s+(\d+)")
-    pattern_print_tasks = re.compile(r"\[\s*(\d+\.\d+)\].*?print_tasks:.*?CPU\s+(\d+)\s+running=(\d+)")
+    pattern_print_tasks = re.compile(r"\[\s*(\d+\.\d+)\].*?print_rq_stats:.*?CPU\s+(\d+)\s+running=(\d+)")
 
     cpu_ts2nr = defaultdict(dict)
     all_timestamps = set()

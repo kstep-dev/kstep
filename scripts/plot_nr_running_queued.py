@@ -26,7 +26,7 @@ def extract_running_queued(filename, cpus=None, time_start=0.0):
     cpu_indices = {cpu: idx for idx, cpu in enumerate(cpus)}
 
     pat = re.compile(
-        r"\[\s*(\d+\.\d+)\].*?print_tasks: - CPU (\d+) running=(\d+), queued=(\d+),"
+        r"\[\s*(\d+\.\d+)\].*?print_rq_stats: - CPU (\d+) running=(\d+), queued=(\d+),"
     )
 
     timeset = set()
