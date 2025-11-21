@@ -4,6 +4,12 @@
 
 static struct task_struct *busy_task;
 
+static void controller_pre_init(void) {
+  kstep_params.step_interval_us = 10;
+  kstep_params.print_tasks = false;
+  kstep_params.print_rq_stats = true;
+}
+
 static void controller_init(void) {
   busy_task = poll_task(TARGET_TASK);
   reset_task_stats(busy_task);
@@ -57,6 +63,7 @@ static void controller_body(void) {
 
 struct controller_ops controller_util_avg = {
     .name = "util_avg",
+    .pre_init = controller_pre_init,
     .init = controller_init,
     .body = controller_body,
 };

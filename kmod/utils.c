@@ -82,9 +82,7 @@ void reset_task_stats(struct task_struct *p) {
   p->se.avg.load_avg = scale_load_down(p->se.load.weight);
 }
 
-void print_tasks(void) {
-  struct task_struct *p;
-
+void print_rq_stats(void) {
   TRACE_INFO("sched_clock=%lld, jiffies=%lu", sched_clock(),
              jiffies - INITIAL_JIFFIES);
 
@@ -114,7 +112,10 @@ void print_tasks(void) {
                rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg,
                rq->cfs.min_vruntime - INIT_TIME_NS, avg_vruntime);
   }
+}
 
+void print_tasks(void) {
+  struct task_struct *p;
   int min_pid = INT_MAX;
   for_each_process(p) {
     if (task_cpu(p) == 0 || is_sys_kthread(p))

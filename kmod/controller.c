@@ -41,6 +41,9 @@ struct controller_ops *kstep_controller_get(const char *name) {
 void kstep_sleep(void) { udelay(kstep_params.step_interval_us); }
 
 void call_tick_once(void) {
+  if (kstep_params.print_rq_stats) {
+    print_rq_stats();
+  }
   if (kstep_params.print_tasks) {
     print_tasks();
   }

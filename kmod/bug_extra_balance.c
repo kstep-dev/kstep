@@ -10,6 +10,7 @@ static void controller_pre_init(void) {
   kstep_params.print_lb_events = true;
   kstep_params.print_nr_running = true;
   kstep_params.print_tasks = false;
+  kstep_params.print_rq_stats = false;
   kstep_params.step_interval_us = 1000;
 }
 
