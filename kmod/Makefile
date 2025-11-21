@@ -1,9 +1,6 @@
 OUT ?= $(abspath ../data/rootfs)
 src ?= $(shell pwd)
 
-.PHONY: all
-all: $(OUT)/kmod.ko
-
 kern-src ?= $(realpath $(src)/../linux/current)
 kern-ver := $(notdir $(kern-src))
 ifeq ($(kern-src),)
@@ -23,11 +20,12 @@ ccflags-y := \
   -Wno-declaration-after-statement \
   -std=gnu11
 
+.PHONY: all
+all: $(kmod-name).ko
+	cp $(kmod-name).ko $(OUT)/kmod.ko
+
 $(kmod-name).ko: $(kmod-srcs) $(wildcard $(src)/*.h)
 	$(MAKE) -C $(kern-src) M=$(src) modules
-
-$(OUT)/kmod.ko: $(kmod-name).ko
-	cp $< $@
 
 .PHONY: clean
 clean:
