@@ -3,15 +3,12 @@
 Plot min_vruntime and avg_vruntime for CPU 2 over time from log files
 """
 
-import re
-import matplotlib.pyplot as plt
-import sys
-import os
 import argparse
+import re
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+import matplotlib.pyplot as plt
 
-from scripts import PROJ_DIR, LOGS_DIR
+from . import LOGS_DIR, RESULTS_DIR
 
 init_timestamp = 10.0
 
@@ -157,7 +154,7 @@ def main():
     buggy_log = log_dir / f'{bugId}_buggy.log'
     fixed_log = log_dir / f'{bugId}_fixed.log'
 
-    output_file = f"{PROJ_DIR}/plot/{bugId}.pdf"
+    output_file = f"{RESULTS_DIR}/{bugId}.pdf"
 
     print(f"Parsing log file: {buggy_log}")
     timestamps_buggy, min_vruntime_buggy, avg_vruntime_buggy = parse_log_file(buggy_log)

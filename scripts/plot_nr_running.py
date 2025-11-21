@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 
+import argparse
 import re
 from collections import defaultdict
-import sys
-import os
-import argparse
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colors
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts import PROJ_DIR, LOGS_DIR
+from . import LOGS_DIR, RESULTS_DIR
 
 # Adapted to allow color-matrix style plot, like plot_cur_task.py.
 # Only plot CPUs 4,5,6,7 -- CPUs 0,1,2,3 are not displayed or included
@@ -122,7 +120,7 @@ if __name__ == "__main__":
     title_buggy = f"{bugId} (normal topology)"
     log_file_fixed = f"{LOGS_DIR}/{bugId}_fixed.log"
     title_fixed = f"{bugId} (special topology)"
-    output_file = f"{PROJ_DIR}/plot/{bugId}.pdf"
+    output_file = f"{RESULTS_DIR}/{bugId}.pdf"
 
     # Load data starting from 10.15 seconds (or what user set)
     matrix_buggy, cpu_count, time_count, t_buggy, min_buggy, max_buggy = build_nr_running_matrix(log_file_buggy, time_start=args.time_start)

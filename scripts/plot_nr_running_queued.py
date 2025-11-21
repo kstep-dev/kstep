@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 
+import argparse
 import re
 from collections import defaultdict
-import sys
-import os
-import argparse
+
 import matplotlib.pyplot as plt
 import numpy as np
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts import PROJ_DIR, LOGS_DIR
+from . import LOGS_DIR, RESULTS_DIR
 
 # Parse both nr_running and nr_queued from a caseSensitiveTime.log file.
 # Plot both, for CPUs 4,5,6,7, on the same figure.
@@ -210,7 +208,7 @@ if __name__ == "__main__":
         log_path = args.log
 
     cpus = [int(x) for x in args.cpus.split(',')]
-    pdf_fn = args.output if args.output else f'{PROJ_DIR}/plot/nr_running_queued.pdf'
+    pdf_fn = args.output if args.output else f"{RESULTS_DIR}/nr_running_queued.pdf"
 
     cpus, timestamps, nr_running, nr_queued, min_running, max_running, min_queued, max_queued = extract_running_queued(
         log_path, cpus=cpus, time_start=args.time_start

@@ -3,17 +3,14 @@
 Script to parse rebalance domain logs and plot overhead over time.
 """
 
+import argparse
 import re
+
 import matplotlib.pyplot as plt
 import numpy as np
-from pathlib import Path
-import argparse
-import sys
-import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from . import LOGS_DIR, RESULTS_DIR
 
-from scripts import PROJ_DIR, LOGS_DIR
 
 def parse_log_file(log_file_path, min_time=10.0):
     """
@@ -142,7 +139,7 @@ def main():
     # Print statistics for CPU 2 only
     target_cpu = 2
     # Generate output filename
-    output_file = f'{PROJ_DIR}/plot/{bugId}.pdf'
+    output_file = f"{RESULTS_DIR}/{bugId}.pdf"
     
     # Plot the comparison for CPU 2
     print(f"\nGenerating comparison plot for CPU {target_cpu}...")

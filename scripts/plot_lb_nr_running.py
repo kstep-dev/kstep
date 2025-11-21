@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 
+import argparse
 import re
 from collections import defaultdict
-import sys
-import os
-import argparse
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colors
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from scripts import PROJ_DIR, LOGS_DIR
+from . import LOGS_DIR, RESULTS_DIR
 
 all_cpus = [4, 5, 6, 7]
 N_COLORS = 7
@@ -145,7 +143,7 @@ if __name__ == "__main__":
     title_buggy = f"{bugId} (buggy)"
     log_file_fixed = f"{LOGS_DIR}/{bugId}_fixed.log"
     title_fixed = f"{bugId} (fixed)"
-    output_file = f"{PROJ_DIR}/plot/{bugId}.pdf"
+    output_file = f"{RESULTS_DIR}/{bugId}.pdf"
 
     matrix_buggy, cpu_count, time_count, t_buggy, min_buggy, max_buggy = build_nr_running_matrix(log_file_buggy, time_start=args.time_start)
     matrix_fixed, _, _, t_fixed, min_fixed, max_fixed = build_nr_running_matrix(log_file_fixed, time_start=args.time_start)
