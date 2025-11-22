@@ -29,7 +29,6 @@ struct kstep_params_t {
 };
 extern struct kstep_params_t kstep_params;
 void kstep_params_print(void);
-extern struct completion init_complete;
 
 // controller.c
 struct controller_ops {

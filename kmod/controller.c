@@ -98,6 +98,8 @@ static void dummy_work_fn(struct work_struct *work) {
 }
 
 static void prealloc_kworker(struct workqueue_struct *wq, int num_kworkers) {
+  reinit_completion(&dummy_start);
+  reinit_completion(&dummy_done);
   int num_cpus = num_online_cpus();
   int num_works = num_kworkers * num_cpus;
   struct work_struct *dummy_works =
@@ -224,7 +226,6 @@ void kstep_controller_run(struct controller_ops *ops) {
   reset_distribute_cpu_mask_prev();
 
   print_all_tasks();
-  complete(&init_complete);
 
   TRACE_INFO("Initializing controller %s", ops->name);
   ops->init();
