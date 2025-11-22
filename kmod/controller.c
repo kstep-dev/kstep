@@ -89,6 +89,41 @@ static void disable_workqueue(void) {
   }
 }
 
+// Prealloc kworkers for workqueue to avoid non-deterministic behavior.
+static DECLARE_COMPLETION(dummy_start);
+static DECLARE_COMPLETION(dummy_done);
+static void dummy_work_fn(struct work_struct *work) {
+  complete(&dummy_start);
+  wait_for_completion(&dummy_done);
+}
+
+static void prealloc_kworker(struct workqueue_struct *wq, int num_kworkers) {
+  reinit_completion(&dummy_start);
+  reinit_completion(&dummy_done);
+  int num_cpus = num_online_cpus();
+  int num_works = num_kworkers * num_cpus;
+  struct work_struct *dummy_works =
+      kcalloc(num_works, sizeof(struct work_struct), GFP_KERNEL);
+  for (int i = 0; i < num_works; i++) {
+    INIT_WORK(&dummy_works[i], dummy_work_fn);
+    int cpu = i / num_kworkers;
+    queue_work_on(cpu, wq, &dummy_works[i]);
+  }
+  for (int i = 0; i < num_works; i++) {
+    wait_for_completion(&dummy_start);
+  }
+  complete_all(&dummy_done);
+  for (int i = 0; i < num_works; i++) {
+    flush_work(&dummy_works[i]);
+  }
+  kfree(dummy_works);
+}
+
+static void prealloc_kworkers(void) {
+  prealloc_kworker(system_wq, 2);
+  prealloc_kworker(system_highpri_wq, 2);
+}
+
 static void move_kthreads(void) {
   struct task_struct *p;
   for_each_process(p) {
@@ -155,6 +190,13 @@ static void reset_distribute_cpu_mask_prev(void) {
   }
 #endif
 }
+static void print_all_tasks(void) {
+  struct task_struct *p;
+  TRACE_INFO("All tasks:");
+  for_each_process(p) {
+    TRACE_INFO("- pid=%d, cpu=%d, comm=%s", p->pid, task_cpu(p), p->comm);
+  }
+}
 
 void kstep_controller_run(struct controller_ops *ops) {
   if (ops->pre_init) {
@@ -171,6 +213,7 @@ void kstep_controller_run(struct controller_ops *ops) {
   }
 
   // Isolate the CPUs to avoid interference
+  prealloc_kworkers();
   disable_workqueue();
   move_kthreads();
 
@@ -181,6 +224,8 @@ void kstep_controller_run(struct controller_ops *ops) {
   // Reset the scheduler state to initial state
   reset_rq();
   reset_distribute_cpu_mask_prev();
+
+  print_all_tasks();
 
   TRACE_INFO("Initializing controller %s", ops->name);
   ops->init();
