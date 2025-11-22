@@ -32,6 +32,8 @@ void kstep_params_print(void) {
 
 static struct task_struct *controller_task;
 
+struct completion init_complete = COMPLETION_INITIALIZER(init_complete);
+
 static int __init kmod_init(void) {
   ksym_init();
   struct controller_ops *ops = kstep_controller_get(kstep_params.controller);
@@ -42,6 +44,7 @@ static int __init kmod_init(void) {
   }
   set_cpus_allowed_ptr(controller_task, cpumask_of(0));
   wake_up_process(controller_task);
+  wait_for_completion(&init_complete);
   return 0;
 }
 
