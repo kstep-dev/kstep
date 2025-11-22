@@ -44,6 +44,7 @@ def run_qemu(
         "irqaffinity=0",
         "rcu_nocbs=1,2",
         "nohz_full=1,2",
+        "init=/init",
     ]
 
     if Arch.get() == Arch.X86_64:
