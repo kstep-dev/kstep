@@ -27,9 +27,10 @@ def make_linux(linux_dir: Path, clean: bool = False, reconfig: bool = False):
         system(f"make -C {linux_dir} -j$(nproc) mod2noconfig || true")
 
     # Build kernel
-    cmd = f"make -C {linux_dir} -j$(nproc) LOCALVERSION=-kstep WERROR=0"
+    cmd = "make -j$(nproc) LOCALVERSION=-kstep WERROR=0"
     if shutil.which("bear"):
         cmd = f"{BEAR_CMD} {cmd}"
+    cmd = f"cd {linux_dir} && {cmd}"
     system(cmd)
 
 
