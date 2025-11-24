@@ -4,9 +4,9 @@ import argparse
 import shutil
 from pathlib import Path
 
-from scripts import LINUX_CONFIG, LINUX_CURR_DIR, PROJ_DIR, system
+from scripts import LINUX_CONFIG, LINUX_CURR_DIR, system
 
-BEAR_CMD = f"bear --append --output {PROJ_DIR}/compile_commands.json --"
+BEAR_CMD = "bear --append --output compile_commands.json --"
 
 
 def make_linux(linux_dir: Path, clean: bool = False, reconfig: bool = False):
