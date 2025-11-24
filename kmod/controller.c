@@ -198,6 +198,13 @@ static void print_all_tasks(void) {
   }
 }
 
+static void run_prog(char *args[]) {
+  int ret = call_usermodehelper(args[0], args, NULL, UMH_WAIT_EXEC);
+  if (ret < 0) {
+    panic("Failed to run %s", args[0]);
+  }
+}
+
 void kstep_controller_run(struct controller_ops *ops) {
   if (ops->pre_init) {
     ops->pre_init();
@@ -217,6 +224,10 @@ void kstep_controller_run(struct controller_ops *ops) {
   disable_workqueue();
   move_kthreads();
 
+  // Run /cgroup and /busy when we know the system is ready
+  run_prog((char *[]){"/cgroup", NULL});
+  run_prog((char *[]){"/busy", NULL});
+
   // Control timer ticks and clock
   disable_timer_ticks();
   kstep_clock_init(INIT_TIME_NS);
@@ -224,6 +235,12 @@ void kstep_controller_run(struct controller_ops *ops) {
   // Reset the scheduler state to initial state
   reset_rq();
   reset_distribute_cpu_mask_prev();
+  struct task_struct *p;
+  for_each_process(p) {
+    if (task_cpu(p) != 0) {
+      reset_task_stats(p);
+    }
+  }
 
   print_all_tasks();
 

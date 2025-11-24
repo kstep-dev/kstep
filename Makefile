@@ -16,7 +16,7 @@ user:
 # Build the kernel module
 .PHONY: kmod
 kmod:
-	$(BEAR_CMD) $(MAKE) -C kmod
+	$(MAKE) -C kmod
 
 # Build the root filesystem
 $(ROOTFS_IMG): user kmod $(shell find $(ROOTFS_DATA) -type f)
