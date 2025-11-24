@@ -50,9 +50,9 @@ def run_qemu(
     if Arch.get() == Arch.X86_64:
         boot_args += ["console=ttyS0", "tsc=nowatchdog"]
 
-    # Everything after the `-` is passed to init
+    # Everything after the `--` is passed to init
     # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
-    boot_args += ["-"]
+    boot_args += ["--"]
     if controller:
         boot_args += [f"controller={controller}"]
 
