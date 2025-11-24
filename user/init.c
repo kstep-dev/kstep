@@ -92,11 +92,11 @@ void insmod(const char *path, const char *params) {
 
 void run_kstep(int argc, char *argv[], char *envp[]) {
   char params[MAX_LINE] = {};
-  for (int i = 2; i < argc; i++) { // Skip "/init" and "-"
+  for (int i = 1; i < argc; i++) { // Skip "/init"
     strlcat(params, argv[i], sizeof(params));
     strlcat(params, " ", sizeof(params));
   }
-  for (int i = 2; envp[i] != NULL; i++) { // Skip HOME and PATH
+  for (int i = 2; envp[i] != NULL; i++) { // Skip HOME and TERM
     strlcat(params, envp[i], sizeof(params));
     strlcat(params, " ", sizeof(params));
   }
