@@ -11,12 +11,12 @@ all: $(ROOTFS_IMG)
 # Build the userspace programs
 .PHONY: user
 user:
-	$(MAKE) -C user
+	$(BEAR_CMD) $(MAKE) -C user
 
 # Build the kernel module
 .PHONY: kmod
 kmod:
-	$(BEAR_CMD) $(MAKE) -C kmod
+	$(MAKE) -C kmod
 
 # Build the root filesystem
 $(ROOTFS_IMG): user kmod $(shell find $(ROOTFS_DATA) -type f)

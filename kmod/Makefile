@@ -1,3 +1,4 @@
+BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.json --,)
 OUT ?= $(abspath ../data/rootfs)
 src ?= $(shell pwd)
 
@@ -25,7 +26,7 @@ all: $(kmod-name).ko
 	cp $(kmod-name).ko $(OUT)/kmod.ko
 
 $(kmod-name).ko: $(kmod-srcs) $(wildcard $(src)/*.h)
-	$(MAKE) -C $(kern-src) M=$(src) modules
+	$(BEAR_CMD) $(MAKE) -C $(kern-src) M=$(src) modules
 
 .PHONY: clean
 clean:

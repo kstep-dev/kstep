@@ -199,7 +199,7 @@ static void print_all_tasks(void) {
 }
 
 static void run_prog(char *args[]) {
-  int ret = call_usermodehelper(args[0], args, NULL, UMH_NO_WAIT);
+  int ret = call_usermodehelper(args[0], args, NULL, UMH_WAIT_EXEC);
   if (ret < 0) {
     panic("Failed to run %s", args[0]);
   }
@@ -224,7 +224,7 @@ void kstep_controller_run(struct controller_ops *ops) {
   disable_workqueue();
   move_kthreads();
 
-  // Run /cgroup and /busy to ensure the system is ready
+  // Run /cgroup and /busy when we know the system is ready
   run_prog((char *[]){"/cgroup", NULL});
   run_prog((char *[]){"/busy", NULL});
 
