@@ -95,8 +95,10 @@ def run_qemu(
 
     system(" ".join(cmd))
 
-    if log_file and "Kernel panic" in log_file.read_text():
-        raise RuntimeError("Kernel exited with panic")
+    if log_file:
+        with log_file.open() as f:
+            if any("Kernel panic" in line for line in f):
+                raise RuntimeError("Kernel exited with panic")
 
 
 if __name__ == "__main__":
