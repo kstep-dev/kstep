@@ -37,15 +37,18 @@ struct controller_ops {
   void (*init)(void);
   void (*body)(void);
 };
-void kstep_sleep(void);
 struct controller_ops *kstep_controller_get(const char *name);
 void kstep_controller_run(struct controller_ops *ops);
-void call_tick_once(void);
 
-// clock.c
-void kstep_clock_init(u64 init_time_ns);
-void kstep_clock_tick(void);
-void kstep_clock_exit(void);
+// tick.c
+void kstep_tick_init(void);
+void kstep_tick_exit(void);
+void kstep_sleep(void);
+void kstep_tick(void);
+// Call tick until the function returns true
+void kstep_tick_until(bool (*fn)(void));
+// Call tick until the function returns true for a task, then return that task
+struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *));
 
 // utils.c
 #define send_sigcode(p, code, val) send_sigcode3(p, code, val, 0, 0)
@@ -58,11 +61,6 @@ void print_rq_stats(void);
 void print_tasks(void);
 void print_nr_running(void);
 int is_sys_kthread(struct task_struct *p);
-
-// Call tick until the function returns true
-void kstep_tick_until(bool (*fn)(void));
-// Call tick until the function returns true for ANY task in some runqueue
-struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *));
 
 // trace.c
 void kstep_trace_exit(void);

@@ -1,6 +1,5 @@
 #define TRACE_LEVEL LOGLEVEL_DEBUG
 
-#include <linux/delay.h>
 #include <linux/reboot.h>
 
 #include "kstep.h"
@@ -36,49 +35,6 @@ struct controller_ops *kstep_controller_get(const char *name) {
     }
   }
   panic("Controller %s not found", name);
-}
-
-void kstep_sleep(void) { udelay(kstep_params.step_interval_us); }
-
-void call_tick_once(void) {
-  if (kstep_params.print_rq_stats) {
-    print_rq_stats();
-  }
-  if (kstep_params.print_tasks) {
-    print_tasks();
-  }
-  if (kstep_params.print_nr_running) {
-    print_nr_running();
-  }
-  kstep_clock_tick();
-
-  // Call tick function
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
-    smp_call_function_single(cpu, (void *)ksym.sched_tick, NULL, 0);
-#else
-    smp_call_function_single(cpu, (void *)ksym.scheduler_tick, NULL, 0);
-#endif
-    kstep_sleep();
-  }
-}
-
-static void disable_timer_ticks(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    // Ref: tick_sched_timer_dying in
-    // https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L1606
-    struct tick_sched *ts = ksym.tick_get_tick_sched(cpu);
-    hrtimer_cancel(&ts->sched_timer);
-    memset(ts, 0, sizeof(struct tick_sched));
-    TRACE_INFO("Disabled timer ticks on CPU %d", cpu);
-  }
-}
-
-static void enable_timer_ticks(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    smp_call_function_single(cpu, (void *)ksym.tick_setup_sched_timer,
-                             (void *)true, 0);
-  }
 }
 
 static void disable_workqueue(void) {
@@ -229,8 +185,7 @@ void kstep_controller_run(struct controller_ops *ops) {
   run_prog((char *[]){"/busy", NULL});
 
   // Control timer ticks and clock
-  disable_timer_ticks();
-  kstep_clock_init(INIT_TIME_NS);
+  kstep_tick_init();
 
   // Reset the scheduler state to initial state
   reset_rq();
@@ -252,7 +207,6 @@ void kstep_controller_run(struct controller_ops *ops) {
   TRACE_INFO("Exiting controller %s", ops->name);
   kernel_power_off();
 
-  kstep_clock_exit();
-  enable_timer_ticks();
+  kstep_tick_exit();
   kstep_trace_exit();
 }

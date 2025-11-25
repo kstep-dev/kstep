@@ -38,13 +38,13 @@ static void controller_body(void) {
     struct task_struct *l1_0_task = find_last_task();
 
     for(int i = 0; i < 20; i++) {
-      call_tick_once();
+      kstep_tick();
     }
 
     send_sigcode2(cgroup_task, SIGCODE_REWEIGHT_CGROUP, 1 << 16 | 0x0, 10000);
 
     for(int i = 0; i < 10; i++) {
-      call_tick_once();
+      kstep_tick();
     }
     print_tasks();
 

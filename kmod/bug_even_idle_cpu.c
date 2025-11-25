@@ -28,7 +28,7 @@ static void controller_body(void) {
   send_sigcode3(busy_task, SIGCODE_FORK_PIN_RANGE, 1, 7, 7);
   
   for (int i = 0; i < 200; i++) {
-    call_tick_once();
+    kstep_tick();
   }
 
   struct task_struct *pin_task;
@@ -41,7 +41,7 @@ static void controller_body(void) {
 
 
   for(int i = 0; i < 1000; i++) {
-    call_tick_once();
+    kstep_tick();
   }
 
 }

@@ -24,13 +24,13 @@ static bool is_ineligible(struct task_struct *p) {
 
 static void controller_body(void) {
   for (int i = 0; i < 20; i++) {
-    call_tick_once();
+    kstep_tick();
   }
   struct task_struct *pause_task = kstep_tick_until_task(is_ineligible);
   TRACE_INFO("dequeue ineligible task %d", pause_task->pid);
   send_sigcode(pause_task, SIGCODE_SLEEP, 1);
 
-  call_tick_once();
+  kstep_tick();
 
   TRACE_INFO("freeze ineligible task %d", pause_task->pid);
 
@@ -52,15 +52,15 @@ static void controller_body(void) {
 #endif
   kstep_sleep();
 
-  call_tick_once();
-  call_tick_once();
+  kstep_tick();
+  kstep_tick();
 
   send_sigcode(pause_task, SIGCODE_UNKNOWN, 0);
   print_tasks();
   kstep_sleep();
 
   for (int i = 0; i < 20; i++) {
-    call_tick_once();
+    kstep_tick();
   }
 }
 
