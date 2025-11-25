@@ -23,7 +23,7 @@ ccflags-y := \
 $(kmod-build)/kstep.ko: $(kmod-srcs) $(wildcard $(src)/*.h)
 	mkdir -p $(kmod-build)
 	touch $(kmod-build)/Makefile
-	$(BEAR_CMD) $(MAKE) -C $(kern-src) M=$(kmod-build) srcroot=$(src) modules
+	$(BEAR_CMD) $(MAKE) -C $(kern-src) M=$(kmod-build) srcroot=$(src) src=$(src) modules
 	rm -rf $(src)/build/current
 	ln -s $(kern-ver) $(src)/build/current
 
