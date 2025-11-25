@@ -11,8 +11,6 @@ compile_commands.events.json
 
 # Kernel module
 /kmod/build/*
-*.ko
-*.o.d
 
 # Userspace programs
 /user/*

@@ -21,7 +21,7 @@ kmod:
 # Build the root filesystem
 $(ROOTFS_IMG): user kmod
 	mkdir -p $(ROOTFS_DATA)
-	cp kmod/build/current/kstep.ko $(ROOTFS_DATA)/kmod.ko
+	cp kmod/build/current/kstep.ko $(ROOTFS_DATA)
 	cp user/cgroup $(ROOTFS_DATA)
 	cp user/init $(ROOTFS_DATA)
 	cp user/busy $(ROOTFS_DATA)
