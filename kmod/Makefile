@@ -1,5 +1,4 @@
 BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.json --,)
-OUT ?= $(abspath ../data/rootfs)
 src ?= $(shell pwd)
 
 kern-src ?= $(realpath $(src)/../linux/current)
@@ -9,10 +8,10 @@ ifeq ($(kern-src),)
 endif
 
 kmod-srcs := $(notdir $(filter-out %.mod.c,$(wildcard $(src)/*.c)))
-kmod-name := kstep-$(kern-ver)
+kmod-build := $(src)/build/$(kern-ver)
 
-obj-m := $(kmod-name).o
-$(kmod-name)-y := $(kmod-srcs:.c=.o)
+obj-m := kstep.o
+kstep-y := $(kmod-srcs:.c=.o)
 
 ccflags-y := \
   -I$(kern-src) \
@@ -21,14 +20,13 @@ ccflags-y := \
   -Wno-declaration-after-statement \
   -std=gnu11
 
-.PHONY: all
-all: $(kmod-name).ko
-	cp $(kmod-name).ko $(OUT)/kmod.ko
-
-$(kmod-name).ko: $(kmod-srcs) $(wildcard $(src)/*.h)
-	$(BEAR_CMD) $(MAKE) -C $(kern-src) M=$(src) modules
+$(kmod-build)/kstep.ko: $(kmod-srcs) $(wildcard $(src)/*.h)
+	mkdir -p $(kmod-build)
+	touch $(kmod-build)/Makefile
+	$(BEAR_CMD) $(MAKE) -C $(kern-src) M=$(kmod-build) src=$(src) modules
+	rm -rf $(src)/build/current
+	ln -s $(kern-ver) $(src)/build/current
 
 .PHONY: clean
 clean:
-	$(MAKE) -C $(kern-src) M=$(src) clean
-	rm -f $(OUT)/kmod.ko
+	rm -rf build

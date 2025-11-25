@@ -10,17 +10,19 @@ compile_commands.events.json
 /linux/*.tar.xz
 
 # Kernel module
+/kmod/build/*
 *.ko
 *.o.d
+
+# Userspace programs
+/user/*
+!/user/*.c
 
 # Data files
 /data/rootfs.cpio
 /data/rootfs/*
 !/data/rootfs/README.md
 /data/logs/*
-
-# Plots
-/plot/*.pdf
 
 # Python
 __pycache__

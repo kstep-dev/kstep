@@ -1,13 +1,9 @@
 {
     "files.exclude": {
+        // clangd cache
         "**/.cache": true,
-        "**/.tmp_*": true,
-        // Kernel module
-        "**/*.cmd": true,
-        "**/*.mod": true,
-        "**/*.mod.c": true,
-        "**/*.mod.o": true,
-        "**/*.o": true,
+        // python cache
+        "**/__pycache__": true,
     },
     "search.useIgnoreFiles": false,
     "files.associations": {

@@ -19,11 +19,17 @@ kmod:
 	$(MAKE) -C kmod
 
 # Build the root filesystem
-$(ROOTFS_IMG): user kmod $(shell find $(ROOTFS_DATA) -type f)
+$(ROOTFS_IMG): user kmod
+	mkdir -p $(ROOTFS_DATA)
+	cp kmod/build/current/kstep.ko $(ROOTFS_DATA)/kmod.ko
+	cp user/cgroup $(ROOTFS_DATA)
+	cp user/init $(ROOTFS_DATA)
+	cp user/busy $(ROOTFS_DATA)
 	cd $(ROOTFS_DATA) && (find . -print0 | cpio -o -H newc --verbose --null > $(ROOTFS_IMG))
 
 .PHONY: clean
 clean:
 	$(MAKE) -C user clean
 	$(MAKE) -C kmod clean
+	rm -rf $(ROOTFS_DATA)
 	rm -f $(ROOTFS_IMG)
