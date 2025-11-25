@@ -68,7 +68,7 @@ void run_kstep(int argc, char *argv[], char *envp[]) {
     strlcat(params, " ", sizeof(params));
   }
   printf("Running kSTEP with params: %s\n", params);
-  insmod("kmod.ko", params);
+  insmod("kstep.ko", params);
 }
 
 int main(int argc, char *argv[], char *envp[]) {
