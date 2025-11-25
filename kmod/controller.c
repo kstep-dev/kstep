@@ -132,7 +132,12 @@ static void reset_rq(void) {
       sd->balance_interval = sd->min_interval;
       sd->nr_balance_failed = 0;
       sd->max_newidle_lb_cost = 0;
+// https://github.com/torvalds/linux/commit/e60b56e46b384cee1ad34e6adc164d883049c6c3
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
       sd->last_decay_max_lb_cost = jiffies;
+#else
+      sd->next_decay_max_lb_cost = jiffies;
+#endif
     }
   }
 }
