@@ -17,15 +17,9 @@ def make_linux(linux_dir: Path, clean: bool = False, reconfig: bool = False):
     # Generate config
     config_path = linux_dir / ".config"
     if not config_path.exists() or reconfig:
-        system(f"make -C {linux_dir} -j$(nproc) defconfig")
         system(
-            f"cd {linux_dir} && ./scripts/kconfig/merge_config.sh -m {config_path} {LINUX_CONFIG}"
+            f"KCONFIG_ALLCONFIG={LINUX_CONFIG} make -C {linux_dir} -j$(nproc) allnoconfig"
         )
-        system(f"make -C {linux_dir} -j$(nproc) olddefconfig")
-        # mod2noconfig introduced in Linux 5.17 to avoid building modules
-        # https://github.com/torvalds/linux/commit/c39afe624853e39af243dd9832640bf9c80b6554
-        system(f"make -C {linux_dir} -j$(nproc) mod2noconfig || true")
-
     # Build kernel
     cmd = "make -j$(nproc) LOCALVERSION=-kstep WERROR=0"
     if shutil.which("bear"):

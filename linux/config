@@ -1,31 +1,51 @@
-# Do not treat warnings as errors, avoid build errors when compiling older kernel with newer compiler
-CONFIG_WERROR=n
-# Avoid adding "-dirty" to the version string, which results in kernel module version magic mismatch
-CONFIG_LOCALVERSION_AUTO=n
-# Include all symbols in kallsyms, including variables
-CONFIG_KALLSYMS_ALL=y
+# Basic
+CONFIG_64BIT=y                 # 64-bit kernel
+CONFIG_BLK_DEV_INITRD=y        # initramfs support
+CONFIG_BINFMT_ELF=y            # run elf binaries
+CONFIG_MODULES=y               # load kernel modules
+CONFIG_HYPERVISOR_GUEST=y      # virtualization
+CONFIG_PARAVIRT=y              # paravirtualization
+CONFIG_WERROR=n                # do not treat warnings as errors
+CONFIG_LOCALVERSION_AUTO=n     # do not add "-dirty" to version
 
-# Basic virtualization support
-CONFIG_HYPERVISOR_GUEST=y
-CONFIG_PARAVIRT=y
-CONFIG_VIRTIO_BLK=y
-CONFIG_VIRTIO_PCI=y
+# Output
+CONFIG_TTY=y                   # TTY support
+CONFIG_SERIAL_8250=y           # 8250 serial port support
+CONFIG_SERIAL_8250_CONSOLE=y   # Console on serial port
+CONFIG_PRINTK=y                # printk support
+CONFIG_PRINTK_TIME=y           # printk with timestamp
 
-# Debugging and tracing
-CONFIG_DEBUG_KERNEL=y
-CONFIG_DEBUG_INFO_DWARF5=y
-CONFIG_GDB_SCRIPTS=y
-CONFIG_KPROBES=y
-CONFIG_FTRACE=y
-CONFIG_FPROBE=y
-CONFIG_FUNCTION_TRACER=y
-CONFIG_FUNCTION_ERROR_INJECTION=y  # for function overriding
+# File systems
+CONFIG_PROC_FS=y               # /proc
+CONFIG_SYSFS=y                 # /sys
+CONFIG_DEBUG_FS=y              # /sys/kernel/debug
+CONFIG_DEVTMPFS=y              # /dev
+CONFIG_DEVTMPFS_MOUNT=y        # /dev auto mount
+
+# CPU and power management
+CONFIG_ACPI=y                  # ACPI support
+CONFIG_ACPI_PROCESSOR=y        # ACPI processor support
+CONFIG_ACPI_HOTPLUG_CPU=y      # ACPI CPU hotplug support
+CONFIG_CPU_FREQ=y              # Frequency scaling
+CONFIG_HOTPLUG_CPU=y           # CPU hotplug support
+CONFIG_PM_SLEEP=y              # PM sleep support
+CONFIG_PM_SLEEP_SMP=y          # PM sleep SMP support
+CONFIG_SUSPEND=y               # Suspend support
+CONFIG_FREEZER=y               # Freezer support
 
 # Scheduler
-# CONFIG_NO_HZ=y
-# CONFIG_NO_HZ_FULL=y
-# CONFIG_RCU_NOCB_CPU=y
-# CONFIG_SCHEDSTATS=y
+CONFIG_SMP=y                   # SMP support
+CONFIG_NUMA=y                  # NUMA support
+CONFIG_SCHED_CORE=y            # Core scheduler
+CONFIG_SCHED_SMT=y             # SMT scheduler
+CONFIG_SCHED_CLUSTER=y         # Cluster scheduler
+CONFIG_SCHED_MC=y              # MC scheduler
+CONFIG_CGROUPS=y               # cgroups support
+CONFIG_CGROUP_SCHED=y          # cgroup scheduler support
+CONFIG_FAIR_GROUP_SCHED=y      # CFS
+CONFIG_CFS_BANDWIDTH=y         # CFS bandwidth control
+CONFIG_RT_GROUP_SCHED=y        # RT
+CONFIG_HIGH_RES_TIMERS=y       # High resolution timers
 CONFIG_SCHED_DEBUG=y
 CONFIG_HZ_1000=y
 CONFIG_NO_HZ_COMMON=n
@@ -33,108 +53,22 @@ CONFIG_NO_HZ_IDLE=n
 CONFIG_NO_HZ=n
 CONFIG_NO_HZ_FULL=n
 CONFIG_RCU_NOCB_CPU=n
+# CONFIG_NO_HZ=y
+# CONFIG_NO_HZ_FULL=y
+# CONFIG_RCU_NOCB_CPU=y
+# CONFIG_SCHEDSTATS=y
 
-# Unneeded features
-CONFIG_BPF_SYSCALL=n
-CONFIG_NET=n
-CONFIG_HIBERNATION=n
-CONFIG_IO_URING=n
-CONFIG_AIO=n
 
-# Unneeded file systems
-CONFIG_BTRFS_FS=n
-CONFIG_EXT4_FS=n
-CONFIG_ISO9660_FS=n
-CONFIG_JOLIET=n
-CONFIG_ZISOFS=n
-CONFIG_MSDOS_FS=n
-CONFIG_FAT_FS=n
-CONFIG_VFAT_FS=n
-CONFIG_QUOTA=n
+# Tracing
+CONFIG_KALLSYMS_ALL=y
+CONFIG_KPROBES=y
+CONFIG_FTRACE=y
+CONFIG_FPROBE=y
+CONFIG_DYNAMIC_FTRACE=y
+CONFIG_FUNCTION_TRACER=y
+CONFIG_FUNCTION_ERROR_INJECTION=y   # function overriding
 
-# Unneeded libraries
-CONFIG_RD_GZIP=n
-CONFIG_RD_BZIP2=n
-CONFIG_RD_LZMA=n
-CONFIG_RD_XZ=n
-CONFIG_RD_LZO=n
-CONFIG_RD_LZ4=n
-CONFIG_RD_ZSTD=n
-CONFIG_CRYPTO=n
-
-# Unneeded drivers
-CONFIG_STAGING=n
-CONFIG_MEDIA_SUPPORT=n
-CONFIG_FB=n
-CONFIG_I2C=n
-CONFIG_SOUND=n
-CONFIG_DRM=n
-CONFIG_USB_SUPPORT=n
-CONFIG_NEW_LEDS=n
-CONFIG_PCCARD=n
-CONFIG_ATA=n
-CONFIG_PPS=n
-CONFIG_MACINTOSH_DRIVERS=n
-CONFIG_MD=n
-CONFIG_SCSI=n
-CONFIG_PNP=n
-CONFIG_INPUT=n
-CONFIG_HID=n
-CONFIG_AGP=n
-CONFIG_RTC_NVMEM=n
-CONFIG_NVMEM=n
-CONFIG_INPUT_MOUSE=n
-CONFIG_INPUT_JOYSTICK=n
-CONFIG_INPUT_TABLET=n
-CONFIG_INPUT_TOUCHSCREEN=n
-CONFIG_INPUT_MISC=n
-
-# Unneeded platforms
-CONFIG_CHROME_PLATFORMS=n
-CONFIG_SURFACE_PLATFORMS=n
-CONFIG_X86_PLATFORM_DEVICES=n
-CONFIG_ARCH_ACTIONS=n
-CONFIG_ARCH_AIROHA=n
-CONFIG_ARCH_SUNXI=n
-CONFIG_ARCH_ALPINE=n
-CONFIG_ARCH_APPLE=n
-CONFIG_ARCH_BCM=n
-CONFIG_ARCH_BCM2835=n
-CONFIG_ARCH_BCM_IPROC=n
-CONFIG_ARCH_BCMBCA=n
-CONFIG_ARCH_BRCMSTB=n
-CONFIG_ARCH_BERLIN=n
-CONFIG_ARCH_BLAIZE=n
-CONFIG_ARCH_EXYNOS=n
-CONFIG_ARCH_SPARX5=n
-CONFIG_ARCH_K3=n
-CONFIG_ARCH_LG1K=n
-CONFIG_ARCH_HISI=n
-CONFIG_ARCH_KEEMBAY=n
-CONFIG_ARCH_MEDIATEK=n
-CONFIG_ARCH_MESON=n
-CONFIG_ARCH_MVEBU=n
-CONFIG_ARCH_NXP=n
-CONFIG_ARCH_LAYERSCAPE=n
-CONFIG_ARCH_MXC=n
-CONFIG_ARCH_S32=n
-CONFIG_ARCH_MA35=n
-CONFIG_ARCH_NPCM=n
-CONFIG_ARCH_QCOM=n
-CONFIG_ARCH_REALTEK=n
-CONFIG_ARCH_RENESAS=n
-CONFIG_ARCH_ROCKCHIP=n
-CONFIG_ARCH_SEATTLE=n
-CONFIG_ARCH_INTEL_SOCFPGA=n
-CONFIG_ARCH_STM32=n
-CONFIG_ARCH_SYNQUACER=n
-CONFIG_ARCH_TEGRA=n
-CONFIG_ARCH_TESLA_FSD=n
-CONFIG_ARCH_SPRD=n
-CONFIG_ARCH_THUNDER=n
-CONFIG_ARCH_THUNDER2=n
-CONFIG_ARCH_UNIPHIER=n
-CONFIG_ARCH_VEXPRESS=n
-CONFIG_ARCH_VISCONTI=n
-CONFIG_ARCH_XGENE=n
-CONFIG_ARCH_ZYNQMP=n
+# Debugging
+# CONFIG_DEBUG_KERNEL=y
+# CONFIG_DEBUG_INFO_DWARF5=y
+# CONFIG_GDB_SCRIPTS=y
