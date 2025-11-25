@@ -66,7 +66,7 @@ static bool is_running_again(void) { return not_eligible_task->on_cpu == 1; }
 
 static void controller_body(void) {
   for (int i = 0; i < 20; i++) {
-    call_tick_once();
+    kstep_tick();
   }
 
   // tick until there is a not eligible task on the same cpu as the busy kthread
@@ -76,14 +76,14 @@ static void controller_body(void) {
   TRACE_INFO("Found not eligible task %d on cpu %d", not_eligible_task->pid, task_cpu(not_eligible_task));
   sleep_all_tasks_except(task_cpu(not_eligible_task), not_eligible_task);
 
-  call_tick_once();
+  kstep_tick();
 
   // wake up the kthread to call sync wakeup
   shared_data = 0;
   atomic_set(&data_ready, 1);
   wake_up_interruptible(&my_wq);
 
-  call_tick_once();
+  kstep_tick();
 
   // tick until the not eligible task is running on the cpu and pause it
   kstep_tick_until(is_running_again);
@@ -91,7 +91,7 @@ static void controller_body(void) {
 
   // tick to show the impact
   for (int i = 0; i < 20; i++) {
-    call_tick_once();
+    kstep_tick();
   }
 }
 

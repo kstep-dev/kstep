@@ -22,7 +22,7 @@ static void controller_body(void) {
   }
 
   for (int i = 0; i < 1000; i++) {
-    call_tick_once();
+    kstep_tick();
   }
 }
 

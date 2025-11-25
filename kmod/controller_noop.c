@@ -12,7 +12,7 @@ static void controller_body(void) {
 
   for (int i = 0; i < 10; i++) {
     send_sigcode(busy_task, SIGCODE_FORK, 1);
-    call_tick_once();
+    kstep_tick();
   }
 }
 

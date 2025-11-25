@@ -107,7 +107,7 @@ static struct task_struct *get_curr_task(int cpu) {
 static void controller_body(void) {
   // Update clock
   for (int i = 0; i < 20; i++) {
-    call_tick_once();
+    kstep_tick();
   }
 
   // tick until there is a not eligible task group with eligible tasks
@@ -125,7 +125,7 @@ static void controller_body(void) {
   send_sigcode(p, SIGCODE_CLONE3_L3_0, 1);
 
   for (int i = 0; i < 60; i++) {
-    call_tick_once();
+    kstep_tick();
   }
 }
 

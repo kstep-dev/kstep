@@ -6,25 +6,6 @@
 
 #include "kstep.h"
 
-void kstep_tick_until(bool (*fn)(void)) {
-  while (1) {
-    if (fn())
-      return;
-    call_tick_once();
-  }
-}
-
-struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *)) {
-  struct task_struct *p;
-  while (1) {
-    for_each_process(p) {
-      if (fn(p))
-        return p;
-    }
-    call_tick_once();
-  }
-}
-
 void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
                    int val3) {
   struct kernel_siginfo info = {
@@ -41,10 +22,6 @@ void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
 
 struct task_struct *poll_task(const char *comm) {
   struct task_struct *p;
-  // for_each_process(p) {
-  //   TRACE_DEBUG("pid=%d, comm=%s, state=%x, on_cpu=%d", p->pid, p->comm,
-  //               p->__state, p->on_cpu);
-  // }
   for (int i = 0; i < 1000; i++) {
     for_each_process(p) {
       if (strcmp(p->comm, comm) == 0)

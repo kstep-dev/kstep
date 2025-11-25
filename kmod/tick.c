@@ -1,9 +1,10 @@
 #include "kstep.h"
 
+#include <linux/delay.h>
 #include <linux/sched_clock.h>
 
-static u64 clock_value = 0;
-static u64 kstep_sched_clock(void) { return clock_value; }
+static u64 kstep_clock_value = 0;
+static u64 kstep_sched_clock(void) { return kstep_clock_value; }
 
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
 // On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
@@ -82,24 +83,83 @@ static void kstep_jiffies_exit(void) {
   TRACE_INFO("Enabled jiffies update");
 }
 
-void kstep_clock_init(u64 init_time_ns) {
+static void kstep_sched_timer_init(void) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    // Ref: tick_sched_timer_dying in
+    // https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L1606
+    struct tick_sched *ts = ksym.tick_get_tick_sched(cpu);
+    hrtimer_cancel(&ts->sched_timer);
+    memset(ts, 0, sizeof(struct tick_sched));
+    TRACE_INFO("Disabled timer ticks on CPU %d", cpu);
+  }
+}
+
+static void kstep_sched_timer_exit(void) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    smp_call_function_single(cpu, (void *)ksym.tick_setup_sched_timer,
+                             (void *)true, 0);
+  }
+}
+
+void kstep_tick_init(void) {
+  kstep_sched_timer_init();
   kstep_jiffies_init();
   kstep_sched_clock_init();
 
-  clock_value = init_time_ns;
-  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(init_time_ns);
+  kstep_clock_value = INIT_TIME_NS;
+  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(INIT_TIME_NS);
   smp_mb();
-  TRACE_INFO("Initialized clock to %llu ns and jiffies to %lu", clock_value,
-             (jiffies - INITIAL_JIFFIES));
+
+  TRACE_INFO("Initialized clock to %llu ns and jiffies to %lu",
+             kstep_clock_value, (jiffies - INITIAL_JIFFIES));
 }
 
-void kstep_clock_tick(void) {
-  clock_value += TICK_NSEC;
-  jiffies += 1;
-  smp_mb();
-}
-
-void kstep_clock_exit(void) {
+void kstep_tick_exit(void) {
   kstep_sched_clock_exit();
   kstep_jiffies_exit();
+  kstep_sched_timer_exit();
+}
+
+void kstep_sleep(void) { udelay(kstep_params.step_interval_us); }
+
+void kstep_tick(void) {
+  if (kstep_params.print_rq_stats)
+    print_rq_stats();
+  if (kstep_params.print_tasks)
+    print_tasks();
+  if (kstep_params.print_nr_running)
+    print_nr_running();
+
+  kstep_clock_value += TICK_NSEC;
+  jiffies += 1;
+  smp_mb();
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+  void *sched_tick = (void *)ksym.sched_tick;
+#else
+  void *sched_tick = (void *)ksym.scheduler_tick;
+#endif
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    smp_call_function_single(cpu, sched_tick, NULL, 0);
+    kstep_sleep();
+  }
+}
+
+void kstep_tick_until(bool (*fn)(void)) {
+  while (1) {
+    if (fn())
+      return;
+    kstep_tick();
+  }
+}
+
+struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *)) {
+  struct task_struct *p;
+  while (1) {
+    for_each_process(p) {
+      if (fn(p))
+        return p;
+    }
+    kstep_tick();
+  }
 }
