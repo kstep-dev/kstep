@@ -44,6 +44,7 @@ def run_qemu(
         "irqaffinity=0",
         "rcu_nocbs=1,2",
         "nohz_full=1,2",
+        "panic=-1",  # Exit immediately on panic
         "init=/init",
     ]
 
@@ -68,6 +69,7 @@ def run_qemu(
         f"-initrd {ROOTFS_IMG}",
         f'-append "{" ".join(boot_args)}"',
         "-nographic",
+        "-no-reboot",  # Prevent automatic reboot after panic
     ]
 
     if kvm_path.exists():
@@ -92,6 +94,9 @@ def run_qemu(
         cmd += ["-s", "-S"]
 
     system(" ".join(cmd))
+
+    if log_file and "Kernel panic" in log_file.read_text():
+        raise RuntimeError("Kernel exited with panic")
 
 
 if __name__ == "__main__":
