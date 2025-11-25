@@ -10,6 +10,7 @@ from scripts import LINUX_CURR_DIR, system
 def run_gdb(linux_dir: Path):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     args = [
+        "-ex 'set pagination off'",
         f"-iex 'set auto-load safe-path {linux_dir}'",
         "-ex 'target remote :1234'",
         f"-ex 'source {linux_dir}/vmlinux-gdb.py'",

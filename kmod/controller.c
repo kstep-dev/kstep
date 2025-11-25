@@ -99,8 +99,6 @@ static void move_kthreads(void) {
     }
     set_cpus_allowed_ptr(p, cpumask_of(0));
     wake_up_process(p);
-    kstep_sleep(); // sometimes kworker/1:2H can be started very late
-                   // and miss the move_kthreads
   }
   TRACE_INFO("Moved kthreads to CPU 0");
 }
@@ -133,6 +131,8 @@ static void reset_rq(void) {
       sd->last_balance = jiffies;
       sd->balance_interval = sd->min_interval;
       sd->nr_balance_failed = 0;
+      sd->max_newidle_lb_cost = 0;
+      sd->last_decay_max_lb_cost = jiffies;
     }
   }
 }
@@ -146,11 +146,12 @@ static void reset_distribute_cpu_mask_prev(void) {
   }
 #endif
 }
+
 static void print_all_tasks(void) {
   struct task_struct *p;
-  TRACE_INFO("All tasks:");
+  pr_info("All tasks:");
   for_each_process(p) {
-    TRACE_INFO("- pid=%d, cpu=%d, comm=%s", p->pid, task_cpu(p), p->comm);
+    pr_info("- pid=%d, cpu=%d, comm=%s", p->pid, task_cpu(p), p->comm);
   }
 }
 
@@ -171,9 +172,6 @@ void kstep_controller_run(struct controller_ops *ops) {
   }
   kstep_topo_print();
   kstep_patch_min_vruntime();
-  if (kstep_params.print_lb_events) {
-    kstep_trace_lb();
-  }
 
   // Isolate the CPUs to avoid interference
   prealloc_kworkers();
@@ -195,6 +193,10 @@ void kstep_controller_run(struct controller_ops *ops) {
     if (task_cpu(p) != 0) {
       reset_task_stats(p);
     }
+  }
+
+  if (kstep_params.print_lb_events) {
+    kstep_trace_lb();
   }
 
   print_all_tasks();
