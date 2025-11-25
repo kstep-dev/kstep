@@ -1,26 +1,22 @@
-# clangd
-compile_commands.json
-compile_commands.json.tmp
-compile_commands.events.json
-.cache
-
 # Linux source code
 /linux/*/
 /linux/current
 /linux/*.tar.xz
 
-# Kernel module
-*.ko
-*.o.d
+# Build artifacts
+/kmod/build
+/user/build
 
 # Data files
 /data/rootfs.cpio
-/data/rootfs/*
-!/data/rootfs/README.md
+/data/rootfs
 /data/logs/*
-
-# Plots
-/plot/*.pdf
 
 # Python
 __pycache__
+
+# clangd
+compile_commands.json
+compile_commands.json.tmp
+compile_commands.events.json
+.cache
