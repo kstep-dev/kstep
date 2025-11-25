@@ -22,9 +22,7 @@ kmod:
 $(ROOTFS_IMG): user kmod
 	mkdir -p $(ROOTFS_DATA)
 	cp kmod/build/current/kstep.ko $(ROOTFS_DATA)
-	cp user/cgroup $(ROOTFS_DATA)
-	cp user/init $(ROOTFS_DATA)
-	cp user/busy $(ROOTFS_DATA)
+	cp user/build/* $(ROOTFS_DATA)
 	cd $(ROOTFS_DATA) && (find . -print0 | cpio -o -H newc --verbose --null > $(ROOTFS_IMG))
 
 .PHONY: clean

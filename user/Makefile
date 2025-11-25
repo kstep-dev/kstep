@@ -1,11 +1,12 @@
-TARGETS = $(patsubst %.c,%,$(wildcard *.c))
-
 .PHONY: all
-all: $(TARGETS)
+all: build build/init build/busy build/cgroup
 
-%: %.c ../kmod/sigcode.h
+build:
+	mkdir -p build
+
+build/%: %.c ../kmod/sigcode.h
 	gcc -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -std=c99 -static -o $@ $<
 
 .PHONY: clean
 clean:
-	rm -rf $(TARGETS)
+	rm -rf build
