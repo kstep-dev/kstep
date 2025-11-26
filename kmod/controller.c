@@ -78,6 +78,7 @@ static void prealloc_kworker(struct workqueue_struct *wq, int num_kworkers) {
 static void prealloc_kworkers(void) {
   prealloc_kworker(system_wq, 2);
   prealloc_kworker(system_highpri_wq, 2);
+  prealloc_kworker(system_unbound_wq, 2);
 }
 
 static void move_kthreads(void) {
