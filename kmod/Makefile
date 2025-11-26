@@ -23,7 +23,7 @@ ccflags-y := \
 .PHONY: all
 all: $(kmod-build)/kstep.ko
 	rm -rf $(src)/build/current
-	ln -s $(kern-ver) $(src)/build/current
+	ln -s $(kmod-build) $(src)/build/current
 
 $(kmod-build)/kstep.ko: $(kmod-srcs) $(wildcard $(src)/*.h)
 	mkdir -p $(kmod-build)
