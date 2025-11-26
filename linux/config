@@ -5,9 +5,11 @@ CONFIG_BINFMT_ELF=y            # run elf binaries
 CONFIG_MODULES=y               # load kernel modules
 CONFIG_HYPERVISOR_GUEST=y      # virtualization
 CONFIG_PARAVIRT=y              # paravirtualization
+CONFIG_KVM_GUEST=y             # for kvm_sched_clock_read
 CONFIG_WERROR=n                # do not treat warnings as errors
 CONFIG_LOCALVERSION_AUTO=n     # do not add "-dirty" to version
 CONFIG_DEBUG_KERNEL=y          # debug kernel
+CONFIG_EXPERT=y                # enable expert mode
 
 # Output
 CONFIG_TTY=y                   # TTY support
@@ -41,8 +43,9 @@ CONFIG_SCHED_CORE=y            # Core scheduler
 CONFIG_SCHED_SMT=y             # SMT scheduler
 CONFIG_SCHED_CLUSTER=y         # Cluster scheduler
 CONFIG_SCHED_MC=y              # MC scheduler
-CONFIG_CGROUPS=y               # cgroups support
-CONFIG_CGROUP_SCHED=y          # cgroup scheduler support
+CONFIG_CGROUPS=y               # cgroups
+CONFIG_CGROUP_SCHED=y          # cgroup scheduler 
+CONFIG_CPUSETS=y               # cgroup cpusets
 CONFIG_FAIR_GROUP_SCHED=y      # CFS
 CONFIG_CFS_BANDWIDTH=y         # CFS bandwidth control
 CONFIG_RT_GROUP_SCHED=y        # RT
@@ -70,6 +73,5 @@ CONFIG_FUNCTION_TRACER=y
 CONFIG_FUNCTION_ERROR_INJECTION=y   # function overriding
 
 # Debugging
-# CONFIG_DEBUG_KERNEL=y
 # CONFIG_DEBUG_INFO_DWARF5=y
 # CONFIG_GDB_SCRIPTS=y
