@@ -212,7 +212,7 @@ void kstep_controller_run(struct controller_ops *ops) {
   TRACE_INFO("Running controller %s", ops->name);
   ops->body();
   TRACE_INFO("Exiting controller %s", ops->name);
-  kernel_power_off();
+  kernel_restart(NULL);
 
   kstep_tick_exit();
   kstep_trace_exit();

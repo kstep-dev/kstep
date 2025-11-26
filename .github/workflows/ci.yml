@@ -26,7 +26,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: linux
-          key: ${{matrix.version}}
+          key: ${{matrix.version}}-${{hashFiles('linux/config')}}
 
       - name: Linux - Download
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -43,7 +43,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: linux
-          key: ${{matrix.version}}
+          key: ${{matrix.version}}-${{hashFiles('linux/config')}}
 
       - name: Build
         run: make

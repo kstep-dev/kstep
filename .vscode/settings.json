@@ -1,11 +1,10 @@
 {
     "files.exclude": {
-        // clangd cache
-        "**/.cache": true,
         // python cache
         "**/__pycache__": true,
+        // build artifacts
+        "**/*.cmd": true,
     },
-    "search.useIgnoreFiles": false,
     "files.associations": {
         "config.current": "makefile"
     },
