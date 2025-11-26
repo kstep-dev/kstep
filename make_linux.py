@@ -22,7 +22,7 @@ def make_linux(linux_dir: Path, clean: bool = False, reconfig: bool = False):
     cmd = "make -j$(nproc) LOCALVERSION=-kstep WERROR=0"
     if shutil.which("bear"):
         cmd = f"{BEAR_CMD} {cmd}"
-    cmd = f"cd {linux_dir} && KBUILD_BUILD_TIMESTAMP='' {cmd}"
+    cmd = f"cd {linux_dir} && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' {cmd}"
     system(cmd)
 
 
