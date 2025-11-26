@@ -64,7 +64,6 @@ int is_sys_kthread(struct task_struct *p);
 
 // trace.c
 void kstep_trace_exit(void);
-void kstep_patch_func_noop(char *name);
 void kstep_trace_rq_clock(void);
 void kstep_trace_lb(void);
 void kstep_trace_rebalance(void);

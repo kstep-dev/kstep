@@ -3,8 +3,11 @@
 #include <linux/delay.h>
 #include <linux/sched_clock.h>
 
-static u64 kstep_clock_value = 0;
+static u64 kstep_clock_value = INIT_TIME_NS;
 static u64 kstep_sched_clock(void) { return kstep_clock_value; }
+static u64 kstep_jiffies(void) {
+  return INITIAL_JIFFIES + nsecs_to_jiffies(kstep_clock_value);
+}
 
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
 // On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
@@ -70,16 +73,18 @@ static void kstep_jiffies_init(void) {
   // Setting an invalid timerkeeper CPU to avoid (most of) jiffies updates.
   *ksym.tick_do_timer_cpu = -1;
 
-  // Unfortunate workaround:
+  // It's possible that a non-timekeeper CPU calls `tick_do_update_jiffies64`
   // https://github.com/torvalds/linux/commit/a1ff03cd6fb9c501fff63a4a2bface9adcfa81cd
-  // allows a non-timekeeper CPU to update jiffies. We force
-  // `tick_do_update_jiffies64` to be a noop function to avoid the update.
-  kstep_patch_func_noop("tick_do_update_jiffies64");
+  // We set `tick_next_period` to a large value to avoid such updates within
+  // `tick_do_update_jiffies64`
+  *ksym.tick_next_period = KTIME_MAX;
+
   TRACE_INFO("Disabled jiffies update");
 }
 
 static void kstep_jiffies_exit(void) {
   *ksym.tick_do_timer_cpu = 0;
+  *ksym.tick_next_period = 0;
   TRACE_INFO("Enabled jiffies update");
 }
 
@@ -106,8 +111,7 @@ void kstep_tick_init(void) {
   kstep_jiffies_init();
   kstep_sched_clock_init();
 
-  kstep_clock_value = INIT_TIME_NS;
-  jiffies = INITIAL_JIFFIES + nsecs_to_jiffies(INIT_TIME_NS);
+  jiffies = kstep_jiffies();
   smp_mb();
 
   TRACE_INFO("Initialized clock to %llu ns and jiffies to %lu",
@@ -130,8 +134,12 @@ void kstep_tick(void) {
   if (kstep_params.print_nr_running)
     print_nr_running();
 
+  if (jiffies != kstep_jiffies()) {
+    panic("Jiffies mismatch: %lu != %llu", jiffies, kstep_jiffies());
+  }
+
   kstep_clock_value += TICK_NSEC;
-  jiffies += 1;
+  jiffies = kstep_jiffies();
   smp_mb();
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
