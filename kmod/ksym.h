@@ -48,6 +48,7 @@ KSYM_VAR(bool, pm_freezing)
 KSYM_VAR(unsigned long, arch_freq_scale)
 KSYM_VAR(const struct sched_class, rt_sched_class)
 KSYM_VAR(int, tick_do_timer_cpu)
+KSYM_VAR(ktime_t, tick_next_period)
 KSYM_VAR(int, distribute_cpu_mask_prev)
 KSYM_VAR(struct sched_domain_topology_level *, sched_domain_topology)
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
