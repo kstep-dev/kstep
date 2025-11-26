@@ -20,12 +20,15 @@ ccflags-y := \
   -Wno-declaration-after-statement \
   -std=gnu11
 
+.PHONY: all
+all: $(kmod-build)/kstep.ko
+	rm -rf $(src)/build/current
+	ln -s $(kern-ver) $(src)/build/current
+
 $(kmod-build)/kstep.ko: $(kmod-srcs) $(wildcard $(src)/*.h)
 	mkdir -p $(kmod-build)
 	ln -sf $(src)/* $(kmod-build) 
 	$(BEAR_CMD) $(MAKE) -C $(kern-src) M=$(kmod-build) src=$(src) modules
-	rm -rf $(src)/build/current
-	ln -s $(kern-ver) $(src)/build/current
 
 .PHONY: clean
 clean:
