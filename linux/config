@@ -41,6 +41,7 @@ CONFIG_PRINTK_TIME=y
 #
 # File systems
 #
+
 # /proc
 CONFIG_PROC_FS=y
 # /sys
@@ -49,8 +50,6 @@ CONFIG_SYSFS=y
 CONFIG_DEBUG_FS=y
 # /dev
 CONFIG_DEVTMPFS=y
-# /dev auto mount
-CONFIG_DEVTMPFS_MOUNT=y
 
 #
 # CPU and power management

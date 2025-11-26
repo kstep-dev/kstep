@@ -72,6 +72,7 @@ void run_kstep(int argc, char *argv[], char *envp[]) {
 }
 
 int main(int argc, char *argv[], char *envp[]) {
+  mount_fs("/dev", "devtmpfs");
   mount_fs("/proc", "proc");
   mount_fs("/sys", "sysfs");
   mount_fs("/sys/kernel/debug", "debugfs");
