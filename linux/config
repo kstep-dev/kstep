@@ -29,13 +29,14 @@ CONFIG_BUG=y
 
 # TTY support
 CONFIG_TTY=y
-# 8250 serial port support
+# x86 terminal support
 CONFIG_SERIAL_8250=y
-# Console on serial port
 CONFIG_SERIAL_8250_CONSOLE=y
-# printk support
+# ARM terminal support
+CONFIG_SERIAL_AMBA_PL011=y
+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+# printk support with timestamp
 CONFIG_PRINTK=y
-# printk with timestamp
 CONFIG_PRINTK_TIME=y
 
 #
