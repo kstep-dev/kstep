@@ -8,4 +8,7 @@
     "files.associations": {
         "config.current": "makefile"
     },
+    "search.exclude": {
+        "kmod/build": true,
+    },
 }
