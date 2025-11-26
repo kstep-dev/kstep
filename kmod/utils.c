@@ -1,7 +1,6 @@
 #define TRACE_LEVEL LOGLEVEL_DEBUG
 
 #include <linux/sched.h>
-#include <linux/sched/clock.h>
 #include <linux/sched/signal.h>
 
 #include "kstep.h"
@@ -60,9 +59,6 @@ void reset_task_stats(struct task_struct *p) {
 }
 
 void print_rq_stats(void) {
-  TRACE_INFO("sched_clock=%lld, jiffies=%lu", sched_clock(),
-             jiffies - INITIAL_JIFFIES);
-
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = cpu_rq(cpu);
 
