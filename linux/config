@@ -1,76 +1,121 @@
+#
 # Basic
-CONFIG_64BIT=y                 # 64-bit kernel
-CONFIG_BLK_DEV_INITRD=y        # initramfs support
-CONFIG_BINFMT_ELF=y            # run elf binaries
-CONFIG_MODULES=y               # load kernel modules
-CONFIG_HYPERVISOR_GUEST=y      # virtualization
-CONFIG_PARAVIRT=y              # paravirtualization
-CONFIG_KVM_GUEST=y             # for kvm_sched_clock_read
-CONFIG_WERROR=n                # do not treat warnings as errors
-CONFIG_LOCALVERSION_AUTO=n     # do not add "-dirty" to version
-CONFIG_DEBUG_KERNEL=y          # debug kernel
-CONFIG_EXPERT=y                # enable expert mode
-CONFIG_BUG=y                   # BUG support
+#
 
+# 64-bit kernel
+CONFIG_64BIT=y
+# initramfs support
+CONFIG_BLK_DEV_INITRD=y
+# run elf binaries
+CONFIG_BINFMT_ELF=y
+# load kernel modules
+CONFIG_MODULES=y
+# virtualization
+CONFIG_HYPERVISOR_GUEST=y
+# paravirtualization
+CONFIG_PARAVIRT=y
+# for kvm_sched_clock_read
+CONFIG_KVM_GUEST=y
+# debug kernel
+CONFIG_DEBUG_KERNEL=y
+# enable expert mode
+CONFIG_EXPERT=y
+# BUG/WARN support
+CONFIG_BUG=y
+
+#
 # Output
-CONFIG_TTY=y                   # TTY support
-CONFIG_SERIAL_8250=y           # 8250 serial port support
-CONFIG_SERIAL_8250_CONSOLE=y   # Console on serial port
-CONFIG_PRINTK=y                # printk support
-CONFIG_PRINTK_TIME=y           # printk with timestamp
+#
 
+# TTY support
+CONFIG_TTY=y
+# 8250 serial port support
+CONFIG_SERIAL_8250=y
+# Console on serial port
+CONFIG_SERIAL_8250_CONSOLE=y
+# printk support
+CONFIG_PRINTK=y
+# printk with timestamp
+CONFIG_PRINTK_TIME=y
+
+#
 # File systems
-CONFIG_PROC_FS=y               # /proc
-CONFIG_SYSFS=y                 # /sys
-CONFIG_DEBUG_FS=y              # /sys/kernel/debug
-CONFIG_DEVTMPFS=y              # /dev
-CONFIG_DEVTMPFS_MOUNT=y        # /dev auto mount
+#
+# /proc
+CONFIG_PROC_FS=y
+# /sys
+CONFIG_SYSFS=y
+# /sys/kernel/debug
+CONFIG_DEBUG_FS=y
+# /dev
+CONFIG_DEVTMPFS=y
+# /dev auto mount
+CONFIG_DEVTMPFS_MOUNT=y
 
+#
 # CPU and power management
-CONFIG_ACPI=y                  # ACPI support
-CONFIG_ACPI_PROCESSOR=y        # ACPI processor support
-CONFIG_ACPI_HOTPLUG_CPU=y      # ACPI CPU hotplug support
-CONFIG_CPU_FREQ=y              # Frequency scaling
-CONFIG_HOTPLUG_CPU=y           # CPU hotplug support
-CONFIG_PM_SLEEP=y              # PM sleep support
-CONFIG_PM_SLEEP_SMP=y          # PM sleep SMP support
-CONFIG_SUSPEND=y               # Suspend support
-CONFIG_FREEZER=y               # Freezer support
+#
 
+# SMP support
+CONFIG_SMP=y
+# NUMA support
+CONFIG_NUMA=y
+# ACPI support
+CONFIG_ACPI=y
+# ACPI processor support
+CONFIG_ACPI_PROCESSOR=y
+# ACPI CPU hotplug support
+CONFIG_ACPI_HOTPLUG_CPU=y
+# Frequency scaling
+CONFIG_CPU_FREQ=y
+# CPU hotplug support
+CONFIG_HOTPLUG_CPU=y
+# PM sleep support
+CONFIG_PM_SLEEP=y
+# PM sleep SMP support
+CONFIG_PM_SLEEP_SMP=y
+# Suspend support
+CONFIG_SUSPEND=y
+# Freezer support
+CONFIG_FREEZER=y
+
+#
 # Scheduler
-CONFIG_SMP=y                   # SMP support
-CONFIG_NUMA=y                  # NUMA support
-CONFIG_SCHED_CORE=y            # Core scheduler
-CONFIG_SCHED_SMT=y             # SMT scheduler
-CONFIG_SCHED_CLUSTER=y         # Cluster scheduler
-CONFIG_SCHED_MC=y              # MC scheduler
-CONFIG_CGROUPS=y               # cgroups
-CONFIG_CGROUP_SCHED=y          # cgroup scheduler 
-CONFIG_CPUSETS=y               # cgroup cpusets
-CONFIG_FAIR_GROUP_SCHED=y      # CFS
-CONFIG_CFS_BANDWIDTH=y         # CFS bandwidth control
-CONFIG_RT_GROUP_SCHED=y        # RT
-CONFIG_HIGH_RES_TIMERS=y       # High resolution timers
-CONFIG_SCHED_DEBUG=y           # tl->name
-CONFIG_HZ_1000=y
-CONFIG_NO_HZ_COMMON=n
-CONFIG_NO_HZ_IDLE=n
-CONFIG_NO_HZ=n
-CONFIG_NO_HZ_FULL=n
-CONFIG_RCU_NOCB_CPU=n
-# CONFIG_NO_HZ=y
-# CONFIG_NO_HZ_FULL=y
-# CONFIG_RCU_NOCB_CPU=y
-# CONFIG_SCHEDSTATS=y
+#
 
+# Core scheduler and sched classes
+CONFIG_SCHED_CORE=y
+CONFIG_FAIR_GROUP_SCHED=y
+CONFIG_CFS_BANDWIDTH=y
+CONFIG_RT_GROUP_SCHED=y
+# Topology
+CONFIG_SCHED_SMT=y
+CONFIG_SCHED_CLUSTER=y
+CONFIG_SCHED_MC=y
+# cgroup
+CONFIG_CGROUPS=y
+CONFIG_CGROUP_SCHED=y
+CONFIG_CPUSETS=y
+# High resolution timers
+CONFIG_HIGH_RES_TIMERS=y
+# tl->name
+CONFIG_SCHED_DEBUG=y
+CONFIG_HZ_1000=y
+# CONFIG_NO_HZ_IDLE is not set
+# CONFIG_NO_HZ_FULL is not set
+# CONFIG_NO_HZ is not set
+
+#
 # Tracing
+#
 CONFIG_KALLSYMS_ALL=y
 CONFIG_KPROBES=y
 CONFIG_FTRACE=y
 CONFIG_FPROBE=y
 CONFIG_DYNAMIC_FTRACE=y
 CONFIG_FUNCTION_TRACER=y
-CONFIG_FUNCTION_ERROR_INJECTION=y   # function overriding
+# function overriding
+CONFIG_FUNCTION_ERROR_INJECTION=y
 
 # Debugging
 # CONFIG_DEBUG_INFO_DWARF5=y

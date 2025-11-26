@@ -17,9 +17,7 @@ def make_linux(linux_dir: Path, clean: bool = False, reconfig: bool = False):
     # Generate config
     config_path = linux_dir / ".config"
     if not config_path.exists() or reconfig:
-        system(
-            f"KCONFIG_ALLCONFIG={LINUX_CONFIG} make -C {linux_dir} -j$(nproc) allnoconfig"
-        )
+        system(f"cd {linux_dir} && ./scripts/kconfig/merge_config.sh -n {LINUX_CONFIG}")
     # Build kernel
     cmd = "make -j$(nproc) LOCALVERSION=-kstep WERROR=0"
     if shutil.which("bear"):
