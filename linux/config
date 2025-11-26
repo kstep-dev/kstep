@@ -10,6 +10,7 @@ CONFIG_WERROR=n                # do not treat warnings as errors
 CONFIG_LOCALVERSION_AUTO=n     # do not add "-dirty" to version
 CONFIG_DEBUG_KERNEL=y          # debug kernel
 CONFIG_EXPERT=y                # enable expert mode
+CONFIG_BUG=y                   # BUG support
 
 # Output
 CONFIG_TTY=y                   # TTY support
