@@ -7,6 +7,7 @@ CONFIG_HYPERVISOR_GUEST=y      # virtualization
 CONFIG_PARAVIRT=y              # paravirtualization
 CONFIG_WERROR=n                # do not treat warnings as errors
 CONFIG_LOCALVERSION_AUTO=n     # do not add "-dirty" to version
+CONFIG_DEBUG_KERNEL=y          # debug kernel
 
 # Output
 CONFIG_TTY=y                   # TTY support
@@ -46,7 +47,7 @@ CONFIG_FAIR_GROUP_SCHED=y      # CFS
 CONFIG_CFS_BANDWIDTH=y         # CFS bandwidth control
 CONFIG_RT_GROUP_SCHED=y        # RT
 CONFIG_HIGH_RES_TIMERS=y       # High resolution timers
-CONFIG_SCHED_DEBUG=y
+CONFIG_SCHED_DEBUG=y           # tl->name
 CONFIG_HZ_1000=y
 CONFIG_NO_HZ_COMMON=n
 CONFIG_NO_HZ_IDLE=n
