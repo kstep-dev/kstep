@@ -38,7 +38,6 @@ struct controller_ops {
   void (*body)(void);
 };
 struct controller_ops *kstep_controller_get(const char *name);
-void kstep_controller_run(struct controller_ops *ops);
 
 // tick.c
 void kstep_tick_init(void);
@@ -50,21 +49,30 @@ void kstep_tick_until(bool (*fn)(void));
 // Call tick until the function returns true for a task, then return that task
 struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *));
 
-// utils.c
+// tasks.c
 #define send_sigcode(p, code, val) send_sigcode3(p, code, val, 0, 0)
 #define send_sigcode2(p, code, val1, val2) send_sigcode3(p, code, val1, val2, 0)
 void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
                    int val3);
 struct task_struct *poll_task(const char *comm);
-void reset_task_stats(struct task_struct *p);
+int is_sys_kthread(struct task_struct *p);
+
+// output.c
 void print_rq_stats(void);
 void print_tasks(void);
 void print_nr_running(void);
-int is_sys_kthread(struct task_struct *p);
+void print_all_tasks(void);
+
+// reset.c
+void kstep_reset_sched_state(void);
+void reset_task_stats(struct task_struct *p);
+
+// isolation.c
+void kstep_disable_workqueue(void);
+void kstep_move_kthreads(void);
+void kstep_prealloc_kworkers(void);
 
 // trace.c
-void kstep_trace_exit(void);
-void kstep_trace_rq_clock(void);
 void kstep_trace_lb(void);
 void kstep_trace_rebalance(void);
 void kstep_patch_min_vruntime(void);

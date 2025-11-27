@@ -1,4 +1,5 @@
 #include <linux/module.h>
+#include <linux/reboot.h>
 
 #include "kstep.h"
 
@@ -30,10 +31,56 @@ void kstep_params_print(void) {
   TRACE_INFO("- print_lb_events: %d", kstep_params.print_lb_events);
 }
 
+static void run_prog(char *args[]) {
+  int ret = call_usermodehelper(args[0], args, NULL, UMH_WAIT_EXEC);
+  if (ret < 0) {
+    panic("Failed to run %s", args[0]);
+  }
+}
+
 static int __init kmod_init(void) {
   ksym_init();
   struct controller_ops *ops = kstep_controller_get(kstep_params.controller);
-  kstep_controller_run(ops);
+  if (ops->pre_init)
+    ops->pre_init();
+
+  kstep_params_print();
+  if (kstep_params.special_topo)
+    kstep_use_special_topo();
+
+  kstep_topo_print();
+  kstep_patch_min_vruntime();
+
+  // Isolate the CPUs to avoid interference
+  kstep_prealloc_kworkers();
+  kstep_disable_workqueue();
+  kstep_move_kthreads();
+
+  // Run /cgroup and /busy when we know the system is ready
+  run_prog((char *[]){"/cgroup", NULL});
+  run_prog((char *[]){"/busy", NULL});
+
+  // Control timer ticks and clock
+  kstep_tick_init();
+
+  // Reset the scheduler state to initial state
+  kstep_reset_sched_state();
+
+  if (kstep_params.print_lb_events)
+    kstep_trace_lb();
+
+  print_all_tasks();
+
+  TRACE_INFO("Initializing controller %s", ops->name);
+  if (ops->init)
+    ops->init();
+  kstep_sleep();
+  TRACE_INFO("Running controller %s", ops->name);
+  ops->body();
+  TRACE_INFO("Exiting controller %s", ops->name);
+  kernel_restart(NULL);
+
+  kstep_tick_exit();
   return 0;
 }
 module_init(kmod_init);
