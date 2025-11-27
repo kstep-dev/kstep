@@ -2,19 +2,13 @@
 
 #define TARGET_TASK "test-proc"
 
-static struct task_struct *busy_task;
-
 static void controller_pre_init(void) {
   kstep_params.step_interval_us = 10;
   kstep_params.print_tasks = false;
   kstep_params.print_rq_stats = true;
 }
 
-static void controller_init(void) {
-  busy_task = poll_task(TARGET_TASK);
-  reset_task_stats(busy_task);
-  kstep_sleep();
-}
+static void controller_init(void) {}
 
 static struct task_struct * find_ff_task(void) {
   struct task_struct *p;

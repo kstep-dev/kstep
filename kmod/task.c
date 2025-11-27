@@ -1,7 +1,39 @@
 #include <linux/sched.h>
 #include <linux/sched/signal.h>
+#include <linux/umh.h>
 
 #include "kstep.h"
+
+static void run_prog(char *path, int (*init)(struct subprocess_info *info,
+                                             struct cred *new)) {
+  struct subprocess_info *info = call_usermodehelper_setup(
+      path, (char *[]){path, NULL}, NULL, GFP_KERNEL, init, NULL, NULL);
+  if (info == NULL)
+    panic("Failed to setup user mode helper");
+
+  if (call_usermodehelper_exec(info, UMH_WAIT_EXEC) < 0)
+    panic("Failed to run user mode helper");
+}
+
+struct task_struct *cgroup_task = NULL;
+struct task_struct *busy_task = NULL;
+
+static int cgroup_task_init(struct subprocess_info *info, struct cred *new) {
+  cgroup_task = current;
+  TRACE_INFO("cgroup task created with pid %d", cgroup_task->pid);
+  kstep_sleep();
+  return 0;
+}
+
+static int busy_task_init(struct subprocess_info *info, struct cred *new) {
+  busy_task = current;
+  TRACE_INFO("busy task created with pid %d", busy_task->pid);
+  kstep_sleep();
+  return 0;
+}
+
+void kstep_run_cgroup(void) { run_prog("/cgroup", cgroup_task_init); }
+void kstep_run_busy(void) { run_prog("/busy", busy_task_init); }
 
 void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
                    int val3) {
@@ -13,23 +45,6 @@ void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
   TRACE_INFO("Sent %s (val1=%d, val2=%d, val3=%d) to pid %d",
              sigcode_to_str[code], val1, val2, val3, p->pid);
   kstep_sleep();
-  yield(); // yield to let the task (e.g. busy during its init, cgroup
-           // controller uthread) run
-}
-
-struct task_struct *poll_task(const char *comm) {
-  struct task_struct *p;
-  for (int i = 0; i < 1000; i++) {
-    for_each_process(p) {
-      if (strcmp(p->comm, comm) == 0)
-        return p;
-    }
-    kstep_sleep();
-    yield(); // busy might be blocked by the busy controller, yield to let it
-             // run
-    TRACE_INFO("Waiting for process %s to be created", comm);
-  }
-  panic("Failed to find process %s", comm);
 }
 
 static char *sys_kthread_comms[] = {

@@ -31,13 +31,6 @@ void kstep_params_print(void) {
   TRACE_INFO("- print_lb_events: %d", kstep_params.print_lb_events);
 }
 
-static void run_prog(char *args[]) {
-  int ret = call_usermodehelper(args[0], args, NULL, UMH_WAIT_EXEC);
-  if (ret < 0) {
-    panic("Failed to run %s", args[0]);
-  }
-}
-
 static int __init kmod_init(void) {
   ksym_init();
   struct controller_ops *ops = kstep_controller_get(kstep_params.controller);
@@ -56,9 +49,9 @@ static int __init kmod_init(void) {
   kstep_disable_workqueue();
   kstep_move_kthreads();
 
-  // Run /cgroup and /busy when we know the system is ready
-  run_prog((char *[]){"/cgroup", NULL});
-  run_prog((char *[]){"/busy", NULL});
+  // Run userspace programs when we know the system is ready
+  kstep_run_cgroup();
+  kstep_run_busy();
 
   // Control timer ticks and clock
   kstep_tick_init();

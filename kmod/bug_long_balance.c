@@ -1,20 +1,12 @@
 #include "kstep.h"
 
-#define TARGET_TASK "test-proc"
-
-static struct task_struct *busy_task;
-
 static void controller_pre_init(void) {
   kstep_params.print_tasks = false;
   kstep_params.print_rq_stats = false;
   kstep_trace_rebalance();
 }
 
-static void controller_init(void) {
-  busy_task = poll_task(TARGET_TASK);
-  reset_task_stats(busy_task);
-  kstep_sleep();
-}
+static void controller_init(void) {}
 
 static void controller_body(void) {
   for (int i = 0; i < 1000; i++) {

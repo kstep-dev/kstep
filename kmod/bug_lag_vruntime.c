@@ -1,17 +1,8 @@
 #include "kstep.h"
 
 #define TARGET_TASK "test-proc"
-#define CGROUP_TASK "cgroup-proc"
-
-static struct task_struct *busy_task;
-static struct task_struct *cgroup_task;
 
 static void controller_init(void) {
-  busy_task = poll_task(TARGET_TASK);
-  reset_task_stats(busy_task);
-  kstep_sleep();
-  cgroup_task = poll_task(CGROUP_TASK);
-
   send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 0);
   send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 1 << 16 | 0x0, 2);
 }

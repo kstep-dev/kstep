@@ -49,13 +49,17 @@ void kstep_tick_until(bool (*fn)(void));
 // Call tick until the function returns true for a task, then return that task
 struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *));
 
-// tasks.c
+// task.c
 #define send_sigcode(p, code, val) send_sigcode3(p, code, val, 0, 0)
 #define send_sigcode2(p, code, val1, val2) send_sigcode3(p, code, val1, val2, 0)
 void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
                    int val3);
-struct task_struct *poll_task(const char *comm);
 int is_sys_kthread(struct task_struct *p);
+
+extern struct task_struct *busy_task;
+extern struct task_struct *cgroup_task;
+void kstep_run_cgroup(void);
+void kstep_run_busy(void);
 
 // output.c
 void print_rq_stats(void);

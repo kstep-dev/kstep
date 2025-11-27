@@ -4,18 +4,7 @@
 
 #define TARGET_TASK "test-proc"
 
-static struct task_struct *busy_task;
-
-static void controller_init(void) {
-  // set_cpus_allowed_ptr(busy_kthread, &mask);
-  kstep_sleep();
-
-  busy_task = poll_task(TARGET_TASK);
-  reset_task_stats(busy_task);
-
-  send_sigcode(busy_task, SIGCODE_FORK, 3);
-  kstep_sleep();
-}
+static void controller_init(void) { send_sigcode(busy_task, SIGCODE_FORK, 3); }
 
 static bool is_ineligible(struct task_struct *p) {
   return strcmp(p->comm, TARGET_TASK) == 0 && p != busy_task && p->on_cpu &&
