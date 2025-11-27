@@ -2,7 +2,6 @@
 
 #define TARGET_TASK "test-proc"
 
-static struct task_struct *busy_task;
 static struct task_struct *busy_kthread;
 static struct task_struct *busy_kthread_children;
 static struct task_struct *not_eligible_task;
@@ -28,8 +27,6 @@ static void controller_init(void) {
 
   kstep_sleep();
 
-  busy_task = poll_task(TARGET_TASK);
-  reset_task_stats(busy_task);
   reset_task_stats(busy_kthread);
   reset_task_stats(busy_kthread_children);
 

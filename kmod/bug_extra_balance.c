@@ -3,9 +3,6 @@
 #define TARGET_TASK "test-proc"
 #define CGROUP_TASK "cgroup-proc"
 
-static struct task_struct *busy_task;
-static struct task_struct *cgroup_task;
-
 static void controller_pre_init(void) {
   kstep_params.print_lb_events = true;
   kstep_params.print_nr_running = true;
@@ -14,13 +11,7 @@ static void controller_pre_init(void) {
   kstep_params.step_interval_us = 1000;
 }
 
-static void controller_init(void) {
-  busy_task = poll_task(TARGET_TASK);
-  reset_task_stats(busy_task);
-  kstep_sleep();
-  send_sigcode(busy_task, SIGCODE_PIN, 1);
-  cgroup_task = poll_task(CGROUP_TASK);
-}
+static void controller_init(void) { send_sigcode(busy_task, SIGCODE_PIN, 1); }
 
 static void controller_body(void) {
   // making the nr_running on cpu 4-7 to [1, 0, 3, 1]

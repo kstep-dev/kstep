@@ -33,14 +33,7 @@ struct controller_ops *kstep_controller_get(const char *name) {
   panic("Controller %s not found", name);
 }
 
-#define TARGET_TASK "test-proc"
-
 static void controller_body(void) {
-  static struct task_struct *busy_task;
-  busy_task = poll_task(TARGET_TASK);
-  reset_task_stats(busy_task);
-  kstep_sleep();
-
   for (int i = 0; i < 10; i++) {
     send_sigcode(busy_task, SIGCODE_FORK, 1);
     kstep_tick();

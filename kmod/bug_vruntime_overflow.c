@@ -1,11 +1,7 @@
 #include "kstep.h"
 
 #define TARGET_TASK "test-proc"
-#define CGROUP_TASK "cgroup-proc"
 # define MAX_TASKS 128
-
-static struct task_struct *busy_task = NULL;
-static struct task_struct *cgroup_task = NULL;
 
 static int task_to_cgroup_id[MAX_TASKS][2];
 
@@ -39,10 +35,6 @@ static void controller_init(void) {
   task_to_cgroup_id[busy_task->pid - busy_task->pid][0] = 0;
   task_to_cgroup_id[busy_task->pid - busy_task->pid][1] = 0;
 
-  busy_task = poll_task(TARGET_TASK);
-  reset_task_stats(busy_task);
-
-  cgroup_task = poll_task(CGROUP_TASK);
   /*
     create a cgroup tree
     root -> l1_0 -> l2_0 -> l3_0

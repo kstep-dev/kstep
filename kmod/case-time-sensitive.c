@@ -4,16 +4,12 @@
 
 #define TARGET_TASK "test-proc"
 
-// ./run_qemu.py --params controller=case_time_sensitive --log_file data/logs/caseSensitiveTime.log
-// ./plot/plot_nr_running_queued.py --log data/logs/caseSensitiveTime.log --cpus 1 --time-start 10 --output plot/case_time_sensitive.pdf
-static struct task_struct *busy_task;
+// ./run_qemu.py --params controller=case_time_sensitive --log_file
+// data/logs/caseSensitiveTime.log
+// ./plot/plot_nr_running_queued.py --log data/logs/caseSensitiveTime.log --cpus
+// 1 --time-start 10 --output plot/case_time_sensitive.pdf
 
-static void controller_init(void) {
-  kstep_sleep();
-
-  busy_task = poll_task(TARGET_TASK);
-  reset_task_stats(busy_task);
-}
+static void controller_init(void) {}
 
 static struct task_struct *find_target_task(void) {
   struct task_struct *p;
