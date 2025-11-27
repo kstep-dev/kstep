@@ -8,61 +8,23 @@
 
 #include "kstep.h"
 
-struct trace_func_info {
-  struct list_head list;
-  struct ftrace_ops op;
-};
-
-static LIST_HEAD(trace_func_list);
-
 static void kstep_trace_function(char *name, ftrace_func_t callback) {
-  struct trace_func_info *info =
-      kcalloc(1, sizeof(struct trace_func_info), GFP_KERNEL);
-  if (info == NULL) {
-    TRACE_ERR("Failed to allocate memory for trace function %s", name);
-    return;
-  }
+  struct ftrace_ops *op = kcalloc(1, sizeof(struct ftrace_ops), GFP_KERNEL);
 
-  info->op.func = callback;
-  info->op.flags =
-      FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED | FTRACE_OPS_FL_RECURSION;
+  op->func = callback;
+  op->flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED | FTRACE_OPS_FL_RECURSION;
 
-  if (ftrace_set_filter(&info->op, name, strlen(name), 1)) {
+  if (ftrace_set_filter(op, name, strlen(name), 1)) {
     TRACE_ERR("Failed to set filter for %s", name);
-    kfree(info);
+    kfree(op);
     return;
   }
 
-  if (register_ftrace_function(&info->op)) {
+  if (register_ftrace_function(op)) {
     TRACE_ERR("Failed to trace %s", name);
-    kfree(info);
+    kfree(op);
     return;
   }
-
-  list_add(&info->list, &trace_func_list);
-}
-
-//
-// Trace update_rq_clock
-//
-
-static void update_rq_clock_cb(unsigned long ip, unsigned long parent_ip,
-                               struct ftrace_ops *op,
-                               struct ftrace_regs *fregs) {
-  if (smp_processor_id() == 0)
-    return;
-
-  struct rq *rq = (void *)regs_get_kernel_argument((void *)fregs, 0);
-  u64 clock = sched_clock();
-  s64 delta = (s64)clock - rq->clock;
-  TRACE_INFO("update_rq_clock called on CPU %d, clock=%llu, rq->clock=%llu, "
-             "delta=%lld",
-             smp_processor_id(), clock, rq->clock, delta);
-}
-
-void kstep_trace_rq_clock(void) {
-  kstep_trace_function("update_rq_clock", &update_rq_clock_cb);
-  TRACE_INFO("Traced update_rq_clock");
 }
 
 //
@@ -166,13 +128,3 @@ void kstep_trace_rebalance(void) {
   TRACE_ERR("Fprobe not supported in this kernel version");
 }
 #endif
-
-void kstep_trace_exit(void) {
-  struct trace_func_info *info, *tmp;
-  list_for_each_entry_safe(info, tmp, &trace_func_list, list) {
-    unregister_ftrace_function(&info->op);
-    list_del(&info->list);
-    kfree(info);
-  }
-  TRACE_INFO("Scheduler trace uninitialized");
-}
