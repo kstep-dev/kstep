@@ -142,18 +142,9 @@ int main() {
   struct sigaction sa = {.sa_sigaction = signal_handler,
                          .sa_flags = SA_SIGINFO};
   sigaction(SIGUSR1, &sa, NULL);
-  pid_t pid = fork();
-  if (pid < 0) {
-    perror("fork");
-    return 1;
-  } else if (pid == 0) {
-    // Child process
-    printf("test-proc started\n");
-    set_proc_affinity();
-    prctl(PR_SET_NAME, "test-proc");
-    pause();
-    loop();
-    exit(0);
-  }
-  return 0;
+  printf("test-proc started\n");
+  set_proc_affinity();
+  prctl(PR_SET_NAME, "test-proc");
+  pause();
+  loop();
 }
