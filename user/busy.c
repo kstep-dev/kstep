@@ -142,7 +142,6 @@ int main() {
   struct sigaction sa = {.sa_sigaction = signal_handler,
                          .sa_flags = SA_SIGINFO};
   sigaction(SIGUSR1, &sa, NULL);
-  printf("test-proc started\n");
   set_proc_affinity();
   prctl(PR_SET_NAME, "test-proc");
   pause();
