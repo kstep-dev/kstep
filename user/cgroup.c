@@ -236,7 +236,6 @@ int main() {
   init_cgroup_nextId();
   init_cgroup_parent_paths();
 
-  // Child process
   set_proc_affinity();
   prctl(PR_SET_NAME, "cgroup-proc");
   while (1) {
