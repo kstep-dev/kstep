@@ -125,8 +125,7 @@ void kstep_tick_exit(void) {
 }
 
 void kstep_sleep(void) {
-  udelay(kstep_params.step_interval_us);
-  yield();
+  usleep_range(kstep_params.step_interval_us, kstep_params.step_interval_us);
 }
 
 void kstep_tick(void) {
