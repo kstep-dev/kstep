@@ -5,7 +5,7 @@
 
 struct kstep_params_t kstep_params = {
     .controller = "noop",
-    .step_interval_us = 19000ULL, // Cannot be larger than DELAY_CONST_MAX
+    .step_interval_us = 10000,
     .special_topo = false,
     .print_rq_stats = true,
     .print_tasks = true,
