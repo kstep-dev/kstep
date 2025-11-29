@@ -7,6 +7,7 @@
 #include <sys/errno.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/reboot.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -79,4 +80,5 @@ int main(int argc, char *argv[], char *envp[]) {
   mount_fs("/sys/fs/cgroup", "cgroup2");
   set_cpu_affinity();
   run_kstep(argc, argv, envp);
+  reboot(RB_AUTOBOOT);
 }

@@ -58,8 +58,7 @@ int is_sys_kthread(struct task_struct *p);
 
 extern struct task_struct *busy_task;
 extern struct task_struct *cgroup_task;
-void kstep_run_cgroup(void);
-void kstep_run_busy(void);
+void kstep_tasks_init(void);
 
 // output.c
 void print_rq_stats(void);
