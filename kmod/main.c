@@ -50,8 +50,7 @@ static int __init kmod_init(void) {
   kstep_move_kthreads();
 
   // Run userspace programs when we know the system is ready
-  kstep_run_cgroup();
-  kstep_run_busy();
+  kstep_tasks_init();
 
   // Control timer ticks and clock
   kstep_tick_init();

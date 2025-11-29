@@ -15,10 +15,23 @@ static void run_prog(char *path, int (*init)(struct subprocess_info *info,
     panic("Failed to run user mode helper");
 }
 
+struct file *console_file = NULL;
 struct task_struct *cgroup_task = NULL;
 struct task_struct *busy_task = NULL;
 
+// Initialize stdin, stdout, and stderr to /dev/console
+// Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
+static void init_task_console(void) {
+  for (int i = 0; i < 3; i++) { // stdin, stdout, stderr
+    int fd = get_unused_fd_flags(0);
+    if (fd < 0 || fd != i)
+      panic("get_unused_fd_flags returned %d for fd %d", fd, i);
+    fd_install(fd, get_file(console_file));
+  }
+}
+
 static int cgroup_task_init(struct subprocess_info *info, struct cred *new) {
+  init_task_console();
   cgroup_task = current;
   TRACE_INFO("cgroup task created with pid %d", cgroup_task->pid);
   kstep_sleep();
@@ -26,14 +39,21 @@ static int cgroup_task_init(struct subprocess_info *info, struct cred *new) {
 }
 
 static int busy_task_init(struct subprocess_info *info, struct cred *new) {
+  init_task_console();
   busy_task = current;
   TRACE_INFO("busy task created with pid %d", busy_task->pid);
   kstep_sleep();
   return 0;
 }
 
-void kstep_run_cgroup(void) { run_prog("/cgroup", cgroup_task_init); }
-void kstep_run_busy(void) { run_prog("/busy", busy_task_init); }
+void kstep_tasks_init(void) {
+  console_file = filp_open("/dev/console", O_RDWR, 0);
+  if (IS_ERR(console_file))
+    panic("Failed to open /dev/console");
+  run_prog("/cgroup", cgroup_task_init);
+  run_prog("/busy", busy_task_init);
+  fput(console_file);
+}
 
 void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
                    int val3) {

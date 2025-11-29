@@ -9,10 +9,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/resource.h> // for setpriority
 #include <sys/stat.h>
 #include <sys/syscall.h> // SYS_clone3
 #include <unistd.h>
-#include <sys/resource.h> // for setpriority
 
 #include "../kmod/sigcode.h"
 
@@ -139,6 +139,7 @@ static void loop() {
 }
 
 int main() {
+  printf("busy task started\n");
   struct sigaction sa = {.sa_sigaction = signal_handler,
                          .sa_flags = SA_SIGINFO};
   sigaction(SIGUSR1, &sa, NULL);
