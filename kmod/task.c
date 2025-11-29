@@ -19,13 +19,13 @@ struct file *console_file = NULL;
 struct task_struct *cgroup_task = NULL;
 struct task_struct *busy_task = NULL;
 
-// Redirect stdout and stderr to /dev/console
+// Initialize stdin, stdout, and stderr to /dev/console
 // Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
 static void init_task_console(void) {
   for (int i = 0; i < 3; i++) { // stdin, stdout, stderr
     int fd = get_unused_fd_flags(0);
-    if (fd < 0)
-      panic("Failed to get unused fd");
+    if (fd < 0 || fd != i)
+      panic("get_unused_fd_flags returned %d for fd %d", fd, i);
     fd_install(fd, get_file(console_file));
   }
 }
