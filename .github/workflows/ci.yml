@@ -14,8 +14,11 @@ jobs:
         id: cache-qemu
         uses: actions/cache@v4
         with:
-          path: /usr/local/bin/qemu-system-x86_64
+          path: |
+            /usr/local/bin/qemu-system-x86_64
+            /usr/local/share/qemu
           key: qemu-10.1.2
+          lookup-only: true
 
       - name: QEMU - Download and build
         if: steps.cache-qemu.outputs.cache-hit != 'true'
@@ -74,8 +77,11 @@ jobs:
       - name: QEMU - Restore cache
         uses: actions/cache/restore@v4
         with:
-          path: /usr/local/bin/qemu-system-x86_64
+          path: |
+            /usr/local/bin/qemu-system-x86_64
+            /usr/local/share/qemu
           key: qemu-10.1.2
+          fail-on-cache-miss: true
 
       - name: Run QEMU
         timeout-minutes: 1
