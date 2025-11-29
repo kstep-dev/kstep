@@ -52,7 +52,7 @@ def download_linux(version: str, linux_dir: Path):
     url = f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
     system(f"mkdir -p {linux_dir}")
     system(f"wget {url} -O {version}.tar.xz")
-    system(f"tar -xvf {version}.tar.xz -C {linux_dir} --strip-components=1")
+    system(f"tar -xf {version}.tar.xz -C {linux_dir} --strip-components=1")
     set_current_linux(linux_dir)
 
 

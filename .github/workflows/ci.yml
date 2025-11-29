@@ -60,7 +60,7 @@ jobs:
         run: |
           sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y libglib2.0-dev
           wget https://download.qemu.org/qemu-10.1.2.tar.xz
-          tar -xvf qemu-10.1.2.tar.xz
+          tar -xf qemu-10.1.2.tar.xz
           cd qemu-10.1.2
           ./configure --target-list=x86_64-softmmu --static --without-default-features --enable-kvm
           make -j$(nproc)
