@@ -52,14 +52,14 @@ jobs:
         id: restore-cache-qemu
         uses: actions/cache/restore@v4
         with:
-          path: /usr/bin/qemu-system-x86_64
+          path: /usr/local/bin/qemu-system-x86_64
           key: qemu-10.1.2
 
       - name: QEMU - Download and build
         if: steps.restore-cache-qemu.outputs.cache-hit != 'true'
         run: |
           sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y libglib2.0-dev
-          wget https://download.qemu.org/qemu-10.1.2.tar.xz
+          wget -q https://download.qemu.org/qemu-10.1.2.tar.xz
           tar -xf qemu-10.1.2.tar.xz
           cd qemu-10.1.2
           ./configure --target-list=x86_64-softmmu --static --without-default-features --enable-kvm
@@ -70,7 +70,7 @@ jobs:
         if: steps.restore-cache-qemu.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: /usr/bin/qemu-system-x86_64
+          path: /usr/local/bin/qemu-system-x86_64
           key: qemu-10.1.2
 
       - name: Run QEMU
