@@ -52,8 +52,8 @@ def plot_min_avg_vruntime(
     Top: min_vruntime as scatter.
     Bottom: avg_vruntime as scatter using same shape, size.
     """
-    # Make both subplots the same size as in plot_util_avg: two rows, one column, figsize=(6,3)
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 4), sharex=True)
+    # Make both subplots the same size as in plot_util_avg: two rows, one column, figsize=(3,2.5)
+    fig, ax1 = plt.subplots(1, figsize=(3, 2.5), sharex=True)
 
     # Top subplot: min_vruntime using scatter
     ax1.scatter(
@@ -78,12 +78,14 @@ def plot_min_avg_vruntime(
         alpha=0.95,
         zorder=3
     )
-    ax1.set_ylabel('min_vruntime')
-    ax1.set_title(f'{bugId} - min_vruntime')
+    # ax1.set_xlim(left = 5000)
+    ax1.set_ylabel('min_vruntime', fontsize = 13)
+    ax1.set_title(f'Lag_Vruntime', fontsize=13)
     ax1.grid(True, alpha=0.3)
     if len(timestamps_buggy) > 0 and len(timestamps_fixed) > 0:
-        ax1.set_xlim(0, max(max(timestamps_buggy), max(timestamps_fixed)))
+        ax1.set_xlim(5, max(max(timestamps_buggy), max(timestamps_fixed)) - 4)
     ax1.legend()
+    ax1.tick_params(axis='both', which='major', labelsize=13)
 
     # Bottom subplot: avg_vruntime as scatter plot if we have those values.
     # Only plot when at least one value is not None and enough points
@@ -95,6 +97,7 @@ def plot_min_avg_vruntime(
 
     shown_any = False
 
+    """
     if buggy_valid:
         t_buggy, v_buggy = zip(*buggy_valid)
         ax2.scatter(
@@ -138,12 +141,14 @@ def plot_min_avg_vruntime(
             transform=ax2.transAxes, ha='center', va='center', fontsize=10, color='grey'
         )
 
-    plt.tight_layout()
-    plt.savefig(output_file, dpi=150, bbox_inches='tight')
+    """
+    ax1.set_xlabel('Time (ms)', fontsize = 13)
+    plt.tight_layout(pad = 0.1)
+    plt.savefig(output_file)
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="5068d84")
+    parser.add_argument("--controller", type=str, default="lag_vruntime") # 5068d84
     args = parser.parse_args()
 
     bugId = args.controller

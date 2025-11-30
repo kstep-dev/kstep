@@ -72,7 +72,7 @@ def build_color_matrix(pid_matrix, cpu_count, time_count):
     overall_color_matrix.append(color_matrix)
 
 def plot_color_matrix(color_matrix, cpu_count, time_count, vmin, vmax, ax, title): 
-    ax.imshow(color_matrix, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax)
+    ax.imshow(color_matrix, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax, interpolation='nearest')
 
     # Adjust ticks
     ax.set_yticks(np.arange(cpu_count))
@@ -83,20 +83,21 @@ def plot_color_matrix(color_matrix, cpu_count, time_count, vmin, vmax, ax, title
         ax.set_xticklabels([])
         ax.set_xlabel("")
     else:
-        xtick_locs = np.arange(0, time_count, 5)
+        xtick_locs = np.arange(0, time_count, 10)
         # Ensure the last tick is included if not already
         if len(xtick_locs) == 0 or xtick_locs[-1] != time_count - 1:
             xtick_locs = np.append(xtick_locs, time_count - 1)
 
         ax.set_xticks(xtick_locs)
-        ax.set_xticklabels([f"{i}" for i in xtick_locs], rotation=45)
-        ax.set_xlabel("Time (ms)")
+        ax.set_xticklabels([f"{i}" for i in xtick_locs])
+        ax.tick_params(axis='x', length=2, pad=1)  # Shorter ticks, labels closer
+        ax.set_xlabel("Time (ms)", labelpad=0.5)
     
-    ax.set_title(title)
+    ax.set_title(title, fontsize=10)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="aa3ee4f")
+    parser.add_argument("--controller", type=str, default="sync_wakeup") # aa3ee4f
     args = parser.parse_args()
 
     bugId = args.controller
@@ -110,7 +111,7 @@ if __name__ == "__main__":
 
     start_timestamp = 10.000000
 
-    fig, axes = plt.subplots(2, 1, figsize=(8, 3), constrained_layout=True)
+    fig, axes = plt.subplots(2, 1, figsize=(3, 1.125), constrained_layout=True, gridspec_kw={'hspace': 0.6})
     pid_matrix_buggy, cpu_count_buggy, time_count_buggy = build_pid_matrix(log_file_buggy)
     pid_matrix_fixed, cpu_count_fixed, time_count_fixed = build_pid_matrix(log_file_fixed)
     pid_to_color[-1] = 0
@@ -133,16 +134,20 @@ if __name__ == "__main__":
             continue
         
         if pid == -1:
-            label = "No task"
+            label = "Idle"
         else:
             label = f"PID {pid}"
         legend_elements.append(Patch(facecolor=cmap(norm(color_idx)), label=label))
 
     fig.legend(handles=legend_elements, 
-                bbox_to_anchor=(1.01, 0.5), 
+                bbox_to_anchor=(0.9, 0.5), 
                 loc='center left', 
-                borderaxespad=0.,
-                ncol=1)
+                handletextpad=-2,  
+                handlelength=2,
+                labelspacing=0.2,    
+                borderpad=0.3,       
+                ncol=1,
+                frameon=False)
 
     plt.tight_layout()
-    plt.savefig(output_file, bbox_inches='tight', pad_inches=0)
+    plt.savefig(output_file, bbox_inches='tight', pad_inches=0, dpi = 1000)

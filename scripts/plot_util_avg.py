@@ -39,14 +39,16 @@ def plot_util_avg(timestamps_buggy, util_avg_values_buggy,
     """
     Plot util_avg over time in two subplots
     """
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 3))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize = (1.8, 1.8))
     
     # Plot buggy version in first subplot
     ax1.plot(timestamps_buggy, util_avg_values_buggy, linewidth=3, linestyle='-', color='#A72703')
     # ax1.set_xlabel('Time (ms)')
     ax1.set_ylabel('util_avg')
-    ax1.set_title(f'{bugId} - Buggy Version')
+    ax1.set_title(f'{bugId} (buggy)', fontsize=10)
     ax1.grid(True, alpha=0.3)
+    ax1.set_yticks([0, 1000])
+    ax1.set_yticklabels(['0', '1k'])
     ax1.set_xticklabels([])
     ax1.set_xlim(0, max(max(timestamps_buggy), max(timestamps_fixed)))
     
@@ -54,17 +56,19 @@ def plot_util_avg(timestamps_buggy, util_avg_values_buggy,
     ax2.plot(timestamps_fixed, util_avg_values_fixed, linewidth=3, linestyle='-', color='#BBC863')
     ax2.set_xlabel('Time (ms)')
     ax2.set_ylabel('util_avg')
-    ax2.set_title(f'{bugId} - Fixed Version')
+    ax2.set_yticks([0, 1000])
+    ax2.set_yticklabels(['0', '1k'])
+    ax2.set_title(f'{bugId} (fixed)', fontsize=10)
     ax2.grid(True, alpha=0.3)
     ax2.set_xlim(0, max(max(timestamps_buggy), max(timestamps_fixed)))
     
-    plt.tight_layout()
-    plt.savefig(output_file, dpi=150, bbox_inches='tight')
+    plt.tight_layout(pad=0.1)
+    plt.savefig(output_file)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="17e3e88")
+    parser.add_argument("--controller", type=str, default="util_avg") # 17e3e88
     args = parser.parse_args()
 
     bugId = args.controller

@@ -163,7 +163,7 @@ def main():
         description="Plot load balancing events (weight == 4 only)"
     )
     parser.add_argument(
-        "--controller", type=str, default="6d7e478", help="Bug ID / controller name"
+        "--controller", type=str, default="extra_balance", help="Bug ID / controller name" # 6d7e478
     )
     args = parser.parse_args()
 

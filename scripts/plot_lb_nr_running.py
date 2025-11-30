@@ -97,17 +97,27 @@ def plot_color_matrix_with_lb(ax, matrix, cpu_count, time_count, vmin, vmax, tim
     yticks = np.arange(all_cpus[0], all_cpus[-1] + 1)
     ax.set_yticks(yticks)
     ax.set_yticklabels([str(cpu) for cpu in yticks])
-    ax.set_ylabel("CPU")
-    ax.set_xlabel("Time offset (ms)")
-    ax.set_title(title_str)
-    n_xticks = 6 if len(timestamps_ms) > 6 else len(timestamps_ms)
-    x_tick_indices = np.linspace(0, len(timestamps_ms)-1, n_xticks, dtype=int)
-    x_ticks = [timestamps_ms[i] for i in x_tick_indices]
-    ax.set_xticks(x_ticks)
-    ax.set_xticklabels([f"{int(x)}" for x in x_ticks])
+    ax.set_ylabel("CPU", fontsize = 13)
+
+    ax.set_title(title_str, fontsize=13)
+
+    if "buggy" in title_str:
+        ax.set_xticks([])
+        ax.set_xlabel("")
+    else:
+        # ax.set_xlabel("Time (ms)", fontsize = 13)
+    
+        n_xticks = 6 if len(timestamps_ms) > 6 else len(timestamps_ms)
+        x_tick_indices = np.linspace(0, len(timestamps_ms)-1, n_xticks, dtype=int)
+        x_ticks = [timestamps_ms[i] for i in x_tick_indices]
+        ax.set_xticks(x_ticks)
+        ax.set_xticklabels([f"{int(x)}" for x in x_ticks], fontsize = 13)
+        ax.tick_params(axis='x', length=2, pad=1)  # Shorter ticks, labels closer
+        ax.set_xlabel("Time (ms)", labelpad=0.5, fontsize = 13)
+    
 
     cbar = plt.colorbar(im, ax=ax, orientation='vertical', pad=0.03, fraction=0.07, boundaries=bounds, ticks=np.arange(vmin, vmax+1))
-    cbar.set_label("nr_running")
+    cbar.set_label("nr_running", fontsize = 13)
     cbar.ax.set_yticklabels([str(int(t)) for t in np.arange(vmin, vmax+1)])
 
     ax.margins(0.03)
@@ -127,13 +137,14 @@ def plot_color_matrix_with_lb(ax, matrix, cpu_count, time_count, vmin, vmax, tim
                 # Scatter dot at (timestamps_ms[idx], lb_cpu)
                 dot_xs.append(timestamps_ms[idx])
                 dot_ys.append(lb_cpu)
-        ax.scatter(dot_xs, dot_ys, s=30, c='#FF9013', marker='o', label="Try Load Balancing across 4 CPUs", zorder=5)
-        if dot_xs:
-            ax.legend(loc='upper right', framealpha=0.92)
+        ax.scatter(dot_xs, dot_ys, s=30, c='#FF9013', marker='o', label="Try Balance in 4-CPU SchedDomain", zorder=5)
+        if dot_xs and "buggy" in title_str:
+            ax.legend(framealpha=0.6, handletextpad=0.1, bbox_to_anchor=(1.05, 1.05), loc='upper right')
+            # ax.set_xlabel("")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="6d7e478")
+    parser.add_argument("--controller", type=str, default="extra_balance") # 6d7e478
     parser.add_argument("--time-start", type=float, default=10.20, help="Only plot data from this time onward (in seconds)")
     args = parser.parse_args()
 
@@ -153,10 +164,10 @@ if __name__ == "__main__":
     lb_events_buggy = parse_lb_events(log_file_buggy, args.time_start)
     lb_events_fixed = parse_lb_events(log_file_fixed, args.time_start)
 
-    fig, axes = plt.subplots(2, 1, figsize=(6, 3.8), sharex=False, dpi=200)
+    fig, axes = plt.subplots(2, 1, figsize=(4, 2.5), sharex=False)
 
     plot_color_matrix_with_lb(axes[0], matrix_buggy, cpu_count, time_count, vmin, vmax, t_buggy, title_buggy, lb_events_buggy)
     plot_color_matrix_with_lb(axes[1], matrix_fixed, cpu_count, time_count, vmin, vmax, t_fixed, title_fixed, lb_events_fixed)
 
-    plt.tight_layout()
-    plt.savefig(output_file, bbox_inches=None, pad_inches=0.2)
+    plt.tight_layout(pad=0.)
+    plt.savefig(output_file, bbox_inches=None)

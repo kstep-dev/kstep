@@ -55,7 +55,7 @@ def plot_rebalance_comparison(buggy_data, fixed_data, output_file=None, target_c
         output_file: Optional path to save the plot
         target_cpu: CPU number to plot (default: 2)
     """
-    fig, ax = plt.subplots(figsize=(5, 2))
+    fig, ax = plt.subplots(figsize=(1.8, 1.8))
     
     # Find the minimum timestamp for buggy data
     buggy_min_timestamp = min(min(buggy_data[cpu]['timestamps']) for cpu in buggy_data.keys())
@@ -95,19 +95,19 @@ def plot_rebalance_comparison(buggy_data, fixed_data, output_file=None, target_c
     
     ax.set_xlabel('Time (ms)',)
     ax.set_ylabel('Overhead (ms)')
-    ax.set_title(f'2feab24: Rebalance Overhead Comparison')
-    ax.legend(loc='best')
+    ax.set_title(f'Long_Balance', fontsize=10)
+    ax.legend(bbox_to_anchor=(1.05, 0.7), loc='upper right')
     ax.grid(True, alpha=0.3)
     # ax.set_yscale('log')
     
-    plt.tight_layout(pad=0.5)
+    plt.tight_layout(pad=0)
     
-    plt.savefig(output_file, dpi=300, bbox_inches='tight')
+    plt.savefig(output_file)
     print(f"Plot saved to: {output_file}")
     
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="2feab24")
+    parser.add_argument("--controller", type=str, default="long_balance") # 2feab24
     args = parser.parse_args()
 
     bugId = args.controller
