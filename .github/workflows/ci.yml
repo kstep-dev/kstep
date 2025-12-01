@@ -9,11 +9,14 @@ jobs:
   build:
     strategy:
       matrix:
-        version:
-          - v5.15
-          - v6.0
-          - v6.6
-          - v6.14
+        version: # LTS versions at https://kernel.org/
+          - v6.18
+          - v6.12.60
+          - v6.6.118
+          - v6.1.158
+          - v5.15.196
+          
+          
 
     name: Linux ${{matrix.version}}
     runs-on: ubuntu-latest
