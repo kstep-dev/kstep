@@ -20,6 +20,33 @@ COLOR_DARK_BLUE = "#4A70A9"
 COLOR_LIGHT_BLUE = "#8FABD4"
 COLOR_BUGGY = "tab:red"
 
+COLOR_MAPS = {
+    "sync_wakeup": {
+        0: COLOR_YELLOW,
+        1: COLOR_BUGGY,
+        2: COLOR_GREEN,
+        3: COLOR_ORANGE,
+        4: COLOR_LIGHT_BLUE,
+        5: COLOR_DARK_BLUE,
+        -1: COLOR_IDLE,
+    },
+    "freeze": {
+        0: COLOR_YELLOW,
+        1: COLOR_BUGGY,
+        2: COLOR_LIGHT_BLUE,
+        -1: COLOR_IDLE,
+    },
+    "vruntime_overflow": {
+        0: COLOR_YELLOW,
+        1: COLOR_GREEN,
+        2: COLOR_ORANGE,
+        3: COLOR_DARK_BLUE,
+        4: COLOR_LIGHT_BLUE,
+        5: COLOR_BUGGY,
+        -1: COLOR_IDLE,
+    },
+}
+
 
 def parse_curr_task(name: str, path: Path) -> pd.DataFrame:
     task_pattern = re.compile(r"\[\s*(\d+\.\d+)\].*?print_tasks:\s+(\d+)\s+>R\s+(\d+)")
@@ -127,7 +154,7 @@ def plot_cur_task(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="sync_wakeup")  # aa3ee4f
+    parser.add_argument("--controller", type=str, default="sync_wakeup")
     args = parser.parse_args()
 
     bugId = args.controller
@@ -138,35 +165,7 @@ if __name__ == "__main__":
     title_fixed = f"{bugId} (fixed)"
 
     output_file = RESULTS_DIR / f"{bugId}.pdf"
-
-    color_map = {}
-    if bugId == "sync_wakeup":
-        color_map = {
-            0: COLOR_YELLOW,
-            1: COLOR_BUGGY,
-            2: COLOR_GREEN,
-            3: COLOR_ORANGE,
-            4: COLOR_LIGHT_BLUE,
-            5: COLOR_DARK_BLUE,
-            -1: COLOR_IDLE,
-        }
-    elif bugId == "freeze":
-        color_map = {
-            0: COLOR_YELLOW,
-            1: COLOR_BUGGY,
-            2: COLOR_LIGHT_BLUE,
-            -1: COLOR_IDLE,
-        }
-    elif bugId == "vruntime_overflow":
-        color_map = {
-            0: COLOR_YELLOW,
-            1: COLOR_GREEN,
-            2: COLOR_ORANGE,
-            3: COLOR_DARK_BLUE,
-            4: COLOR_LIGHT_BLUE,
-            5: COLOR_BUGGY,
-            -1: COLOR_IDLE,
-        }
+    color_map = COLOR_MAPS.get(bugId, {})
 
     fig = plot_cur_task(
         log_file_buggy, log_file_fixed, title_buggy, title_fixed, color_map
