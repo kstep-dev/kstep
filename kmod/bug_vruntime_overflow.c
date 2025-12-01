@@ -97,10 +97,7 @@ static struct task_struct *get_curr_task(int cpu) {
 }
 
 static void controller_body(void) {
-  // Update clock
-  for (int i = 0; i < 20; i++) {
-    kstep_tick();
-  }
+  kstep_tick_repeat(10);
 
   // tick until there is a not eligible task group with eligible tasks
   ineligible_task = kstep_tick_until_task(is_ineligible);
@@ -116,9 +113,7 @@ static void controller_body(void) {
 
   send_sigcode(p, SIGCODE_CLONE3_L3_0, 1);
 
-  for (int i = 0; i < 60; i++) {
-    kstep_tick();
-  }
+  kstep_tick_repeat(26);
 }
 
 struct controller_ops controller_vruntime_overflow = {
