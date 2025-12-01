@@ -50,6 +50,7 @@ bugs = [
         plot_format="cur_task",
         fixed=Config(version="cd9626e"),
         buggy=Config(version="cd9626e~1"),
+        smp="2",
     ),
     # https://github.com/torvalds/linux/commit/bbce3de72be56e4b5f68924b7da9630cc89aa1a8
     Bug(

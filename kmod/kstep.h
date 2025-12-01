@@ -44,6 +44,7 @@ void kstep_tick_init(void);
 void kstep_tick_exit(void);
 void kstep_sleep(void);
 void kstep_tick(void);
+void kstep_tick_repeat(int n);
 // Call tick until the function returns true
 void kstep_tick_until(bool (*fn)(void));
 // Call tick until the function returns true for a task, then return that task

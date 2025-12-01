@@ -62,9 +62,7 @@ static bool is_ineligible(struct task_struct *p) {
 static bool is_running_again(void) { return not_eligible_task->on_cpu == 1; }
 
 static void controller_body(void) {
-  for (int i = 0; i < 20; i++) {
-    kstep_tick();
-  }
+  kstep_tick_repeat(20);
 
   // tick until there is a not eligible task on the same cpu as the busy kthread
   not_eligible_task = kstep_tick_until_task(is_ineligible);
@@ -87,9 +85,7 @@ static void controller_body(void) {
   send_sigcode(not_eligible_task, SIGCODE_PAUSE, 0);
 
   // tick to show the impact
-  for (int i = 0; i < 20; i++) {
-    kstep_tick();
-  }
+  kstep_tick_repeat(7);
 }
 
 static int loopBusy(void *data) {

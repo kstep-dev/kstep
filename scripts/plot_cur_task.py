@@ -2,87 +2,75 @@
 
 import argparse
 import re
-from collections import defaultdict
+from pathlib import Path
 
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from consts import RESULTS_DIR
 from matplotlib import colors
-from matplotlib.patches import Patch
+from plot_utils import save_fig
 
-cmap = plt.cm.tab20
-overall_color_matrix = []
-pid_to_color = {}
-all_cpus = [1, 2]
+COLOR_IDLE = (0.95, 0.95, 0.95)
+COLOR_YELLOW = "#FFE797"
+COLOR_GREEN = "#84994F"
+COLOR_ORANGE = "#FCB53B"
+COLOR_DARK_BLUE = "#4A70A9"
+COLOR_LIGHT_BLUE = "#8FABD4"
+COLOR_BUGGY = "tab:red"
 
-def build_pid_matrix(filename):
-    # Dictionary to store results: {timestamp: {cpu: pid}}
-    current_tasks = defaultdict(dict)
 
-    # Regular expression to parse the task lines
-    # Format: [timestamp] ... CPU >R PID PPID ...
-    task_pattern = re.compile(
-        r'\[\s*(\d+\.\d+)\].*?print_tasks:\s+(\d+)\s+>R\s+(\d+)'
-    )
-
-    with open(filename, 'r') as f:
+def parse_curr_task(name: str, path: Path) -> pd.DataFrame:
+    task_pattern = re.compile(r"\[\s*(\d+\.\d+)\].*?print_tasks:\s+(\d+)\s+>R\s+(\d+)")
+    data = []
+    with open(path, "r") as f:
         for line in f:
             match = task_pattern.search(line)
             if match:
                 timestamp = float(match.group(1))
                 cpu = int(match.group(2))
                 pid = int(match.group(3))
-                current_tasks[timestamp][cpu] = pid
+                data.append([name, timestamp, cpu, pid])
+    return pd.DataFrame(data, columns=["name", "timestamp", "cpu", "pid"])
 
-    unique_pids = set()
-    # Print results
-    for timestamp in sorted(current_tasks.keys()):
-        for cpu in sorted(current_tasks[timestamp].keys()):
-            pid = current_tasks[timestamp][cpu]
-            unique_pids.add(pid)
 
-    unique_pids = sorted(unique_pids)
-    pid_to_uid = {pid: i for i, pid in enumerate(unique_pids)}
-    timestamps = sorted(current_tasks.keys())
+def build_pid_matrix(df: pd.DataFrame) -> pd.DataFrame:
+    # Normalize pids to start from 0 and be consecutive
+    df["pid"], _ = pd.factorize(df["pid"], sort=True)
+    # Transform table to matrix
+    return (
+        df.pivot(
+            index=["name", "timestamp"],
+            columns=["cpu"],
+            values="pid",
+        )
+        .replace(np.nan, -1)
+        .astype(int)
+    )
 
-    # Build a 2D array: rows = cpus, cols = timestamps, values = pid
-    cpu_idx = {cpu: i for i, cpu in enumerate(all_cpus)}
-    cpu_count = 2
-    time_count = len(timestamps)
-    pid_matrix = np.full((cpu_count, time_count), -1)  # -1 means no task
 
-    for j, ts in enumerate(timestamps):
-        for cpu in all_cpus:
-            pid = current_tasks[ts].get(cpu, -1)
-            pid_matrix[cpu_idx[cpu], j] = pid_to_uid.get(pid, -1)
+def plot_color_matrix(
+    pid_matrix: pd.DataFrame, ax: plt.Axes, title: str, color_map: dict[int, str]
+):
+    # Map pids to colors and convert to numpy array
+    color_df = pid_matrix.map(lambda x: colors.to_rgba(color_map[x]))
+    color_matrix = np.array(color_df.T.values.tolist())
 
-    # Map each PID to a unique color index
-    for pid in unique_pids:
-        if pid not in pid_to_color and pid != -1:
-            pid_to_color[pid_to_uid[pid]] = len(pid_to_color) + 1
-    return pid_matrix, cpu_count, time_count
-
-def build_color_matrix(pid_matrix, cpu_count, time_count):
-    color_matrix = np.zeros_like(pid_matrix)
-    for i in range(cpu_count):
-        for j in range(time_count):
-            pid = pid_matrix[i, j]
-            color_matrix[i, j] = pid_to_color.get(pid)
-
-    overall_color_matrix.append(color_matrix)
-
-def plot_color_matrix(color_matrix, cpu_count, time_count, vmin, vmax, ax, title): 
-    ax.imshow(color_matrix, cmap=cmap, aspect='auto', vmin=vmin, vmax=vmax, interpolation='nearest')
+    # Plot color matrix
+    ax.imshow(color_matrix, aspect="auto", interpolation="nearest")
 
     # Adjust ticks
+    cpu_count = color_matrix.shape[0]
     ax.set_yticks(np.arange(cpu_count))
-    ax.set_yticklabels([f'CPU {cpu}' for cpu in all_cpus])
+    ax.set_yticklabels([f"CPU {i + 1}" for i in range(cpu_count)])
 
     if "buggy" in title:
         ax.set_xticks([])
         ax.set_xticklabels([])
         ax.set_xlabel("")
     else:
+        time_count = color_matrix.shape[1]
         xtick_locs = np.arange(0, time_count, 10)
         # Ensure the last tick is included if not already
         if len(xtick_locs) == 0 or xtick_locs[-1] != time_count - 1:
@@ -90,14 +78,56 @@ def plot_color_matrix(color_matrix, cpu_count, time_count, vmin, vmax, ax, title
 
         ax.set_xticks(xtick_locs)
         ax.set_xticklabels([f"{i}" for i in xtick_locs])
-        ax.tick_params(axis='x', length=2, pad=1)  # Shorter ticks, labels closer
+        ax.tick_params(axis="x", length=2, pad=1)  # Shorter ticks, labels closer
         ax.set_xlabel("Time (ms)", labelpad=0.5)
-    
-    ax.set_title(title, fontsize=10)
+
+    ax.set_title(title, fontsize=10, pad=3)
+
+
+def plot_cur_task(
+    log_file_buggy: Path,
+    log_file_fixed: Path,
+    title_buggy: str,
+    title_fixed: str,
+    color_map: dict[int, str],
+):
+    fig, (ax_buggy, ax_fixed) = plt.subplots(
+        2, 1, figsize=(4, 1.125), gridspec_kw={"hspace": 0.6}
+    )
+    df_buggy = parse_curr_task("buggy", log_file_buggy)
+    df_fixed = parse_curr_task("fixed", log_file_fixed)
+    df = build_pid_matrix(pd.concat([df_buggy, df_fixed]))
+
+    plot_color_matrix(df.loc["buggy"], ax_buggy, title_buggy, color_map)
+    plot_color_matrix(df.loc["fixed"], ax_fixed, title_fixed, color_map)
+
+    # Plot legend
+    handles = []
+    labels = []
+    unique_pids = np.unique(df.values.flatten())
+    for pid in unique_pids:
+        handles.append(mpatches.Patch(color=color_map[pid]))
+        labels.append("Idle" if pid == -1 else f"PID {pid}")
+
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        ncol=8,
+        bbox_to_anchor=(0.5, 1.25),
+        fontsize=8,
+        handlelength=0.75,
+        handletextpad=0.25,
+        columnspacing=0.75,
+        frameon=False,
+    )
+
+    return fig
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="sync_wakeup") # aa3ee4f
+    parser.add_argument("--controller", type=str, default="sync_wakeup")  # aa3ee4f
     args = parser.parse_args()
 
     bugId = args.controller
@@ -109,45 +139,37 @@ if __name__ == "__main__":
 
     output_file = RESULTS_DIR / f"{bugId}.pdf"
 
-    start_timestamp = 10.000000
+    color_map = {}
+    if bugId == "sync_wakeup":
+        color_map = {
+            0: COLOR_YELLOW,
+            1: COLOR_BUGGY,
+            2: COLOR_GREEN,
+            3: COLOR_ORANGE,
+            4: COLOR_LIGHT_BLUE,
+            5: COLOR_DARK_BLUE,
+            -1: COLOR_IDLE,
+        }
+    elif bugId == "freeze":
+        color_map = {
+            0: COLOR_YELLOW,
+            1: COLOR_BUGGY,
+            2: COLOR_LIGHT_BLUE,
+            -1: COLOR_IDLE,
+        }
+    elif bugId == "vruntime_overflow":
+        color_map = {
+            0: COLOR_YELLOW,
+            1: COLOR_GREEN,
+            2: COLOR_ORANGE,
+            3: COLOR_DARK_BLUE,
+            4: COLOR_LIGHT_BLUE,
+            5: COLOR_BUGGY,
+            -1: COLOR_IDLE,
+        }
 
-    fig, axes = plt.subplots(2, 1, figsize=(3, 1.125), constrained_layout=True, gridspec_kw={'hspace': 0.6})
-    pid_matrix_buggy, cpu_count_buggy, time_count_buggy = build_pid_matrix(log_file_buggy)
-    pid_matrix_fixed, cpu_count_fixed, time_count_fixed = build_pid_matrix(log_file_fixed)
-    pid_to_color[-1] = 0
+    fig = plot_cur_task(
+        log_file_buggy, log_file_fixed, title_buggy, title_fixed, color_map
+    )
 
-    build_color_matrix(pid_matrix_buggy, cpu_count_buggy, time_count_buggy)
-    build_color_matrix(pid_matrix_fixed, cpu_count_fixed, time_count_fixed)
-
-    vmin = min([overall_color_matrix[i].min() for i in range(len(overall_color_matrix))])
-    vmax = max([overall_color_matrix[i].max() for i in range(len(overall_color_matrix))])
-
-    plot_color_matrix(overall_color_matrix[0], cpu_count_buggy, time_count_buggy, vmin, vmax, axes[0], title_buggy)
-    plot_color_matrix(overall_color_matrix[1], cpu_count_fixed, time_count_fixed, vmin, vmax, axes[1], title_fixed)
-
-    legend_elements = []
-
-    norm = colors.Normalize(vmin=min([overall_color_matrix[i].min() for i in range(len(overall_color_matrix))]), 
-                            vmax=max([overall_color_matrix[i].max() for i in range(len(overall_color_matrix))]))
-    for pid, color_idx in pid_to_color.items():
-        if not any((overall_color_matrix[i] == color_idx).any() for i in range(len(overall_color_matrix))):
-            continue
-        
-        if pid == -1:
-            label = "Idle"
-        else:
-            label = f"PID {pid}"
-        legend_elements.append(Patch(facecolor=cmap(norm(color_idx)), label=label))
-
-    fig.legend(handles=legend_elements, 
-                bbox_to_anchor=(0.9, 0.5), 
-                loc='center left', 
-                handletextpad=-2,  
-                handlelength=2,
-                labelspacing=0.2,    
-                borderpad=0.3,       
-                ncol=1,
-                frameon=False)
-
-    plt.tight_layout()
-    plt.savefig(output_file, bbox_inches='tight', pad_inches=0, dpi = 1000)
+    save_fig(fig, output_file)
