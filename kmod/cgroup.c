@@ -26,8 +26,7 @@ static int open_cgroup_root(void) {
   if (fd < 0)
     panic("get_unused_fd_flags failed: %d", fd);
   fd_install(fd, file);
-  
-  filp_close(file, NULL);
+
   return fd;
 }
 
