@@ -4,6 +4,8 @@
 
 #define TARGET_TASK "test-proc"
 
+static void controller_pre_init(void) { kstep_params.step_interval_us = 50000; }
+
 static bool is_ineligible(struct task_struct *p) {
   return strcmp(p->comm, TARGET_TASK) == 0 && p != busy_task && p->on_cpu &&
          ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0;
@@ -44,5 +46,6 @@ static void controller_body(void) {
 
 struct controller_ops controller_freeze = {
     .name = "freeze",
+    .pre_init = controller_pre_init,
     .body = controller_body,
 };
