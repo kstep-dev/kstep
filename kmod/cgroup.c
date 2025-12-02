@@ -73,8 +73,14 @@ void kstep_cgroup_write_file(const char *dir, const char *filename,
 
 static void kstep_cgroup_mkdir(const char *dir) {
   struct path path;
+// https://github.com/torvalds/linux/commit/3d18f80ce181ba27f37d0ec1c550b22acb01dd49
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+  struct dentry *dentry =
+      start_creating_path(cgroup_root_fd, dir, &path, LOOKUP_DIRECTORY);
+#else
   struct dentry *dentry =
       kern_path_create(cgroup_root_fd, dir, &path, LOOKUP_DIRECTORY);
+#endif
   if (IS_ERR(dentry))
     panic("kern_path_create %s failed: %ld", dir, PTR_ERR(dentry));
 
@@ -95,7 +101,12 @@ static void kstep_cgroup_mkdir(const char *dir) {
   if (err)
     panic("mkdir %s failed: %d", dir, err);
 
+  // https://github.com/torvalds/linux/commit/3d18f80ce181ba27f37d0ec1c550b22acb01dd49
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+  end_creating_path(&path, dentry);
+#else
   done_path_create(&path, dentry);
+#endif
 
   TRACE_INFO("created cgroup %s", dir);
 }
