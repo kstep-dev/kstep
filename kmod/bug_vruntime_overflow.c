@@ -1,11 +1,12 @@
 #include "kstep.h"
 
 #define TARGET_TASK "test-proc"
-# define MAX_TASKS 128
+#define MAX_TASKS 128
 
 static int task_to_cgroup_id[MAX_TASKS][2];
 
-static void record_task_to_groups(int expected_count, int level_id, int id_in_level) {
+static void record_task_to_groups(int expected_count, int level_id,
+                                  int id_in_level) {
   struct task_struct *p;
   int count = 0;
   while (1) {
@@ -42,19 +43,14 @@ static void controller_init(void) {
                  |
                  |--> l2_1
   */
-  send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 0);
-  send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 1 << 16 | 0x0);
-  send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 1 << 16 | 0x0);
-  send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 2 << 16 | 0x0);
-  send_sigcode(cgroup_task, SIGCODE_CGROUP_CREATE, 2 << 16 | 0x0);
+  kstep_cgroup_create("l1_0", "1");
+  kstep_cgroup_create("l1_0/l2_0", "1");
+  kstep_cgroup_create("l1_0/l2_0/l3_0", "1");
+  kstep_cgroup_create("l1_0/l2_0/l3_1", "1");
+  kstep_cgroup_create("l1_0/l2_1", "1");
 
   // set up the configuration for the cgroup tree
-  send_sigcode2(cgroup_task, SIGCODE_REWEIGHT_CGROUP, 3 << 16 | 0x0, 20);
-  send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 1 << 16 | 0x0, 1);
-  send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 2 << 16 | 0x0, 1);
-  send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 2 << 16 | 0x1, 1);
-  send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 3 << 16 | 0x0, 1);
-  send_sigcode2(cgroup_task, SIGCODE_SETCPU_CGROUP, 3 << 16 | 0x1, 1);
+  kstep_cgroup_write_file_va("l1_0/l2_0/l3_0", "cpu.weight", "%d", 20);
 
   // create 1 task in l3_0
   send_sigcode(busy_task, SIGCODE_CLONE3_L3_0, 1);
@@ -107,9 +103,10 @@ static void controller_body(void) {
   // pause all tasks in the not eligible task group
   sleep_all_tasks_in_ineligible_tg();
 
-  ksym.dequeue_entities(ineligible_tg_se->cfs_rq, ineligible_tg_se, DEQUEUE_SLEEP);
+  ksym.dequeue_entities(ineligible_tg_se->cfs_rq, ineligible_tg_se,
+                        DEQUEUE_SLEEP);
   struct task_struct *p = get_curr_task(cpu_of_ineligible_task);
-  send_sigcode2(cgroup_task, SIGCODE_REWEIGHT_CGROUP, 3 << 16 | 0x0, 100);
+  kstep_cgroup_write_file_va("l1_0/l2_0/l3_0", "cpu.weight", "%d", 100);
 
   send_sigcode(p, SIGCODE_CLONE3_L3_0, 1);
 

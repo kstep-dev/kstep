@@ -82,4 +82,5 @@ void kstep_reset_sched_state(void) {
       reset_task_stats(p);
     }
   }
+  TRACE_INFO("Reset scheduler state");
 }

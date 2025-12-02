@@ -58,8 +58,15 @@ void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
 int is_sys_kthread(struct task_struct *p);
 
 extern struct task_struct *busy_task;
-extern struct task_struct *cgroup_task;
 void kstep_tasks_init(void);
+
+// cgroup.c
+void kstep_cgroup_init(void);
+void kstep_cgroup_create(const char *path, const char *cpuset);
+void kstep_cgroup_write_file(const char *dir, const char *filename,
+                             const char *buf);
+void kstep_cgroup_write_file_va(const char *dir, const char *filename,
+                                const char *fmt, ...);
 
 // output.c
 void print_rq_stats(void);
