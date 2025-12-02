@@ -16,9 +16,6 @@
   X(SIGCODE_SLEEP)                                                             \
   X(SIGCODE_EXIT)                                                              \
   X(SIGCODE_PAUSE)                                                             \
-  X(SIGCODE_CGROUP_CREATE)                                                     \
-  X(SIGCODE_SETCPU_CGROUP)                                                     \
-  X(SIGCODE_REWEIGHT_CGROUP)                                                   \
   X(SIGCODE_REWEIGHT)                                                          \
   X(SIGCODE_PIN)
 
