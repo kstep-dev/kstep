@@ -79,10 +79,22 @@ static void kstep_cgroup_mkdir(const char *dir) {
   if (IS_ERR(dentry))
     panic("kern_path_create %s failed: %ld", dir, PTR_ERR(dentry));
 
+// https://github.com/torvalds/linux/commit/c54b386969a58151765a9ffaaa0438e7b580283f
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
   struct dentry *result =
       vfs_mkdir(&nop_mnt_idmap, d_inode(path.dentry), dentry, 0755);
-  if (IS_ERR(result))
-    panic("mkdir %s failed: %ld", dir, PTR_ERR(result));
+  int err = PTR_ERR(result);
+// https://github.com/torvalds/linux/commit/abf08576afe31506b812c8c1be9714f78613f300
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+  int err = vfs_mkdir(&nop_mnt_idmap, d_inode(path.dentry), dentry, 0755);
+// https://github.com/torvalds/linux/commit/6521f8917082928a4cb637eb64b77b5f2f5b30fc
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+  int err = vfs_mkdir(&init_user_ns, d_inode(path.dentry), dentry, 0755);
+#else
+  int err = vfs_mkdir(d_inode(path.dentry), dentry, 0755);
+#endif
+  if (err)
+    panic("mkdir %s failed: %d", dir, err);
 
   done_path_create(&path, dentry);
 
