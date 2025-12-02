@@ -64,7 +64,9 @@ void kstep_tasks_init(void);
 void kstep_cgroup_init(void);
 void kstep_cgroup_create(const char *path, const char *cpuset);
 void kstep_cgroup_write_file(const char *dir, const char *filename,
-                             const char *fmt, ...);
+                             const char *buf);
+void kstep_cgroup_write_file_va(const char *dir, const char *filename,
+                                const char *fmt, ...);
 
 // output.c
 void print_rq_stats(void);

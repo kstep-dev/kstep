@@ -51,24 +51,28 @@ static struct file *kstep_cgroup_open_file(const char *dir,
 }
 
 void kstep_cgroup_write_file(const char *dir, const char *filename,
-                             const char *fmt, ...) {
+                             const char *buf) {
   struct file *file = kstep_cgroup_open_file(dir, filename);
 
+  loff_t pos = 0;
+  if (kernel_write(file, buf, strlen(buf), &pos) < 0)
+    panic("write %s/%s: %s failed", dir, filename, buf);
+
+  filp_close(file, NULL);
+
+  TRACE_INFO("wrote %s/%s: %s", dir, filename, buf);
+}
+
+void kstep_cgroup_write_file_va(const char *dir, const char *filename,
+                                const char *fmt, ...) {
   char buf[MAX_CGROUP_FILE_LENGTH];
   va_list args;
   va_start(args, fmt);
   int len = vscnprintf(buf, sizeof(buf), fmt, args);
   va_end(args);
   if (len <= 0 || len >= sizeof(buf))
-    panic("failed to format cgroup file path for %s", filename);
-
-  loff_t pos = 0;
-  if (kernel_write(file, buf, len, &pos) < 0)
-    panic("write %s/%s: %s failed", dir, filename, buf);
-
-  filp_close(file, NULL);
-
-  TRACE_INFO("wrote %s/%s: %s", dir, filename, buf);
+    panic("failed to format cgroup file content for %s", filename);
+  kstep_cgroup_write_file(dir, filename, buf);
 }
 
 static void kstep_cgroup_mkdir(const char *dir) {
@@ -88,7 +92,7 @@ static void kstep_cgroup_mkdir(const char *dir) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
   struct dentry *result =
       vfs_mkdir(&nop_mnt_idmap, d_inode(path.dentry), dentry, 0755);
-  int err = PTR_ERR(result);
+  int err = IS_ERR(result);
 // https://github.com/torvalds/linux/commit/abf08576afe31506b812c8c1be9714f78613f300
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
   int err = vfs_mkdir(&nop_mnt_idmap, d_inode(path.dentry), dentry, 0755);
