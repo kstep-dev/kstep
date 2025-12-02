@@ -16,7 +16,6 @@ static void run_prog(char *path, int (*init)(struct subprocess_info *info,
 }
 
 struct file *console_file = NULL;
-struct task_struct *cgroup_task = NULL;
 struct task_struct *busy_task = NULL;
 
 // Initialize stdin, stdout, and stderr to /dev/console
@@ -28,14 +27,6 @@ static void init_task_console(void) {
       panic("get_unused_fd_flags returned %d for fd %d", fd, i);
     fd_install(fd, get_file(console_file));
   }
-}
-
-static int cgroup_task_init(struct subprocess_info *info, struct cred *new) {
-  init_task_console();
-  cgroup_task = current;
-  TRACE_INFO("cgroup task created with pid %d", cgroup_task->pid);
-  kstep_sleep();
-  return 0;
 }
 
 static int busy_task_init(struct subprocess_info *info, struct cred *new) {
@@ -50,7 +41,6 @@ void kstep_tasks_init(void) {
   console_file = filp_open("/dev/console", O_RDWR, 0);
   if (IS_ERR(console_file))
     panic("Failed to open /dev/console");
-  run_prog("/cgroup", cgroup_task_init);
   run_prog("/busy", busy_task_init);
   fput(console_file);
 }
