@@ -39,17 +39,16 @@ static void clone3(int val, const char *cgroup_path) {
     if (cgfd < 0)
       panic("Failed to open cgroup %s", cgroup_path);
 
-    struct clone_args args;
-    memset(&args, 0, sizeof(args));
-    args.flags = 0 | CLONE_INTO_CGROUP;
-    args.cgroup = (uintptr_t)cgfd; // <— CLONE_INTO_CGROUP: target cgroup fd
-
+    struct clone_args args = {
+        .flags = CLONE_INTO_CGROUP,
+        .cgroup = cgfd, // <— CLONE_INTO_CGROUP: target cgroup fd
+    };
     pid_t pid = syscall(SYS_clone3, &args, sizeof(args));
+    close(cgfd);
     if (pid < 0)
       panic("Failed to clone3");
     if (pid == 0) // child process
       return;
-    close(cgfd);
   }
 }
 static void signal_handler(int signum, siginfo_t *info, void *context) {
