@@ -18,13 +18,26 @@
 
 #define CGROUP_ROOT "/sys/fs/cgroup"
 
-void clone3(int val, const char *cgroup_path) {
+#define panic(msg, ...)                                                        \
+  do {                                                                         \
+    fprintf(stderr, msg "\n", ##__VA_ARGS__);                                  \
+    exit(1);                                                                   \
+  } while (0)
+
+static void set_proc_affinity(int begin, int end) { // [begin, end]
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  for (int i = begin; i <= end; i++)
+    CPU_SET(i, &cpuset);
+  if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) != 0)
+    panic("Failed to set CPU affinity to %d-%d", begin, end);
+}
+
+static void clone3(int val, const char *cgroup_path) {
   for (int i = 0; i < val; i++) {
     int cgfd = open(cgroup_path, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-    if (cgfd < 0) {
-      perror("open cgroup");
-      return;
-    }
+    if (cgfd < 0)
+      panic("Failed to open cgroup %s", cgroup_path);
 
     struct clone_args args;
     memset(&args, 0, sizeof(args));
@@ -32,13 +45,10 @@ void clone3(int val, const char *cgroup_path) {
     args.cgroup = (uintptr_t)cgfd; // <— CLONE_INTO_CGROUP: target cgroup fd
 
     pid_t pid = syscall(SYS_clone3, &args, sizeof(args));
-    if (pid < 0) {
-      perror("clone3");
+    if (pid < 0)
+      panic("Failed to clone3");
+    if (pid == 0) // child process
       return;
-    }
-    if (pid == 0) {
-      return;
-    }
     close(cgfd);
   }
 }
@@ -55,28 +65,13 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
       int pid = fork();
       if (pid == 0) {
         if (code == SIGCODE_FORK_PIN) {
-          cpu_set_t cpuset;
-          CPU_ZERO(&cpuset);
-          CPU_SET(val2, &cpuset);
-          int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
-          if (s != 0) {
-            perror("sched_setaffinity");
-          }
+          set_proc_affinity(val2, val2);
         } else if (code == SIGCODE_FORK_PIN_RANGE) {
-          cpu_set_t cpuset;
-          CPU_ZERO(&cpuset);
-          for (int i = val2; i <= val3; i++) {
-            CPU_SET(i, &cpuset);
-          }
-          int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
-          if (s != 0) {
-            perror("sched_setaffinity");
-          }
+          set_proc_affinity(val2, val3);
         } else if (code == SIGCODE_FORK_FF) {
           struct sched_param sp = { .sched_priority = 80 };
-          if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0) {
-            perror("sched_setscheduler");
-          }
+          if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0)
+            panic("sched_setscheduler failed");
           printf("set scheduler to FIFO with priority %d\n", sp.sched_priority);
         }
         return;
@@ -97,39 +92,13 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
     clone3(val, CGROUP_ROOT "/l1_0/l2_1");
   } else if (code == SIGCODE_CLONE3_L1_0) {
     clone3(val, CGROUP_ROOT "/l1_0");
-  } else if (code == SIGCODE_REWEIGHT) { 
-    if (setpriority(PRIO_PROCESS, 0, val) == -1) {
-      perror("setpriority");
-    }
+  } else if (code == SIGCODE_REWEIGHT) {
+    if (setpriority(PRIO_PROCESS, 0, val) < 0)
+      panic("setpriority failed");
   } else if (code == SIGCODE_PIN) {
-    cpu_set_t cpuset;
-    CPU_ZERO(&cpuset);
-    CPU_SET(val, &cpuset);
-    if (val2 == 0) {
-      CPU_SET(val, &cpuset);
-    } else {
-      for (int i = val; i <= val2; i++)
-        CPU_SET(i, &cpuset);
-    }
-    int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
-    if (s != 0) {
-      perror("sched_setaffinity");
-    }
+    set_proc_affinity(val, val2 == 0 ? val : val2);
   } else {
     printf("Unknown signal code: %d\n", code);
-  }
-}
-
-static void set_proc_affinity() {
-  cpu_set_t cpuset;
-  CPU_ZERO(&cpuset);
-  int nproc = sysconf(_SC_NPROCESSORS_ONLN);
-  for (int i = 1; i < nproc; i++) { // skip cpu 0
-    CPU_SET(i, &cpuset);
-  }
-  int s = sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
-  if (s != 0) {
-    perror("sched_setaffinity");
   }
 }
 
@@ -143,7 +112,7 @@ int main() {
   struct sigaction sa = {.sa_sigaction = signal_handler,
                          .sa_flags = SA_SIGINFO};
   sigaction(SIGUSR1, &sa, NULL);
-  set_proc_affinity();
+  set_proc_affinity(1, sysconf(_SC_NPROCESSORS_ONLN) - 1);
   prctl(PR_SET_NAME, "test-proc");
   pause();
   loop();
