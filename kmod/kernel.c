@@ -18,7 +18,7 @@ void kstep_write_file(const char *path, const char *buf, size_t size) {
     panic("open %s failed: %ld", path, PTR_ERR(file));
 
   loff_t pos = 0;
-  if (kernel_write(file, buf, strlen(buf), &pos) < 0)
+  if (kernel_write(file, buf, size, &pos) < 0)
     panic("write %s failed: %s", path, buf);
 
   filp_close(file, NULL);
@@ -65,8 +65,7 @@ void kstep_mkdir(int dfd, const char *dir) {
 }
 
 int kstep_open_fd(const char *path, int flags) {
-  struct file *file =
-      filp_open(path, O_DIRECTORY | O_RDONLY | O_CLOEXEC, 0);
+  struct file *file = filp_open(path, flags, 0);
   if (IS_ERR(file))
     panic("open %s failed: %ld", path, PTR_ERR(file));
 
