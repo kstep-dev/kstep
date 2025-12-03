@@ -60,13 +60,15 @@ int is_sys_kthread(struct task_struct *p);
 extern struct task_struct *busy_task;
 void kstep_tasks_init(void);
 
-// cgroup.c
+// kernel.c
+void kstep_write_file(const char *path, const char *buf, size_t size);
+void kstep_mkdir(int dfd, const char *dir);
+int kstep_open_fd(const char *path, int flags);
+void kstep_close_fd(int fd);
 void kstep_cgroup_init(void);
 void kstep_cgroup_create(const char *path, const char *cpuset);
 void kstep_cgroup_write_file(const char *dir, const char *filename,
                              const char *buf);
-void kstep_cgroup_write_file_va(const char *dir, const char *filename,
-                                const char *fmt, ...);
 
 // output.c
 void print_rq_stats(void);

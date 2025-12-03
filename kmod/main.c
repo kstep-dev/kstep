@@ -56,6 +56,9 @@ static int __init kmod_init(void) {
   // Control timer ticks and clock
   kstep_tick_init();
 
+  // Enable printk time
+  kstep_write_file("/sys/module/printk/parameters/time", "1", 1);
+
   // Reset the scheduler state to initial state
   kstep_reset_sched_state();
 
