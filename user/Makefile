@@ -4,7 +4,7 @@ all: build build/init build/busy
 build:
 	mkdir -p build
 
-build/%: %.c ../kmod/sigcode.h
+build/%: %.c ../kmod/sigcode.h utils.h
 	gcc -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -std=c99 -static -o $@ $<
 
 .PHONY: clean
