@@ -1,26 +1,17 @@
 #define _GNU_SOURCE
 
-#include <sched.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/errno.h>
-#include <sys/mman.h>
-#include <sys/mount.h>
-#include <sys/reboot.h>
-#include <sys/stat.h>
-#include <sys/syscall.h>
-#include <unistd.h>
+#include <string.h>      // strlcat
+#include <sys/errno.h>   // EEXIST
+#include <sys/mount.h>   // mount
+#include <sys/reboot.h>  // reboot
+#include <sys/stat.h>    // mkdir
+#include <sys/syscall.h> // SYS_*
+#include <unistd.h>      // open, close, syscall
 
-#define MAX_LINE 1024
+#include "utils.h"
 
-#define panic(msg, ...)                                                        \
-  do {                                                                         \
-    fprintf(stderr, msg "\n", ##__VA_ARGS__);                                  \
-    exit(1);                                                                   \
-  } while (0)
+#define MAX_PARAMS_LENGTH 512
 
-// Mount filesystems
 void mount_fs(const char *dir, const char *type) {
   if (mkdir(dir, 0755) < 0 && errno != EEXIST)
     panic("Failed to create directory %s", dir);
@@ -28,38 +19,19 @@ void mount_fs(const char *dir, const char *type) {
     panic("Failed to mount %s as %s", dir, type);
 }
 
-void set_cpu_affinity() {
-  cpu_set_t cpuset;
-  CPU_ZERO(&cpuset);
-  CPU_SET(0, &cpuset);
-  if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) < 0)
-    panic("Failed to set CPU affinity");
-}
-
-void insmod(const char *path, const char *params) {
+static void insmod(const char *path, const char *params) {
   int fd = open(path, O_RDONLY);
   if (fd < 0)
     panic("Failed to open %s", path);
 
-  struct stat st;
-  if (fstat(fd, &st) < 0)
-    panic("Failed to fstat %s", path);
-
-  off_t size = st.st_size;
-  void *addr = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-  if (addr == MAP_FAILED)
-    panic("Failed to mmap %s", path);
+  if (syscall(SYS_finit_module, fd, params, 0) < 0)
+    panic("Failed to finit_module %s", path);
 
   close(fd);
-
-  if (syscall(SYS_init_module, addr, size, params) < 0)
-    panic("Failed to init_module %s", path);
-
-  munmap(addr, size);
 }
 
 void run_kstep(int argc, char *argv[], char *envp[]) {
-  char params[MAX_LINE] = {};
+  char params[MAX_PARAMS_LENGTH] = {};
   for (int i = 1; i < argc; i++) { // Skip "/init"
     strlcat(params, argv[i], sizeof(params));
     strlcat(params, " ", sizeof(params));
@@ -78,7 +50,7 @@ int main(int argc, char *argv[], char *envp[]) {
   mount_fs("/sys", "sysfs");
   mount_fs("/sys/kernel/debug", "debugfs");
   mount_fs("/sys/fs/cgroup", "cgroup2");
-  set_cpu_affinity();
+  set_proc_affinity(0, 0); // bind to cpu 0
   run_kstep(argc, argv, envp);
   reboot(RB_AUTOBOOT);
 }
