@@ -1,12 +1,10 @@
 #include "kstep.h"
 
-#define TARGET_TASK "test-proc"
-
 static struct task_struct *find_last_task(void) {
   struct task_struct *p;
   struct task_struct *target;
   for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0)
+    if (strcmp(p->comm, busy_task->comm) != 0)
       continue;
     target = p;
   }

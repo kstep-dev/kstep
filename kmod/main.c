@@ -31,7 +31,8 @@ void kstep_params_print(void) {
   TRACE_INFO("- print_lb_events: %d", kstep_params.print_lb_events);
 }
 
-static int __init kmod_init(void) {
+static int __init kstep_main(void) {
+  TRACE_INFO("Initializing kSTEP");
   ksym_init();
   struct controller_ops *ops = kstep_controller_get(kstep_params.controller);
   if (ops->pre_init)
@@ -67,20 +68,15 @@ static int __init kmod_init(void) {
 
   print_all_tasks();
 
-  TRACE_INFO("Initializing controller %s", ops->name);
-  if (ops->init)
-    ops->init();
-  kstep_sleep();
   TRACE_INFO("Running controller %s", ops->name);
   ops->body();
   TRACE_INFO("Exiting controller %s", ops->name);
   kernel_restart(NULL);
-
-  kstep_tick_exit();
+  
   return 0;
 }
-module_init(kmod_init);
+module_init(kstep_main);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Shawn Zhong");
-MODULE_DESCRIPTION("Scheduler control");
+MODULE_DESCRIPTION("kSTEP");

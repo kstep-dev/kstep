@@ -1,6 +1,5 @@
 #include "kstep.h"
 
-#define TARGET_TASK "test-proc"
 #define MAX_TASKS 128
 
 static int task_to_cgroup_id[MAX_TASKS][2];
@@ -11,7 +10,7 @@ static void record_task_to_groups(int expected_count, int level_id,
   int count = 0;
   while (1) {
     for_each_process(p) {
-      if (strcmp(p->comm, TARGET_TASK) == 0 &&
+      if (strcmp(p->comm, busy_task->comm) == 0 &&
           task_to_cgroup_id[p->pid - busy_task->pid][0] == -1) {
         task_to_cgroup_id[p->pid - busy_task->pid][0] = level_id;
         task_to_cgroup_id[p->pid - busy_task->pid][1] = id_in_level;
@@ -27,7 +26,39 @@ static void record_task_to_groups(int expected_count, int level_id,
   }
 }
 
-static void controller_init(void) {
+static struct task_struct *ineligible_task = NULL;
+static struct sched_entity *ineligible_tg_se = NULL;
+static int cpu_of_ineligible_task = -1;
+
+static bool is_ineligible(struct task_struct *p) {
+  struct sched_entity *se = &p->se;
+  return strcmp(p->comm, busy_task->comm) == 0 && p != busy_task && p->on_cpu &&
+         ksym.entity_eligible(se->parent->cfs_rq, se->parent) == 0 &&
+         ksym.entity_eligible(se->cfs_rq, se) == 1 &&
+         task_to_cgroup_id[p->pid - busy_task->pid][0] == 3;
+}
+
+static void sleep_all_tasks_in_ineligible_tg(void) {
+  struct task_struct *p;
+  for_each_process(p) {
+    if (strcmp(p->comm, busy_task->comm) != 0 || p == busy_task)
+      continue;
+    if (p->se.parent != ineligible_tg_se)
+      continue;
+    send_sigcode(p, SIGCODE_PAUSE, 0);
+  }
+}
+
+static struct task_struct *get_curr_task(int cpu) {
+  struct task_struct *p;
+  for_each_process(p) {
+    if (task_cpu(p) == cpu && p->on_cpu == 1)
+      return p;
+  }
+  return NULL;
+}
+
+static void controller_body(void) {
   for (int i = 0; i < MAX_TASKS; i++) {
     task_to_cgroup_id[i][0] = -1;
     task_to_cgroup_id[i][1] = -1;
@@ -58,41 +89,7 @@ static void controller_init(void) {
   // create 3 tasks in l3_1
   send_sigcode(busy_task, SIGCODE_CLONE3_L3_1, 3);
   record_task_to_groups(3, 3, 1);
-}
 
-static struct task_struct *ineligible_task = NULL;
-static struct sched_entity *ineligible_tg_se = NULL;
-static int cpu_of_ineligible_task = -1;
-
-static bool is_ineligible(struct task_struct *p) {
-  struct sched_entity *se = &p->se;
-  return strcmp(p->comm, TARGET_TASK) == 0 && p != busy_task && p->on_cpu &&
-         ksym.entity_eligible(se->parent->cfs_rq, se->parent) == 0 &&
-         ksym.entity_eligible(se->cfs_rq, se) == 1 &&
-         task_to_cgroup_id[p->pid - busy_task->pid][0] == 3;
-}
-
-static void sleep_all_tasks_in_ineligible_tg(void) {
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task)
-      continue;
-    if (p->se.parent != ineligible_tg_se)
-      continue;
-    send_sigcode(p, SIGCODE_PAUSE, 0);
-  }
-}
-
-static struct task_struct *get_curr_task(int cpu) {
-  struct task_struct *p;
-  for_each_process(p) {
-    if (task_cpu(p) == cpu && p->on_cpu == 1)
-      return p;
-  }
-  return NULL;
-}
-
-static void controller_body(void) {
   kstep_tick_repeat(10);
 
   // tick until there is a not eligible task group with eligible tasks
@@ -115,6 +112,5 @@ static void controller_body(void) {
 
 struct controller_ops controller_vruntime_overflow = {
     .name = "vruntime_overflow",
-    .init = controller_init,
     .body = controller_body,
 };
