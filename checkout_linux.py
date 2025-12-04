@@ -4,7 +4,7 @@ import argparse
 import logging
 from pathlib import Path
 
-from scripts import LINUX_CURR_DIR, LINUX_MASTER_DIR, LINUX_ROOT_DIR, system
+from scripts import DATA_DIR, LINUX_CURR_DIR, LINUX_MASTER_DIR, LINUX_ROOT_DIR, system
 
 LINUX_GIT_URL = "https://github.com/torvalds/linux.git"
 
@@ -12,20 +12,42 @@ LINUX_GIT_URL = "https://github.com/torvalds/linux.git"
 def clone_master():
     if LINUX_MASTER_DIR.exists():
         logging.info(f"Linux master already cloned to {LINUX_MASTER_DIR}")
-    else:
-        system(f"git clone {LINUX_GIT_URL} {LINUX_MASTER_DIR}")
+        return
+
+    system(f"git clone {LINUX_GIT_URL} {LINUX_MASTER_DIR}")
 
 
 def add_worktree(version: str, linux_dir: Path):
     if linux_dir.exists():
         logging.info(f"Linux {version} already cloned to {linux_dir}")
-    else:
-        system(f"cd {LINUX_MASTER_DIR} && git worktree prune -v")
-        system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {version}")
+        return
+
+    system(f"cd {LINUX_MASTER_DIR} && git worktree prune -v")
+    system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {version}")
 
 
 def reset_git(linux_dir: Path):
     system(f"cd {linux_dir} && git restore .")
+
+
+def download_linux(version: str, tarball_path: Path):
+    if tarball_path.exists():
+        logging.info(f"Linux tarball already exists at {tarball_path}")
+        return
+
+    version = version.removeprefix("v")
+    major = version.split(".", 1)[0]
+    url = f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
+    system(f"wget --no-verbose {url} -O {tarball_path}")
+
+
+def decompress_linux(tarball_path: Path, linux_dir: Path):
+    if linux_dir.exists():
+        logging.info(f"Linux already decompressed to {linux_dir}")
+        return
+
+    system(f"mkdir -p {linux_dir}")
+    system(f"tar -xf {tarball_path} -C {linux_dir} --strip-components=1")
 
 
 def set_current_linux(linux_dir: Path):
@@ -35,24 +57,16 @@ def set_current_linux(linux_dir: Path):
     logging.info(f"Current Linux now points to {linux_dir}")
 
 
-def checkout_linux(version: str, linux_dir: Path, reset: bool):
-    clone_master()
-    add_worktree(version, linux_dir)
-    if reset:
-        reset_git(linux_dir)
-    set_current_linux(linux_dir)
-
-
-def download_linux(version: str, linux_dir: Path):
-    if linux_dir.exists():
-        logging.info(f"Linux {version} already downloaded to {linux_dir}")
-        return
-    version = version.removeprefix("v")
-    major = version.split(".", 1)[0]
-    url = f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
-    system(f"mkdir -p {linux_dir}")
-    system(f"wget --no-verbose {url} -O {version}.tar.xz")
-    system(f"tar -xf {version}.tar.xz -C {linux_dir} --strip-components=1")
+def checkout_linux(version: str, linux_dir: Path, reset: bool, tarball: bool = False):
+    if not tarball:
+        clone_master()
+        add_worktree(version, linux_dir)
+        if reset:
+            reset_git(linux_dir)
+    else:
+        tarball_path = DATA_DIR / f"{version}.tar.xz"
+        download_linux(version, tarball_path)
+        decompress_linux(tarball_path, linux_dir)
     set_current_linux(linux_dir)
 
 
@@ -68,14 +82,9 @@ if __name__ == "__main__":
     parser.add_argument("--tarball", action="store_true", default=False)
     args = parser.parse_args()
 
-    if not args.tarball:
-        checkout_linux(
-            version=args.version,
-            linux_dir=LINUX_ROOT_DIR / args.version,
-            reset=args.reset,
-        )
-    else:
-        download_linux(
-            version=args.version,
-            linux_dir=LINUX_ROOT_DIR / args.version,
-        )
+    checkout_linux(
+        version=args.version,
+        linux_dir=LINUX_ROOT_DIR / args.version,
+        reset=args.reset,
+        tarball=args.tarball,
+    )
