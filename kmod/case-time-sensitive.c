@@ -2,19 +2,16 @@
 
 #include "kstep.h"
 
-#define TARGET_TASK "test-proc"
-
 // ./run_qemu.py --params controller=case_time_sensitive --log_file
 // data/logs/caseSensitiveTime.log
 // ./plot/plot_nr_running_queued.py --log data/logs/caseSensitiveTime.log --cpus
 // 1 --time-start 10 --output plot/case_time_sensitive.pdf
 
-static void controller_init(void) {}
-
 static struct task_struct *find_target_task(void) {
   struct task_struct *p;
   for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task || p->on_cpu == 0)
+    if (strcmp(p->comm, busy_task->comm) != 0 || p == busy_task ||
+        p->on_cpu == 0)
       continue;
     return p;
   }
@@ -55,6 +52,5 @@ static void controller_body(void) {
 
 struct controller_ops controller_case_time_sensitive = {
     .name = "case_time_sensitive",
-    .init = controller_init,
     .body = controller_body,
 };

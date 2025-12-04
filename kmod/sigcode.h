@@ -2,7 +2,7 @@
 #define SIGCODE_H
 
 #define SIGCODE_LIST                                                           \
-  X(SIGCODE_UNKNOWN)                                                           \
+  X(SIGCODE_WAKEUP)                                                            \
   X(SIGCODE_FORK)                                                              \
   X(SIGCODE_FORK_PIN)                                                          \
   X(SIGCODE_FORK_PIN_RANGE)                                                    \

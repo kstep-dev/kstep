@@ -36,8 +36,10 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
   int val = info->si_int;
   int val2 = info->si_pid;
   int val3 = info->si_uid;
-  if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN ||
-      code == SIGCODE_FORK_FF || code == SIGCODE_FORK_PIN_RANGE) {
+  if (code == SIGCODE_WAKEUP) {
+    return; // do nothing
+  } else if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN ||
+             code == SIGCODE_FORK_FF || code == SIGCODE_FORK_PIN_RANGE) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
       if (pid == 0) {

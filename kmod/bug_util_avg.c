@@ -1,19 +1,15 @@
 #include "kstep.h"
 
-#define TARGET_TASK "test-proc"
-
 static void controller_pre_init(void) {
   kstep_params.step_interval_us = 10;
   kstep_params.print_tasks = false;
   kstep_params.print_rq_stats = true;
 }
 
-static void controller_init(void) {}
-
 static struct task_struct * find_ff_task(void) {
   struct task_struct *p;
   for_each_process(p) {
-    if (strcmp(p->comm, TARGET_TASK) != 0 || p == busy_task)
+    if (strcmp(p->comm, busy_task->comm) != 0 || p == busy_task)
       continue;
     if (p->sched_class == ksym.rt_sched_class)
       return p;
@@ -28,9 +24,7 @@ static void controller_body(void) {
   kstep_set_cpu_freq(2, SCHED_CAPACITY_SCALE >> 1);
 
   // tick until the util_avg becomes 100%
-  for (int i = 0; i < 600; i++) {
-    kstep_tick();
-  }
+  kstep_tick_repeat(600);
 
   // pause the fifo task for
   struct task_struct *ff_task = find_ff_task();
@@ -42,22 +36,17 @@ static void controller_body(void) {
   }
 
   // wait for another 2 ticks (2ms)
-  for (int i = 0; i < 2; i++) {
-    kstep_tick();
-  }
+  kstep_tick_repeat(2);
 
   // start another fifo task
   send_sigcode(busy_task, SIGCODE_FORK_FF, 1);
 
   // tick for another 600 ticks (600ms) to show the impact
-  for (int i = 0; i < 600; i++) {
-    kstep_tick();
-  }
+  kstep_tick_repeat(600);
 }
 
 struct controller_ops controller_util_avg = {
     .name = "util_avg",
     .pre_init = controller_pre_init,
-    .init = controller_init,
     .body = controller_body,
 };
