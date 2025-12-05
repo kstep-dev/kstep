@@ -11,6 +11,7 @@
 #define CGROUP_CONTROL "+cpu +cpuset"
 
 #define MAX_CGROUP_PATH_LENGTH 64
+#define MAX_CGROUP_DATA_LENGTH 64
 
 void kstep_write_file(const char *path, const char *buf, size_t size) {
   struct file *file = filp_open(path, O_WRONLY, 0);
@@ -90,21 +91,35 @@ void kstep_cgroup_init(void) {
   snprintf(default_cpuset, sizeof(default_cpuset), "1-%d",
            num_online_cpus() - 1);
   cgroup_root_fd = kstep_open_fd(CGROUP_ROOT, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-  kstep_cgroup_write_file("", "cgroup.subtree_control", CGROUP_CONTROL);
+  kstep_cgroup_write_raw("", "cgroup.subtree_control", CGROUP_CONTROL,
+                         strlen(CGROUP_CONTROL));
 }
 
-void kstep_cgroup_write_file(const char *dir, const char *filename,
-                             const char *buf) {
+void kstep_cgroup_write_raw(const char *dir, const char *filename,
+                            const char *buf, size_t size) {
   char path[MAX_CGROUP_PATH_LENGTH];
   int ret = scnprintf(path, sizeof(path), CGROUP_ROOT "%s/%s", dir, filename);
   if (ret <= 0 || ret >= sizeof(path))
     panic("failed to form cgroup file path for %s", filename);
-  kstep_write_file(path, buf, strlen(buf));
+  kstep_write_file(path, buf, size);
+}
+
+void kstep_cgroup_write(const char *dir, const char *filename, const char *fmt,
+                        ...) {
+  va_list args;
+  va_start(args, fmt);
+  char buf[MAX_CGROUP_DATA_LENGTH];
+  int size = vsnprintf(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  if (size <= 0 || size >= sizeof(buf))
+    panic("failed to format cgroup data for %s", filename);
+  kstep_cgroup_write_raw(dir, filename, buf, size);
 }
 
 void kstep_cgroup_create(const char *path, const char *cpuset) {
   kstep_mkdir(cgroup_root_fd, path);
-  kstep_cgroup_write_file(path, "cgroup.subtree_control", CGROUP_CONTROL);
-  kstep_cgroup_write_file(path, "cpuset.cpus",
-                          cpuset ? cpuset : default_cpuset);
+  kstep_cgroup_write_raw(path, "cgroup.subtree_control", CGROUP_CONTROL,
+                         strlen(CGROUP_CONTROL));
+  const char *cpus = cpuset ? cpuset : default_cpuset;
+  kstep_cgroup_write_raw(path, "cpuset.cpus", cpus, strlen(cpus));
 }

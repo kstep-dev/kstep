@@ -4,8 +4,6 @@
 
 #include "kstep.h"
 
-struct task_struct *busy_task = NULL;
-
 // Initialize stdin, stdout, and stderr to /dev/console
 // Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
 static void init_task_console(void) {
@@ -22,31 +20,38 @@ static void init_task_console(void) {
   fput(console_file);
 }
 
-static int busy_task_init(struct subprocess_info *info, struct cred *new) {
+struct kstep_task_info {
+  struct task_struct *task;
+};
+
+static int task_init(struct subprocess_info *info, struct cred *new) {
+  struct kstep_task_info *task_info = info->data;
   init_task_console();
-  busy_task = current;
-  TRACE_INFO("busy task created with pid %d", busy_task->pid);
+  task_info->task = current;
+  TRACE_INFO("Task created with pid %d", current->pid);
   return 0;
 }
 
-void kstep_tasks_init(void) {
+struct task_struct *kstep_task_create(void) {
   char *path = "/busy";
   char *argv[] = {path, NULL};
+  struct kstep_task_info task_info = {};
   struct subprocess_info *info = call_usermodehelper_setup(
-      path, argv, NULL, GFP_KERNEL, busy_task_init, NULL, NULL);
+      path, argv, NULL, GFP_KERNEL, task_init, NULL, &task_info);
   if (info == NULL)
     panic("Failed to setup user mode helper");
 
   if (call_usermodehelper_exec(info, UMH_WAIT_EXEC) < 0)
     panic("Failed to run user mode helper");
 
+  struct task_struct *p = task_info.task;
   for (int i = 0; i < 100; i++) {
-    if (strcmp(busy_task->comm, "test-proc") == 0)
-      return;
     kstep_sleep();
-    TRACE_INFO("Waiting for busy task to start");
+    if (strcmp(p->comm, "test-proc") == 0)
+      return p;
+    TRACE_INFO("Waiting for task %d to start", p->pid);
   }
-  panic("Busy task did not start");
+  panic("Task %d did not start", p->pid);
 }
 
 void kstep_task_signal(struct task_struct *p, enum sigcode code, int val1,
@@ -90,6 +95,11 @@ void kstep_task_wakeup(struct task_struct *p) {
 void kstep_task_sleep(struct task_struct *p, int n) {
   kstep_task_signal(p, SIGCODE_SLEEP, n, 0, 0);
   TRACE_INFO("Put task %d to sleep for %d seconds", p->pid, n);
+}
+
+void kstep_task_reweight(struct task_struct *p, int weight) {
+  kstep_task_signal(p, SIGCODE_REWEIGHT, weight, 0, 0);
+  TRACE_INFO("Reweighted task %d to %d", p->pid, weight);
 }
 
 static char *sys_kthread_comms[] = {
