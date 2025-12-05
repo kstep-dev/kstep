@@ -85,7 +85,6 @@ static void loop() {
 }
 
 int main() {
-  printf("busy task started\n");
   struct sigaction sa = {.sa_sigaction = signal_handler,
                          .sa_flags = SA_SIGINFO};
   sigaction(SIGUSR1, &sa, NULL);

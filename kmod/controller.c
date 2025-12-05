@@ -33,14 +33,22 @@ struct controller_ops *kstep_controller_get(const char *name) {
   panic("Controller %s not found", name);
 }
 
-static void controller_body(void) {
-  for (int i = 0; i < 10; i++) {
-    kstep_task_fork(busy_task, 1);
+static struct task_struct *tasks[10];
+static void noop_init(void) {
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
+    tasks[i] = kstep_task_create();
+}
+
+static void noop_body(void) {
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++) 
+    kstep_task_wakeup(tasks[i]);
+
+  for (int i = 0; i < 15; i++) 
     kstep_tick();
-  }
 }
 
 struct controller_ops controller_noop = {
     .name = "noop",
-    .body = controller_body,
+    .init = noop_init,
+    .body = noop_body,
 };

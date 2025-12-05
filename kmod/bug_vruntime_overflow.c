@@ -81,7 +81,7 @@ static void controller_body(void) {
   kstep_cgroup_create("l1_0/l2_1", "1");
 
   // set up the configuration for the cgroup tree
-  kstep_cgroup_write_file("l1_0/l2_0/l3_0", "cpu.weight", "20");
+  kstep_cgroup_write("l1_0/l2_0/l3_0", "cpu.weight", "%d", 20);
 
   // create 1 task in l3_0
   kstep_task_signal(busy_task, SIGCODE_CLONE3_L3_0, 1, 0, 0);
@@ -105,7 +105,7 @@ static void controller_body(void) {
   ksym.dequeue_entities(ineligible_tg_se->cfs_rq, ineligible_tg_se,
                         DEQUEUE_SLEEP);
   struct task_struct *p = get_curr_task(cpu_of_ineligible_task);
-  kstep_cgroup_write_file("l1_0/l2_0/l3_0", "cpu.weight", "100");
+  kstep_cgroup_write("l1_0/l2_0/l3_0", "cpu.weight", "%d", 100);
 
   kstep_task_signal(p, SIGCODE_CLONE3_L3_0, 1, 0, 0);
 

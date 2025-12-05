@@ -28,12 +28,14 @@ struct kstep_params_t {
   bool print_lb_events;                // Whether to print LB events
 };
 extern struct kstep_params_t kstep_params;
+extern struct task_struct *busy_task;
 void kstep_params_print(void);
 
 // controller.c
 struct controller_ops {
   const char *name;
   void (*pre_init)(void);
+  void (*init)(void);
   void (*body)(void);
 };
 struct controller_ops *kstep_controller_get(const char *name);
@@ -50,18 +52,18 @@ void kstep_tick_until(bool (*fn)(void));
 struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *));
 
 // tasks.c
-int is_sys_kthread(struct task_struct *p);
-extern struct task_struct *busy_task;
-void kstep_tasks_init(void);
+struct task_struct *kstep_task_create(void);
 void kstep_task_pin(struct task_struct *p, int begin, int end);
 void kstep_task_fork(struct task_struct *p, int n);
 void kstep_task_fork_pin(struct task_struct *p, int n, int begin, int end);
 void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
 void kstep_task_sleep(struct task_struct *p, int n);
+void kstep_task_reweight(struct task_struct *p, int weight);
 // Low level signal sending, use with caution
 void kstep_task_signal(struct task_struct *p, enum sigcode code, int val1,
                        int val2, int val3);
+int is_sys_kthread(struct task_struct *p);
 
 // kernel.c
 void kstep_write_file(const char *path, const char *buf, size_t size);
@@ -70,8 +72,10 @@ int kstep_open_fd(const char *path, int flags);
 void kstep_close_fd(int fd);
 void kstep_cgroup_init(void);
 void kstep_cgroup_create(const char *path, const char *cpuset);
-void kstep_cgroup_write_file(const char *dir, const char *filename,
-                             const char *buf);
+void kstep_cgroup_write(const char *dir, const char *filename, const char *fmt,
+                        ...);
+void kstep_cgroup_write_raw(const char *dir, const char *filename,
+                            const char *buf, size_t size);
 
 // output.c
 void print_rq_stats(void);
