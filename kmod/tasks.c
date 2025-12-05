@@ -4,17 +4,6 @@
 
 #include "kstep.h"
 
-static void run_prog(char *path, int (*init)(struct subprocess_info *info,
-                                             struct cred *new)) {
-  struct subprocess_info *info = call_usermodehelper_setup(
-      path, (char *[]){path, NULL}, NULL, GFP_KERNEL, init, NULL, NULL);
-  if (info == NULL)
-    panic("Failed to setup user mode helper");
-
-  if (call_usermodehelper_exec(info, UMH_WAIT_EXEC) < 0)
-    panic("Failed to run user mode helper");
-}
-
 struct task_struct *busy_task = NULL;
 
 // Initialize stdin, stdout, and stderr to /dev/console
@@ -41,7 +30,16 @@ static int busy_task_init(struct subprocess_info *info, struct cred *new) {
 }
 
 void kstep_tasks_init(void) {
-  run_prog("/busy", busy_task_init);
+  char *path = "/busy";
+  char *argv[] = {path, NULL};
+  struct subprocess_info *info = call_usermodehelper_setup(
+      path, argv, NULL, GFP_KERNEL, busy_task_init, NULL, NULL);
+  if (info == NULL)
+    panic("Failed to setup user mode helper");
+
+  if (call_usermodehelper_exec(info, UMH_WAIT_EXEC) < 0)
+    panic("Failed to run user mode helper");
+
   for (int i = 0; i < 100; i++) {
     if (strcmp(busy_task->comm, "test-proc") == 0)
       return;
@@ -51,8 +49,8 @@ void kstep_tasks_init(void) {
   panic("Busy task did not start");
 }
 
-void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
-                   int val3) {
+void kstep_task_signal(struct task_struct *p, enum sigcode code, int val1,
+                       int val2, int val3) {
   struct kernel_siginfo info = {
       .si_signo = SIGUSR1,
       .si_code = code,
@@ -61,6 +59,37 @@ void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
   TRACE_INFO("Sent %s (val1=%d, val2=%d, val3=%d) to pid %d",
              sigcode_to_str[code], val1, val2, val3, p->pid);
   kstep_sleep();
+}
+
+void kstep_task_fork(struct task_struct *p, int n) {
+  kstep_task_signal(p, SIGCODE_FORK, n, 0, 0);
+  TRACE_INFO("Forked task %d %d times", p->pid, n);
+}
+
+void kstep_task_fork_pin(struct task_struct *p, int n, int begin, int end) {
+  kstep_task_signal(p, SIGCODE_FORK_PIN, n, begin, end);
+  TRACE_INFO("Forked task %d %d times and pinned to CPUs %d-%d", p->pid, n,
+             begin, end);
+}
+
+void kstep_task_pin(struct task_struct *p, int begin, int end) {
+  kstep_task_signal(p, SIGCODE_PIN, begin, end, 0);
+  TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
+}
+
+void kstep_task_pause(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_PAUSE, 0, 0, 0);
+  TRACE_INFO("Paused task %d", p->pid);
+}
+
+void kstep_task_wakeup(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_WAKEUP, 0, 0, 0);
+  TRACE_INFO("Waked up task %d", p->pid);
+}
+
+void kstep_task_sleep(struct task_struct *p, int n) {
+  kstep_task_signal(p, SIGCODE_SLEEP, n, 0, 0);
+  TRACE_INFO("Put task %d to sleep for %d seconds", p->pid, n);
 }
 
 static char *sys_kthread_comms[] = {

@@ -20,7 +20,7 @@ static struct task_struct *find_target_task(void) {
 
 static void controller_body(void) {
   // fork 3 processes on cpu 1
-  send_sigcode2(busy_task, SIGCODE_FORK_PIN, 4, 2);
+  kstep_task_fork_pin(busy_task, 4, 2, 2);
 
   // The pattern: Make nr_queued > nr_running, and then run until nr_queued == nr_running before ending the "highlight".
   for (int i = 0; i < 10; i++) {
@@ -33,7 +33,7 @@ static void controller_body(void) {
 
     // Step 2: Pause a newly-forked task, which will result in it being queued but not running
     struct task_struct *target_task = find_target_task();
-    send_sigcode(target_task, SIGCODE_PAUSE, 0);
+    kstep_task_pause(target_task);
 
     // Step 3: Wait until nr_queued == nr_running again, i.e. the queue clears (simulate shade end)
     // For the workload's purposes, we keep calling tick until that's the case.
@@ -45,7 +45,7 @@ static void controller_body(void) {
     }
 
     // Now, simulate a draining phase: unpause the "queued" task if possible -- here, we resume the busy task
-    send_sigcode2(busy_task, SIGCODE_FORK_PIN, 1, 2);
+    kstep_task_fork_pin(busy_task, 1, 2, 2);
     // (or you might send a SIGCODE_RESUME to "target_task" if that makes more sense)
   }
 }

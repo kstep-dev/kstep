@@ -5,7 +5,6 @@
   X(SIGCODE_WAKEUP)                                                            \
   X(SIGCODE_FORK)                                                              \
   X(SIGCODE_FORK_PIN)                                                          \
-  X(SIGCODE_FORK_PIN_RANGE)                                                    \
   X(SIGCODE_FORK_FF)                                                           \
   X(SIGCODE_CLONE3)                                                            \
   X(SIGCODE_CLONE3_L3_0)                                                       \
