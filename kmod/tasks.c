@@ -44,11 +44,13 @@ struct task_struct *kstep_task_create(void) {
   if (call_usermodehelper_exec(info, UMH_WAIT_EXEC) < 0)
     panic("Failed to run user mode helper");
 
+  // Wait for the task to start
+  kstep_sleep();
   struct task_struct *p = task_info.task;
   for (int i = 0; i < 100; i++) {
-    kstep_sleep();
     if (strcmp(p->comm, "test-proc") == 0)
       return p;
+    kstep_sleep();
     TRACE_INFO("Waiting for task %d to start", p->pid);
   }
   panic("Task %d did not start", p->pid);
