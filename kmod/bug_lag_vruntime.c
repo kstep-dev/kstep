@@ -22,9 +22,9 @@ static void controller_body(void) {
 
   send_sigcode(busy_task, SIGCODE_CLONE3_L1_0, 1);
   struct task_struct *l1_0_task = find_last_task();
-  kstep_tick_repeat(20);
+  kstep_tick_repeat(15);
   kstep_cgroup_write_file("l1_0", "cpu.weight", "10000");
-  kstep_tick_repeat(10);
+  kstep_tick_repeat(5);
 }
 
 struct controller_ops controller_lag_vruntime = {

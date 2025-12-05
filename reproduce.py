@@ -58,6 +58,7 @@ bugs = [
         plot_format="cur_task",
         fixed=Config(version="bbce3de"),
         buggy=Config(version="bbce3de~1"),
+        smp="2",
     ),
     # https://github.com/torvalds/linux/commit/2feab2492deb2f14f9675dd6388e9e2bf669c27a
     Bug(

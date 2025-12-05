@@ -24,7 +24,7 @@ static void controller_body(void) {
       send_sigcode2(pin_task, SIGCODE_PIN, 4, 6);
   }
 
-  kstep_tick_repeat(1000);
+  kstep_tick_repeat(301);
 }
 
 struct controller_ops controller_extra_balance = {

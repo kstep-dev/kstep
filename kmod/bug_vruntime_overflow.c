@@ -90,6 +90,8 @@ static void controller_body(void) {
   send_sigcode(busy_task, SIGCODE_CLONE3_L3_1, 3);
   record_task_to_groups(3, 3, 1);
 
+  send_sigcode(busy_task, SIGCODE_PAUSE, 0);
+
   kstep_tick_repeat(10);
 
   // tick until there is a not eligible task group with eligible tasks
@@ -107,7 +109,7 @@ static void controller_body(void) {
 
   send_sigcode(p, SIGCODE_CLONE3_L3_0, 1);
 
-  kstep_tick_repeat(26);
+  kstep_tick_repeat(18);
 }
 
 struct controller_ops controller_vruntime_overflow = {

@@ -9,8 +9,9 @@ def save_fig(fig: Figure, filename: Path):
     png_path = filename.with_suffix(".png")
 
     fig.savefig(pdf_path, bbox_inches="tight", pad_inches=0, dpi=1000)
-    fig.savefig(png_path, bbox_inches="tight", pad_inches=0, dpi=1000)
+    print(f"Saved figure to {pdf_path}")
 
-    print(f"Saved figure to {pdf_path} and {png_path}")
+    fig.savefig(png_path, bbox_inches="tight", pad_inches=0, dpi=1000)
+    print(f"Saved figure to {png_path}")
 
     return pdf_path, png_path
