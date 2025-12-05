@@ -37,12 +37,11 @@ COLOR_MAPS = {
         -1: COLOR_IDLE,
     },
     "vruntime_overflow": {
-        0: COLOR_YELLOW,
-        1: COLOR_GREEN,
+        0: COLOR_GREEN,
+        1: COLOR_YELLOW,
         2: COLOR_ORANGE,
-        3: COLOR_DARK_BLUE,
-        4: COLOR_LIGHT_BLUE,
-        5: COLOR_BUGGY,
+        3: COLOR_LIGHT_BLUE,
+        4: COLOR_BUGGY,
         -1: COLOR_IDLE,
     },
 }
@@ -92,7 +91,7 @@ def plot_color_matrix(
     ax.set_yticks(np.arange(cpu_count))
     ax.set_yticklabels([f"CPU {i + 1}" for i in range(cpu_count)])
 
-    if "buggy" in title:
+    if "Buggy" in title:
         ax.set_xticks([])
         ax.set_xticklabels([])
         ax.set_xlabel("")
@@ -118,34 +117,41 @@ def plot_cur_task(
     title_fixed: str,
     color_map: dict[int, str],
 ):
-    fig, (ax_buggy, ax_fixed) = plt.subplots(
-        2, 1, figsize=(4, 1.125), gridspec_kw={"hspace": 0.6}
-    )
     df_buggy = parse_curr_task("buggy", log_file_buggy)
     df_fixed = parse_curr_task("fixed", log_file_fixed)
     df = build_pid_matrix(pd.concat([df_buggy, df_fixed]))
 
+    num_cpus = df.shape[1]
+
+    if num_cpus == 1:
+        figsize = (4, 0.875)
+    else:
+        figsize = (4, 1.125)
+
+    fig, (ax_buggy, ax_fixed) = plt.subplots(
+        2, 1, figsize=figsize, gridspec_kw={"hspace": 0.75}
+    )
+
     plot_color_matrix(df.loc["buggy"], ax_buggy, title_buggy, color_map)
     plot_color_matrix(df.loc["fixed"], ax_fixed, title_fixed, color_map)
 
-    # Plot legend
     handles = []
     labels = []
     unique_pids = np.unique(df.values.flatten())
     for pid in unique_pids:
         handles.append(mpatches.Patch(color=color_map[pid]))
-        labels.append("Idle" if pid == -1 else f"PID {pid}")
+        labels.append("Idle" if pid == -1 else f"Task {pid + 1}")
 
     fig.legend(
         handles,
         labels,
         loc="upper center",
         ncol=8,
-        bbox_to_anchor=(0.5, 1.25),
+        bbox_to_anchor=(0.5, 1.25 if num_cpus == 2 else 1.3),
         fontsize=8,
         handlelength=0.75,
         handletextpad=0.25,
-        columnspacing=0.75,
+        columnspacing=1,
         frameon=False,
     )
 
@@ -159,13 +165,17 @@ if __name__ == "__main__":
 
     bugId = args.controller
     log_file_buggy = RESULTS_DIR / f"{bugId}_buggy.log"
-    title_buggy = f"{bugId} (buggy)"
-
     log_file_fixed = RESULTS_DIR / f"{bugId}_fixed.log"
-    title_fixed = f"{bugId} (fixed)"
 
     output_file = RESULTS_DIR / f"{bugId}.pdf"
     color_map = COLOR_MAPS.get(bugId, {})
+
+    if bugId == "sync_wakeup":
+        title_buggy = "Buggy and Official Fix"
+        title_fixed = "Our Fix"
+    else:
+        title_buggy = "Buggy"
+        title_fixed = "Fixed"
 
     fig = plot_cur_task(
         log_file_buggy, log_file_fixed, title_buggy, title_fixed, color_map

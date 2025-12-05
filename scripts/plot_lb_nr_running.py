@@ -4,21 +4,29 @@ import argparse
 import re
 from collections import defaultdict
 
+import matplotlib.lines as mlines
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 from consts import RESULTS_DIR
 from matplotlib import colors
+from plot_utils import save_fig
 
 all_cpus = [4, 5, 6, 7]
-N_COLORS = 7
-cmap = plt.cm.get_cmap('Blues', N_COLORS)
+N_COLORS = 4
+cmap = plt.cm.get_cmap("Blues", N_COLORS)
+
 
 def build_nr_running_matrix(filename, time_start=0.0):
-    pattern_nr_running = re.compile(r"\[\s*(\d+\.\d+)\].*?print_nr_running:\s+(\d+)\s+(\d+)")
-    pattern_print_tasks = re.compile(r"\[\s*(\d+\.\d+)\].*?print_rq_stats:.*?CPU\s+(\d+)\s+running=(\d+)")
+    pattern_nr_running = re.compile(
+        r"\[\s*(\d+\.\d+)\].*?print_nr_running:\s+(\d+)\s+(\d+)"
+    )
+    pattern_print_tasks = re.compile(
+        r"\[\s*(\d+\.\d+)\].*?print_rq_stats:.*?CPU\s+(\d+)\s+running=(\d+)"
+    )
     cpu_ts2nr = defaultdict(dict)
     all_timestamps = set()
-    min_running, max_running = float('inf'), float('-inf')
+    min_running, max_running = float("inf"), float("-inf")
 
     with open(filename, "r") as f:
         for line in f:
@@ -59,15 +67,24 @@ def build_nr_running_matrix(filename, time_start=0.0):
             if not np.isnan(val):
                 min_running = min(min_running, val)
                 max_running = max(max_running, val)
-    return nr_running_matrix, cpu_count, time_count, all_timestamps, int(min_running), int(max_running)
+
+    return (
+        nr_running_matrix,
+        cpu_count,
+        time_count,
+        all_timestamps,
+        int(min_running),
+        int(max_running),
+    )
+
 
 def parse_lb_events(filename, time_start=0.0):
     """
     Return a set of (timestamp, cpu) for each LB event with weight == 4 and timestamp >= time_start.
     """
-    pattern = re.compile(r'\[\s*([\d\.]+)\]\s+LB\s+(\d+)\s+(\d+)')
+    pattern = re.compile(r"\[\s*([\d\.]+)\]\s+LB\s+(\d+)\s+(\d+)")
     events = set()
-    with open(filename, 'r') as f:
+    with open(filename, "r") as f:
         for line in f:
             m = pattern.search(line)
             if m:
@@ -78,10 +95,13 @@ def parse_lb_events(filename, time_start=0.0):
                     events.add((ts, cpu))
     return events
 
-def plot_color_matrix_with_lb(ax, matrix, cpu_count, time_count, vmin, vmax, timestamps, title_str, lb_events):
+
+def plot_color_matrix_with_lb(
+    ax, matrix, cpu_count, time_count, vmin, vmax, timestamps, title_str, lb_events
+):
     # x ticks: in ms, offsets from the time_start
     time_start = timestamps[0]
-    timestamps_ms = [(t-time_start)*1000 for t in timestamps]
+    timestamps_ms = [(t - time_start) * 1000 for t in timestamps]
     bounds = np.linspace(vmin - 0.5, vmax + 0.5, N_COLORS + 1)
     norm = colors.BoundaryNorm(boundaries=bounds, ncolors=cmap.N)
     x_min = timestamps_ms[0]
@@ -90,35 +110,33 @@ def plot_color_matrix_with_lb(ax, matrix, cpu_count, time_count, vmin, vmax, tim
     y_max = all_cpus[-1] + 0.7
 
     im = ax.imshow(
-        matrix, aspect="auto", interpolation="nearest", cmap=cmap, norm=norm,
-        extent=[x_min, x_max, y_min, y_max], origin="lower"
+        matrix,
+        aspect="auto",
+        interpolation="nearest",
+        cmap=cmap,
+        norm=norm,
+        extent=[x_min, x_max, y_min, y_max],
+        origin="lower",
     )
     # Set y-ticks at each integer step, for clear tick marks for CPUs
     yticks = np.arange(all_cpus[0], all_cpus[-1] + 1)
     ax.set_yticks(yticks)
     ax.set_yticklabels([str(cpu) for cpu in yticks])
-    ax.set_ylabel("CPU", fontsize = 13)
+    ax.set_ylabel("CPU", fontsize=13)
 
-    ax.set_title(title_str, fontsize=13)
+    ax.set_title(title_str, fontsize=12, pad=3)
 
-    if "buggy" in title_str:
+    if "Buggy" in title_str:
         ax.set_xticks([])
         ax.set_xlabel("")
     else:
-        # ax.set_xlabel("Time (ms)", fontsize = 13)
-    
         n_xticks = 6 if len(timestamps_ms) > 6 else len(timestamps_ms)
-        x_tick_indices = np.linspace(0, len(timestamps_ms)-1, n_xticks, dtype=int)
+        x_tick_indices = np.linspace(0, len(timestamps_ms) - 1, n_xticks, dtype=int)
         x_ticks = [timestamps_ms[i] for i in x_tick_indices]
         ax.set_xticks(x_ticks)
-        ax.set_xticklabels([f"{int(x)}" for x in x_ticks], fontsize = 13)
-        ax.tick_params(axis='x', length=2, pad=1)  # Shorter ticks, labels closer
-        ax.set_xlabel("Time (ms)", labelpad=0.5, fontsize = 13)
-    
-
-    cbar = plt.colorbar(im, ax=ax, orientation='vertical', pad=0.03, fraction=0.07, boundaries=bounds, ticks=np.arange(vmin, vmax+1))
-    cbar.set_label("nr_running", fontsize = 13)
-    cbar.ax.set_yticklabels([str(int(t)) for t in np.arange(vmin, vmax+1)])
+        ax.set_xticklabels([f"{int(x)}" for x in x_ticks], fontsize=13)
+        ax.tick_params(axis="x", length=2, pad=1)  # Shorter ticks, labels closer
+        ax.set_xlabel("Time (ms)", labelpad=0.5, fontsize=13)
 
     ax.margins(0.03)
     ax.set_xlim(x_min, x_max)
@@ -130,33 +148,51 @@ def plot_color_matrix_with_lb(ax, matrix, cpu_count, time_count, vmin, vmax, tim
         ts2idx = {t: i for i, t in enumerate(timestamps)}
         dot_xs = []
         dot_ys = []
-        for (lb_ts, lb_cpu) in lb_events:
+        for lb_ts, lb_cpu in lb_events:
             # Find closest timestamp in timestamps (within a small tolerance, e.g. 1ms)
-            idx = min(range(len(timestamps)), key=lambda i: abs(timestamps[i]-lb_ts)) if timestamps else None
+            idx = (
+                min(range(len(timestamps)), key=lambda i: abs(timestamps[i] - lb_ts))
+                if timestamps
+                else None
+            )
             if idx is not None and abs(timestamps[idx] - lb_ts) < 0.005:
                 # Scatter dot at (timestamps_ms[idx], lb_cpu)
                 dot_xs.append(timestamps_ms[idx])
                 dot_ys.append(lb_cpu)
-        ax.scatter(dot_xs, dot_ys, s=30, c='#FF9013', marker='o', label="Try Balance in 4-CPU SchedDomain", zorder=5)
-        if dot_xs and "buggy" in title_str:
-            ax.legend(framealpha=0.6, handletextpad=0.1, bbox_to_anchor=(1.05, 1.05), loc='upper right')
-            # ax.set_xlabel("")
+        ax.scatter(
+            dot_xs,
+            dot_ys,
+            s=30,
+            c="#FF9013",
+            marker="o",
+            zorder=5,
+        )
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="extra_balance") # 6d7e478
-    parser.add_argument("--time-start", type=float, default=10.20, help="Only plot data from this time onward (in seconds)")
+    parser.add_argument("--controller", type=str, default="extra_balance")  # 6d7e478
+    parser.add_argument(
+        "--time-start",
+        type=float,
+        default=10.10,
+        help="Only plot data from this time onward (in seconds)",
+    )
     args = parser.parse_args()
 
     bugId = args.controller
     log_file_buggy = RESULTS_DIR / f"{bugId}_buggy.log"
-    title_buggy = f"{bugId} (buggy)"
+    title_buggy = "Buggy"
     log_file_fixed = RESULTS_DIR / f"{bugId}_fixed.log"
-    title_fixed = f"{bugId} (fixed)"
+    title_fixed = "Fixed"
     output_file = RESULTS_DIR / f"{bugId}.pdf"
 
-    matrix_buggy, cpu_count, time_count, t_buggy, min_buggy, max_buggy = build_nr_running_matrix(log_file_buggy, time_start=args.time_start)
-    matrix_fixed, _, _, t_fixed, min_fixed, max_fixed = build_nr_running_matrix(log_file_fixed, time_start=args.time_start)
+    matrix_buggy, cpu_count, time_count, t_buggy, min_buggy, max_buggy = (
+        build_nr_running_matrix(log_file_buggy, time_start=args.time_start)
+    )
+    matrix_fixed, _, _, t_fixed, min_fixed, max_fixed = build_nr_running_matrix(
+        log_file_fixed, time_start=args.time_start
+    )
     vmin = min(min_buggy, min_fixed)
     vmax = max(max_buggy, max_fixed)
 
@@ -164,10 +200,49 @@ if __name__ == "__main__":
     lb_events_buggy = parse_lb_events(log_file_buggy, args.time_start)
     lb_events_fixed = parse_lb_events(log_file_fixed, args.time_start)
 
-    fig, axes = plt.subplots(2, 1, figsize=(4, 2.5), sharex=False)
+    fig, axes = plt.subplots(
+        2, 1, figsize=(3.5, 2), sharex=False, gridspec_kw={"hspace": 0.3}
+    )
 
-    plot_color_matrix_with_lb(axes[0], matrix_buggy, cpu_count, time_count, vmin, vmax, t_buggy, title_buggy, lb_events_buggy)
-    plot_color_matrix_with_lb(axes[1], matrix_fixed, cpu_count, time_count, vmin, vmax, t_fixed, title_fixed, lb_events_fixed)
+    plot_color_matrix_with_lb(
+        axes[0],
+        matrix_buggy,
+        cpu_count,
+        time_count,
+        vmin,
+        vmax,
+        t_buggy,
+        title_buggy,
+        lb_events_buggy,
+    )
+    plot_color_matrix_with_lb(
+        axes[1],
+        matrix_fixed,
+        cpu_count,
+        time_count,
+        vmin,
+        vmax,
+        t_fixed,
+        title_fixed,
+        lb_events_fixed,
+    )
 
-    plt.tight_layout(pad=0.)
-    plt.savefig(output_file, bbox_inches=None)
+    handles = []
+    labels = []
+    handles.append(mlines.Line2D([], [], color="#FF9013", marker="o", linestyle="None"))
+    labels.append("Balance \nin 4-CPU\ndomain")
+    for i in range(N_COLORS):
+        handles.append(mpatches.Patch(color=cmap(i)))
+        labels.append(f"{i} running")
+    fig.legend(
+        handles,
+        labels,
+        loc="center right",
+        bbox_to_anchor=(1.2, 0.5),
+        borderaxespad=0.0,
+        handlelength=1,
+        handletextpad=0.5,
+        frameon=False,
+    )
+
+    save_fig(fig, output_file)

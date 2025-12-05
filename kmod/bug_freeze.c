@@ -42,7 +42,7 @@ static void controller_body(void) {
 
   send_sigcode(pause_task, SIGCODE_WAKEUP, 0);
 
-  kstep_tick_repeat(45);
+  kstep_tick_repeat(25);
 }
 
 struct controller_ops controller_freeze = {

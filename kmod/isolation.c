@@ -27,14 +27,13 @@ static void prealloc_kworker(struct workqueue_struct *wq, int num_kworkers) {
     INIT_WORK(&dummy_works[i], dummy_work_fn);
     int cpu = i / num_kworkers;
     queue_work_on(cpu, wq, &dummy_works[i]);
-  }
-  for (int i = 0; i < num_works; i++) {
     wait_for_completion(&dummy_start);
   }
-  complete_all(&dummy_done);
   for (int i = 0; i < num_works; i++) {
+    complete(&dummy_done);
     flush_work(&dummy_works[i]);
   }
+
   kfree(dummy_works);
 }
 
