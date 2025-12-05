@@ -89,7 +89,7 @@ void kstep_task_wakeup(struct task_struct *p) {
 
 void kstep_task_sleep(struct task_struct *p, int n) {
   kstep_task_signal(p, SIGCODE_SLEEP, n, 0, 0);
-  TRACE_INFO("Sleeped task %d for %d seconds", p->pid, n);
+  TRACE_INFO("Put task %d to sleep for %d seconds", p->pid, n);
 }
 
 static char *sys_kthread_comms[] = {
