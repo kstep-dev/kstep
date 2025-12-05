@@ -4,15 +4,15 @@
 #include "kstep.h"
 
 struct kstep_params_t kstep_params = {
-    .controller = "noop",
+    .driver = "noop",
     .step_interval_us = 10000,
     .special_topo = false,
     .print_rq_stats = true,
     .print_tasks = true,
     .print_nr_running = false,
 };
-module_param_string(controller, kstep_params.controller,
-                    sizeof(kstep_params.controller), 0644);
+module_param_string(driver, kstep_params.driver, sizeof(kstep_params.driver),
+                    0644);
 module_param_named(step_interval_us, kstep_params.step_interval_us, ullong,
                    0644);
 module_param_named(special_topo, kstep_params.special_topo, bool, 0644);
@@ -22,7 +22,7 @@ module_param_named(print_lb_events, kstep_params.print_lb_events, bool, 0644);
 
 void kstep_params_print(void) {
   TRACE_INFO("kSTEP params:");
-  TRACE_INFO("- controller: %s", kstep_params.controller);
+  TRACE_INFO("- driver: %s", kstep_params.driver);
   TRACE_INFO("- step_interval_us: %llu", kstep_params.step_interval_us);
   TRACE_INFO("- special_topo: %d", kstep_params.special_topo);
   TRACE_INFO("- print_rq_stats: %d", kstep_params.print_rq_stats);
@@ -36,9 +36,9 @@ struct task_struct *busy_task = NULL;
 static int __init kstep_main(void) {
   TRACE_INFO("Initializing kSTEP");
   ksym_init();
-  struct controller_ops *ops = kstep_controller_get(kstep_params.controller);
-  if (ops->pre_init)
-    ops->pre_init();
+  struct kstep_driver *driver = kstep_driver_get(kstep_params.driver);
+  if (driver->pre_init)
+    driver->pre_init();
 
   kstep_params_print();
   if (kstep_params.special_topo)
@@ -56,8 +56,8 @@ static int __init kstep_main(void) {
 
   // Run userspace programs when we know the system is ready
   busy_task = kstep_task_create();
-  if (ops->init)
-    ops->init();
+  if (driver->init)
+    driver->init();
 
   // Control timer ticks and clock
   kstep_tick_init();
@@ -73,9 +73,9 @@ static int __init kstep_main(void) {
 
   print_all_tasks();
 
-  TRACE_INFO("Running controller %s", ops->name);
-  ops->body();
-  TRACE_INFO("Exiting controller %s", ops->name);
+  TRACE_INFO("Running driver %s", driver->name);
+  driver->body();
+  TRACE_INFO("Exiting driver %s", driver->name);
   kernel_restart(NULL);
   
   return 0;

@@ -58,7 +58,7 @@ static struct task_struct *get_curr_task(int cpu) {
   return NULL;
 }
 
-static void controller_body(void) {
+static void body(void) {
   for (int i = 0; i < MAX_TASKS; i++) {
     task_to_cgroup_id[i][0] = -1;
     task_to_cgroup_id[i][1] = -1;
@@ -67,18 +67,17 @@ static void controller_body(void) {
   task_to_cgroup_id[busy_task->pid - busy_task->pid][0] = 0;
   task_to_cgroup_id[busy_task->pid - busy_task->pid][1] = 0;
 
-  /*
-    create a cgroup tree
-    root -> l1_0 -> l2_0 -> l3_0
-                 |      |-> l3_1
-                 |
-                 |--> l2_1
-  */
-  kstep_cgroup_create("l1_0", "1");
-  kstep_cgroup_create("l1_0/l2_0", "1");
-  kstep_cgroup_create("l1_0/l2_0/l3_0", "1");
-  kstep_cgroup_create("l1_0/l2_0/l3_1", "1");
-  kstep_cgroup_create("l1_0/l2_1", "1");
+  const char *cgroups[] = {
+      "l1_0",           //
+      "l1_0/l2_0",      //
+      "l1_0/l2_0/l3_0", //
+      "l1_0/l2_0/l3_1", //
+      "l1_0/l2_1",      //
+  };
+  for (int i = 0; i < ARRAY_SIZE(cgroups); i++) {
+    kstep_cgroup_create(cgroups[i]);
+    kstep_cgroup_write(cgroups[i], "cpuset.cpus", "1");
+  }
 
   // set up the configuration for the cgroup tree
   kstep_cgroup_write("l1_0/l2_0/l3_0", "cpu.weight", "%d", 20);
@@ -112,7 +111,7 @@ static void controller_body(void) {
   kstep_tick_repeat(18);
 }
 
-struct controller_ops controller_vruntime_overflow = {
+struct kstep_driver vruntime_overflow = {
     .name = "vruntime_overflow",
-    .body = controller_body,
+    .body = body,
 };

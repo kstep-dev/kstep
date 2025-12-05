@@ -19,7 +19,7 @@
 
 // main.c
 struct kstep_params_t {
-  char controller[32];                 // Name of the controller to run
+  char driver[32];                     // Name of the driver to run
   unsigned long long step_interval_us; // Interval between steps in us
   bool special_topo;                   // Whether to use the special topology
   bool print_rq_stats;                 // Whether to print rq stats
@@ -31,14 +31,14 @@ extern struct kstep_params_t kstep_params;
 extern struct task_struct *busy_task;
 void kstep_params_print(void);
 
-// controller.c
-struct controller_ops {
+// driver.c
+struct kstep_driver {
   const char *name;
   void (*pre_init)(void);
   void (*init)(void);
   void (*body)(void);
 };
-struct controller_ops *kstep_controller_get(const char *name);
+struct kstep_driver *kstep_driver_get(const char *name);
 
 // tick.c
 void kstep_tick_init(void);
@@ -71,7 +71,7 @@ void kstep_mkdir(int dfd, const char *dir);
 int kstep_open_fd(const char *path, int flags);
 void kstep_close_fd(int fd);
 void kstep_cgroup_init(void);
-void kstep_cgroup_create(const char *path, const char *cpuset);
+void kstep_cgroup_create(const char *dir);
 void kstep_cgroup_write(const char *dir, const char *filename, const char *fmt,
                         ...);
 void kstep_cgroup_write_raw(const char *dir, const char *filename,

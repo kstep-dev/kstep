@@ -18,7 +18,7 @@ static struct task_struct *find_target_task(void) {
   return NULL;
 }
 
-static void controller_body(void) {
+static void body(void) {
   // fork 3 processes on cpu 1
   kstep_task_fork_pin(busy_task, 4, 2, 2);
 
@@ -50,7 +50,7 @@ static void controller_body(void) {
   }
 }
 
-struct controller_ops controller_case_time_sensitive = {
+struct kstep_driver case_time_sensitive = {
     .name = "case_time_sensitive",
-    .body = controller_body,
+    .body = body,
 };

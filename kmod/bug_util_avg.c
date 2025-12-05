@@ -1,12 +1,12 @@
 #include "kstep.h"
 
-static void controller_pre_init(void) {
+static void pre_init(void) {
   kstep_params.step_interval_us = 10;
   kstep_params.print_tasks = false;
   kstep_params.print_rq_stats = true;
 }
 
-static struct task_struct * find_ff_task(void) {
+static struct task_struct *find_ff_task(void) {
   struct task_struct *p;
   for_each_process(p) {
     if (strcmp(p->comm, busy_task->comm) != 0 || p == busy_task)
@@ -16,7 +16,7 @@ static struct task_struct * find_ff_task(void) {
   }
   return NULL;
 }
-static void controller_body(void) {
+static void body(void) {
   // fork 1 process using fifo sched class
   kstep_task_signal(busy_task, SIGCODE_FORK_FF, 1, 0, 0);
 
@@ -28,7 +28,7 @@ static void controller_body(void) {
 
   // pause the fifo task for
   struct task_struct *ff_task = find_ff_task();
-  
+
   if (ff_task) {
     kstep_task_pause(ff_task);
   } else {
@@ -45,8 +45,8 @@ static void controller_body(void) {
   kstep_tick_repeat(600);
 }
 
-struct controller_ops controller_util_avg = {
+struct kstep_driver util_avg = {
     .name = "util_avg",
-    .pre_init = controller_pre_init,
-    .body = controller_body,
+    .pre_init = pre_init,
+    .body = body,
 };

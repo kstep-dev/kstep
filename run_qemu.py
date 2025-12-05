@@ -16,7 +16,7 @@ def run_qemu(
     linux_dir: Path,
     debug: bool = False,
     log_file: Optional[Path] = None,
-    controller: Optional[str] = None,
+    driver: Optional[str] = None,
     params: Iterable[str] = (),
     smp: str = "3",
     mem_mb: int = 256,
@@ -55,8 +55,8 @@ def run_qemu(
     # Everything after the `--` is passed to init
     # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
     boot_args += ["--"]
-    if controller:
-        boot_args += [f"controller={controller}"]
+    if driver:
+        boot_args += [f"driver={driver}"]
 
     if params:
         boot_args.extend(params)
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--controller", type=str, default=None)
+    parser.add_argument("--driver", type=str, default=None)
     parser.add_argument("--log_file", type=Path, default=get_log_path(create=True))
     parser.add_argument("--smp", type=str, default="3")
     parser.add_argument("--params", type=str, nargs="+")

@@ -122,7 +122,7 @@ def main(bug: Bug, run: List[str], reset: bool):
         make_kstep()
         run_qemu(
             linux_dir=linux_dir,
-            controller=bug.name,
+            driver=bug.name,
             params=bug.buggy.params,
             log_file=RESULTS_DIR / f"{bug.name}_buggy.log",
             smp=bug.smp,
@@ -139,7 +139,7 @@ def main(bug: Bug, run: List[str], reset: bool):
         make_kstep()
         run_qemu(
             linux_dir=linux_dir,
-            controller=bug.name,
+            driver=bug.name,
             params=bug.fixed.params,
             log_file=RESULTS_DIR / f"{bug.name}_fixed.log",
             smp=bug.smp,

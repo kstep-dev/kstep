@@ -50,7 +50,7 @@ static bool is_ineligible(struct task_struct *p) {
 
 static bool is_running_again(void) { return not_eligible_task->on_cpu == 1; }
 
-static void controller_body(void) {
+static void body(void) {
   // create a busy kthread on cpu 1
   busy_kthread = kthread_create(loop, NULL, "busy_kthread");
   set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
@@ -105,7 +105,7 @@ static void controller_body(void) {
   kstep_tick_repeat(7);
 }
 
-struct controller_ops controller_sync_wakeup = {
+struct kstep_driver sync_wakeup = {
     .name = "sync_wakeup",
-    .body = controller_body,
+    .body = body,
 };

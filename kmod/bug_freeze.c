@@ -2,7 +2,7 @@
 
 #include "kstep.h"
 
-static void controller_pre_init(void) { kstep_params.step_interval_us = 50000; }
+static void pre_init(void) { kstep_params.step_interval_us = 50000; }
 
 static void kstep_freeze_task(struct task_struct *p) {
 // https://github.com/torvalds/linux/commit/f5d39b020809146cc28e6e73369bf8065e0310aa
@@ -28,7 +28,7 @@ static bool is_ineligible(struct task_struct *p) {
          ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0;
 }
 
-static void controller_body(void) {
+static void body(void) {
   kstep_task_fork(busy_task, 2);
 
   struct task_struct *pause_task = kstep_tick_until_task(is_ineligible);
@@ -45,8 +45,8 @@ static void controller_body(void) {
   kstep_tick_repeat(25);
 }
 
-struct controller_ops controller_freeze = {
+struct kstep_driver freeze = {
     .name = "freeze",
-    .pre_init = controller_pre_init,
-    .body = controller_body,
+    .pre_init = pre_init,
+    .body = body,
 };
