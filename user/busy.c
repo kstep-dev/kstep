@@ -39,13 +39,11 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
   if (code == SIGCODE_WAKEUP) {
     return; // do nothing
   } else if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN ||
-             code == SIGCODE_FORK_FF || code == SIGCODE_FORK_PIN_RANGE) {
+             code == SIGCODE_FORK_FF) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
       if (pid == 0) {
         if (code == SIGCODE_FORK_PIN) {
-          set_proc_affinity(val2, val2);
-        } else if (code == SIGCODE_FORK_PIN_RANGE) {
           set_proc_affinity(val2, val3);
         } else if (code == SIGCODE_FORK_FF) {
           struct sched_param sp = {.sched_priority = 80};
@@ -75,7 +73,7 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
     if (setpriority(PRIO_PROCESS, 0, val) < 0)
       panic("setpriority failed");
   } else if (code == SIGCODE_PIN) {
-    set_proc_affinity(val, val2 == 0 ? val : val2);
+    set_proc_affinity(val, val2);
   } else {
     printf("Unknown signal code: %d\n", code);
   }

@@ -49,15 +49,19 @@ void kstep_tick_until(bool (*fn)(void));
 // Call tick until the function returns true for a task, then return that task
 struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *));
 
-// task.c
-#define send_sigcode(p, code, val) send_sigcode3(p, code, val, 0, 0)
-#define send_sigcode2(p, code, val1, val2) send_sigcode3(p, code, val1, val2, 0)
-void send_sigcode3(struct task_struct *p, enum sigcode code, int val1, int val2,
-                   int val3);
+// tasks.c
 int is_sys_kthread(struct task_struct *p);
-
 extern struct task_struct *busy_task;
 void kstep_tasks_init(void);
+void kstep_task_pin(struct task_struct *p, int begin, int end);
+void kstep_task_fork(struct task_struct *p, int n);
+void kstep_task_fork_pin(struct task_struct *p, int n, int begin, int end);
+void kstep_task_pause(struct task_struct *p);
+void kstep_task_wakeup(struct task_struct *p);
+void kstep_task_sleep(struct task_struct *p, int n);
+// Low level signal sending, use with caution
+void kstep_task_signal(struct task_struct *p, enum sigcode code, int val1,
+                       int val2, int val3);
 
 // kernel.c
 void kstep_write_file(const char *path, const char *buf, size_t size);

@@ -10,9 +10,9 @@ static void controller_pre_init(void) {
 
 static void controller_body(void) {
   // making the nr_running on cpu 4-7 to [1, 0, 3, 1]
-  send_sigcode(busy_task, SIGCODE_PIN, 4);
-  send_sigcode3(busy_task, SIGCODE_FORK_PIN_RANGE, 3, 6, 6);
-  send_sigcode3(busy_task, SIGCODE_FORK_PIN_RANGE, 1, 7, 7);
+  kstep_task_pin(busy_task, 4, 4);
+  kstep_task_fork_pin(busy_task, 3, 6, 6);
+  kstep_task_fork_pin(busy_task, 1, 7, 7);
 
   kstep_tick_repeat(1000);
 
@@ -21,7 +21,7 @@ static void controller_body(void) {
     if (strcmp(pin_task->comm, busy_task->comm) != 0 || pin_task == busy_task)
       continue;
     if (task_cpu(pin_task) == 6)
-      send_sigcode2(pin_task, SIGCODE_PIN, 4, 6);
+      kstep_task_pin(pin_task, 4, 6);
   }
 
   kstep_tick_repeat(301);

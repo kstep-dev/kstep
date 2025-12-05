@@ -45,7 +45,7 @@ static void sleep_all_tasks_in_ineligible_tg(void) {
       continue;
     if (p->se.parent != ineligible_tg_se)
       continue;
-    send_sigcode(p, SIGCODE_PAUSE, 0);
+    kstep_task_pause(p);
   }
 }
 
@@ -84,13 +84,13 @@ static void controller_body(void) {
   kstep_cgroup_write_file("l1_0/l2_0/l3_0", "cpu.weight", "20");
 
   // create 1 task in l3_0
-  send_sigcode(busy_task, SIGCODE_CLONE3_L3_0, 1);
+  kstep_task_signal(busy_task, SIGCODE_CLONE3_L3_0, 1, 0, 0);
   record_task_to_groups(1, 3, 0);
   // create 3 tasks in l3_1
-  send_sigcode(busy_task, SIGCODE_CLONE3_L3_1, 3);
+  kstep_task_signal(busy_task, SIGCODE_CLONE3_L3_1, 3, 0, 0);
   record_task_to_groups(3, 3, 1);
 
-  send_sigcode(busy_task, SIGCODE_PAUSE, 0);
+  kstep_task_pause(busy_task);
 
   kstep_tick_repeat(10);
 
@@ -107,7 +107,7 @@ static void controller_body(void) {
   struct task_struct *p = get_curr_task(cpu_of_ineligible_task);
   kstep_cgroup_write_file("l1_0/l2_0/l3_0", "cpu.weight", "100");
 
-  send_sigcode(p, SIGCODE_CLONE3_L3_0, 1);
+  kstep_task_signal(p, SIGCODE_CLONE3_L3_0, 1, 0, 0);
 
   kstep_tick_repeat(18);
 }

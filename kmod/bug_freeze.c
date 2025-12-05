@@ -29,18 +29,18 @@ static bool is_ineligible(struct task_struct *p) {
 }
 
 static void controller_body(void) {
-  send_sigcode(busy_task, SIGCODE_FORK, 2);
+  kstep_task_fork(busy_task, 2);
 
   struct task_struct *pause_task = kstep_tick_until_task(is_ineligible);
   TRACE_INFO("dequeue ineligible task %d", pause_task->pid);
-  send_sigcode(pause_task, SIGCODE_SLEEP, 1);
+  kstep_task_sleep(pause_task, 1);
 
   kstep_tick();
 
   TRACE_INFO("freeze ineligible task %d", pause_task->pid);
   kstep_freeze_task(pause_task);
 
-  send_sigcode(pause_task, SIGCODE_WAKEUP, 0);
+  kstep_task_wakeup(pause_task);
 
   kstep_tick_repeat(25);
 }

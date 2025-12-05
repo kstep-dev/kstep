@@ -8,7 +8,7 @@ static void controller_pre_init(void) {
 
 static void controller_body(void) {
   for (int i = 0; i < 1000; i++) {
-    send_sigcode2(busy_task, SIGCODE_FORK_PIN, 100, 1);
+    kstep_task_fork_pin(busy_task, 100, 1, 1);
   }
 
   kstep_tick_repeat(1000);

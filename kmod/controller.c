@@ -35,7 +35,7 @@ struct controller_ops *kstep_controller_get(const char *name) {
 
 static void controller_body(void) {
   for (int i = 0; i < 10; i++) {
-    send_sigcode(busy_task, SIGCODE_FORK, 1);
+    kstep_task_fork(busy_task, 1);
     kstep_tick();
   }
 }

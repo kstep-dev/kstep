@@ -38,7 +38,7 @@ static void sleep_all_tasks_except(int cpu, struct task_struct *target) {
   for_each_process(p) {
     if (strcmp(p->comm, busy_task->comm) != 0 || p == target)
       continue;
-    send_sigcode(p, SIGCODE_PAUSE, 0);
+    kstep_task_pause(p);
   }
 }
 
@@ -72,7 +72,7 @@ static void controller_body(void) {
   reset_task_stats(busy_kthread_children);
 
   // fork 3 processes on cpu 1
-  send_sigcode(busy_task, SIGCODE_FORK, 3);
+  kstep_task_fork(busy_task, 3);
   struct task_struct *p;
   for_each_process(p) {
     if (strcmp(p->comm, busy_task->comm) == 0)
@@ -99,7 +99,7 @@ static void controller_body(void) {
 
   // tick until the not eligible task is running on the cpu and pause it
   kstep_tick_until(is_running_again);
-  send_sigcode(not_eligible_task, SIGCODE_PAUSE, 0);
+  kstep_task_pause(not_eligible_task);
 
   // tick to show the impact
   kstep_tick_repeat(7);
