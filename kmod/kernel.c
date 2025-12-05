@@ -84,12 +84,9 @@ void kstep_close_fd(int fd) {
   put_unused_fd(fd);
 }
 
-static char default_cpuset[16];
 static int cgroup_root_fd;
 
 void kstep_cgroup_init(void) {
-  snprintf(default_cpuset, sizeof(default_cpuset), "1-%d",
-           num_online_cpus() - 1);
   cgroup_root_fd = kstep_open_fd(CGROUP_ROOT, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
   kstep_cgroup_write_raw("", "cgroup.subtree_control", CGROUP_CONTROL,
                          strlen(CGROUP_CONTROL));
@@ -116,10 +113,8 @@ void kstep_cgroup_write(const char *dir, const char *filename, const char *fmt,
   kstep_cgroup_write_raw(dir, filename, buf, size);
 }
 
-void kstep_cgroup_create(const char *path, const char *cpuset) {
-  kstep_mkdir(cgroup_root_fd, path);
-  kstep_cgroup_write_raw(path, "cgroup.subtree_control", CGROUP_CONTROL,
+void kstep_cgroup_create(const char *dir) {
+  kstep_mkdir(cgroup_root_fd, dir);
+  kstep_cgroup_write_raw(dir, "cgroup.subtree_control", CGROUP_CONTROL,
                          strlen(CGROUP_CONTROL));
-  const char *cpus = cpuset ? cpuset : default_cpuset;
-  kstep_cgroup_write_raw(path, "cpuset.cpus", cpus, strlen(cpus));
 }
