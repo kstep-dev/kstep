@@ -21,7 +21,7 @@ def parse_log_file(log_file):
     util_avg_values = []
     
     # Pattern to match lines with CPU 2 and avg_util
-    pattern = r'\[\s*(\d+\.\d+)\].*CPU 2.*avg_util=(\d+)'
+    pattern = r"\[\s*(\d+\.\d+)\].*CPU 1.*avg_util=(\d+)"
     
     with open(log_file, 'r') as f:
         for line in f:

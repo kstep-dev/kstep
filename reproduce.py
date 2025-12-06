@@ -74,6 +74,7 @@ bugs = [
         plot_format="util_avg",
         fixed=Config(version="17e3e88"),
         buggy=Config(version="17e3e88~1"),
+        smp="2",
     ),
     # https://github.com/torvalds/linux/commit/5068d84054b766efe7c6202fc71b2350d1c326f1
     Bug(

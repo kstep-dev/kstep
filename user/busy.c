@@ -15,18 +15,12 @@ static void handler(int signum, siginfo_t *info, void *context) {
   int val3 = info->si_uid;
   if (code == SIGCODE_WAKEUP) {
     return; // do nothing
-  } else if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN ||
-             code == SIGCODE_FORK_FF) {
+  } else if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
       if (pid == 0) {
         if (code == SIGCODE_FORK_PIN) {
           set_proc_affinity(val2, val3);
-        } else if (code == SIGCODE_FORK_FF) {
-          struct sched_param sp = {.sched_priority = 80};
-          if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0)
-            panic("sched_setscheduler failed");
-          printf("set scheduler to FIFO with priority %d\n", sp.sched_priority);
         }
         return;
       }
@@ -42,6 +36,10 @@ static void handler(int signum, siginfo_t *info, void *context) {
       panic("setpriority failed");
   } else if (code == SIGCODE_PIN) {
     set_proc_affinity(val, val2);
+  } else if (code == SIGCODE_FIFO) {
+    struct sched_param sp = {.sched_priority = 80};
+    if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0)
+      panic("sched_setscheduler failed");
   } else {
     printf("Unknown signal code: %d\n", code);
   }
