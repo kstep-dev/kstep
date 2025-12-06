@@ -1,14 +1,11 @@
 #include "kstep.h"
 
-static struct task_struct *busy_task;
-static void init(void) { busy_task = kstep_task_create(); }
-
 static struct task_struct *busy_kthread;
 static struct task_struct *busy_kthread_children;
-static struct task_struct *not_eligible_task;
+static struct task_struct *ineligible_task;
+static struct task_struct *tasks[3];
 
 // send data to the busy kthread
-static int shared_data = 0;
 static atomic_t data_ready = ATOMIC_INIT(0);
 static DECLARE_WAIT_QUEUE_HEAD(my_wq);
 
@@ -25,7 +22,7 @@ static int loop(void *data) {
   while (!kthread_should_stop()) {
     wait_event_interruptible(my_wq, atomic_read(&data_ready) != 0 ||
                                         kthread_should_stop());
-    TRACE_INFO("Receiver: Woke up! Consumed data: %d", shared_data);
+    TRACE_INFO("Receiver: Woke up! Consumed data");
     if (kthread_should_stop()) {
       break;
     }
@@ -36,25 +33,10 @@ static int loop(void *data) {
   return 0;
 }
 
-static void sleep_all_tasks_except(int cpu, struct task_struct *target) {
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, busy_task->comm) != 0 || p == target)
-      continue;
-    kstep_task_pause(p);
-  }
-}
+static void init(void) {
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
+    tasks[i] = kstep_task_create();
 
-static bool is_ineligible(struct task_struct *p) {
-  return strcmp(p->comm, busy_task->comm) == 0 && p != busy_task && p->on_cpu &&
-         task_cpu(p) == task_cpu(busy_kthread) && kstep_eligible(&p->se) == 0;
-}
-
-static void *is_running_again(void) {
-  return not_eligible_task->on_cpu == 1 ? not_eligible_task : NULL;
-}
-
-static void body(void) {
   // create a busy kthread on cpu 1
   busy_kthread = kthread_create(loop, NULL, "busy_kthread");
   set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
@@ -70,32 +52,41 @@ static void body(void) {
   set_cpus_allowed_ptr(busy_kthread_children, &mask);
   busy_kthread_children->wake_cpu = 2;
 
-  kstep_sleep();
-
   reset_task_stats(busy_kthread);
   reset_task_stats(busy_kthread_children);
+}
 
-  // fork 3 processes on cpu 1
-  kstep_task_fork(busy_task, 3);
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, busy_task->comm) == 0)
-      set_cpus_allowed_ptr(p, cpumask_of(1));
-  }
+static void *is_ineligible(void) {
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
+    if (tasks[i]->on_cpu && task_cpu(tasks[i]) == task_cpu(busy_kthread) &&
+        !kstep_eligible(&tasks[i]->se))
+      return tasks[i];
+  return NULL;
+}
+
+static void *is_running_again(void) {
+  return ineligible_task->on_cpu == 1 ? ineligible_task : NULL;
+}
+
+static void body(void) {
+  for (int i = 1; i < ARRAY_SIZE(tasks); i++)
+    kstep_task_pin(tasks[i], 1, 1);
 
   kstep_tick_repeat(20);
 
-  // tick until there is a not eligible task on the same cpu as the busy kthread
-  not_eligible_task = kstep_tick_until_task(is_ineligible);
+  // tick until there is a ineligible task on the same cpu as the busy kthread
+  ineligible_task = kstep_tick_until(is_ineligible);
 
-  // sleep all colocated tasks 
-  TRACE_INFO("Found not eligible task %d on cpu %d", not_eligible_task->pid, task_cpu(not_eligible_task));
-  sleep_all_tasks_except(task_cpu(not_eligible_task), not_eligible_task);
+  // sleep all colocated tasks
+  TRACE_INFO("Found ineligible task %d on cpu %d", ineligible_task->pid,
+             task_cpu(ineligible_task));
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
+    if (tasks[i] != ineligible_task)
+      kstep_task_pause(tasks[i]);
 
   kstep_tick();
 
   // wake up the kthread to call sync wakeup
-  shared_data = 0;
   atomic_set(&data_ready, 1);
   wake_up_interruptible(&my_wq);
 
@@ -103,10 +94,10 @@ static void body(void) {
 
   // tick until the not eligible task is running on the cpu and pause it
   kstep_tick_until(is_running_again);
-  kstep_task_pause(not_eligible_task);
+  kstep_task_pause(ineligible_task);
 
   // tick to show the impact
-  kstep_tick_repeat(7);
+  kstep_tick_repeat(8);
 }
 
 struct kstep_driver sync_wakeup = {
