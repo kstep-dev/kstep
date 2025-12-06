@@ -32,6 +32,7 @@ void kstep_params_print(void) {
 }
 
 static int __init kstep_main(void) {
+  kstep_write_file("/proc/sys/kernel/printk", "7", 1);
   TRACE_INFO("Initializing kSTEP");
   ksym_init();
   struct kstep_driver *driver = kstep_driver_get(kstep_params.driver);
@@ -59,16 +60,14 @@ static int __init kstep_main(void) {
   // Control timer ticks and clock
   kstep_tick_init();
 
-  // Enable printk time
-  kstep_write_file("/sys/module/printk/parameters/time", "1", 1);
-
   // Reset the scheduler state to initial state
   kstep_reset_sched();
 
   if (kstep_params.print_lb_events)
     kstep_trace_lb();
 
-  print_all_tasks();
+  // Enable printk time
+  kstep_write_file("/sys/module/printk/parameters/time", "1", 1);
 
   TRACE_INFO("Running driver %s", driver->name);
   driver->body();

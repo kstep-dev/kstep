@@ -22,9 +22,8 @@
 
 #define TRACE_PRINT(level, fmt, ...)                                           \
   (void)(LOGLEVEL_##level <= TRACE_LEVEL &&                                    \
-         (printk(KERN_INFO TERM_COLOR_##level                                  \
-                 "[%20s:%-3d] %24s: " fmt TERM_RESET "\n",                     \
-                 __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__),            \
+         (printk(KERN_INFO TERM_COLOR_##level "%24s: " fmt TERM_RESET "\n",    \
+                 __func__, ##__VA_ARGS__),                                     \
           0))
 
 #define TRACE_DEBUG(fmt, ...) TRACE_PRINT(DEBUG, fmt, ##__VA_ARGS__)

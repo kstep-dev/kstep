@@ -45,6 +45,8 @@ CONFIG_PRINTK_TIME=y
 
 # /proc
 CONFIG_PROC_FS=y
+# /proc/sys
+CONFIG_PROC_SYSCTL=y
 # /sys
 CONFIG_SYSFS=y
 # /sys/kernel/debug
