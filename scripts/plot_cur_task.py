@@ -34,15 +34,12 @@ COLOR_MAPS = {
         0: COLOR_YELLOW,
         1: COLOR_BUGGY,
         2: COLOR_LIGHT_BLUE,
-        -1: COLOR_IDLE,
     },
     "vruntime_overflow": {
-        0: COLOR_GREEN,
-        1: COLOR_YELLOW,
-        2: COLOR_ORANGE,
-        3: COLOR_LIGHT_BLUE,
-        4: COLOR_BUGGY,
-        -1: COLOR_IDLE,
+        0: COLOR_ORANGE,
+        1: COLOR_BUGGY,
+        2: COLOR_LIGHT_BLUE,
+        3: COLOR_YELLOW,
     },
 }
 
