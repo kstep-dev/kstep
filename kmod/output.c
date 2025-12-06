@@ -31,13 +31,6 @@ void print_rq_stats(void) {
 
 void print_tasks(void) {
   struct task_struct *p;
-  int min_pid = INT_MAX;
-  for_each_process(p) {
-    if (task_cpu(p) == 0 || is_sys_kthread(p))
-      continue;
-    if (task_pid_nr(p) < min_pid)
-      min_pid = task_pid_nr(p);
-  }
 
   pr_info("\t%3s %c%s %5s %5s %12s %12s %9s\n", "CPU", ' ', "S", "PID", "PPID",
           "vruntime", "sum-exec", "switches");
@@ -48,7 +41,7 @@ void print_tasks(void) {
       continue;
     pr_info("\tprint_tasks: %3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu\n",
             task_cpu(p), p->on_cpu ? '>' : ' ', task_state_to_char(p),
-            task_pid_nr(p) - min_pid, task_ppid_nr(p), p->se.vruntime,
+            task_pid_nr(p), task_ppid_nr(p), p->se.vruntime,
             p->se.sum_exec_runtime, p->nvcsw, p->nivcsw);
   }
 }

@@ -1,6 +1,6 @@
 #include "kstep.h"
 
-void reset_task_stats(struct task_struct *p) {
+void kstep_reset_task(struct task_struct *p) {
   // reset generic task stats
   p->nivcsw = 0;
   p->nvcsw = 0;
@@ -24,7 +24,7 @@ void reset_task_stats(struct task_struct *p) {
   p->se.avg.load_avg = scale_load_down(p->se.load.weight);
 }
 
-static void reset_rq(void) {
+static void kstep_reset_rq(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = cpu_rq(cpu);
 
@@ -63,7 +63,7 @@ static void reset_rq(void) {
   }
 }
 
-static void reset_distribute_cpu_mask_prev(void) {
+static void kstep_reset_cpumask(void) {
 // https://github.com/torvalds/linux/commit/46a87b3851f0d6eb05e6d83d5c5a30df0eca8f76
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
@@ -73,14 +73,13 @@ static void reset_distribute_cpu_mask_prev(void) {
 #endif
 }
 
-void kstep_reset_sched_state(void) {
-  reset_rq();
-  reset_distribute_cpu_mask_prev();
+void kstep_reset_sched(void) {
+  kstep_reset_rq();
+  kstep_reset_cpumask();
   struct task_struct *p;
   for_each_process(p) {
-    if (task_cpu(p) != 0) {
-      reset_task_stats(p);
-    }
+    if (task_cpu(p) != 0)
+      kstep_reset_task(p);
   }
   TRACE_INFO("Reset scheduler state");
 }

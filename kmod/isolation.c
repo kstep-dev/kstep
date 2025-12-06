@@ -57,7 +57,7 @@ void kstep_move_kthreads(void) {
     }
 
     if (is_sys_kthread(p)) {
-      reset_task_stats(p);
+      kstep_reset_task(p);
       continue;
     }
     set_cpus_allowed_ptr(p, cpumask_of(0));

@@ -23,11 +23,9 @@ COLOR_BUGGY = "tab:red"
 COLOR_MAPS = {
     "sync_wakeup": {
         0: COLOR_YELLOW,
-        1: COLOR_BUGGY,
-        2: COLOR_GREEN,
-        3: COLOR_ORANGE,
-        4: COLOR_LIGHT_BLUE,
-        5: COLOR_DARK_BLUE,
+        1: COLOR_LIGHT_BLUE,
+        2: COLOR_BUGGY,
+        3: COLOR_GREEN,
         -1: COLOR_IDLE,
     },
     "freeze": {

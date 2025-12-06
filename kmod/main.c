@@ -63,7 +63,7 @@ static int __init kstep_main(void) {
   kstep_write_file("/sys/module/printk/parameters/time", "1", 1);
 
   // Reset the scheduler state to initial state
-  kstep_reset_sched_state();
+  kstep_reset_sched();
 
   if (kstep_params.print_lb_events)
     kstep_trace_lb();
