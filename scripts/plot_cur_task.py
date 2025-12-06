@@ -31,8 +31,8 @@ COLOR_MAPS = {
         -1: COLOR_IDLE,
     },
     "freeze": {
-        0: COLOR_YELLOW,
-        1: COLOR_BUGGY,
+        0: COLOR_BUGGY,
+        1: COLOR_YELLOW,
         2: COLOR_LIGHT_BLUE,
     },
     "vruntime_overflow": {

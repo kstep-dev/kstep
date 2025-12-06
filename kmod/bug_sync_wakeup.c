@@ -1,5 +1,8 @@
 #include "kstep.h"
 
+static struct task_struct *busy_task;
+static void init(void) { busy_task = kstep_task_create(); }
+
 static struct task_struct *busy_kthread;
 static struct task_struct *busy_kthread_children;
 static struct task_struct *not_eligible_task;
@@ -44,11 +47,12 @@ static void sleep_all_tasks_except(int cpu, struct task_struct *target) {
 
 static bool is_ineligible(struct task_struct *p) {
   return strcmp(p->comm, busy_task->comm) == 0 && p != busy_task && p->on_cpu &&
-         task_cpu(p) == task_cpu(busy_kthread) &&
-         ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0;
+         task_cpu(p) == task_cpu(busy_kthread) && kstep_eligible(&p->se) == 0;
 }
 
-static bool is_running_again(void) { return not_eligible_task->on_cpu == 1; }
+static void *is_running_again(void) {
+  return not_eligible_task->on_cpu == 1 ? not_eligible_task : NULL;
+}
 
 static void body(void) {
   // create a busy kthread on cpu 1
@@ -107,5 +111,6 @@ static void body(void) {
 
 struct kstep_driver sync_wakeup = {
     .name = "sync_wakeup",
+    .init = init,
     .body = body,
 };

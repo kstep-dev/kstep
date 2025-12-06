@@ -161,10 +161,11 @@ void kstep_tick_repeat(int n) {
   }
 }
 
-void kstep_tick_until(bool (*fn)(void)) {
+void *kstep_tick_until(void *(*fn)(void)) {
   while (1) {
-    if (fn())
-      return;
+    void *result = fn();
+    if (result)
+      return result;
     kstep_tick();
   }
 }

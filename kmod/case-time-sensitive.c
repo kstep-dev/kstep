@@ -7,6 +7,10 @@
 // ./plot/plot_nr_running_queued.py --log data/logs/caseSensitiveTime.log --cpus
 // 1 --time-start 10 --output plot/case_time_sensitive.pdf
 
+static struct task_struct *busy_task;
+
+static void init(void) { busy_task = kstep_task_create(); }
+
 static struct task_struct *find_target_task(void) {
   struct task_struct *p;
   for_each_process(p) {
@@ -52,5 +56,6 @@ static void body(void) {
 
 struct kstep_driver case_time_sensitive = {
     .name = "case_time_sensitive",
+    .init = init,
     .body = body,
 };
