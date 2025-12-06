@@ -55,7 +55,7 @@ static void body(void) {
 
   kstep_tick_repeat(20);
 
-  // tick until there is a ineligible task on the same cpu as the busy kthread
+  // tick until there is a ineligible task
   struct task_struct *ineligible_task = kstep_tick_until(is_ineligible);
   TRACE_INFO("Found ineligible task %d on cpu %d", ineligible_task->pid,
              task_cpu(ineligible_task));
