@@ -54,7 +54,7 @@ struct task_struct *kstep_task_create(void);
 void kstep_task_pin(struct task_struct *p, int begin, int end);
 void kstep_task_fork(struct task_struct *p, int n);
 void kstep_task_fork_pin(struct task_struct *p, int n, int begin, int end);
-void kstep_task_fork_ff(struct task_struct *p, int n);
+void kstep_task_fifo(struct task_struct *p);
 void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
 void kstep_task_sleep(struct task_struct *p, int n);

@@ -78,9 +78,10 @@ void kstep_task_fork_pin(struct task_struct *p, int n, int begin, int end) {
              begin, end);
 }
 
-void kstep_task_fork_ff(struct task_struct *p, int n) {
-  kstep_task_signal(p, SIGCODE_FORK_FF, n, 0, 0);
-  TRACE_INFO("Forked task %d %d times and set to FIFO", p->pid, n);
+
+void kstep_task_fifo(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_FIFO, 0, 0, 0);
+  TRACE_INFO("Set task %d to FIFO", p->pid);
 }
 
 void kstep_task_pin(struct task_struct *p, int begin, int end) {

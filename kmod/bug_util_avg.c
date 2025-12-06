@@ -1,49 +1,36 @@
 #include "kstep.h"
 
 static void pre_init(void) {
-  kstep_params.step_interval_us = 10;
+  kstep_params.step_interval_us = 1000;
   kstep_params.print_tasks = false;
   kstep_params.print_rq_stats = true;
 }
 
-static struct task_struct *busy_task;
+static struct task_struct *tasks[2];
 
-static void init(void) { busy_task = kstep_task_create(); }
-
-static struct task_struct *find_ff_task(void) {
-  struct task_struct *p;
-  for_each_process(p) {
-    if (strcmp(p->comm, busy_task->comm) != 0 || p == busy_task)
-      continue;
-    if (p->sched_class == ksym.rt_sched_class)
-      return p;
-  }
-  return NULL;
+static void init(void) {
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
+    tasks[i] = kstep_task_create();
 }
-static void body(void) {
-  // fork 1 process using fifo sched class
-  kstep_task_fork_ff(busy_task, 1);
 
-  // fake the frequency of cpu 2 to 50% of the base frequency
-  kstep_set_cpu_freq(2, SCHED_CAPACITY_SCALE >> 1);
+static void body(void) {
+  // set the first task to fifo
+  kstep_task_fifo(tasks[0]);
+
+  // fake the frequency of cpu 1 to 50% of the base frequency
+  kstep_set_cpu_freq(1, SCHED_CAPACITY_SCALE >> 1);
 
   // tick until the util_avg becomes 100%
   kstep_tick_repeat(600);
 
-  // pause the fifo task for
-  struct task_struct *ff_task = find_ff_task();
-
-  if (ff_task) {
-    kstep_task_pause(ff_task);
-  } else {
-    TRACE_ERR("no FF task found");
-  }
+  // pause the fifo task
+  kstep_task_pause(tasks[0]);
 
   // wait for another 2 ticks (2ms)
   kstep_tick_repeat(2);
 
-  // start another fifo task
-  kstep_task_fork_ff(busy_task, 1);
+  // wake up and set another task to fifo
+  kstep_task_fifo(tasks[1]);
 
   // tick for another 600 ticks (600ms) to show the impact
   kstep_tick_repeat(600);
