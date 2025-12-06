@@ -80,7 +80,7 @@ void kstep_task_fork_pin(struct task_struct *p, int n, int begin, int end) {
 
 
 void kstep_task_fifo(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_FIFO, 1, 0, 0);
+  kstep_task_signal(p, SIGCODE_FIFO, 0, 0, 0);
   TRACE_INFO("Set task %d to FIFO", p->pid);
 }
 
