@@ -1,37 +1,14 @@
 #define _GNU_SOURCE
 
-#include <fcntl.h>        // open
-#include <linux/sched.h>  // struct clone_args
 #include <signal.h>       // signal
 #include <sys/prctl.h>    // PR_SET_NAME
 #include <sys/resource.h> // setpriority
-#include <sys/syscall.h>  // SYS_clone3
 #include <unistd.h>       // sleep, exit, pause
 
 #include "../kmod/sigcode.h"
 #include "utils.h"
 
-#define CGROUP_ROOT "/sys/fs/cgroup"
-
-static void clone3(int val, const char *cgroup_path) {
-  for (int i = 0; i < val; i++) {
-    int cgfd = open(cgroup_path, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-    if (cgfd < 0)
-      panic("Failed to open cgroup %s", cgroup_path);
-
-    struct clone_args args = {
-        .flags = CLONE_INTO_CGROUP,
-        .cgroup = cgfd, // <— CLONE_INTO_CGROUP: target cgroup fd
-    };
-    pid_t pid = syscall(SYS_clone3, &args, sizeof(args));
-    close(cgfd);
-    if (pid < 0)
-      panic("Failed to clone3");
-    if (pid == 0) // child process
-      return;
-  }
-}
-static void signal_handler(int signum, siginfo_t *info, void *context) {
+static void handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
   int val = info->si_int;
   int val2 = info->si_pid;
@@ -60,15 +37,6 @@ static void signal_handler(int signum, siginfo_t *info, void *context) {
     exit(0);
   } else if (code == SIGCODE_PAUSE) {
     pause();
-  } // TODO: generalize the logic of clone3 to different cgroup
-  else if (code == SIGCODE_CLONE3_L3_0) {
-    clone3(val, CGROUP_ROOT "/l1_0/l2_0/l3_0");
-  } else if (code == SIGCODE_CLONE3_L3_1) {
-    clone3(val, CGROUP_ROOT "/l1_0/l2_0/l3_1");
-  } else if (code == SIGCODE_CLONE3_L2_1) {
-    clone3(val, CGROUP_ROOT "/l1_0/l2_1");
-  } else if (code == SIGCODE_CLONE3_L1_0) {
-    clone3(val, CGROUP_ROOT "/l1_0");
   } else if (code == SIGCODE_REWEIGHT) {
     if (setpriority(PRIO_PROCESS, 0, val) < 0)
       panic("setpriority failed");
@@ -85,8 +53,7 @@ static void loop() {
 }
 
 int main() {
-  struct sigaction sa = {.sa_sigaction = signal_handler,
-                         .sa_flags = SA_SIGINFO};
+  struct sigaction sa = {.sa_sigaction = handler, .sa_flags = SA_SIGINFO};
   sigaction(SIGUSR1, &sa, NULL);
   set_proc_affinity(1, sysconf(_SC_NPROCESSORS_ONLN) - 1);
   prctl(PR_SET_NAME, "test-proc");

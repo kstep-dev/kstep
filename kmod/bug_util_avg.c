@@ -18,7 +18,7 @@ static struct task_struct *find_ff_task(void) {
 }
 static void body(void) {
   // fork 1 process using fifo sched class
-  kstep_task_signal(busy_task, SIGCODE_FORK_FF, 1, 0, 0);
+  kstep_task_fork_ff(busy_task, 1);
 
   // fake the frequency of cpu 2 to 50% of the base frequency
   kstep_set_cpu_freq(2, SCHED_CAPACITY_SCALE >> 1);
@@ -39,7 +39,7 @@ static void body(void) {
   kstep_tick_repeat(2);
 
   // start another fifo task
-  kstep_task_signal(busy_task, SIGCODE_FORK_FF, 1, 0, 0);
+  kstep_task_fork_ff(busy_task, 1);
 
   // tick for another 600 ticks (600ms) to show the impact
   kstep_tick_repeat(600);

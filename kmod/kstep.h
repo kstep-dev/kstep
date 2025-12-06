@@ -13,7 +13,6 @@
 #pragma GCC diagnostic pop
 
 #include "logging.h"
-#include "sigcode.h"
 
 #define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 
@@ -56,11 +55,13 @@ struct task_struct *kstep_task_create(void);
 void kstep_task_pin(struct task_struct *p, int begin, int end);
 void kstep_task_fork(struct task_struct *p, int n);
 void kstep_task_fork_pin(struct task_struct *p, int n, int begin, int end);
+void kstep_task_fork_ff(struct task_struct *p, int n);
 void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
 void kstep_task_sleep(struct task_struct *p, int n);
 void kstep_task_reweight(struct task_struct *p, int weight);
-// Low level signal sending, use with caution
+// Low level signal sending, use with caution, see "sigcode.h"
+enum sigcode;
 void kstep_task_signal(struct task_struct *p, enum sigcode code, int val1,
                        int val2, int val3);
 int is_sys_kthread(struct task_struct *p);
