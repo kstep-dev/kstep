@@ -169,14 +169,3 @@ void *kstep_tick_until(void *(*fn)(void)) {
     kstep_tick();
   }
 }
-
-struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *)) {
-  struct task_struct *p;
-  while (1) {
-    for_each_process(p) {
-      if (fn(p))
-        return p;
-    }
-    kstep_tick();
-  }
-}

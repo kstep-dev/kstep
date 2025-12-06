@@ -46,8 +46,6 @@ void kstep_tick(void);
 void kstep_tick_repeat(int n);
 // Call tick until the function returns something, then return that something
 void *kstep_tick_until(void *(*fn)(void));
-// Call tick until the function returns true for a task, then return that task
-struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *));
 
 // tasks.c
 struct task_struct *kstep_task_create(void);
