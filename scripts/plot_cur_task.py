@@ -25,6 +25,7 @@ COLOR_MAPS = {
         0: COLOR_YELLOW,
         1: COLOR_LIGHT_BLUE,
         2: COLOR_BUGGY,
+        3: COLOR_GREEN,
         -1: COLOR_IDLE,
     },
     "freeze": {

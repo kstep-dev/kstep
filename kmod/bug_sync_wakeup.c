@@ -2,21 +2,21 @@
 
 static struct task_struct *waker_task;
 static struct task_struct *wakee_task;
-static struct task_struct *tasks[3];
+static struct task_struct *tasks[1];
 
-// To notify the waker
-static DECLARE_COMPLETION(wakeup_ready);
+static atomic_t wakeup_ready = ATOMIC_INIT(0);
 
 static int wakee_main(void *data) {
-  TRACE_INFO("Wakee started on CPU %d", smp_processor_id());
-  while (!kthread_should_stop())
+  TRACE_INFO("Wakee %d started on CPU %d", current->pid, smp_processor_id());
+  while (1)
     __asm__("" : : : "memory");
   return 0;
 }
 
 static int waker_main(void *data) {
-  TRACE_INFO("Waker started on CPU %d", smp_processor_id());
-  wait_for_completion(&wakeup_ready);
+  TRACE_INFO("Waker %d started on CPU %d", current->pid, smp_processor_id());
+  while (atomic_read(&wakeup_ready) == 0)
+    yield();
   ksym.try_to_wake_up(wakee_task, TASK_NORMAL, WF_SYNC);
   return 0;
 }
@@ -50,7 +50,7 @@ static void *is_ineligible(void) {
 }
 
 static void body(void) {
-  for (int i = 1; i < ARRAY_SIZE(tasks); i++)
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     kstep_task_pin(tasks[i], 1, 1);
 
   kstep_tick_repeat(20);
@@ -66,7 +66,7 @@ static void body(void) {
       kstep_task_pause(tasks[i]);
 
   // wake up the waker to call sync wakeup
-  complete(&wakeup_ready);
+  atomic_set(&wakeup_ready, 1);
 
   // Pause the ineligible task
   kstep_task_pause(ineligible_task);
