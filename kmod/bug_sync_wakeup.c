@@ -1,35 +1,23 @@
 #include "kstep.h"
 
-static struct task_struct *busy_kthread;
-static struct task_struct *busy_kthread_children;
-static struct task_struct *ineligible_task;
+static struct task_struct *waker_task;
+static struct task_struct *wakee_task;
 static struct task_struct *tasks[3];
 
-// send data to the busy kthread
-static atomic_t data_ready = ATOMIC_INIT(0);
-static DECLARE_WAIT_QUEUE_HEAD(my_wq);
+// To notify the waker
+static DECLARE_COMPLETION(wakeup_ready);
 
-static int loopBusy(void *data) {
-  TRACE_INFO("Sync wakeup's children started on CPU %d", smp_processor_id());
-  while (!kthread_should_stop()) {
+static int wakee_main(void *data) {
+  TRACE_INFO("Wakee started on CPU %d", smp_processor_id());
+  while (!kthread_should_stop())
     __asm__("" : : : "memory");
-  }
   return 0;
 }
 
-static int loop(void *data) {
-  TRACE_INFO("Busy kthread started on CPU %d", smp_processor_id());
-  while (!kthread_should_stop()) {
-    wait_event_interruptible(my_wq, atomic_read(&data_ready) != 0 ||
-                                        kthread_should_stop());
-    TRACE_INFO("Receiver: Woke up! Consumed data");
-    if (kthread_should_stop()) {
-      break;
-    }
-
-    ksym.try_to_wake_up(busy_kthread_children, TASK_NORMAL, 0 | WF_SYNC);
-    atomic_set(&data_ready, 0);
-  }
+static int waker_main(void *data) {
+  TRACE_INFO("Waker started on CPU %d", smp_processor_id());
+  wait_for_completion(&wakeup_ready);
+  ksym.try_to_wake_up(wakee_task, TASK_NORMAL, WF_SYNC);
   return 0;
 }
 
@@ -37,35 +25,28 @@ static void init(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
 
-  // create a busy kthread on cpu 1
-  busy_kthread = kthread_create(loop, NULL, "busy_kthread");
-  set_cpus_allowed_ptr(busy_kthread, cpumask_of(1));
-  wake_up_process(busy_kthread);
+  // Create a waker on cpu 1
+  waker_task = kthread_create(waker_main, NULL, "waker");
+  set_cpus_allowed_ptr(waker_task, cpumask_of(1));
+  wake_up_process(waker_task);
 
-  // create a busy kthread children on all controlled cpus
-  // don't wake up the children immediately
-  busy_kthread_children =
-      kthread_create(loopBusy, NULL, "busy_kthread_children");
+  // Create a wakee. Don't wake up the wakee immediately
+  wakee_task = kthread_create(wakee_main, NULL, "wakee");
   struct cpumask mask;
   cpumask_copy(&mask, cpu_active_mask);
   cpumask_clear_cpu(0, &mask);
-  set_cpus_allowed_ptr(busy_kthread_children, &mask);
-  busy_kthread_children->wake_cpu = 2;
+  set_cpus_allowed_ptr(wakee_task, &mask);
+  wakee_task->wake_cpu = 2;
 
-  reset_task_stats(busy_kthread);
-  reset_task_stats(busy_kthread_children);
+  kstep_reset_task(waker_task);
+  kstep_reset_task(wakee_task);
 }
 
 static void *is_ineligible(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    if (tasks[i]->on_cpu && task_cpu(tasks[i]) == task_cpu(busy_kthread) &&
-        !kstep_eligible(&tasks[i]->se))
+    if (tasks[i]->on_cpu && !kstep_eligible(&tasks[i]->se))
       return tasks[i];
   return NULL;
-}
-
-static void *is_running_again(void) {
-  return ineligible_task->on_cpu == 1 ? ineligible_task : NULL;
 }
 
 static void body(void) {
@@ -75,29 +56,23 @@ static void body(void) {
   kstep_tick_repeat(20);
 
   // tick until there is a ineligible task on the same cpu as the busy kthread
-  ineligible_task = kstep_tick_until(is_ineligible);
-
-  // sleep all colocated tasks
+  struct task_struct *ineligible_task = kstep_tick_until(is_ineligible);
   TRACE_INFO("Found ineligible task %d on cpu %d", ineligible_task->pid,
              task_cpu(ineligible_task));
+
+  // sleep all other tasks
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     if (tasks[i] != ineligible_task)
       kstep_task_pause(tasks[i]);
 
-  kstep_tick();
+  // wake up the waker to call sync wakeup
+  complete(&wakeup_ready);
 
-  // wake up the kthread to call sync wakeup
-  atomic_set(&data_ready, 1);
-  wake_up_interruptible(&my_wq);
-
-  kstep_tick();
-
-  // tick until the not eligible task is running on the cpu and pause it
-  kstep_tick_until(is_running_again);
+  // Pause the ineligible task
   kstep_task_pause(ineligible_task);
 
   // tick to show the impact
-  kstep_tick_repeat(8);
+  kstep_tick_repeat(10);
 }
 
 struct kstep_driver sync_wakeup = {
