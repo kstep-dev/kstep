@@ -29,7 +29,7 @@ static void body(void) {
   // wait for another 2 ticks (2ms)
   kstep_tick_repeat(2);
 
-  // wake up and set antoher task to fifo
+  // wake up and set another task to fifo
   kstep_task_fifo(tasks[1]);
 
   // tick for another 600 ticks (600ms) to show the impact
