@@ -86,12 +86,10 @@ def plot_min_avg_vruntime(
     ax1.set_ylabel('min_vruntime', fontsize = 13)
     # ax1.set_title(f'Lag_Vruntime', fontsize=13)
     ax1.grid(True, alpha=0.3)
-    if len(timestamps_buggy) > 0 and len(timestamps_fixed) > 0:
-        ax1.set_xlim(5, max(max(timestamps_buggy), max(timestamps_fixed)) + 1)
-    ax1.legend(
-        handlelength=0.75,
-        handletextpad=0.25,
-    )
+    # show end x-axis label
+    # ax1.set_xlim(0, max(max(timestamps_buggy), max(timestamps_fixed)) + 1)
+    ax1.set_xticks([0, 5, 10, 15])
+    ax1.legend(loc="upper left", handlelength=0.75)
     ax1.tick_params(axis="both", which="major", labelsize=13)
     ax1.set_xlabel("Time (ms)", fontsize=13)
     save_fig(fig, output_file)
