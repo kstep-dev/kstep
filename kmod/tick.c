@@ -156,9 +156,8 @@ void kstep_tick(void) {
 }
 
 void kstep_tick_repeat(int n) {
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < n; i++)
     kstep_tick();
-  }
 }
 
 void *kstep_tick_until(void *(*fn)(void)) {
