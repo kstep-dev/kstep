@@ -1,52 +1,37 @@
-#include <linux/freezer.h>
-
 #include "kstep.h"
 
 static void pre_init(void) { kstep_params.step_interval_us = 50000; }
 
-static void kstep_freeze_task(struct task_struct *p) {
-// https://github.com/torvalds/linux/commit/f5d39b020809146cc28e6e73369bf8065e0310aa
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
-  static_branch_inc(&freezer_active);
-#else
-  atomic_inc(&system_freezing_cnt);
-#endif
+static struct task_struct *tasks[3];
 
-  *ksym.pm_freezing = true;
-  ksym.freeze_task(p);
-
-  *ksym.pm_freezing = false;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
-  static_branch_dec(&freezer_active);
-#else
-  atomic_dec(&system_freezing_cnt);
-#endif
+static void init(void) {
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
+    tasks[i] = kstep_task_create();
 }
 
-static bool is_ineligible(struct task_struct *p) {
-  return strcmp(p->comm, busy_task->comm) == 0 && p != busy_task && p->on_cpu &&
-         ksym.entity_eligible(p->se.cfs_rq, &p->se) == 0;
+static void *is_ineligible(void) {
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
+    if (tasks[i]->on_cpu && !kstep_eligible(&tasks[i]->se))
+      return tasks[i];
+  return NULL;
 }
 
 static void body(void) {
-  kstep_task_fork(busy_task, 2);
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
+    kstep_task_wakeup(tasks[i]);
 
-  struct task_struct *pause_task = kstep_tick_until_task(is_ineligible);
-  TRACE_INFO("dequeue ineligible task %d", pause_task->pid);
-  kstep_task_sleep(pause_task, 1);
+  struct task_struct *p = kstep_tick_until(is_ineligible);
+  kstep_task_sleep(p, 1);
 
-  kstep_tick();
+  kstep_freeze_task(p);
+  kstep_task_wakeup(p);
 
-  TRACE_INFO("freeze ineligible task %d", pause_task->pid);
-  kstep_freeze_task(pause_task);
-
-  kstep_task_wakeup(pause_task);
-
-  kstep_tick_repeat(25);
+  kstep_tick_repeat(30);
 }
 
 struct kstep_driver freeze = {
     .name = "freeze",
     .pre_init = pre_init,
+    .init = init,
     .body = body,
 };

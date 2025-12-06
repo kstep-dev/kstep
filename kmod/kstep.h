@@ -27,7 +27,6 @@ struct kstep_params_t {
   bool print_lb_events;                // Whether to print LB events
 };
 extern struct kstep_params_t kstep_params;
-extern struct task_struct *busy_task;
 void kstep_params_print(void);
 
 // driver.c
@@ -45,8 +44,8 @@ void kstep_tick_exit(void);
 void kstep_sleep(void);
 void kstep_tick(void);
 void kstep_tick_repeat(int n);
-// Call tick until the function returns true
-void kstep_tick_until(bool (*fn)(void));
+// Call tick until the function returns something, then return that something
+void *kstep_tick_until(void *(*fn)(void));
 // Call tick until the function returns true for a task, then return that task
 struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *));
 
@@ -77,6 +76,8 @@ void kstep_cgroup_write(const char *dir, const char *filename, const char *fmt,
                         ...);
 void kstep_cgroup_write_raw(const char *dir, const char *filename,
                             const char *buf, size_t size);
+void kstep_freeze_task(struct task_struct *p);
+int kstep_eligible(struct sched_entity *se);
 
 // output.c
 void print_rq_stats(void);

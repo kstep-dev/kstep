@@ -18,11 +18,11 @@ static void init(void) {
   }
 }
 
-static bool ineligible_group_with_eligible_tasks(void) {
+static void *ineligible_group_with_eligible_tasks(void) {
   struct task_struct *p = tasks[0];
-  return p->on_cpu &&
-         !ksym.entity_eligible(p->se.parent->cfs_rq, p->se.parent) &&
-         ksym.entity_eligible(p->se.cfs_rq, &p->se);
+  if (p->on_cpu && !kstep_eligible(p->se.parent) && kstep_eligible(&p->se))
+    return p;
+  return NULL;
 }
 
 static void body(void) {

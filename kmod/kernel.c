@@ -1,5 +1,6 @@
 #include <linux/cpumask.h>
 #include <linux/dcache.h>
+#include <linux/freezer.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
 #include <linux/slab.h>
@@ -117,4 +118,29 @@ void kstep_cgroup_create(const char *dir) {
   kstep_mkdir(cgroup_root_fd, dir);
   kstep_cgroup_write_raw(dir, "cgroup.subtree_control", CGROUP_CONTROL,
                          strlen(CGROUP_CONTROL));
+}
+
+void kstep_freeze_task(struct task_struct *p) {
+// https://github.com/torvalds/linux/commit/f5d39b020809146cc28e6e73369bf8065e0310aa
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+  static_branch_inc(&freezer_active);
+#else
+  atomic_inc(&system_freezing_cnt);
+#endif
+
+  *ksym.pm_freezing = true;
+
+  TRACE_INFO("Freezing task %d", p->pid);
+  ksym.freeze_task(p);
+
+  *ksym.pm_freezing = false;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+  static_branch_dec(&freezer_active);
+#else
+  atomic_dec(&system_freezing_cnt);
+#endif
+}
+
+int kstep_eligible(struct sched_entity *se) {
+  return ksym.entity_eligible(se->cfs_rq, se);
 }

@@ -31,8 +31,6 @@ void kstep_params_print(void) {
   TRACE_INFO("- print_lb_events: %d", kstep_params.print_lb_events);
 }
 
-struct task_struct *busy_task = NULL;
-
 static int __init kstep_main(void) {
   TRACE_INFO("Initializing kSTEP");
   ksym_init();
@@ -55,7 +53,6 @@ static int __init kstep_main(void) {
   kstep_cgroup_init();
 
   // Run userspace programs when we know the system is ready
-  busy_task = kstep_task_create();
   if (driver->init)
     driver->init();
 

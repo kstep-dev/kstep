@@ -6,6 +6,10 @@ static void pre_init(void) {
   kstep_params.print_rq_stats = true;
 }
 
+static struct task_struct *busy_task;
+
+static void init(void) { busy_task = kstep_task_create(); }
+
 static struct task_struct *find_ff_task(void) {
   struct task_struct *p;
   for_each_process(p) {
@@ -48,5 +52,6 @@ static void body(void) {
 struct kstep_driver util_avg = {
     .name = "util_avg",
     .pre_init = pre_init,
+    .init = init,
     .body = body,
 };
