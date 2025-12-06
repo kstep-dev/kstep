@@ -3,6 +3,7 @@
 #include <linux/umh.h>
 
 #include "kstep.h"
+#include "sigcode.h"
 
 // Initialize stdin, stdout, and stderr to /dev/console
 // Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
@@ -77,6 +78,11 @@ void kstep_task_fork_pin(struct task_struct *p, int n, int begin, int end) {
   kstep_task_signal(p, SIGCODE_FORK_PIN, n, begin, end);
   TRACE_INFO("Forked task %d %d times and pinned to CPUs %d-%d", p->pid, n,
              begin, end);
+}
+
+void kstep_task_fork_ff(struct task_struct *p, int n) {
+  kstep_task_signal(p, SIGCODE_FORK_FF, n, 0, 0);
+  TRACE_INFO("Forked task %d %d times and set to FIFO", p->pid, n);
 }
 
 void kstep_task_pin(struct task_struct *p, int begin, int end) {
