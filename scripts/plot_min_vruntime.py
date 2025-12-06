@@ -24,9 +24,9 @@ def parse_log_file(log_file):
     min_vruntime_values = []
     avg_vruntime_values = []
 
-    # Pattern to match lines with CPU 2, min_vruntime, and optionally avg_vruntime
+    # Pattern to match lines with CPU 1, min_vruntime, and optionally avg_vruntime
     pattern = (
-        r"\[\s*(\d+\.\d+)\].*CPU 2.*min_vruntime=([0-9]+)(?:.*avg_vruntime=([0-9]+))?"
+        r"\[\s*(\d+\.\d+)\].*CPU 1.*min_vruntime=([0-9]+)(?:.*avg_vruntime=([0-9]+))?"
     )
 
     with open(log_file, 'r') as f:
