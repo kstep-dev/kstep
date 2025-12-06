@@ -31,13 +31,6 @@ void print_rq_stats(void) {
 
 void print_tasks(void) {
   struct task_struct *p;
-  // int min_pid = INT_MAX;
-  // for_each_process(p) {
-  //   if (task_cpu(p) == 0 || is_sys_kthread(p))
-  //     continue;
-  //   if (task_pid_nr(p) < min_pid)
-  //     min_pid = task_pid_nr(p);
-  // }
 
   pr_info("\t%3s %c%s %5s %5s %12s %12s %9s\n", "CPU", ' ', "S", "PID", "PPID",
           "vruntime", "sum-exec", "switches");
