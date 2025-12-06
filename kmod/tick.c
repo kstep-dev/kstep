@@ -156,9 +156,8 @@ void kstep_tick(void) {
 }
 
 void kstep_tick_repeat(int n) {
-  for (int i = 0; i < n; i++) {
+  for (int i = 0; i < n; i++)
     kstep_tick();
-  }
 }
 
 void *kstep_tick_until(void *(*fn)(void)) {
@@ -166,17 +165,6 @@ void *kstep_tick_until(void *(*fn)(void)) {
     void *result = fn();
     if (result)
       return result;
-    kstep_tick();
-  }
-}
-
-struct task_struct *kstep_tick_until_task(bool (*fn)(struct task_struct *)) {
-  struct task_struct *p;
-  while (1) {
-    for_each_process(p) {
-      if (fn(p))
-        return p;
-    }
     kstep_tick();
   }
 }
