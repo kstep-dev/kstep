@@ -15,6 +15,7 @@
 #define MAX_CGROUP_DATA_LENGTH 64
 
 void kstep_write_file(const char *path, const char *buf, size_t size) {
+  TRACE_INFO("Writing %s: %s", path, buf);
   struct file *file = filp_open(path, O_WRONLY, 0);
   if (IS_ERR(file))
     panic("open %s failed: %ld", path, PTR_ERR(file));
@@ -24,7 +25,6 @@ void kstep_write_file(const char *path, const char *buf, size_t size) {
     panic("write %s failed: %s", path, buf);
 
   filp_close(file, NULL);
-  TRACE_INFO("Wrote %s: %s", path, buf);
 }
 
 void kstep_mkdir(int dfd, const char *dir) {
