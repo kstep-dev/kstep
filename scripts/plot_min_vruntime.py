@@ -55,7 +55,7 @@ def plot_min_avg_vruntime(
     Top: min_vruntime as scatter.
     Bottom: avg_vruntime as scatter using same shape, size.
     """
-    fig, ax1 = plt.subplots(1, figsize=(2.5, 2.25))
+    fig, ax1 = plt.subplots(1, figsize=(2.25, 2.25))
 
     # Top subplot: min_vruntime using scatter
     ax1.scatter(
@@ -88,8 +88,11 @@ def plot_min_avg_vruntime(
     ax1.grid(True, alpha=0.3)
     # show end x-axis label
     # ax1.set_xlim(0, max(max(timestamps_buggy), max(timestamps_fixed)) + 1)
-    ax1.set_xticks([0, 5, 10, 15])
-    ax1.legend(loc="upper left", handlelength=0.75)
+    ax1.set_xticks([0, 5, 10])
+    ax1.legend(
+        handlelength=0.5,
+        handletextpad=0.5,
+    )
     ax1.tick_params(axis="both", which="major", labelsize=13)
     ax1.set_xlabel("Time (ms)", fontsize=13)
     save_fig(fig, output_file)
