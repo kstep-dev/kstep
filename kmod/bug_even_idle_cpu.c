@@ -24,7 +24,7 @@ static void body(void) {
   kstep_tick_repeat(200);
   for (int i = 1; i <= 2; i++)
     kstep_task_pin(tasks[i], 5, 6);
-  kstep_tick_repeat(1000);
+  kstep_tick_repeat(400);
 }
 
 struct kstep_driver even_idle_cpu = {
