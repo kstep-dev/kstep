@@ -1,0 +1,26 @@
+From 490f50232032820493da3fde8b162132c252bce9 Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Sun, 7 Dec 2025 16:58:33 -0600
+Subject: [PATCH] even_idle_cpu_patch
+
+---
+ kernel/sched/fair.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 8ce56a8d507f..a26ab13d3e46 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -11094,6 +11094,9 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
+ 			env->migration_type = migrate_task;
+ 			env->imbalance = max_t(long, 0,
+ 					       (local->idle_cpus - busiest->idle_cpus));
++			if (env->imbalance == 1 && busiest->group_type > group_fully_busy) {
++				env->imbalance += 1;
++			}
+ 		}
+ 
+ #ifdef CONFIG_NUMA
+-- 
+2.43.0
+
