@@ -112,14 +112,15 @@ def plot_data(python_script: str, controller: str):
     system(f"{PROJ_DIR}/scripts/plot_{python_script}.py --controller={controller}")
 
 
-def main(bug: Bug, run: List[str], reset: bool):
+def main(bug: Bug, run: List[str], reset: bool, skip_build: bool):
     # Run the buggy version
     if "buggy" in run:
         linux_dir = LINUX_ROOT_DIR / f"{bug.name}_buggy"
         checkout_linux(bug.buggy.version, linux_dir=linux_dir, reset=reset)
         for patch in bug.buggy.patches:
             patch_linux(linux_dir, patch)
-        make_linux(linux_dir)
+        if not skip_build:
+            make_linux(linux_dir)
         make_kstep()
         run_qemu(
             linux_dir=linux_dir,
@@ -136,7 +137,8 @@ def main(bug: Bug, run: List[str], reset: bool):
         checkout_linux(bug.fixed.version, linux_dir=linux_dir, reset=reset)
         for patch in bug.fixed.patches:
             patch_linux(linux_dir, patch)
-        make_linux(linux_dir)
+        if not skip_build:
+            make_linux(linux_dir)
         make_kstep()
         run_qemu(
             linux_dir=linux_dir,
@@ -169,13 +171,19 @@ if __name__ == "__main__":
         nargs="+",
     )
     parser.add_argument("--reset", action="store_true", default=False)
+    parser.add_argument(
+        "--skip_build",
+        action="store_true",
+        default=False,
+        help="Skip kernel rebuild, assuming no changes have been made.",
+    )
     args = parser.parse_args()
 
     if args.name == "all":
         for bug in bugs:
-            main(bug=bug, run=args.run, reset=args.reset)
+            main(bug=bug, run=args.run, reset=args.reset, skip_build=args.skip_build)
     else:
         bug = next((bug for bug in bugs if bug.name == args.name), None)
         if not bug:
             raise ValueError(f"Bug '{args.name}' not found.")
-        main(bug=bug, run=args.run, reset=args.reset)
+        main(bug=bug, run=args.run, reset=args.reset, skip_build=args.skip_build)
