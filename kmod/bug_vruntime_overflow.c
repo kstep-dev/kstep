@@ -4,17 +4,14 @@ static struct task_struct *tasks[4];
 
 static void init(void) {
   // Setup cgroups
-  kstep_cgroup_create("g0");
-  kstep_cgroup_write("g0", "cpuset.cpus", "1");
-  kstep_cgroup_write("g0", "cpu.weight", "%d", 20);
-  kstep_cgroup_create("g1");
-  kstep_cgroup_write("g1", "cpuset.cpus", "1");
+  kstep_cgroup_create_pinned("g0", "1");
+  kstep_cgroup_create_pinned("g1", "1");
+  kstep_cgroup_set_weight("g0", 20);
 
   // 2 tasks in each group
   for (int i = 0; i < ARRAY_SIZE(tasks); i++) {
     tasks[i] = kstep_task_create();
-    kstep_cgroup_write(i < 2 ? "g0" : "g1", "cgroup.procs", "%d",
-                       tasks[i]->pid);
+    kstep_cgroup_add_task(i < 2 ? "g0" : "g1", tasks[i]->pid);
   }
 }
 
@@ -43,7 +40,7 @@ static void body(void) {
   ksym.dequeue_entities(group_se->cfs_rq, group_se, DEQUEUE_SLEEP);
 
   // Reweight the group
-  kstep_cgroup_write("g0", "cpu.weight", "%d", 100);
+  kstep_cgroup_set_weight("g0", 100);
 
   // Starvation for tasks[1]
   kstep_task_wakeup(tasks[1]);
