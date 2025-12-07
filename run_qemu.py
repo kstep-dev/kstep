@@ -46,8 +46,8 @@ def run_qemu(
         "nohz_full=1,2",
         "init=/init",
         "panic=-1",  # Exit immediately on panic
-        "printk.time=0",  # Disable printk time
-        "quiet",  # Disable kernel messages
+        "quiet",  # Disable printk to be enabled later
+        "printk.time=0",  # Disable printk time to be enabled later
     ]
 
     if Arch.get() == Arch.X86_64:
