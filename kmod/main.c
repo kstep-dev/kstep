@@ -32,7 +32,7 @@ void kstep_params_print(void) {
 }
 
 static int __init kstep_main(void) {
-  kstep_write_file("/proc/sys/kernel/printk", "7", 1);
+  kstep_write("/proc/sys/kernel/printk", "7", 1);
   TRACE_INFO("Initializing kSTEP");
   ksym_init();
   struct kstep_driver *driver = kstep_driver_get(kstep_params.driver);
@@ -51,8 +51,6 @@ static int __init kstep_main(void) {
   kstep_disable_workqueue();
   kstep_move_kthreads();
 
-  kstep_cgroup_init();
-
   // Run userspace programs when we know the system is ready
   if (driver->init)
     driver->init();
@@ -67,7 +65,7 @@ static int __init kstep_main(void) {
     kstep_trace_lb();
 
   // Enable printk time
-  kstep_write_file("/sys/module/printk/parameters/time", "1", 1);
+  kstep_write("/sys/module/printk/parameters/time", "1", 1);
 
   TRACE_INFO("Running driver %s", driver->name);
   driver->body();

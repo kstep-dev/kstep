@@ -64,16 +64,13 @@ void kstep_task_signal(struct task_struct *p, enum sigcode code, int val1,
 int is_sys_kthread(struct task_struct *p);
 
 // kernel.c
-void kstep_write_file(const char *path, const char *buf, size_t size);
-void kstep_mkdir(int dfd, const char *dir);
-int kstep_open_fd(const char *path, int flags);
-void kstep_close_fd(int fd);
-void kstep_cgroup_init(void);
-void kstep_cgroup_create(const char *dir);
-void kstep_cgroup_write(const char *dir, const char *filename, const char *fmt,
+void kstep_write(const char *path, const char *buf, size_t size);
+void kstep_mkdir(const char *dir);
+void kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
                         ...);
-void kstep_cgroup_write_raw(const char *dir, const char *filename,
-                            const char *buf, size_t size);
+void kstep_cgroup_create_pinned(const char *name, const char *cpuset);
+void kstep_cgroup_set_weight(const char *name, int weight);
+void kstep_cgroup_add_task(const char *name, int pid);
 void kstep_freeze_task(struct task_struct *p);
 int kstep_eligible(struct sched_entity *se);
 

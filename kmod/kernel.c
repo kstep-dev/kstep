@@ -14,7 +14,7 @@
 #define MAX_CGROUP_PATH_LENGTH 64
 #define MAX_CGROUP_DATA_LENGTH 64
 
-void kstep_write_file(const char *path, const char *buf, size_t size) {
+void kstep_write(const char *path, const char *buf, size_t size) {
   TRACE_INFO("Writing %s: %s", path, buf);
   struct file *file = filp_open(path, O_WRONLY, 0);
   if (IS_ERR(file))
@@ -27,14 +27,14 @@ void kstep_write_file(const char *path, const char *buf, size_t size) {
   filp_close(file, NULL);
 }
 
-void kstep_mkdir(int dfd, const char *dir) {
+void kstep_mkdir(const char *dir) {
   struct path path;
   int flags = LOOKUP_DIRECTORY;
 // https://github.com/torvalds/linux/commit/3d18f80ce181ba27f37d0ec1c550b22acb01dd49
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
-  struct dentry *dentry = start_creating_path(dfd, dir, &path, flags);
+  struct dentry *dentry = start_creating_path(AT_FDCWD, dir, &path, flags);
 #else
-  struct dentry *dentry = kern_path_create(dfd, dir, &path, flags);
+  struct dentry *dentry = kern_path_create(AT_FDCWD, dir, &path, flags);
 #endif
   if (IS_ERR(dentry))
     panic("kern_path_create %s failed: %ld", dir, PTR_ERR(dentry));
@@ -66,58 +66,53 @@ void kstep_mkdir(int dfd, const char *dir) {
   TRACE_INFO("Created directory %s", dir);
 }
 
-int kstep_open_fd(const char *path, int flags) {
-  struct file *file = filp_open(path, flags, 0);
-  if (IS_ERR(file))
-    panic("open %s failed: %ld", path, PTR_ERR(file));
-
-  int fd = get_unused_fd_flags(0);
-  if (fd < 0)
-    panic("get_unused_fd_flags failed: %d", fd);
-  fd_install(fd, file);
-
-  return fd;
-}
-
-void kstep_close_fd(int fd) {
-  struct file *file = fget_raw(fd);
-  filp_close(file, NULL);
-  put_unused_fd(fd);
-}
-
-static int cgroup_root_fd;
-
-void kstep_cgroup_init(void) {
-  cgroup_root_fd = kstep_open_fd(CGROUP_ROOT, O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-  kstep_cgroup_write_raw("", "cgroup.subtree_control", CGROUP_CONTROL,
-                         strlen(CGROUP_CONTROL));
-}
-
-void kstep_cgroup_write_raw(const char *dir, const char *filename,
-                            const char *buf, size_t size) {
-  char path[MAX_CGROUP_PATH_LENGTH];
-  int ret = scnprintf(path, sizeof(path), CGROUP_ROOT "%s/%s", dir, filename);
-  if (ret <= 0 || ret >= sizeof(path))
-    panic("failed to form cgroup file path for %s", filename);
-  kstep_write_file(path, buf, size);
-}
-
-void kstep_cgroup_write(const char *dir, const char *filename, const char *fmt,
+void kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
                         ...) {
+  char data[MAX_CGROUP_DATA_LENGTH] = {0};
+  char path[MAX_CGROUP_PATH_LENGTH] = {0};
+
+  // Format data
   va_list args;
   va_start(args, fmt);
-  char buf[MAX_CGROUP_DATA_LENGTH];
-  int size = vsnprintf(buf, sizeof(buf), fmt, args);
+  int size = vsnprintf(data, sizeof(data), fmt, args);
   va_end(args);
-  if (size <= 0 || size >= sizeof(buf))
+  if (size <= 0 || size >= sizeof(data))
     panic("failed to format cgroup data for %s", filename);
-  kstep_cgroup_write_raw(dir, filename, buf, size);
+
+  // Format path
+  int ret = scnprintf(path, sizeof(path), CGROUP_ROOT "%s/%s", name, filename);
+  if (ret <= 0 || ret >= sizeof(path))
+    panic("failed to form cgroup file path for %s", filename);
+
+  kstep_write(path, data, size);
 }
 
-void kstep_cgroup_create(const char *dir) {
-  kstep_mkdir(cgroup_root_fd, dir);
-  kstep_cgroup_write_raw(dir, "cgroup.subtree_control", CGROUP_CONTROL,
-                         strlen(CGROUP_CONTROL));
+static void kstep_cgroup_mkdir(const char *name) {
+  char path[MAX_CGROUP_PATH_LENGTH] = {0};
+  int ret = scnprintf(path, sizeof(path), CGROUP_ROOT "%s", name);
+  if (ret <= 0 || ret >= sizeof(path))
+    panic("failed to form cgroup file path for %s", name);
+  kstep_mkdir(path);
+}
+
+void kstep_cgroup_create_pinned(const char *name, const char *cpuset) {
+  static bool root_initialized = false;
+  if (!root_initialized) {
+    kstep_cgroup_write("", "cgroup.subtree_control", CGROUP_CONTROL);
+    root_initialized = true;
+  }
+
+  kstep_cgroup_mkdir(name);
+  kstep_cgroup_write(name, "cgroup.subtree_control", CGROUP_CONTROL);
+  kstep_cgroup_write(name, "cpuset.cpus", "%s", cpuset);
+}
+
+void kstep_cgroup_set_weight(const char *name, int weight) {
+  kstep_cgroup_write(name, "cpu.weight", "%d", weight);
+}
+
+void kstep_cgroup_add_task(const char *name, int pid) {
+  kstep_cgroup_write(name, "cgroup.procs", "%d", pid);
 }
 
 void kstep_freeze_task(struct task_struct *p) {
