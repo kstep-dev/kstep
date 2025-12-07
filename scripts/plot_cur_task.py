@@ -22,11 +22,10 @@ COLOR_BUGGY = "tab:red"
 
 COLOR_MAPS = {
     "sync_wakeup": {
+        -1: COLOR_IDLE,
         0: COLOR_YELLOW,
         1: COLOR_LIGHT_BLUE,
         2: COLOR_BUGGY,
-        3: COLOR_GREEN,
-        -1: COLOR_IDLE,
     },
     "freeze": {
         0: COLOR_BUGGY,
@@ -34,10 +33,28 @@ COLOR_MAPS = {
         2: COLOR_LIGHT_BLUE,
     },
     "vruntime_overflow": {
-        0: COLOR_ORANGE,
+        0: COLOR_YELLOW,
         1: COLOR_BUGGY,
         2: COLOR_LIGHT_BLUE,
-        3: COLOR_YELLOW,
+    },
+}
+
+NAME_MAPS = {
+    "sync_wakeup": {
+        -1: "Idle",
+        0: "Task 1",
+        1: "Task 2 (waker)",
+        2: "Task 3 (wakee)",
+    },
+    "freeze": {
+        0: "Task 1 (fail to freeze)",
+        1: "Task 2",
+        2: "Task 3",
+    },
+    "vruntime_overflow": {
+        0: "Task 1",
+        1: "Task 2 (starved)",
+        2: "Task 3",
     },
 }
 
@@ -111,6 +128,7 @@ def plot_cur_task(
     title_buggy: str,
     title_fixed: str,
     color_map: dict[int, str],
+    name_map: dict[int, str],
 ):
     df_buggy = parse_curr_task("buggy", log_file_buggy)
     df_fixed = parse_curr_task("fixed", log_file_fixed)
@@ -135,7 +153,7 @@ def plot_cur_task(
     unique_pids = np.unique(df.values.flatten())
     for pid in unique_pids:
         handles.append(mpatches.Patch(color=color_map[pid]))
-        labels.append("Idle" if pid == -1 else f"Task {pid + 1}")
+        labels.append(name_map[pid])
 
     fig.legend(
         handles,
@@ -144,7 +162,7 @@ def plot_cur_task(
         ncol=8,
         bbox_to_anchor=(0.5, 1.25 if num_cpus == 2 else 1.3),
         fontsize=8,
-        handlelength=0.75,
+        handlelength=1,
         handletextpad=0.25,
         columnspacing=1,
         frameon=False,
@@ -163,7 +181,6 @@ if __name__ == "__main__":
     log_file_fixed = RESULTS_DIR / f"{bugId}_fixed.log"
 
     output_file = RESULTS_DIR / f"{bugId}.pdf"
-    color_map = COLOR_MAPS.get(bugId, {})
 
     if bugId == "sync_wakeup":
         title_buggy = "Buggy and Official Fix"
@@ -173,7 +190,12 @@ if __name__ == "__main__":
         title_fixed = "Fixed"
 
     fig = plot_cur_task(
-        log_file_buggy, log_file_fixed, title_buggy, title_fixed, color_map
+        log_file_buggy,
+        log_file_fixed,
+        title_buggy,
+        title_fixed,
+        color_map=COLOR_MAPS.get(bugId, {}),
+        name_map=NAME_MAPS.get(bugId, {}),
     )
 
     save_fig(fig, output_file)
