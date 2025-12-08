@@ -76,7 +76,11 @@ void kstep_trace_lb(void) {
   // Instead of tracing in the middle of load_balance (in between
   // should_we_balance and find_busiest_group), we trace find_busiest_group
   // instead to check if the load balance is happening.
-  kstep_trace_function("find_busiest_group", &find_busiest_group_cb);
+  # if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+    kstep_trace_function("sched_balance_find_src_group", &find_busiest_group_cb);
+  #else
+    kstep_trace_function("find_busiest_group", &find_busiest_group_cb);
+  #endif
   TRACE_INFO("Traced find_busiest_group for load balancing");
 }
 

@@ -91,7 +91,11 @@ def parse_lb_events(filename, time_start=0.0):
                 ts = float(m.group(1))
                 cpu = int(m.group(2))
                 weight = int(m.group(3))
-                if weight == 4 and cpu in all_cpus and ts > time_start:
+                if bugId == "even_idle_cpu":
+                    target_weight = 8
+                else:
+                    target_weight = 4
+                if weight == target_weight and cpu in all_cpus and ts > time_start:
                     events.add((ts, cpu))
     return events
 
@@ -130,16 +134,17 @@ def plot_color_matrix_with_lb(
         ax.set_xticks([])
         ax.set_xlabel("")
     else:
-        n_xticks = 6 if len(timestamps_ms) > 6 else len(timestamps_ms)
-        x_tick_indices = np.linspace(0, len(timestamps_ms) - 1, n_xticks, dtype=int)
-        x_ticks = [timestamps_ms[i] for i in x_tick_indices]
+        # print(x_min, x_max)
+        tick_start = int(np.ceil(timestamps_ms[0] / 100) * 100)
+        tick_end = int(np.floor((timestamps_ms[-1] + 1) / 100) * 100)
+        x_ticks = list(range(tick_start, tick_end + 1, 100))
         ax.set_xticks(x_ticks)
         ax.set_xticklabels([f"{int(x)}" for x in x_ticks], fontsize=13)
         ax.tick_params(axis="x", length=2, pad=1)  # Shorter ticks, labels closer
         ax.set_xlabel("Time (ms)", labelpad=0.5, fontsize=13)
 
     ax.margins(0.03)
-    ax.set_xlim(x_min, x_max)
+    ax.set_xlim(x_min, x_max + 1)
     ax.set_ylim(y_min, y_max)
 
     # ----- Plot dots for lb events -----
@@ -159,10 +164,15 @@ def plot_color_matrix_with_lb(
                 # Scatter dot at (timestamps_ms[idx], lb_cpu)
                 dot_xs.append(timestamps_ms[idx])
                 dot_ys.append(lb_cpu)
+        if bugId == "even_idle_cpu":
+            dot_size = 10
+            ax.set_yticklabels([str(cpu - 4) for cpu in yticks])
+        else:
+            dot_size = 30
         ax.scatter(
             dot_xs,
             dot_ys,
-            s=30,
+            s=dot_size,
             c="#FF9013",
             marker="o",
             zorder=5,
@@ -230,7 +240,10 @@ if __name__ == "__main__":
     handles = []
     labels = []
     handles.append(mlines.Line2D([], [], color="#FF9013", marker="o", linestyle="None"))
-    labels.append("Balance \nin 4-CPU\ndomain")
+    if bugId == "even_idle_cpu":
+        labels.append("Balance \nacross\n2-CPU group\n")
+    else:
+        labels.append("Balance \nin 4-CPU\ndomain")
     for i in range(N_COLORS):
         handles.append(mpatches.Patch(color=cmap(i)))
         labels.append(f"{i} running")
@@ -238,7 +251,7 @@ if __name__ == "__main__":
         handles,
         labels,
         loc="center right",
-        bbox_to_anchor=(1.2, 0.5),
+        bbox_to_anchor=(1.25, 0.5),
         borderaxespad=0.0,
         handlelength=1,
         handletextpad=0.5,
