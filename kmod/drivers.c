@@ -18,10 +18,8 @@ static struct kstep_driver *drivers[] = {
 };
 
 struct kstep_driver *kstep_driver_get(const char *name) {
-  for (int i = 0; i < ARRAY_SIZE(drivers); i++) {
-    if (strcmp(drivers[i]->name, name) == 0) {
+  for (int i = 0; i < ARRAY_SIZE(drivers); i++)
+    if (strcmp(drivers[i]->name, name) == 0)
       return drivers[i];
-    }
-  }
   panic("Driver %s not found", name);
 }
