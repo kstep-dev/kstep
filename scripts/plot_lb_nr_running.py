@@ -134,16 +134,17 @@ def plot_color_matrix_with_lb(
         ax.set_xticks([])
         ax.set_xlabel("")
     else:
-        tick_start = int(np.ceil(timestamps_ms[0] / 200) * 200)
-        tick_end = int(np.floor(timestamps_ms[-1] / 200) * 200)
-        x_ticks = list(range(tick_start, tick_end + 1, 200))
+        # print(x_min, x_max)
+        tick_start = int(np.ceil(timestamps_ms[0] / 100) * 100)
+        tick_end = int(np.floor((timestamps_ms[-1] + 1) / 100) * 100)
+        x_ticks = list(range(tick_start, tick_end + 1, 100))
         ax.set_xticks(x_ticks)
         ax.set_xticklabels([f"{int(x)}" for x in x_ticks], fontsize=13)
         ax.tick_params(axis="x", length=2, pad=1)  # Shorter ticks, labels closer
         ax.set_xlabel("Time (ms)", labelpad=0.5, fontsize=13)
 
     ax.margins(0.03)
-    ax.set_xlim(x_min, x_max)
+    ax.set_xlim(x_min, x_max + 1)
     ax.set_ylim(y_min, y_max)
 
     # ----- Plot dots for lb events -----
