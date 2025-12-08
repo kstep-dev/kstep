@@ -56,8 +56,8 @@ void kstep_task_fifo(struct task_struct *p);
 void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
 void kstep_task_sleep(struct task_struct *p, int n);
-void kstep_task_reweight(struct task_struct *p, int weight);
-// Low level signal sending, use with caution, see "sigcode.h"
+void kstep_task_set_prio(struct task_struct *p, int prio);
+// Low level signal sending, use with caution, see "user.h"
 enum sigcode;
 void kstep_task_signal(struct task_struct *p, enum sigcode code, int val1,
                        int val2, int val3);
