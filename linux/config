@@ -18,10 +18,11 @@ CONFIG_PARAVIRT=y
 CONFIG_KVM_GUEST=y
 # debug kernel
 CONFIG_DEBUG_KERNEL=y
-# enable expert mode
-CONFIG_EXPERT=y
 # BUG/WARN support
 CONFIG_BUG=y
+# expert settings
+CONFIG_EXPERT=y
+CONFIG_PROCESSOR_SELECT=y
 
 #
 # Output
