@@ -15,9 +15,9 @@ static void init(void) {
 }
 
 static void body(void) {
-  // Reweight other tasks to 19
+  // Set priority of other tasks to 19
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    kstep_task_reweight(tasks[i], 19);
+    kstep_task_set_prio(tasks[i], 19);
 
   kstep_task_wakeup(target_task);
 

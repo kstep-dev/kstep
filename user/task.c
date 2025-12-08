@@ -5,7 +5,7 @@
 #include <sys/resource.h> // setpriority
 #include <unistd.h>       // sleep, exit, pause
 
-#include "../kmod/sigcode.h"
+#include "../kmod/user.h"
 #include "utils.h"
 
 static void handler(int signum, siginfo_t *info, void *context) {
@@ -18,10 +18,11 @@ static void handler(int signum, siginfo_t *info, void *context) {
   } else if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
-      if (pid == 0) {
-        if (code == SIGCODE_FORK_PIN) {
+      if (pid < 0)
+        panic("fork failed");
+      if (pid == 0) { // child process
+        if (code == SIGCODE_FORK_PIN)
           set_proc_affinity(val2, val3);
-        }
         return;
       }
     }
@@ -31,7 +32,7 @@ static void handler(int signum, siginfo_t *info, void *context) {
     exit(0);
   } else if (code == SIGCODE_PAUSE) {
     pause();
-  } else if (code == SIGCODE_REWEIGHT) {
+  } else if (code == SIGCODE_SET_PRIO) {
     if (setpriority(PRIO_PROCESS, 0, val) < 0)
       panic("setpriority failed");
   } else if (code == SIGCODE_PIN) {
@@ -54,7 +55,7 @@ int main() {
   struct sigaction sa = {.sa_sigaction = handler, .sa_flags = SA_SIGINFO};
   sigaction(SIGUSR1, &sa, NULL);
   set_proc_affinity(1, sysconf(_SC_NPROCESSORS_ONLN) - 1);
-  prctl(PR_SET_NAME, "test-proc");
+  prctl(PR_SET_NAME, TASK_READY_COMM);
   pause();
   loop();
 }

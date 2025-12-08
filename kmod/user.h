@@ -1,5 +1,5 @@
-#ifndef SIGCODE_H
-#define SIGCODE_H
+#ifndef KSTEP_USER_H
+#define KSTEP_USER_H
 
 enum sigcode {
   SIGCODE_WAKEUP,
@@ -8,9 +8,10 @@ enum sigcode {
   SIGCODE_SLEEP,
   SIGCODE_EXIT,
   SIGCODE_PAUSE,
-  SIGCODE_REWEIGHT,
+  SIGCODE_SET_PRIO,
   SIGCODE_PIN,
   SIGCODE_FIFO,
 };
 
+#define TASK_READY_COMM "ready"
 #endif

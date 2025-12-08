@@ -18,30 +18,8 @@ static struct kstep_driver *drivers[] = {
 };
 
 struct kstep_driver *kstep_driver_get(const char *name) {
-  for (int i = 0; i < ARRAY_SIZE(drivers); i++) {
-    if (strcmp(drivers[i]->name, name) == 0) {
+  for (int i = 0; i < ARRAY_SIZE(drivers); i++)
+    if (strcmp(drivers[i]->name, name) == 0)
       return drivers[i];
-    }
-  }
   panic("Driver %s not found", name);
 }
-
-static struct task_struct *tasks[10];
-static void noop_init(void) {
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    tasks[i] = kstep_task_create();
-}
-
-static void noop_body(void) {
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++) 
-    kstep_task_wakeup(tasks[i]);
-
-  for (int i = 0; i < 15; i++) 
-    kstep_tick();
-}
-
-struct kstep_driver noop = {
-    .name = "noop",
-    .init = noop_init,
-    .body = noop_body,
-};

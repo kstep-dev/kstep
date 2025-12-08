@@ -3,7 +3,7 @@
 #include <linux/umh.h>
 
 #include "kstep.h"
-#include "sigcode.h"
+#include "user.h"
 
 // Initialize stdin, stdout, and stderr to /dev/console
 // Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
@@ -34,7 +34,7 @@ static int task_init(struct subprocess_info *info, struct cred *new) {
 }
 
 struct task_struct *kstep_task_create(void) {
-  char *path = "/busy";
+  char *path = "/task";
   char *argv[] = {path, NULL};
   struct kstep_task_info task_info = {};
   struct subprocess_info *info = call_usermodehelper_setup(
@@ -49,7 +49,7 @@ struct task_struct *kstep_task_create(void) {
   kstep_sleep();
   struct task_struct *p = task_info.task;
   for (int i = 0; i < 100; i++) {
-    if (strcmp(p->comm, "test-proc") == 0)
+    if (strcmp(p->comm, TASK_READY_COMM) == 0)
       return p;
     kstep_sleep();
     TRACE_INFO("Waiting for task %d to start", p->pid);
@@ -104,9 +104,9 @@ void kstep_task_sleep(struct task_struct *p, int n) {
   TRACE_INFO("Put task %d to sleep for %d seconds", p->pid, n);
 }
 
-void kstep_task_reweight(struct task_struct *p, int weight) {
-  kstep_task_signal(p, SIGCODE_REWEIGHT, weight, 0, 0);
-  TRACE_INFO("Reweighted task %d to %d", p->pid, weight);
+void kstep_task_set_prio(struct task_struct *p, int prio) {
+  kstep_task_signal(p, SIGCODE_SET_PRIO, prio, 0, 0);
+  TRACE_INFO("Set priority of task %d to %d", p->pid, prio);
 }
 
 static char *sys_kthread_comms[] = {
