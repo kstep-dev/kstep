@@ -1,5 +1,5 @@
 .PHONY: all
-all: build build/task build/busy
+all: build build/init build/task
 
 build:
 	mkdir -p build

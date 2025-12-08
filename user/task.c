@@ -18,10 +18,11 @@ static void handler(int signum, siginfo_t *info, void *context) {
   } else if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
-      if (pid == 0) {
-        if (code == SIGCODE_FORK_PIN) {
+      if (pid < 0)
+        panic("fork failed");
+      if (pid == 0) { // child process
+        if (code == SIGCODE_FORK_PIN)
           set_proc_affinity(val2, val3);
-        }
         return;
       }
     }
