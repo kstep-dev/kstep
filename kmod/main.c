@@ -64,6 +64,9 @@ static int __init kstep_main(void) {
   if (kstep_params.print_lb_events)
     kstep_trace_lb();
 
+  if (kstep_params.print_rebalance_overhead)
+    kstep_trace_rebalance();
+
   // Enable printk time
   kstep_write("/sys/module/printk/parameters/time", "1", 1);
 

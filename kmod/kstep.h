@@ -25,6 +25,7 @@ struct kstep_params_t {
   bool print_tasks;                    // Whether to print tasks
   bool print_nr_running;               // Whether to print nr_running
   bool print_lb_events;                // Whether to print LB events
+  bool print_rebalance_overhead;       // Whether to print rebalance overhead
 };
 extern struct kstep_params_t kstep_params;
 void kstep_params_print(void);
