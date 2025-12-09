@@ -3,7 +3,7 @@
 static void pre_init(void) {
   kstep_params.print_tasks = false;
   kstep_params.print_rq_stats = false;
-  kstep_trace_rebalance();
+  kstep_params.print_rebalance_overhead = true;
 }
 
 static struct task_struct *busy_task;
@@ -11,8 +11,11 @@ static struct task_struct *busy_task;
 static void init(void) { busy_task = kstep_task_create(); }
 
 static void body(void) {
-  for (int i = 0; i < 1000; i++)
-    kstep_task_fork_pin(busy_task, 100, 1, 1);
+  kstep_task_fork_pin(busy_task, 10000, 1, 1);
+
+  while (cpu_rq(1)->nr_running < 10000)
+    kstep_sleep();
+
   kstep_tick_repeat(1000);
 }
 
