@@ -11,7 +11,7 @@ kmod-build := $(src)/build/$(notdir $(kern-src))
 
 obj-m := kstep.o
 kstep-y := $(kmod-srcs:.c=.o)
-ccflags-y := -I$(kern-src) -std=gnu11
+ccflags-y := -I$(kern-src) -std=gnu11 -Wno-declaration-after-statement
 
 .PHONY: all
 all: $(kmod-build)/kstep.ko
