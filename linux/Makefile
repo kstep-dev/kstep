@@ -4,7 +4,7 @@ LINUX_DIR := $(realpath current)
 ifeq ($(LINUX_DIR),)
     $(error linux/current does not exist)
 endif
-LINUX_CONFIG := $(realpath current/.config)
+LINUX_CONFIG := $(LINUX_DIR)/.config
 KSTEP_CONFIG := $(realpath config.kstep)
 
 .PHONY: kernel
