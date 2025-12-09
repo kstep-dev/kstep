@@ -3,8 +3,8 @@ MAKEFLAGS += -j$(shell nproc)
 ROOTFS_DATA := $(abspath data/rootfs)
 ROOTFS_IMG := $(abspath data/rootfs.cpio)
 
-.PHONY: all
-all: $(ROOTFS_IMG)
+.PHONY: rootfs
+rootfs: $(ROOTFS_IMG)
 
 # Build the userspace programs
 .PHONY: user
