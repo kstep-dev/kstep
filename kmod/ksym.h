@@ -29,7 +29,6 @@ KSYM_FUNC(void, dequeue_entities, struct cfs_rq *cfs_rq,
           struct sched_entity *se, int flags)
 KSYM_FUNC(u64, avg_vruntime, struct cfs_rq *cfs_rq)
 KSYM_FUNC(struct tick_sched *, tick_get_tick_sched, int cpu)
-KSYM_FUNC(void, override_function_with_return, struct pt_regs *regs)
 KSYM_FUNC(void, rebuild_sched_domains, void)
 KSYM_FUNC(bool, arch_enable_hybrid_capacity_scale, void)
 KSYM_FUNC(void, arch_set_cpu_capacity, int cpu, unsigned long cap,
