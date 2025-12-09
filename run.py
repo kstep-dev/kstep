@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import logging
 import os
 from pathlib import Path
 from typing import Iterable, Optional
@@ -11,8 +12,10 @@ from scripts import LINUX_CURR_DIR, PROJ_DIR, ROOTFS_IMG, Arch, get_log_path, sy
 def make_kstep():
     system(f"make -C {PROJ_DIR} kstep")
 
+
 def make_linux():
     system(f"make -C {PROJ_DIR} linux")
+
 
 def run_qemu(
     linux_dir: Path,
@@ -105,6 +108,27 @@ def run_qemu(
                 raise RuntimeError("Kernel exited with panic")
 
 
+def is_port_free(port: int) -> bool:
+    import socket
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("localhost", port)) != 0
+
+
+def run_gdb(linux_dir: Path):
+    import signal
+
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    args = [
+        "-iex 'set pagination off'",
+        "-iex 'set debuginfod enabled off'",
+        f"-iex 'set auto-load safe-path {linux_dir}'",
+        f"-ex 'source {linux_dir}/vmlinux-gdb.py'",
+        "-ex 'target remote :1234'",
+    ]
+    system(f"gdb {linux_dir}/vmlinux " + " ".join(args))
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
@@ -114,5 +138,10 @@ if __name__ == "__main__":
     parser.add_argument("--smp", type=str, default="3")
     parser.add_argument("--params", type=str, nargs="+")
     args = parser.parse_args()
-    make_kstep()
-    run_qemu(**vars(args))
+
+    if args.debug and not is_port_free(1234):
+        logging.info("Port 1234 is already in use, running GDB...")
+        run_gdb(args.linux_dir)
+    else:
+        make_kstep()
+        run_qemu(**vars(args))
