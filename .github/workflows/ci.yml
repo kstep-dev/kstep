@@ -22,6 +22,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Basic setup
+        run: sudo rm -f /var/lib/man-db/auto-update  # avoid man-db auto-update
+
       - name: Linux - Restore cache
         id: restore-cache
         uses: actions/cache/restore@v4
@@ -31,13 +34,15 @@ jobs:
 
       - name: Linux - Download
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: ./checkout_linux.py --version ${{matrix.version}} --tarball
+        run: ./checkout_linux.py ${{matrix.version}} --tarball
+
+      - name: Linux - Install build dependencies
+        if: steps.restore-cache.outputs.cache-hit != 'true'
+        run: sudo apt update && sudo apt install -y libelf-dev
 
       - name: Linux - Build
         if: steps.restore-cache.outputs.cache-hit != 'true'
-        run: |
-          sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y libelf-dev
-          make linux
+        run: make linux
 
       - name: Linux - Save cache
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -46,12 +51,12 @@ jobs:
           path: linux
           key: ${{matrix.version}}-${{hashFiles('linux/config.kstep')}}
 
-      - name: Build
+      - name: Build kSTEP
         run: make kstep
 
       - name: Install QEMU
-        run: sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y qemu-kvm
+        run: sudo apt update && sudo apt install -y qemu-kvm
 
-      - name: Run QEMU
+      - name: Run kSTEP
         timeout-minutes: 1
-        run: ./run_qemu.py
+        run: ./run.py

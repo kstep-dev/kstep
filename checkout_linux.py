@@ -73,18 +73,29 @@ def checkout_linux(version: str, linux_dir: Path, reset: bool, tarball: bool = F
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--version",
+        "version",
         type=str,
+        nargs="?",
         default="v6.14",
         help="Linux branch/tag/commit to checkout",
+    )
+    parser.add_argument(
+        "name",
+        type=str,
+        nargs="?",
+        default=None,
+        help="Name of the directory (default: <version>)",
     )
     parser.add_argument("--reset", action="store_true", default=False)
     parser.add_argument("--tarball", action="store_true", default=False)
     args = parser.parse_args()
 
+    if args.name is None:
+        args.name = args.version
+
     checkout_linux(
         version=args.version,
-        linux_dir=LINUX_ROOT_DIR / args.version,
+        linux_dir=LINUX_ROOT_DIR / args.name,
         reset=args.reset,
         tarball=args.tarball,
     )
