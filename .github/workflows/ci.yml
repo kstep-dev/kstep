@@ -37,7 +37,7 @@ jobs:
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
           sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y libelf-dev
-          ./make_linux.py --reconfig
+          make linux
 
       - name: Linux - Save cache
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -47,7 +47,7 @@ jobs:
           key: ${{matrix.version}}-${{hashFiles('linux/config.kstep')}}
 
       - name: Build
-        run: make
+        run: make kstep
 
       - name: Install QEMU
         run: sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y qemu-kvm

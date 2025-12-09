@@ -9,7 +9,7 @@ from scripts import LINUX_CURR_DIR, PROJ_DIR, ROOTFS_IMG, Arch, get_log_path, sy
 
 
 def make_kstep():
-    system(f"make -C {PROJ_DIR}")
+    system(f"make -C {PROJ_DIR} kstep")
 
 def make_linux():
     system(f"make -C {PROJ_DIR} linux")
