@@ -9,7 +9,7 @@ kSTEP
 
 - Build Linux kernel and kSTEP: `make linux kstep`
 
-- Run: `./run.py [--driver <name>] [--params <param1=value1>...] [--debug]` (also triggers `make`)
+- Run: `./run.py [--driver <name>] [--params <param1=value1>...]` (also triggers `make`)
 
     - `driver`: Driver name to run, see `kmod/driver.c` for available drivers
     - `params`: Additional parameters to pass to the kernel module, see `kmod/main.c` for available parameters
