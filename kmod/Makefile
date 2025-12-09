@@ -2,23 +2,16 @@ BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.jso
 src ?= $(shell pwd)
 
 kern-src ?= $(realpath $(src)/../linux/current)
-kern-ver := $(notdir $(kern-src))
 ifeq ($(kern-src),)
     $(error kern-src does not exist)
 endif
 
 kmod-srcs := $(notdir $(filter-out %.mod.c,$(wildcard $(src)/*.c)))
-kmod-build := $(src)/build/$(kern-ver)
+kmod-build := $(src)/build/$(notdir $(kern-src))
 
 obj-m := kstep.o
 kstep-y := $(kmod-srcs:.c=.o)
-
-ccflags-y := \
-  -I$(kern-src) \
-  -Wno-unused-variable \
-  -Wno-unused-function \
-  -Wno-declaration-after-statement \
-  -std=gnu11
+ccflags-y := -I$(kern-src) -std=gnu11
 
 .PHONY: all
 all: $(kmod-build)/kstep.ko
