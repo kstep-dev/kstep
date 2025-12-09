@@ -7,8 +7,7 @@ from pathlib import Path
 from typing import Iterable, List
 
 from checkout_linux import checkout_linux
-from make_linux import make_linux
-from run_qemu import make_kstep, run_qemu
+from run_qemu import make_kstep, make_linux, run_qemu
 from scripts import LINUX_ROOT_DIR, PROJ_DIR, RESULTS_DIR, system
 
 # Enforce reproducible builds for matplotlib PDF output
@@ -120,7 +119,7 @@ def main(bug: Bug, run: List[str], reset: bool, skip_build: bool):
         for patch in bug.buggy.patches:
             patch_linux(linux_dir, patch)
         if not skip_build:
-            make_linux(linux_dir)
+            make_linux()
         make_kstep()
         run_qemu(
             linux_dir=linux_dir,
@@ -138,7 +137,7 @@ def main(bug: Bug, run: List[str], reset: bool, skip_build: bool):
         for patch in bug.fixed.patches:
             patch_linux(linux_dir, patch)
         if not skip_build:
-            make_linux(linux_dir)
+            make_linux()
         make_kstep()
         run_qemu(
             linux_dir=linux_dir,

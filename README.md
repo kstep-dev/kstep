@@ -7,9 +7,7 @@ kSTEP
 
 - Download Linux kernel: `./checkout_linux.py [--version <branch|tag|commit>]`
 
-- Build Linux kernel: `./make_linux.py [--clean] [--reconfig]`
-
-- Prepare root filesystem: `make`
+- Build Linux kernel and kSTEP: `make linux kstep`
 
 - Run kernel: `./run_qemu.py [--debug] [--driver <name>] [--params <param1=value1>...]` (also triggers `make`)
 

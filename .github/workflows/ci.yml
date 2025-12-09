@@ -27,7 +27,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: linux
-          key: ${{matrix.version}}-${{hashFiles('linux/config')}}
+          key: ${{matrix.version}}-${{hashFiles('linux/config.kstep')}}
 
       - name: Linux - Download
         if: steps.restore-cache.outputs.cache-hit != 'true'
@@ -37,17 +37,17 @@ jobs:
         if: steps.restore-cache.outputs.cache-hit != 'true'
         run: |
           sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y libelf-dev
-          ./make_linux.py --reconfig
+          make linux
 
       - name: Linux - Save cache
         if: steps.restore-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: linux
-          key: ${{matrix.version}}-${{hashFiles('linux/config')}}
+          key: ${{matrix.version}}-${{hashFiles('linux/config.kstep')}}
 
       - name: Build
-        run: make
+        run: make kstep
 
       - name: Install QEMU
         run: sudo rm -f /var/lib/man-db/auto-update && sudo apt update && sudo apt install -y qemu-kvm
