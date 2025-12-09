@@ -3,8 +3,8 @@ MAKEFLAGS += -j$(shell nproc)
 ROOTFS_DATA := $(abspath data/rootfs)
 ROOTFS_IMG := $(abspath data/rootfs.cpio)
 
-.PHONY: rootfs
-rootfs: $(ROOTFS_IMG)
+.PHONY: kstep
+kstep: $(ROOTFS_IMG)
 $(ROOTFS_IMG): user kmod
 	mkdir -p $(ROOTFS_DATA)
 	cp kmod/build/current/kstep.ko $(ROOTFS_DATA)
