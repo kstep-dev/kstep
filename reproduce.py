@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterable, List
 
 from checkout_linux import checkout_linux
-from run_qemu import make_kstep, make_linux, run_qemu
+from run import make_kstep, make_linux, run_qemu
 from scripts import LINUX_ROOT_DIR, PROJ_DIR, RESULTS_DIR, system
 
 # Enforce reproducible builds for matplotlib PDF output
