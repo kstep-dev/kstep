@@ -9,8 +9,10 @@ from scripts import LINUX_CURR_DIR, PROJ_DIR, ROOTFS_IMG, Arch, get_log_path, sy
 
 
 def make_kstep():
-    system(f"make -C {PROJ_DIR} -j$(nproc)")
+    system(f"make -C {PROJ_DIR}")
 
+def make_linux():
+    system(f"make -C {PROJ_DIR} linux")
 
 def run_qemu(
     linux_dir: Path,

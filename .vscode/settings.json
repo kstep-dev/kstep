@@ -6,7 +6,7 @@
         "**/*.cmd": true,
     },
     "files.associations": {
-        "config.current": "makefile"
+        "**/linux/config.*": "makefile",
     },
     "search.exclude": {
         "kmod/build": true,
