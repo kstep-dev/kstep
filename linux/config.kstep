@@ -22,7 +22,6 @@ CONFIG_DEBUG_KERNEL=y
 CONFIG_BUG=y
 # expert settings
 CONFIG_EXPERT=y
-CONFIG_PROCESSOR_SELECT=y
 
 #
 # Output
