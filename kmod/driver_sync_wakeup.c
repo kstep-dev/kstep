@@ -2,19 +2,17 @@
 
 static struct task_struct *waker_task;
 static struct task_struct *wakee_task;
-static struct task_struct *tasks[1];
+static struct task_struct *other_task;
 
 static atomic_t wakeup_ready = ATOMIC_INIT(0);
 
 static int wakee_main(void *data) {
-  TRACE_INFO("Wakee %d started on CPU %d", current->pid, smp_processor_id());
   while (1)
     __asm__("" : : : "memory");
   return 0;
 }
 
 static int waker_main(void *data) {
-  TRACE_INFO("Waker %d started on CPU %d", current->pid, smp_processor_id());
   while (atomic_read(&wakeup_ready) == 0)
     yield();
   ksym.try_to_wake_up(wakee_task, TASK_NORMAL, WF_SYNC);
@@ -22,12 +20,10 @@ static int waker_main(void *data) {
 }
 
 static void init(void) {
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    tasks[i] = kstep_task_create();
+  other_task = kstep_task_create();
 
   // Create a waker on cpu 1
-  waker_task = kthread_create(waker_main, NULL, "waker");
-  set_cpus_allowed_ptr(waker_task, cpumask_of(1));
+  waker_task = kthread_create_on_cpu(waker_main, NULL, 1, "waker");
   wake_up_process(waker_task);
 
   // Create a wakee. Don't wake up the wakee immediately
@@ -43,33 +39,24 @@ static void init(void) {
 }
 
 static void *is_ineligible(void) {
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    if (tasks[i]->on_cpu && !kstep_eligible(&tasks[i]->se))
-      return tasks[i];
+  if (other_task->on_cpu && !kstep_eligible(&other_task->se))
+    return other_task;
   return NULL;
 }
 
 static void body(void) {
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    kstep_task_pin(tasks[i], 1, 1);
+  kstep_task_pin(other_task, 1, 1);
 
   kstep_tick_repeat(20);
 
   // tick until there is a ineligible task
-  struct task_struct *ineligible_task = kstep_tick_until(is_ineligible);
-  TRACE_INFO("Found ineligible task %d on cpu %d", ineligible_task->pid,
-             task_cpu(ineligible_task));
-
-  // sleep all other tasks
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    if (tasks[i] != ineligible_task)
-      kstep_task_pause(tasks[i]);
+  kstep_tick_until(is_ineligible);
 
   // wake up the waker to call sync wakeup
   atomic_set(&wakeup_ready, 1);
 
   // Pause the ineligible task
-  kstep_task_pause(ineligible_task);
+  kstep_task_pause(other_task);
 
   // tick to show the impact
   kstep_tick_repeat(10);
