@@ -16,14 +16,15 @@ static void init(void) {
 }
 
 static void body(void) {
-  // making the nr_running on cpu 4-7 to [1, 0, 3, 1]
-  int cpus[] = {4, 6, 6, 7};
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    kstep_task_pin(tasks[i], cpus[i], cpus[i]);
+  // making the nr_running on cpu 4-7 to [1, 0, 2, 1]
+  kstep_task_pin(tasks[0], 4, 4);
+  kstep_task_pin(tasks[1], 6, 6);
+  kstep_task_pin(tasks[2], 6, 6);
+  kstep_task_pin(tasks[3], 7, 7);
 
   kstep_tick_repeat(200);
-  for (int i = 1; i <= 2; i++)
-    kstep_task_pin(tasks[i], 5, 6);
+  kstep_task_pin(tasks[1], 5, 6);
+  kstep_task_pin(tasks[2], 5, 6);
   kstep_tick_repeat(400);
 }
 
