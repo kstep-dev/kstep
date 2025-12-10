@@ -43,6 +43,19 @@ void kstep_prealloc_kworkers(void) {
   prealloc_kworker(system_unbound_wq, 2);
 }
 
+static const char *sys_kthread_names[] = {
+    "cpuhp/",
+    "migration/",
+    "ksoftirqd/",
+};
+
+bool kstep_is_sys_kthread(struct task_struct *p) {
+  for (int i = 0; i < ARRAY_SIZE(sys_kthread_names); i++)
+    if (strstarts(p->comm, sys_kthread_names[i]))
+      return true;
+  return false;
+}
+
 void kstep_move_kthreads(void) {
   struct task_struct *p;
   for_each_process(p) {
@@ -51,15 +64,10 @@ void kstep_move_kthreads(void) {
         cpumask_weight(&p->cpus_mask) == 1) {
       continue;
     }
-    // skip non-kthreads
-    if (!(p->flags & PF_KTHREAD)) {
+    // skip non-kthreads and sys kthreads
+    if (!(p->flags & PF_KTHREAD) || kstep_is_sys_kthread(p))
       continue;
-    }
 
-    if (is_sys_kthread(p)) {
-      kstep_reset_task(p);
-      continue;
-    }
     set_cpus_allowed_ptr(p, cpumask_of(0));
     wake_up_process(p);
   }
