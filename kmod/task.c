@@ -20,7 +20,7 @@ static int task_init(struct subprocess_info *info, struct cred *new) {
     int fd = get_unused_fd_flags(0);
     if (fd < 0 || fd != i)
       panic("get_unused_fd_flags returned %d for fd %d", fd, i);
-    fd_install(fd, console);
+    fd_install(fd, get_file(console));
   }
   info->data = current;
   TRACE_INFO("Task created with pid %d", current->pid);
