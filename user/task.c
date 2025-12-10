@@ -12,19 +12,16 @@ static void handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
   int val = info->si_int;
   int val2 = info->si_pid;
-  int val3 = info->si_uid;
+  // int val3 = info->si_uid;
   if (code == SIGCODE_WAKEUP) {
     return; // do nothing
-  } else if (code == SIGCODE_FORK || code == SIGCODE_FORK_PIN) {
+  } else if (code == SIGCODE_FORK) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
       if (pid < 0)
         panic("fork failed");
-      if (pid == 0) { // child process
-        if (code == SIGCODE_FORK_PIN)
-          set_proc_affinity(val2, val3);
+      if (pid == 0) // child process
         return;
-      }
     }
   } else if (code == SIGCODE_SLEEP) {
     sleep(val);
@@ -42,7 +39,7 @@ static void handler(int signum, siginfo_t *info, void *context) {
     if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0)
       panic("sched_setscheduler failed");
   } else {
-    printf("Unknown signal code: %d\n", code);
+    panic("Unknown signal code: %d\n", code);
   }
 }
 
