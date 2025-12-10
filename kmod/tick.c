@@ -3,11 +3,9 @@
 #include <linux/delay.h>
 #include <linux/sched_clock.h>
 
-static u64 kstep_clock_value = INIT_TIME_NS;
-static u64 kstep_sched_clock(void) { return kstep_clock_value; }
-static u64 kstep_jiffies(void) {
-  return INITIAL_JIFFIES + nsecs_to_jiffies(kstep_clock_value);
-}
+static u64 kstep_sched_clock = INIT_TIME_NS;
+static u64 kstep_sched_clock_read(void) { return kstep_sched_clock; }
+static void kstep_sched_clock_tick(void) { kstep_sched_clock += TICK_NSEC; }
 
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
 // On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
@@ -16,7 +14,7 @@ static u64 kstep_jiffies(void) {
 
 static void kstep_sched_clock_init(void) {
   *ksym.__sched_clock_offset = 0;
-  ksym.paravirt_set_sched_clock(kstep_sched_clock);
+  ksym.paravirt_set_sched_clock(kstep_sched_clock_read);
 }
 
 static void kstep_sched_clock_exit(void) {
@@ -41,10 +39,10 @@ static struct clock_data cd_backup;
 static void kstep_sched_clock_init(void) {
   struct clock_data *cd = ksym.cd;
   memcpy(&cd_backup, cd, sizeof(struct clock_data));
-  cd->actual_read_sched_clock = kstep_sched_clock;
+  cd->actual_read_sched_clock = kstep_sched_clock_read;
   for (int i = 0; i < 2; i++) {
     struct clock_read_data *rd = &cd->read_data[i];
-    rd->read_sched_clock = kstep_sched_clock;
+    rd->read_sched_clock = kstep_sched_clock_read;
     rd->mult = 1;
     rd->shift = 0;
     rd->epoch_ns = 0;
@@ -59,6 +57,8 @@ static void kstep_sched_clock_exit(void) {
 #else
 #error "Sched clock mocking not supported for this platform"
 #endif
+
+static u64 kstep_jiffies = 0;
 
 static void kstep_jiffies_init(void) {
   // Avoid calling `tick_do_update_jiffies64` and `do_timer` to update jiffies.
@@ -79,7 +79,20 @@ static void kstep_jiffies_init(void) {
   // `tick_do_update_jiffies64`
   *ksym.tick_next_period = KTIME_MAX;
 
+  kstep_jiffies = nsecs_to_jiffies(kstep_sched_clock);
+  jiffies = kstep_jiffies + INITIAL_JIFFIES;
+  smp_mb();
+
   TRACE_INFO("Disabled jiffies update");
+}
+
+static void kstep_jiffies_tick(void) {
+  if (jiffies != kstep_jiffies + INITIAL_JIFFIES)
+    panic("%lu != %llu", jiffies, kstep_jiffies + INITIAL_JIFFIES);
+
+  kstep_jiffies++;
+  jiffies = kstep_jiffies + INITIAL_JIFFIES;
+  smp_mb();
 }
 
 static void kstep_jiffies_exit(void) {
@@ -106,26 +119,34 @@ static void kstep_sched_timer_exit(void) {
   }
 }
 
+void kstep_sleep(void) {
+  usleep_range(kstep_params.step_interval_us, kstep_params.step_interval_us);
+}
+
+static void kstep_sched_tick(void) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+  void *sched_tick = (void *)ksym.sched_tick;
+#else
+  void *sched_tick = (void *)ksym.scheduler_tick;
+#endif
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    smp_call_function_single(cpu, sched_tick, NULL, 0);
+    kstep_sleep();
+  }
+}
+
 void kstep_tick_init(void) {
   kstep_sched_timer_init();
   kstep_jiffies_init();
   kstep_sched_clock_init();
-
-  jiffies = kstep_jiffies();
-  smp_mb();
-
-  TRACE_INFO("Initialized clock to %llu ns and jiffies to %lu",
-             kstep_clock_value, (jiffies - INITIAL_JIFFIES));
+  TRACE_INFO("Initialized clock to %llu ns and jiffies to %llu",
+             kstep_sched_clock, kstep_jiffies);
 }
 
 void kstep_tick_exit(void) {
   kstep_sched_clock_exit();
   kstep_jiffies_exit();
   kstep_sched_timer_exit();
-}
-
-void kstep_sleep(void) {
-  usleep_range(kstep_params.step_interval_us, kstep_params.step_interval_us);
 }
 
 void kstep_tick(void) {
@@ -136,23 +157,9 @@ void kstep_tick(void) {
   if (kstep_params.print_nr_running)
     print_nr_running();
 
-  if (jiffies != kstep_jiffies()) {
-    panic("Jiffies mismatch: %lu != %llu", jiffies, kstep_jiffies());
-  }
-
-  kstep_clock_value += TICK_NSEC;
-  jiffies = kstep_jiffies();
-  smp_mb();
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
-  void *sched_tick = (void *)ksym.sched_tick;
-#else
-  void *sched_tick = (void *)ksym.scheduler_tick;
-#endif
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    smp_call_function_single(cpu, sched_tick, NULL, 0);
-    kstep_sleep();
-  }
+  kstep_sched_clock_tick();
+  kstep_jiffies_tick();
+  kstep_sched_tick();
 }
 
 void kstep_tick_repeat(int n) {
