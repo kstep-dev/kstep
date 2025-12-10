@@ -10,7 +10,7 @@ from typing import Iterable, Optional
 from scripts import (
     LINUX_CURR_DIR,
     PROJ_DIR,
-    QEMU_BUILD_DIR,
+    QEMU_DIR,
     ROOTFS_IMG,
     Arch,
     get_log_path,
@@ -37,7 +37,7 @@ def get_qemu_path() -> Path:
     if path is not None:
         return Path(path)
 
-    path = QEMU_BUILD_DIR / name
+    path = QEMU_DIR / "bin" / name
     if path.exists():
         return path
 

@@ -18,7 +18,6 @@ ROOTFS_IMG = DATA_DIR / "rootfs.cpio"
 LOGS_DIR = DATA_DIR / "logs"
 RESULTS_DIR = PROJ_DIR / "results"
 QEMU_DIR = DATA_DIR / "qemu"
-QEMU_BUILD_DIR = QEMU_DIR / "build"
 
 
 def get_log_path(create: bool) -> Path:

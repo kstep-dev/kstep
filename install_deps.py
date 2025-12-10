@@ -2,7 +2,13 @@
 
 import argparse
 
-from scripts import DATA_DIR, QEMU_BUILD_DIR, QEMU_DIR, decompress, download, system
+from scripts import (
+    DATA_DIR,
+    QEMU_DIR,
+    decompress,
+    download,
+    system,
+)
 
 PACKAGES = [
     "build-essential",
@@ -31,19 +37,23 @@ def install_uv():
 def qemu_install():
     url = "https://download.qemu.org/qemu-10.1.3.tar.xz"
     tarball_path = DATA_DIR / "qemu.tar.xz"
+    src_dir = DATA_DIR / "qemu-10.1.3"
+    build_dir = src_dir / "build"
 
     download(url, tarball_path)
-    decompress(tarball_path, QEMU_DIR)
+    decompress(tarball_path, src_dir)
 
     opts = [
         "--target-list=x86_64-softmmu",
         "--static",
         "--without-default-features",
         "--enable-kvm",
+        f"--prefix={QEMU_DIR}",
     ]
-    system(f"mkdir -p {QEMU_BUILD_DIR}")
-    system(f"cd {QEMU_BUILD_DIR} && ../configure {' '.join(opts)}")
-    system(f"cd {QEMU_BUILD_DIR} && make -j$(nproc)")
+    system(f"mkdir -p {build_dir}")
+    system(f"cd {build_dir} && ../configure {' '.join(opts)}")
+    system(f"cd {build_dir} && make -j$(nproc)")
+    system(f"cd {build_dir} && make install")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
