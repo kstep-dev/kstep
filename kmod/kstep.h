@@ -49,6 +49,7 @@ void kstep_tick_repeat(int n);
 void *kstep_tick_until(void *(*fn)(void));
 
 // tasks.c
+void kstep_tasks_init(void);
 struct task_struct *kstep_task_create(void);
 void kstep_task_pin(struct task_struct *p, int begin, int end);
 void kstep_task_fork(struct task_struct *p, int n);
@@ -61,7 +62,6 @@ void kstep_task_set_prio(struct task_struct *p, int prio);
 enum sigcode;
 void kstep_task_signal(struct task_struct *p, enum sigcode code, int val1,
                        int val2, int val3);
-int is_sys_kthread(struct task_struct *p);
 
 // kernel.c
 void kstep_write(const char *path, const char *buf, size_t size);
@@ -88,6 +88,7 @@ void kstep_reset_task(struct task_struct *p);
 void kstep_disable_workqueue(void);
 void kstep_move_kthreads(void);
 void kstep_prealloc_kworkers(void);
+bool kstep_is_sys_kthread(struct task_struct *p);
 
 // trace.c
 void kstep_trace_lb(void);

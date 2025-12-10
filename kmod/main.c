@@ -50,6 +50,7 @@ static int __init kstep_main(void) {
   kstep_prealloc_kworkers();
   kstep_disable_workqueue();
   kstep_move_kthreads();
+  kstep_tasks_init();
 
   // Run userspace programs when we know the system is ready
   if (driver->init)

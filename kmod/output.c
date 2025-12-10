@@ -37,7 +37,7 @@ void print_tasks(void) {
   pr_info("\t-------------------------------------------------------------\n");
 
   for_each_process(p) {
-    if (task_cpu(p) == 0 || is_sys_kthread(p))
+    if (task_cpu(p) == 0 || kstep_is_sys_kthread(p))
       continue;
     pr_info("\tprint_tasks: %3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu\n",
             task_cpu(p), p->on_cpu ? '>' : ' ', task_state_to_char(p),
