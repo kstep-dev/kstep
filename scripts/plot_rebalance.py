@@ -94,9 +94,11 @@ def plot_rebalance_comparison(buggy_data, fixed_data, output_file=None, target_c
                    color = "#BBC863")
     
     ax.set_xlabel('Time (ms)',)
-    ax.set_ylabel('Overhead (ms)')
-    ax.set_title(f'Long_Balance', fontsize=10)
-    ax.legend(bbox_to_anchor=(1.05, 0.7), loc='upper right')
+    ax.set_ylabel('Balance Overhead (ms)', )
+    ax.yaxis.label.set_position((0, 0.4))  # Adjust the second value (0-1) to move vertically
+    # ax.set_title(f'Long_Balance', fontsize=10)
+    ax.set_ylim(0, 4)
+    ax.legend(bbox_to_anchor=(1.01, 0.5), loc='upper right', borderaxespad=0.2)
     ax.grid(True, alpha=0.3)
     # ax.set_yscale('log')
     

@@ -11,12 +11,13 @@ static struct task_struct *busy_task;
 static void init(void) { busy_task = kstep_task_create(); }
 
 static void body(void) {
-  kstep_task_fork_pin(busy_task, 10000, 1, 1);
+  kstep_task_pin(busy_task, 1, 1);
+  kstep_task_fork(busy_task, 20000);
 
-  while (cpu_rq(1)->nr_running < 10000)
+  while (cpu_rq(1)->nr_running < 20000)
     kstep_sleep();
 
-  kstep_tick_repeat(1000);
+  kstep_tick_repeat(2000);
 }
 
 struct kstep_driver long_balance = {
