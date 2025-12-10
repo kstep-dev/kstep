@@ -12,6 +12,7 @@
 /data/rootfs
 /data/logs/*
 /data/*.tar.xz
+/data/qemu/*
 
 # Python
 __pycache__
