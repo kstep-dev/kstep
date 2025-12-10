@@ -22,7 +22,7 @@ static void body(void) {
   kstep_task_pin(tasks[2], 6, 6);
   kstep_task_pin(tasks[3], 7, 7);
 
-  kstep_tick_repeat(200);
+  kstep_tick_repeat(50);
   kstep_task_pin(tasks[1], 5, 6);
   kstep_task_pin(tasks[2], 5, 6);
   kstep_tick_repeat(400);

@@ -73,7 +73,7 @@ def plot_rebalance_comparison(buggy_data, fixed_data, output_file=None, target_c
         
         ax.scatter(timestamps_ms, latencies_ms, 
                    label=f'Buggy', 
-                   alpha=0.6)
+                   color = "#A72703")
     
     # Find the minimum timestamp for fixed data
     fixed_min_timestamp = min(min(fixed_data[cpu]['timestamps']) for cpu in fixed_data.keys())
@@ -91,7 +91,7 @@ def plot_rebalance_comparison(buggy_data, fixed_data, output_file=None, target_c
         
         ax.scatter(timestamps_ms, latencies_ms, 
                    label=f'Fixed', 
-                   alpha=0.6, s=60, marker='s')
+                   color = "#BBC863")
     
     ax.set_xlabel('Time (ms)',)
     ax.set_ylabel('Overhead (ms)')

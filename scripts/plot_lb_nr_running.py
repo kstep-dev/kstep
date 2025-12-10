@@ -197,6 +197,8 @@ if __name__ == "__main__":
     title_fixed = "Fixed"
     output_file = RESULTS_DIR / f"{bugId}.pdf"
 
+    args.time_start = args.time_start if bugId != "even_idle_cpu" else 10.0
+
     matrix_buggy, cpu_count, time_count, t_buggy, min_buggy, max_buggy = (
         build_nr_running_matrix(log_file_buggy, time_start=args.time_start)
     )
