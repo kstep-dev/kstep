@@ -1,5 +1,3 @@
-#include <linux/sched.h>
-#include <linux/sched/signal.h>
 #include <linux/umh.h>
 
 #include "kstep.h"
