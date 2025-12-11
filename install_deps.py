@@ -34,6 +34,7 @@ def apt_install(packages: list[str]):
 def install_uv():
     system("curl -LsSf https://astral.sh/uv/install.sh | sh")
 
+
 def qemu_install():
     url = "https://download.qemu.org/qemu-10.1.3.tar.xz"
     tarball_path = DATA_DIR / "qemu.tar.xz"
@@ -54,6 +55,7 @@ def qemu_install():
     system(f"cd {build_dir} && ../configure {' '.join(opts)}")
     system(f"cd {build_dir} && make -j$(nproc)")
     system(f"cd {build_dir} && make install")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
