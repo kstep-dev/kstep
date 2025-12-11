@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from pathlib import Path
 
 from scripts import (
     DATA_DIR,
@@ -35,23 +36,24 @@ def install_uv():
     system("curl -LsSf https://astral.sh/uv/install.sh | sh")
 
 
-def qemu_install():
+def qemu_install(
+    download_path: Path = DATA_DIR / "qemu.tar.xz",
+    src_dir: Path = DATA_DIR / "qemu-src",
+    build_dir: Path = DATA_DIR / "qemu-build",
+    install_dir: Path = QEMU_DIR,
+):
     url = "https://download.qemu.org/qemu-10.1.3.tar.xz"
-    tarball_path = DATA_DIR / "qemu.tar.xz"
-    src_dir = DATA_DIR / "qemu-10.1.3"
-    build_dir = src_dir / "build"
-
-    download(url, tarball_path)
-    decompress(tarball_path, src_dir)
+    download(url, download_path)
+    decompress(download_path, src_dir)
 
     opts = [
         "--target-list=x86_64-softmmu",
         "--without-default-features",
         "--enable-kvm",
-        f"--prefix={QEMU_DIR}",
+        f"--prefix={install_dir}",
     ]
     system(f"mkdir -p {build_dir}")
-    system(f"cd {build_dir} && ../configure {' '.join(opts)}")
+    system(f"cd {build_dir} && {src_dir}/configure {' '.join(opts)}")
     system(f"cd {build_dir} && make -j$(nproc)")
     system(f"cd {build_dir} && make install")
 
