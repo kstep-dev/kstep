@@ -4,7 +4,15 @@ import argparse
 import logging
 from pathlib import Path
 
-from scripts import DATA_DIR, LINUX_CURR_DIR, LINUX_MASTER_DIR, LINUX_ROOT_DIR, system
+from scripts import (
+    DATA_DIR,
+    LINUX_CURR_DIR,
+    LINUX_MASTER_DIR,
+    LINUX_ROOT_DIR,
+    decompress,
+    download,
+    system,
+)
 
 LINUX_GIT_URL = "https://github.com/torvalds/linux.git"
 
@@ -38,16 +46,14 @@ def download_linux(version: str, tarball_path: Path):
     version = version.removeprefix("v")
     major = version.split(".", 1)[0]
     url = f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
-    system(f"wget --no-verbose {url} -O {tarball_path}")
+    download(url, tarball_path)
 
 
 def decompress_linux(tarball_path: Path, linux_dir: Path):
     if linux_dir.exists():
         logging.info(f"Linux already decompressed to {linux_dir}")
         return
-
-    system(f"mkdir -p {linux_dir}")
-    system(f"tar -xf {tarball_path} -C {linux_dir} --strip-components=1")
+    decompress(tarball_path, linux_dir)
 
 
 def set_current_linux(linux_dir: Path):

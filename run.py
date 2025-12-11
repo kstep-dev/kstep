@@ -3,10 +3,19 @@
 import argparse
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import Iterable, Optional
 
-from scripts import LINUX_CURR_DIR, PROJ_DIR, ROOTFS_IMG, Arch, get_log_path, system
+from scripts import (
+    LINUX_CURR_DIR,
+    PROJ_DIR,
+    QEMU_DIR,
+    ROOTFS_IMG,
+    Arch,
+    get_log_path,
+    system,
+)
 
 
 def make_kstep():
@@ -15,6 +24,24 @@ def make_kstep():
 
 def make_linux():
     system(f"make -C {PROJ_DIR} linux")
+
+
+def get_qemu_path() -> Path:
+    arch = Arch.get()
+    name = {
+        Arch.X86_64: "qemu-system-x86_64",
+        Arch.ARM64: "qemu-system-aarch64",
+    }[arch]
+
+    path = shutil.which(name)
+    if path is not None:
+        return Path(path)
+
+    path = QEMU_DIR / "bin" / name
+    if path.exists():
+        return path
+
+    raise RuntimeError(f"QEMU executable not found: {name}")
 
 
 def run_qemu(
@@ -30,12 +57,9 @@ def run_qemu(
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
 
-    arch = Arch.get()
-    exe = {
-        Arch.X86_64: "qemu-system-x86_64",
-        Arch.ARM64: "qemu-system-aarch64",
-    }[arch]
+    qemu_path = get_qemu_path()
 
+    arch = Arch.get()
     kernel_image_path = {
         Arch.X86_64: linux_dir / "arch/x86/boot/bzImage",
         Arch.ARM64: linux_dir / "arch/arm64/boot/Image",
@@ -68,7 +92,7 @@ def run_qemu(
         boot_args.extend(params)
 
     cmd = [
-        exe,
+        str(qemu_path),
         f"-smp {smp}",
         "-cpu max",
         f"-m {mem_mb}M",

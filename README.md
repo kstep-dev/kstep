@@ -1,7 +1,7 @@
 kSTEP
 ==============
 
-- Install dependencies: `./install_deps.sh`
+- Install dependencies: `./install_deps.py`
 
 - Reproduce bugs: `./reproduce.py <bug_name|all> [--run <buggy|fixed|plot>]`
 

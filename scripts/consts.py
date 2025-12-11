@@ -17,7 +17,7 @@ DATA_DIR = PROJ_DIR / "data"
 ROOTFS_IMG = DATA_DIR / "rootfs.cpio"
 LOGS_DIR = DATA_DIR / "logs"
 RESULTS_DIR = PROJ_DIR / "results"
-
+QEMU_DIR = DATA_DIR / "qemu"
 
 
 def get_log_path(create: bool) -> Path:
@@ -35,7 +35,6 @@ def get_log_path(create: bool) -> Path:
             return symlink.resolve()
         else:
             return symlink
-
 
 
 class Arch(Enum):

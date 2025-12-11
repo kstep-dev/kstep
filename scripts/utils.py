@@ -1,6 +1,7 @@
 import logging
 import subprocess
 from enum import StrEnum
+from pathlib import Path
 
 
 class TermColor(StrEnum):
@@ -18,3 +19,11 @@ class TermColor(StrEnum):
 def system(cmd: str):
     logging.info(f"Running: `{TermColor.BLUE}{cmd}{TermColor.RESET}`")
     subprocess.run(cmd, shell=True, check=True)
+
+def download(url: str, output_path: Path):
+    system(f"wget --no-verbose {url} -O {output_path}")
+
+
+def decompress(tarball_path: Path, output_dir: Path):
+    system(f"mkdir -p {output_dir}")
+    system(f"tar -xf {tarball_path} -C {output_dir} --strip-components=1")
