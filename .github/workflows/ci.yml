@@ -11,10 +11,10 @@ jobs:
       matrix:
         version: # LTS versions at https://kernel.org/
           - v6.18
-          # - v6.12.60
-          # - v6.6.118
-          # - v6.1.158
-          # - v5.15.196
+          - v6.12.60
+          - v6.6.118
+          - v6.1.158
+          - v5.15.196
 
     name: Linux ${{matrix.version}}
     runs-on: ubuntu-latest
