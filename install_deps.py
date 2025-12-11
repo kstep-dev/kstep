@@ -46,7 +46,6 @@ def qemu_install():
 
     opts = [
         "--target-list=x86_64-softmmu",
-        "--static",
         "--without-default-features",
         "--enable-kvm",
         f"--prefix={QEMU_DIR}",
