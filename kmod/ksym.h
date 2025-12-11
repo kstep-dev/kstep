@@ -9,7 +9,7 @@
 // Define variable symbols
 // KSYM_VAR(type, name) declares `ksym.name` as a *pointer* to the variable
 #ifndef KSYM_VAR
-#define KSYM_VAR(...)
+#define KSYM_VAR(type, name)
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
