@@ -19,14 +19,14 @@ static void handler(int signum, siginfo_t *info, void *context) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
       if (pid < 0)
-        panic("fork failed");
+        panic("fork failed at i == %d", i);
       if (pid == 0) // child process
         return;
     }
   } else if (code == SIGCODE_SLEEP) {
     sleep(val);
   } else if (code == SIGCODE_EXIT) {
-    exit(0);
+    _exit(0);
   } else if (code == SIGCODE_PAUSE) {
     pause();
   } else if (code == SIGCODE_SET_PRIO) {
