@@ -1,11 +1,13 @@
-#include <sched.h>  // sched_setaffinity
-#include <stdio.h>  // fprintf
-#include <stdlib.h> // exit
+#define _GNU_SOURCE
+
+#include <sched.h>      // sched_setaffinity
+#include <stdio.h>      // fprintf
+#include <sys/reboot.h> // reboot
 
 #define panic(msg, ...)                                                        \
   do {                                                                         \
     fprintf(stderr, msg "\n", ##__VA_ARGS__);                                  \
-    exit(1);                                                                   \
+    reboot(RB_AUTOBOOT);                                                       \
   } while (0)
 
 static void set_proc_affinity(int begin, int end) { // [begin, end]

@@ -3,7 +3,6 @@
 #include <string.h>      // strlcat
 #include <sys/errno.h>   // EEXIST
 #include <sys/mount.h>   // mount
-#include <sys/reboot.h>  // reboot
 #include <sys/stat.h>    // mkdir
 #include <sys/syscall.h> // SYS_*
 #include <unistd.h>      // open, close, syscall
@@ -52,5 +51,5 @@ int main(int argc, char *argv[], char *envp[]) {
   mount_fs("/sys/fs/cgroup", "cgroup2");
   set_proc_affinity(0, 0); // bind to cpu 0
   run_kstep(argc, argv, envp);
-  reboot(RB_AUTOBOOT);
+  panic("kSTEP exited unexpectedly");
 }
