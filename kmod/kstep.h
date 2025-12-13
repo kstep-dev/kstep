@@ -5,11 +5,9 @@
 #include <linux/types.h>
 #include <linux/version.h>
 
-// private headers
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
-#include <kernel/sched/sched.h>
-#include <kernel/time/tick-sched.h>
+#include <kernel/sched/sched.h> // internal header
 #pragma GCC diagnostic pop
 
 #include "logging.h"
@@ -45,7 +43,6 @@ void kstep_tick_exit(void);
 void kstep_sleep(void);
 void kstep_tick(void);
 void kstep_tick_repeat(int n);
-// Call tick until the function returns something, then return that something
 void *kstep_tick_until(void *(*fn)(void));
 
 // task.c

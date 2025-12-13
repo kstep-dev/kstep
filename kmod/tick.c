@@ -3,6 +3,8 @@
 #include <linux/delay.h>
 #include <linux/sched_clock.h>
 
+#include <kernel/time/tick-sched.h> // internal header
+
 static u64 kstep_sched_clock = INIT_TIME_NS;
 static u64 kstep_sched_clock_read(void) { return kstep_sched_clock; }
 static void kstep_sched_clock_tick(void) { kstep_sched_clock += TICK_NSEC; }
@@ -166,6 +168,7 @@ void kstep_tick_repeat(int n) {
     kstep_tick();
 }
 
+// Tick until fn() returns non-NULL; return that.
 void *kstep_tick_until(void *(*fn)(void)) {
   while (1) {
     void *result = fn();
