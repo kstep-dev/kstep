@@ -1,3 +1,5 @@
+#include <linux/tracepoint.h>
+
 #include "kstep.h"
 
 void print_rq_stats(void) {
@@ -59,4 +61,38 @@ void print_all_tasks(void) {
   for_each_process(p) {
     pr_info("- pid=%d, cpu=%d, comm=%s", p->pid, task_cpu(p), p->comm);
   }
+}
+
+static DEFINE_PER_CPU(ktime_t, sched_softirq_starttime) = 0;
+
+static void sched_softirq_entry(void *ignore, unsigned int vec_nr) {
+  if (vec_nr != SCHED_SOFTIRQ || smp_processor_id() == 0)
+    return;
+  this_cpu_write(sched_softirq_starttime, ktime_get());
+}
+
+static void sched_softirq_exit(void *ignore, unsigned int vec_nr) {
+  if (vec_nr != SCHED_SOFTIRQ || smp_processor_id() == 0)
+    return;
+
+  ktime_t endtime = ktime_get();
+  ktime_t starttime = this_cpu_read(sched_softirq_starttime);
+  if (!starttime)
+    panic("sched_softirq_starttime is not set");
+  this_cpu_write(sched_softirq_starttime, 0);
+  ktime_t duration = ktime_sub(endtime, starttime);
+  pr_info("run_rebalance_domains on CPU %d, latency: %lld ns\n",
+          smp_processor_id(), ktime_to_ns(duration));
+}
+
+void kstep_trace_rebalance(void) {
+  if (tracepoint_probe_register((void *)ksym.__tracepoint_softirq_entry,
+                                sched_softirq_entry, NULL))
+    panic("Failed to register softirq_entry tracepoint");
+
+  if (tracepoint_probe_register((void *)ksym.__tracepoint_softirq_exit,
+                                sched_softirq_exit, NULL))
+    panic("Failed to register softirq_exit tracepoint");
+
+  TRACE_INFO("Tracing sched_softirq latency");
 }
