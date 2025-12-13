@@ -1,3 +1,5 @@
+#include <linux/tracepoint.h>
+
 #include "kstep.h"
 
 void print_rq_stats(void) {
