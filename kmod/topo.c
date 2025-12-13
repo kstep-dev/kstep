@@ -85,21 +85,6 @@ enum kstep_topo_type {
   KSTEP_TOPO_NR,
 };
 
-static enum kstep_topo_type get_topo_type(const char *name) {
-  if (strcmp(name, "SMT") == 0)
-    return KSTEP_TOPO_SMT;
-  if (strcmp(name, "CLS") == 0)
-    return KSTEP_TOPO_CLS;
-  if (strcmp(name, "MC") == 0)
-    return KSTEP_TOPO_MC;
-  // https://github.com/torvalds/linux/commit/f577cd57bfaa889cf0718e30e92c08c7f78c9d85
-  if (strcmp(name, "PKG") == 0 || strcmp(name, "DIE") == 0)
-    return KSTEP_TOPO_PKG;
-  if (strcmp(name, "NODE") == 0)
-    return KSTEP_TOPO_NODE;
-  panic("Unknown topology type %s", name);
-}
-
 static struct cpumask kstep_masks[KSTEP_TOPO_NR][NR_CPUS];
 
 // https://github.com/torvalds/linux/commit/661f951e371cc134ea31c84238dbdc9a898b8403
@@ -125,6 +110,21 @@ static sched_domain_mask_f kstep_masks_fns[KSTEP_TOPO_NR] = {
     [KSTEP_TOPO_MC] = mc_masks_fn,     [KSTEP_TOPO_PKG] = pkg_masks_fn,
     [KSTEP_TOPO_NODE] = node_masks_fn,
 };
+
+static enum kstep_topo_type get_topo_type(const char *name) {
+  if (strcmp(name, "SMT") == 0)
+    return KSTEP_TOPO_SMT;
+  if (strcmp(name, "CLS") == 0)
+    return KSTEP_TOPO_CLS;
+  if (strcmp(name, "MC") == 0)
+    return KSTEP_TOPO_MC;
+  // https://github.com/torvalds/linux/commit/f577cd57bfaa889cf0718e30e92c08c7f78c9d85
+  if (strcmp(name, "PKG") == 0 || strcmp(name, "DIE") == 0)
+    return KSTEP_TOPO_PKG;
+  if (strcmp(name, "NODE") == 0)
+    return KSTEP_TOPO_NODE;
+  panic("Unknown topology type %s", name);
+}
 
 void kstep_topo_init(void) {
   int nr_cpus = num_online_cpus();
