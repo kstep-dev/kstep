@@ -115,13 +115,13 @@ static struct cpumask kstep_masks[KSTEP_TOPO_NR][NR_CPUS];
 #endif
 
 DEFINE_MASKS_FN(smt_masks_fn, KSTEP_TOPO_SMT)
-DEFINE_MASKS_FN(cluster_masks_fn, KSTEP_TOPO_CLS)
+DEFINE_MASKS_FN(cls_masks_fn, KSTEP_TOPO_CLS)
 DEFINE_MASKS_FN(mc_masks_fn, KSTEP_TOPO_MC)
 DEFINE_MASKS_FN(pkg_masks_fn, KSTEP_TOPO_PKG)
 DEFINE_MASKS_FN(node_masks_fn, KSTEP_TOPO_NODE)
 
 static sched_domain_mask_f kstep_masks_fns[KSTEP_TOPO_NR] = {
-    [KSTEP_TOPO_SMT] = smt_masks_fn,   [KSTEP_TOPO_CLS] = cluster_masks_fn,
+    [KSTEP_TOPO_SMT] = smt_masks_fn,   [KSTEP_TOPO_CLS] = cls_masks_fn,
     [KSTEP_TOPO_MC] = mc_masks_fn,     [KSTEP_TOPO_PKG] = pkg_masks_fn,
     [KSTEP_TOPO_NODE] = node_masks_fn,
 };
