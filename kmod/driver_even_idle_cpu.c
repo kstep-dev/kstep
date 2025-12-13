@@ -11,6 +11,17 @@ static void pre_init(void) {
 static struct task_struct *tasks[4];
 
 static void init(void) {
+  kstep_cpu_set_capacity(4, SCHED_CAPACITY_SCALE);
+  kstep_cpu_set_capacity(5, SCHED_CAPACITY_SCALE / 2);
+  kstep_cpu_set_capacity(6, SCHED_CAPACITY_SCALE);
+  kstep_cpu_set_capacity(7, SCHED_CAPACITY_SCALE / 2);
+
+  kstep_topo_init();
+  const char *cpulists[] = {"0-1", "0-1", "2-3", "2-3",
+                            "4-5", "4-5", "6-7", "6-7"};
+  kstep_topo_set_level(KSTEP_TOPO_CLS, cpulists, ARRAY_SIZE(cpulists));
+  kstep_topo_apply();
+
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
 }

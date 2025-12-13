@@ -18,7 +18,6 @@
 struct kstep_params_t {
   char driver[32];          // Name of the driver to run
   u64 step_interval_us;     // Interval between steps in us
-  bool special_topo;        // Whether to use the special topology
   bool print_rq_stats;      // Whether to print rq stats
   bool print_tasks;         // Whether to print tasks
   bool print_nr_running;    // Whether to print nr_running
@@ -85,13 +84,19 @@ void kstep_prealloc_kworkers(void);
 bool kstep_is_sys_kthread(struct task_struct *p);
 
 // topo.c
-enum kstep_topo_type;
+enum kstep_topo_type {
+  KSTEP_TOPO_SMT,
+  KSTEP_TOPO_CLS,
+  KSTEP_TOPO_MC,
+  KSTEP_TOPO_PKG,
+  KSTEP_TOPO_NODE,
+  KSTEP_TOPO_NR,
+};
 void kstep_topo_init(void);
 void kstep_topo_set_level(enum kstep_topo_type type, const char *cpulists[],
                           int size);
 void kstep_topo_apply(void);
 void kstep_topo_print(void);
-void kstep_topo_use_special(void);
 void kstep_cpu_set_freq(int cpu, int scale);
 void kstep_cpu_set_capacity(int cpu, int scale);
 

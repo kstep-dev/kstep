@@ -86,12 +86,8 @@ bugs = [
         name="even_idle_cpu",
         plot_format="lb_nr_running",
         smp="8",
-        fixed=Config(
-            version="v6.17",
-            patches=[LINUX_ROOT_DIR / "even_idle_cpu.patch"],
-            params=["special_topo=true"],
-        ),
-        buggy=Config(version="v6.17", params=["special_topo=true"]),
+        fixed=Config(version="v6.17", patches=[LINUX_ROOT_DIR / "even_idle_cpu.patch"]),
+        buggy=Config(version="v6.17"),
     ),
     # https://github.com/torvalds/linux/commit/6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3
     Bug(
