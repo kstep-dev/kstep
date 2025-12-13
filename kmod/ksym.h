@@ -53,6 +53,8 @@ KSYM_VAR(int, update_topology)
 #else
 KSYM_VAR(bool, x86_topology_update)
 #endif
+KSYM_VAR(void *, __tracepoint_softirq_entry)
+KSYM_VAR(void *, __tracepoint_softirq_exit)
 
 #undef KSYM_FUNC
 #undef KSYM_VAR

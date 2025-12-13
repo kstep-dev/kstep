@@ -63,7 +63,7 @@ bugs = [
     Bug(
         name="long_balance",
         plot_format="rebalance",
-        mem_mb=25600,
+        mem_mb=4096,
         fixed=Config(version="2feab24"),
         buggy=Config(version="2feab24~1"),
     ),
@@ -86,7 +86,11 @@ bugs = [
         name="even_idle_cpu",
         plot_format="lb_nr_running",
         smp="8",
-        fixed=Config(version="v6.17", patches=[LINUX_ROOT_DIR / "even_idle_cpu.patch"], params=["special_topo=true"]),
+        fixed=Config(
+            version="v6.17",
+            patches=[LINUX_ROOT_DIR / "even_idle_cpu.patch"],
+            params=["special_topo=true"],
+        ),
         buggy=Config(version="v6.17", params=["special_topo=true"]),
     ),
     # https://github.com/torvalds/linux/commit/6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3
