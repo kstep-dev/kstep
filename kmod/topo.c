@@ -76,15 +76,6 @@ void kstep_topo_print(void) {
   print_sched_domains();
 }
 
-enum kstep_topo_type {
-  KSTEP_TOPO_SMT,
-  KSTEP_TOPO_CLS,
-  KSTEP_TOPO_MC,
-  KSTEP_TOPO_PKG,
-  KSTEP_TOPO_NODE,
-  KSTEP_TOPO_NR,
-};
-
 static struct cpumask kstep_masks[KSTEP_TOPO_NR][NR_CPUS];
 
 // https://github.com/torvalds/linux/commit/661f951e371cc134ea31c84238dbdc9a898b8403
@@ -164,20 +155,9 @@ void kstep_topo_apply(void) {
   ksym.rebuild_sched_domains();
 }
 
-void kstep_topo_use_special(void) {
-  int nr_cpus = num_online_cpus();
-  for (int cpu = 0; cpu < nr_cpus; cpu++)
-    kstep_cpu_set_capacity(cpu, (cpu % 2 == 0) ? SCHED_CAPACITY_SCALE
-                                               : SCHED_CAPACITY_SCALE / 2);
-
-  kstep_topo_init();
-  const char *cpulists[] = {"0-1", "0-1", "2-3", "2-3",
-                            "4-5", "4-5", "6-7", "6-7"};
-  kstep_topo_set_level(KSTEP_TOPO_CLS, cpulists, ARRAY_SIZE(cpulists));
-  kstep_topo_apply();
-}
-
 void kstep_cpu_set_freq(int cpu, int scale) {
+  if (cpu < 0 || cpu >= num_online_cpus())
+    panic("cpu %d out of range", cpu);
   // x86:
   // https://elixir.bootlin.com/linux/v6.14.11/source/arch/x86/include/asm/topology.h#L287-L293
   // generic:
@@ -186,6 +166,8 @@ void kstep_cpu_set_freq(int cpu, int scale) {
 }
 
 void kstep_cpu_set_capacity(int cpu, int scale) {
+  if (cpu < 0 || cpu >= num_online_cpus())
+    panic("cpu %d out of range", cpu);
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
   // https://elixir.bootlin.com/linux/v6.17.8/source/include/linux/topology.h#L332-L339
   per_cpu(cpu_scale, cpu) = scale;
