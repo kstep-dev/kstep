@@ -1,3 +1,4 @@
+#include <linux/ftrace.h>
 #include <linux/tracepoint.h>
 
 #include "kstep.h"
