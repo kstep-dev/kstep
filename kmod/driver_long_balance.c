@@ -3,7 +3,7 @@
 static void pre_init(void) {
   kstep_params.print_tasks = false;
   kstep_params.print_rq_stats = false;
-  kstep_params.print_rebalance_overhead = true;
+  kstep_params.print_sched_softirq = true;
 }
 
 static struct task_struct *busy_task;

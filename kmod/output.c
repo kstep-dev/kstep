@@ -2,7 +2,7 @@
 
 #include "kstep.h"
 
-void print_rq_stats(void) {
+void kstep_print_rq_stats(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = cpu_rq(cpu);
 
@@ -31,7 +31,7 @@ void print_rq_stats(void) {
   }
 }
 
-void print_tasks(void) {
+void kstep_print_tasks(void) {
   struct task_struct *p;
 
   pr_info("\t%3s %c%s %5s %5s %12s %12s %9s\n", "CPU", ' ', "S", "PID", "PPID",
@@ -48,18 +48,10 @@ void print_tasks(void) {
   }
 }
 
-void print_nr_running(void) {
+void kstep_print_nr_running(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = cpu_rq(cpu);
     pr_info("print_nr_running: %d %d\n", cpu, rq->nr_running);
-  }
-}
-
-void print_all_tasks(void) {
-  struct task_struct *p;
-  pr_info("All tasks:");
-  for_each_process(p) {
-    pr_info("- pid=%d, cpu=%d, comm=%s", p->pid, task_cpu(p), p->comm);
   }
 }
 
@@ -85,7 +77,7 @@ static void sched_softirq_exit(void *ignore, unsigned int vec_nr) {
           smp_processor_id(), ktime_to_ns(duration));
 }
 
-void kstep_trace_rebalance(void) {
+void kstep_trace_sched_softirq(void) {
   if (tracepoint_probe_register((void *)ksym.__tracepoint_softirq_entry,
                                 sched_softirq_entry, NULL))
     panic("Failed to register softirq_entry tracepoint");
@@ -95,4 +87,50 @@ void kstep_trace_rebalance(void) {
     panic("Failed to register softirq_exit tracepoint");
 
   TRACE_INFO("Tracing sched_softirq latency");
+}
+
+struct lb_env {
+  struct sched_domain *sd;
+  struct rq *src_rq;
+  int src_cpu;
+  int dst_cpu;
+  struct rq *dst_rq;
+  // other fields are not needed
+};
+
+static void load_balance_enter(unsigned long ip, unsigned long parent_ip,
+                               struct ftrace_ops *op,
+                               struct ftrace_regs *fregs) {
+  struct lb_env *env = (void *)regs_get_kernel_argument((void *)fregs, 0);
+  if (env->dst_cpu >= 4 && env->dst_cpu <= 7) {
+    pr_info("LB %d %d %d %d %d\n", env->dst_cpu, env->sd->span_weight,
+            env->sd->groups->group_weight,
+            cpumask_first(sched_domain_span(env->sd)),
+            cpumask_last(sched_domain_span(env->sd)));
+  }
+}
+
+struct ftrace_ops load_balance_enter_op = {
+    .func = load_balance_enter,
+    .flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED | FTRACE_OPS_FL_RECURSION,
+};
+
+void kstep_trace_load_balance(void) {
+  // We use `sched_balance_find_src_group`/`find_busiest_group` as a proxy to
+  // trace `sched_balance_rq`/`load_balance` when `should_we_balance` is true.
+
+// https://github.com/torvalds/linux/commit/82cf921432fc184adbbb9c1bced182564876ec5e
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+  char *name = "sched_balance_find_src_group";
+#else
+  char *name = "find_busiest_group";
+#endif
+
+  if (ftrace_set_filter(&load_balance_enter_op, name, strlen(name), 1))
+    panic("Failed to set filter for %s", name);
+
+  if (register_ftrace_function(&load_balance_enter_op))
+    panic("Failed to register ftrace function for %s", name);
+
+  TRACE_INFO("Traced %s for load balancing", name);
 }

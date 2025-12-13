@@ -47,8 +47,8 @@ struct task_struct *kstep_task_create(void) {
   panic("Task %d did not start", p->pid);
 }
 
-void kstep_task_signal(struct task_struct *p, enum sigcode code, int val1,
-                       int val2, int val3) {
+static void kstep_task_signal(struct task_struct *p, enum sigcode code,
+                              int val1, int val2, int val3) {
   struct kernel_siginfo info = {
       .si_signo = SIGUSR1,
       .si_code = code,

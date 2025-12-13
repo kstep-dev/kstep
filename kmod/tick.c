@@ -151,12 +151,11 @@ void kstep_tick_exit(void) {
 
 void kstep_tick(void) {
   if (kstep_params.print_rq_stats)
-    print_rq_stats();
+    kstep_print_rq_stats();
   if (kstep_params.print_tasks)
-    print_tasks();
+    kstep_print_tasks();
   if (kstep_params.print_nr_running)
-    print_nr_running();
-
+    kstep_print_nr_running();
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
   kstep_sched_tick();

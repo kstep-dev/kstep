@@ -24,8 +24,8 @@ struct kstep_params_t {
   bool print_rq_stats;                 // Whether to print rq stats
   bool print_tasks;                    // Whether to print tasks
   bool print_nr_running;               // Whether to print nr_running
-  bool print_lb_events;                // Whether to print LB events
-  bool print_rebalance_overhead;       // Whether to print rebalance overhead
+  bool print_load_balance;             // Whether to print load balancing
+  bool print_sched_softirq;            // Whether to print sched softirq latency
 };
 extern struct kstep_params_t kstep_params;
 void kstep_params_print(void);
@@ -48,7 +48,7 @@ void kstep_tick_repeat(int n);
 // Call tick until the function returns something, then return that something
 void *kstep_tick_until(void *(*fn)(void));
 
-// tasks.c
+// task.c
 void kstep_tasks_init(void);
 struct task_struct *kstep_task_create(void);
 void kstep_task_pin(struct task_struct *p, int begin, int end);
@@ -58,10 +58,6 @@ void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
 void kstep_task_sleep(struct task_struct *p, int n);
 void kstep_task_set_prio(struct task_struct *p, int prio);
-// Low level signal sending, use with caution, see "user.h"
-enum sigcode;
-void kstep_task_signal(struct task_struct *p, enum sigcode code, int val1,
-                       int val2, int val3);
 
 // kernel.c
 void kstep_write(const char *path, const char *buf, size_t size);
@@ -75,10 +71,11 @@ void kstep_freeze_task(struct task_struct *p);
 int kstep_eligible(struct sched_entity *se);
 
 // output.c
-void print_rq_stats(void);
-void print_tasks(void);
-void print_nr_running(void);
-void print_all_tasks(void);
+void kstep_print_rq_stats(void);
+void kstep_print_tasks(void);
+void kstep_print_nr_running(void);
+void kstep_trace_sched_softirq(void);
+void kstep_trace_load_balance(void);
 
 // reset.c
 void kstep_reset_sched(void);
@@ -90,16 +87,11 @@ void kstep_move_kthreads(void);
 void kstep_prealloc_kworkers(void);
 bool kstep_is_sys_kthread(struct task_struct *p);
 
-// trace.c
-void kstep_trace_lb(void);
-void kstep_trace_rebalance(void);
-void kstep_patch_min_vruntime(void);
-
 // topo.c
 void kstep_topo_print(void);
-void kstep_use_special_topo(void);
-void kstep_set_cpu_freq(int cpu, int scale);
-void kstep_set_cpu_capacity(int cpu, int scale);
+void kstep_topo_use_special(void);
+void kstep_cpu_set_freq(int cpu, int scale);
+void kstep_cpu_set_capacity(int cpu, int scale);
 
 // ksym.c
 struct ksym_t {

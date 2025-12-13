@@ -1,7 +1,7 @@
 #include "kstep.h"
 
 static void pre_init(void) {
-  kstep_params.print_lb_events = true;
+  kstep_params.print_load_balance = true;
   kstep_params.print_nr_running = true;
   kstep_params.print_tasks = false;
   kstep_params.print_rq_stats = false;
