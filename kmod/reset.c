@@ -1,3 +1,5 @@
+#include <linux/ftrace.h>
+
 #include "kstep.h"
 
 void kstep_reset_task(struct task_struct *p) {
@@ -89,7 +91,7 @@ static void set_min_vruntime(unsigned long ip, unsigned long parent_ip,
   TRACE_INFO("Set min vruntime to %llu ns", INIT_TIME_NS);
 }
 
-struct ftrace_ops set_min_vruntime_op = {
+static struct ftrace_ops set_min_vruntime_op = {
     .func = set_min_vruntime,
     .flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED | FTRACE_OPS_FL_RECURSION,
 };
