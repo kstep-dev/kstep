@@ -1,10 +1,4 @@
 #include <linux/ftrace.h>
-#include <linux/sched/clock.h>
-#include <linux/version.h>
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 18, 0)
-#include <linux/fprobe.h>
-#endif
 
 #include "kstep.h"
 
