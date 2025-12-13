@@ -95,6 +95,8 @@ struct ftrace_ops set_min_vruntime_op = {
 };
 
 void kstep_patch_min_vruntime(void) {
+  // We trace `init_tg_cfs_entry` as it is called immediately after
+  // `init_cfs_rq` to initialize the cfs_rq for the new task group.
   char *name = "init_tg_cfs_entry";
   if (ftrace_set_filter(&set_min_vruntime_op, name, strlen(name), 1))
     panic("Failed to set filter for %s", name);
