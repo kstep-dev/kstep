@@ -22,23 +22,6 @@ static void kstep_trace_function(char *name, ftrace_func_t callback) {
 }
 
 //
-// Set min vruntime for newly created cfs_rq
-//
-
-static void init_tg_cfs_entry_cb(unsigned long ip, unsigned long parent_ip,
-                                 struct ftrace_ops *op,
-                                 struct ftrace_regs *fregs) {
-  struct cfs_rq *cfs_rq = (void *)regs_get_kernel_argument((void *)fregs, 1);
-  cfs_rq->min_vruntime = INIT_TIME_NS;
-  TRACE_INFO("Set min vruntime to %llu ns", INIT_TIME_NS);
-}
-
-void kstep_patch_min_vruntime(void) {
-  kstep_trace_function("init_tg_cfs_entry", &init_tg_cfs_entry_cb);
-  TRACE_INFO("Patched init_tg_cfs_entry to set min vruntime");
-}
-
-//
 // Trace load balancing
 //
 

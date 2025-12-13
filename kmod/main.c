@@ -44,7 +44,6 @@ static int __init kstep_main(void) {
     kstep_use_special_topo();
 
   kstep_topo_print();
-  kstep_patch_min_vruntime();
 
   // Isolate the CPUs to avoid interference
   kstep_prealloc_kworkers();
