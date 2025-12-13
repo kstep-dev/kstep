@@ -96,7 +96,7 @@ static struct ftrace_ops set_min_vruntime_op = {
     .flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED | FTRACE_OPS_FL_RECURSION,
 };
 
-void kstep_patch_min_vruntime(void) {
+static void kstep_patch_min_vruntime(void) {
   // We trace `init_tg_cfs_entry` as it is called immediately after
   // `init_cfs_rq` to initialize the cfs_rq for the new task group.
   char *name = "init_tg_cfs_entry";

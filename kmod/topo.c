@@ -55,15 +55,15 @@ static void print_sched_domain(struct sched_domain *sd) {
 
 static void print_sched_domains(void) {
   pr_info("Sched domains:\n");
-  for (struct sched_domain_topology_level *tl = *ksym.sched_domain_topology;
-       tl->mask; tl++) {
+  struct sched_domain_topology_level *tl;
+  for_each_tl(tl) {
     for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
       struct sched_domain *sd;
       for_each_domain(cpu, sd) {
-        if (strcmp(sd->name, tl->name) == 0) {
-          pr_info("- %s[%d]: ", tl->name, cpu);
-          print_sched_domain(sd);
-        }
+        if (strcmp(sd->name, tl->name) != 0)
+          continue;
+        pr_info("- %s[%d]: ", tl->name, cpu);
+        print_sched_domain(sd);
       }
     }
   }
@@ -87,7 +87,7 @@ static void kstep_topo_apply(void) {
   ksym.rebuild_sched_domains();
 }
 
-void kstep_set_cpu_freq(int cpu, int scale) {
+void kstep_cpu_set_freq(int cpu, int scale) {
   // x86:
   // https://elixir.bootlin.com/linux/v6.14.11/source/arch/x86/include/asm/topology.h#L287-L293
   // generic:
@@ -95,7 +95,7 @@ void kstep_set_cpu_freq(int cpu, int scale) {
   *per_cpu_ptr(ksym.arch_freq_scale, cpu) = scale;
 }
 
-void kstep_set_cpu_capacity(int cpu, int scale) {
+void kstep_cpu_set_capacity(int cpu, int scale) {
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
   // https://elixir.bootlin.com/linux/v6.17.8/source/include/linux/topology.h#L332-L339
   per_cpu(cpu_scale, cpu) = scale;
@@ -136,9 +136,9 @@ static const struct cpumask *cluster_masks_fn(
   return &cluster_masks[cpu];
 }
 
-void kstep_use_special_topo(void) {
+void kstep_topo_use_special(void) {
   for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
-    kstep_set_cpu_capacity(cpu, (cpu % 2 == 0) ? SCHED_CAPACITY_SCALE
+    kstep_cpu_set_capacity(cpu, (cpu % 2 == 0) ? SCHED_CAPACITY_SCALE
                                                : SCHED_CAPACITY_SCALE >> 1);
   }
 

@@ -18,7 +18,6 @@ module_param_named(step_interval_us, kstep_params.step_interval_us, ullong,
 module_param_named(special_topo, kstep_params.special_topo, bool, 0644);
 module_param_named(print_tasks, kstep_params.print_tasks, bool, 0644);
 module_param_named(print_nr_running, kstep_params.print_nr_running, bool, 0644);
-module_param_named(print_lb_events, kstep_params.print_lb_events, bool, 0644);
 
 void kstep_params_print(void) {
   TRACE_INFO("kSTEP params:");
@@ -28,7 +27,6 @@ void kstep_params_print(void) {
   TRACE_INFO("- print_rq_stats: %d", kstep_params.print_rq_stats);
   TRACE_INFO("- print_tasks: %d", kstep_params.print_tasks);
   TRACE_INFO("- print_nr_running: %d", kstep_params.print_nr_running);
-  TRACE_INFO("- print_lb_events: %d", kstep_params.print_lb_events);
 }
 
 static int __init kstep_main(void) {
@@ -41,8 +39,7 @@ static int __init kstep_main(void) {
 
   kstep_params_print();
   if (kstep_params.special_topo)
-    kstep_use_special_topo();
-
+    kstep_topo_use_special();
   kstep_topo_print();
 
   // Isolate the CPUs to avoid interference
@@ -61,11 +58,10 @@ static int __init kstep_main(void) {
   // Reset the scheduler state to initial state
   kstep_reset_sched();
 
-  if (kstep_params.print_lb_events)
-    kstep_trace_lb();
-
-  if (kstep_params.print_rebalance_overhead)
-    kstep_trace_rebalance();
+  if (kstep_params.print_load_balance)
+    kstep_trace_load_balance();
+  if (kstep_params.print_sched_softirq)
+    kstep_trace_sched_softirq();
 
   // Enable printk time
   kstep_write("/sys/module/printk/parameters/time", "1", 1);
