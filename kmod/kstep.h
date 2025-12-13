@@ -16,14 +16,14 @@
 
 // main.c
 struct kstep_params_t {
-  char driver[32];                     // Name of the driver to run
-  unsigned long long step_interval_us; // Interval between steps in us
-  bool special_topo;                   // Whether to use the special topology
-  bool print_rq_stats;                 // Whether to print rq stats
-  bool print_tasks;                    // Whether to print tasks
-  bool print_nr_running;               // Whether to print nr_running
-  bool print_load_balance;             // Whether to print load balancing
-  bool print_sched_softirq;            // Whether to print sched softirq latency
+  char driver[32];          // Name of the driver to run
+  u64 step_interval_us;     // Interval between steps in us
+  bool special_topo;        // Whether to use the special topology
+  bool print_rq_stats;      // Whether to print rq stats
+  bool print_tasks;         // Whether to print tasks
+  bool print_nr_running;    // Whether to print nr_running
+  bool print_load_balance;  // Whether to print load balancing
+  bool print_sched_softirq; // Whether to print sched softirq latency
 };
 extern struct kstep_params_t kstep_params;
 void kstep_params_print(void);
@@ -85,6 +85,11 @@ void kstep_prealloc_kworkers(void);
 bool kstep_is_sys_kthread(struct task_struct *p);
 
 // topo.c
+enum kstep_topo_type;
+void kstep_topo_init(void);
+void kstep_topo_set_level(enum kstep_topo_type type, const char *cpulists[],
+                          int size);
+void kstep_topo_apply(void);
 void kstep_topo_print(void);
 void kstep_topo_use_special(void);
 void kstep_cpu_set_freq(int cpu, int scale);
