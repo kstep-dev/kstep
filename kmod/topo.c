@@ -130,20 +130,20 @@ void kstep_topo_init(void) {
   int nr_cpus = num_online_cpus();
   struct sched_domain_topology_level *tl;
   for_each_tl(tl) {
-    sched_domain_mask_f old_mask_fn = tl->mask;
-    sched_domain_mask_f new_mask_fn = kstep_masks_fns[get_topo_type(tl->name)];
+    sched_domain_mask_f old_masks_fn = tl->mask;
+    sched_domain_mask_f new_masks_fn = kstep_masks_fns[get_topo_type(tl->name)];
 
     for (int cpu = 0; cpu < nr_cpus; cpu++) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
-      const struct cpumask *old_mask = old_mask_fn(tl, cpu);
-      const struct cpumask *new_mask = new_mask_fn(tl, cpu);
+      const struct cpumask *old_mask = old_masks_fn(tl, cpu);
+      const struct cpumask *new_mask = new_masks_fn(tl, cpu);
 #else
-      const struct cpumask *old_mask = old_mask_fn(cpu);
-      const struct cpumask *new_mask = new_mask_fn(cpu);
+      const struct cpumask *old_mask = old_masks_fn(cpu);
+      const struct cpumask *new_mask = new_masks_fn(cpu);
 #endif
       cpumask_copy((struct cpumask *)new_mask, old_mask);
     }
-    tl->mask = new_mask_fn;
+    tl->mask = new_masks_fn;
   }
 }
 
