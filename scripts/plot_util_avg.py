@@ -4,35 +4,15 @@ Plot util_avg for CPU 2 over time from log files
 """
 
 import argparse
-import re
 
 import matplotlib.pyplot as plt
 from consts import RESULTS_DIR
+from parse import parse_rq
 
 init_timestamp = 10.0
 def parse_log_file(log_file):
-    """
-    Parse the log file and extract timestamp and avg_util for CPU 2
-    
-    Expected format:
-    [timestamp] ... print_tasks: - CPU 2 running=X, switches=Y, avg_load=Z, avg_util=VALUE
-    """
-    timestamps = []
-    util_avg_values = []
-    
-    # Pattern to match lines with CPU 2 and avg_util
-    pattern = r"\[\s*(\d+\.\d+)\].*CPU 1.*avg_util=(\d+)"
-    
-    with open(log_file, 'r') as f:
-        for line in f:
-            match = re.search(pattern, line)
-            if match and float(match.group(1)) >= init_timestamp:
-                timestamp = (float(match.group(1)) - init_timestamp) * 1000
-                util_avg = int(match.group(2))
-                timestamps.append(timestamp)
-                util_avg_values.append(util_avg)
-    print(len(timestamps))
-    return timestamps, util_avg_values
+    df = parse_rq(log_file)
+    return df["timestamp"], df["avg_util"]
 
 def plot_util_avg(timestamps_buggy, util_avg_values_buggy, 
                   timestamps_fixed, util_avg_values_fixed, bugId, output_file):
@@ -78,8 +58,7 @@ def main():
     fixed_log = RESULTS_DIR / f"{bugId}_fixed.log"
 
     output_file = RESULTS_DIR / f"{bugId}.pdf"
-    
-    print(f"Parsing log file: {buggy_log}")
+
     timestamps_buggy, util_avg_values_buggy = parse_log_file(buggy_log)
     timestamps_fixed, util_avg_values_fixed = parse_log_file(fixed_log)
 

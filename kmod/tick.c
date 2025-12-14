@@ -17,6 +17,7 @@ static void kstep_sched_clock_tick(void) { kstep_sched_clock += TICK_NSEC; }
 static void kstep_sched_clock_init(void) {
   *ksym.__sched_clock_offset = 0;
   ksym.paravirt_set_sched_clock(kstep_sched_clock_read);
+  TRACE_INFO("Mocked sched clock");
 }
 
 static void kstep_sched_clock_exit(void) {
@@ -50,6 +51,7 @@ static void kstep_sched_clock_init(void) {
     rd->epoch_ns = 0;
     rd->epoch_cyc = 0;
   }
+  TRACE_INFO("Mocked sched clock");
 }
 
 static void kstep_sched_clock_exit(void) {
@@ -140,8 +142,6 @@ void kstep_tick_init(void) {
   kstep_sched_timer_init();
   kstep_jiffies_init();
   kstep_sched_clock_init();
-  TRACE_INFO("Initialized clock to %llu ns and jiffies to %llu",
-             kstep_sched_clock, kstep_jiffies);
 }
 
 void kstep_tick_exit(void) {
