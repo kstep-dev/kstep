@@ -4,7 +4,7 @@
 #include "kstep.h"
 
 #define pr_json_end(key, fmt, expr) pr_cont("\"" #key "\": " fmt, expr)
-#define pr_json_cont(key, fmt, expr) pr_json_end(key, fmt ",     ", expr)
+#define pr_json_cont(key, fmt, expr) pr_json_end(key, fmt "  ,  ", expr)
 
 static void print_rq(struct rq *rq) {
 // https://github.com/torvalds/linux/commit/c2a295bffeaf9461ecba76dc9e4780c898c94f03
