@@ -36,6 +36,7 @@ struct kstep_driver {
 struct kstep_driver *kstep_driver_get(const char *name);
 
 // tick.c
+extern u64 kstep_tick_count;
 void kstep_tick_init(void);
 void kstep_tick_exit(void);
 void kstep_sleep(void);

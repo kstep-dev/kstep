@@ -81,19 +81,18 @@ static void kstep_jiffies_init(void) {
   // `tick_do_update_jiffies64`
   *ksym.tick_next_period = KTIME_MAX;
 
-  kstep_jiffies = nsecs_to_jiffies(kstep_sched_clock);
-  jiffies = kstep_jiffies + INITIAL_JIFFIES;
+  kstep_jiffies = nsecs_to_jiffies(kstep_sched_clock) + INITIAL_JIFFIES;
+  jiffies = kstep_jiffies;
   smp_mb();
 
   TRACE_INFO("Disabled jiffies update");
 }
 
 static void kstep_jiffies_tick(void) {
-  if (jiffies != kstep_jiffies + INITIAL_JIFFIES)
-    panic("%lu != %llu", jiffies, kstep_jiffies + INITIAL_JIFFIES);
-
+  if (jiffies != kstep_jiffies)
+    panic("%lu != %llu", jiffies, kstep_jiffies);
   kstep_jiffies++;
-  jiffies = kstep_jiffies + INITIAL_JIFFIES;
+  jiffies = kstep_jiffies;
   smp_mb();
 }
 
@@ -151,6 +150,8 @@ void kstep_tick_exit(void) {
   kstep_sched_timer_exit();
 }
 
+u64 kstep_tick_count = 0;
+
 void kstep_tick(void) {
   if (kstep_params.print_rq_stats)
     kstep_print_rq_stats();
@@ -161,6 +162,7 @@ void kstep_tick(void) {
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
   kstep_sched_tick();
+  kstep_tick_count++;
 }
 
 void kstep_tick_repeat(int n) {
