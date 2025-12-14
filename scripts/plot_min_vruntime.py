@@ -4,46 +4,18 @@ Plot min_vruntime and avg_vruntime for CPU 2 over time from log files
 """
 
 import argparse
-import re
 
 import matplotlib.pyplot as plt
 from consts import RESULTS_DIR
+from parse import parse_rq
 from plot_utils import save_fig
 
 init_timestamp = 10.0
 
 def parse_log_file(log_file):
-    """
-    Parse the log file and extract timestamp, min_vruntime, and avg_vruntime for CPU 2
-
-    Expected format:
-    [timestamp] ... print_tasks: - CPU 2 ... min_vruntime=VALUE ... avg_vruntime=VALUE
-    avg_vruntime may be absent in old kernels or log files.
-    """
-    timestamps = []
-    min_vruntime_values = []
-    avg_vruntime_values = []
-
-    # Pattern to match lines with CPU 1, min_vruntime, and optionally avg_vruntime
-    pattern = (
-        r"\[\s*(\d+\.\d+)\].*CPU 1.*min_vruntime=([0-9]+)(?:.*avg_vruntime=([0-9]+))?"
-    )
-
-    with open(log_file, 'r') as f:
-        for line in f:
-            match = re.search(pattern, line)
-            if match and float(match.group(1)) >= init_timestamp:
-                timestamp = (float(match.group(1)) - init_timestamp) * 1000
-                min_vruntime = int(match.group(2))
-                if match.group(3) is not None:
-                    avg_vruntime = int(match.group(3))
-                else:
-                    avg_vruntime = None
-                timestamps.append(timestamp)
-                min_vruntime_values.append(min_vruntime)
-                avg_vruntime_values.append(avg_vruntime)
-    print(f"min_vruntime samples: {len(timestamps)}")
-    return timestamps, min_vruntime_values, avg_vruntime_values
+    df = parse_rq(log_file)
+    df = df[df["cpu"] == 1]
+    return df["timestamp"], df["min_vruntime"], df["avg_vruntime"]
 
 def plot_min_avg_vruntime(
     timestamps_buggy, min_vruntime_buggy, avg_vruntime_buggy,

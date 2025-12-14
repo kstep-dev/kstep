@@ -3,48 +3,59 @@
 
 #include "kstep.h"
 
-void kstep_print_rq_stats(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    struct rq *rq = cpu_rq(cpu);
+#define pr_json_end(key, fmt, expr) pr_cont("\"" #key "\": " fmt, expr)
+#define pr_json_cont(key, fmt, expr) pr_json_end(key, fmt ",     ", expr)
 
-    int h_nr_runnable_val = 0, h_nr_queued_val = 0;
+static void print_rq(struct rq *rq) {
+// https://github.com/torvalds/linux/commit/c2a295bffeaf9461ecba76dc9e4780c898c94f03
+// https://github.com/torvalds/linux/commit/7b8a702d943827130cc00ae36075eff5500f86f1
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
-    h_nr_runnable_val = rq->cfs.h_nr_runnable;
-    h_nr_queued_val = rq->cfs.h_nr_queued;
+  int h_nr_runnable = rq->cfs.h_nr_runnable;
+  int h_nr_queued = rq->cfs.h_nr_queued;
+#else
+  int h_nr_runnable = 0;
+  int h_nr_queued = 0;
 #endif
 
 // https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-    u64 avg_load = rq->cfs.avg_load;
-    u64 avg_vruntime = ksym.avg_vruntime(&rq->cfs) - INIT_TIME_NS;
+  u64 avg_load = rq->cfs.avg_load;
+  u64 avg_vruntime = ksym.avg_vruntime(&rq->cfs) - INIT_TIME_NS;
 #else
-    u64 avg_load = 0;
-    u64 avg_vruntime = 0;
+  u64 avg_load = 0;
+  u64 avg_vruntime = 0;
 #endif
 
-    pr_info("print_rq_stats: CPU %d running=%d, queued=%d, switches=%3lld, "
-            "avg_load=%lld, "
-            "avg_util=%lu, min_vruntime=%lld, avg_vruntime=%lld\n",
-            cpu, rq->nr_running - (h_nr_queued_val - h_nr_runnable_val),
-            rq->nr_running, rq->nr_switches, avg_load,
-            rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg,
-            rq->cfs.min_vruntime - INIT_TIME_NS, avg_vruntime);
-  }
+  u64 avg_util =
+      rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
+
+  pr_info("rq: {");
+  pr_json_cont(cpu, "%d", rq->cpu);
+  pr_json_cont(running, "%2d", rq->nr_running - (h_nr_queued - h_nr_runnable));
+  pr_json_cont(queued, "%2d", rq->nr_running);
+  pr_json_cont(avg_load, "%4lld", avg_load);
+  pr_json_cont(avg_util, "%4lld", avg_util);
+  pr_json_cont(min_vruntime, "%12lld", rq->cfs.min_vruntime - INIT_TIME_NS);
+  pr_json_cont(avg_vruntime, "%12lld", avg_vruntime);
+  pr_json_end(timestamp, "%4llu", kstep_tick_count);
+  pr_cont("}\n");
 }
 
-#define pr_json_start(prefix) pr_info(#prefix ": {")
-#define pr_json(key, fmt, expr) pr_cont("\"" #key "\": " fmt ",     ", expr)
-#define pr_json_end() pr_cont("\"timestamp\": %4llu}\n", kstep_tick_count)
+void kstep_print_rq_stats(void) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
+    print_rq(cpu_rq(cpu));
+}
 
 static void print_task(struct task_struct *p) {
-  pr_json_start(task);
-  pr_json(pid, "%d", task_pid_nr(p));
-  pr_json(on_cpu, "%5s", p->on_cpu ? "true" : "false");
-  pr_json(cpu, "%d", task_cpu(p));
-  pr_json(state, "\"%c\"", task_state_to_char(p));
-  pr_json(vruntime, "%12lld", p->se.vruntime);
-  pr_json(sum_exec, "%12lld", p->se.sum_exec_runtime);
-  pr_json_end();
+  pr_info("task: {");
+  pr_json_cont(pid, "%d", task_pid_nr(p));
+  pr_json_cont(on_cpu, "%5s", p->on_cpu ? "true" : "false");
+  pr_json_cont(cpu, "%d", task_cpu(p));
+  pr_json_cont(state, "\"%c\"", task_state_to_char(p));
+  pr_json_cont(vruntime, "%12lld", p->se.vruntime);
+  pr_json_cont(sum_exec, "%12lld", p->se.sum_exec_runtime);
+  pr_json_end(timestamp, "%4llu", kstep_tick_count);
+  pr_cont("}\n");
 }
 
 void kstep_print_tasks(void) {
