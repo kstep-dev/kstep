@@ -1,19 +1,17 @@
 #include "kstep.h"
 
-static void pre_init(void) {
+static struct task_struct *tasks[2];
+
+static void setup(void) {
   kstep_params.step_interval_us = 1000;
   kstep_params.print_tasks = false;
   kstep_params.print_rq_stats = true;
-}
 
-static struct task_struct *tasks[2];
-
-static void init(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
 }
 
-static void body(void) {
+static void run(void) {
   // set the first task to fifo
   kstep_task_fifo(tasks[0]);
 
@@ -38,7 +36,6 @@ static void body(void) {
 
 struct kstep_driver util_avg = {
     .name = "util_avg",
-    .pre_init = pre_init,
-    .init = init,
-    .body = body,
+    .setup = setup,
+    .run = run,
 };

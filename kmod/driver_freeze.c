@@ -1,10 +1,10 @@
 #include "kstep.h"
 
-static void pre_init(void) { kstep_params.step_interval_us = 50000; }
-
 static struct task_struct *tasks[3];
 
-static void init(void) {
+static void setup(void) {
+  kstep_params.step_interval_us = 50000;
+
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
 }
@@ -16,7 +16,7 @@ static void *is_ineligible(void) {
   return NULL;
 }
 
-static void body(void) {
+static void run(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     kstep_task_wakeup(tasks[i]);
 
@@ -31,7 +31,6 @@ static void body(void) {
 
 struct kstep_driver freeze = {
     .name = "freeze",
-    .pre_init = pre_init,
-    .init = init,
-    .body = body,
+    .setup = setup,
+    .run = run,
 };

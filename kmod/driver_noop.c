@@ -2,12 +2,12 @@
 
 static struct task_struct *tasks[10];
 
-static void init(void) {
+static void setup(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
 }
 
-static void body(void) {
+static void run(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++) 
     kstep_task_wakeup(tasks[i]);
 
@@ -17,6 +17,6 @@ static void body(void) {
 
 struct kstep_driver noop = {
     .name = "noop",
-    .init = init,
-    .body = body,
+    .setup = setup,
+    .run = run,
 };

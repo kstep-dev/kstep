@@ -31,10 +31,6 @@ static int __init kstep_main(void) {
   TRACE_INFO("Initializing kSTEP");
   ksym_init();
   struct kstep_driver *driver = kstep_driver_get(kstep_params.driver);
-  if (driver->pre_init)
-    driver->pre_init();
-
-  kstep_params_print();
 
   // Isolate the CPUs to avoid interference
   kstep_prealloc_kworkers();
@@ -43,9 +39,9 @@ static int __init kstep_main(void) {
 
   // Run userspace programs when we know the system is ready
   kstep_tasks_init();
-  if (driver->init)
-    driver->init();
+  driver->setup();
 
+  kstep_params_print();
   kstep_topo_print();
 
   // Control timer ticks and clock
@@ -63,10 +59,10 @@ static int __init kstep_main(void) {
   kstep_write("/sys/module/printk/parameters/time", "1", 1);
 
   TRACE_INFO("Running driver %s", driver->name);
-  driver->body();
+  driver->run();
   TRACE_INFO("Exiting driver %s", driver->name);
   kernel_restart(NULL);
-  
+
   return 0;
 }
 module_init(kstep_main);

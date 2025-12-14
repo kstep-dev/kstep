@@ -1,16 +1,14 @@
 #include "kstep.h"
 
-static void pre_init(void) {
+static struct task_struct *tasks[4];
+
+static void setup(void) {
   kstep_params.step_interval_us = 1000;
   kstep_params.print_load_balance = true;
   kstep_params.print_nr_running = true;
   kstep_params.print_tasks = false;
   kstep_params.print_rq_stats = false;
-}
 
-static struct task_struct *tasks[4];
-
-static void init(void) {
   kstep_cpu_set_capacity(4, SCHED_CAPACITY_SCALE);
   kstep_cpu_set_capacity(5, SCHED_CAPACITY_SCALE / 2);
   kstep_cpu_set_capacity(6, SCHED_CAPACITY_SCALE);
@@ -26,7 +24,7 @@ static void init(void) {
     tasks[i] = kstep_task_create();
 }
 
-static void body(void) {
+static void run(void) {
   // making the nr_running on cpu 4-7 to [1, 0, 2, 1]
   kstep_task_pin(tasks[0], 4, 4);
   kstep_task_pin(tasks[1], 6, 6);
@@ -41,7 +39,6 @@ static void body(void) {
 
 struct kstep_driver even_idle_cpu = {
     .name = "even_idle_cpu",
-    .pre_init = pre_init,
-    .init = init,
-    .body = body,
+    .setup = setup,
+    .run = run,
 };
