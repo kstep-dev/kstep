@@ -33,8 +33,8 @@ static void print_rq(struct rq *rq) {
   pr_json_cont(cpu, "%d", rq->cpu);
   pr_json_cont(running, "%2d", rq->nr_running - (h_nr_queued - h_nr_runnable));
   pr_json_cont(queued, "%2d", rq->nr_running);
-  pr_json_cont(avg_load, "%4lld", avg_load);
-  pr_json_cont(avg_util, "%4lld", avg_util);
+  pr_json_cont(avg_load, "%4llu", avg_load);
+  pr_json_cont(avg_util, "%4llu", avg_util);
   pr_json_cont(min_vruntime, "%12lld", rq->cfs.min_vruntime - INIT_TIME_NS);
   pr_json_cont(avg_vruntime, "%12lld", avg_vruntime);
   pr_json_end(timestamp, "%4llu", kstep_tick_count);
