@@ -16,25 +16,18 @@ KMOD_DIR = PROJ_DIR / "kmod"
 DATA_DIR = PROJ_DIR / "data"
 ROOTFS_IMG = DATA_DIR / "rootfs.cpio"
 LOGS_DIR = DATA_DIR / "logs"
+LOG_LATEST = LOGS_DIR / "latest.log"
 RESULTS_DIR = PROJ_DIR / "results"
 QEMU_DIR = DATA_DIR / "qemu"
 
 
-def get_log_path(create: bool) -> Path:
-    symlink = LOGS_DIR / "latest.log"
-
-    if create:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        actual = LOGS_DIR / f"log-{timestamp}.log"
-        actual.touch()
-        symlink.unlink(missing_ok=True)
-        symlink.symlink_to(actual)
-        return actual
-    else:
-        if symlink.exists():
-            return symlink.resolve()
-        else:
-            return symlink
+def create_log_path() -> Path:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    actual = LOGS_DIR / f"log-{timestamp}.log"
+    actual.touch()
+    LOG_LATEST.unlink(missing_ok=True)
+    LOG_LATEST.symlink_to(actual)
+    return actual
 
 
 class Arch(Enum):

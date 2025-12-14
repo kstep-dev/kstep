@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import re
 from pathlib import Path
 
 import matplotlib.patches as mpatches
@@ -10,6 +9,7 @@ import numpy as np
 import pandas as pd
 from consts import RESULTS_DIR
 from matplotlib import colors
+from parse import parse_task
 from plot_utils import save_fig
 
 COLOR_IDLE = (0.95, 0.95, 0.95)
@@ -60,18 +60,10 @@ NAME_MAPS = {
 
 
 def parse_curr_task(name: str, path: Path) -> pd.DataFrame:
-    task_pattern = re.compile(r"\[\s*(\d+\.\d+)\].*?print_tasks:\s+(\d+)\s+>R\s+(\d+)")
-    data = []
-    with open(path, "r") as f:
-        for line in f:
-            match = task_pattern.search(line)
-            if match:
-                timestamp = float(match.group(1))
-                cpu = int(match.group(2))
-                pid = int(match.group(3))
-                data.append([name, timestamp, cpu, pid])
-    return pd.DataFrame(data, columns=["name", "timestamp", "cpu", "pid"])
-
+    df = parse_task(path)
+    df = df[df["on_cpu"] == True]
+    df["name"] = name
+    return df
 
 def build_pid_matrix(df: pd.DataFrame) -> pd.DataFrame:
     # Normalize pids to start from 0 and be consecutive

@@ -32,20 +32,27 @@ void kstep_print_rq_stats(void) {
   }
 }
 
+#define pr_json_start(prefix) pr_info(#prefix ": {")
+#define pr_json(key, fmt, expr) pr_cont("\"" #key "\": " fmt ",     ", expr)
+#define pr_json_end() pr_cont("\"timestamp\": %4llu}\n", kstep_tick_count)
+
+static void print_task(struct task_struct *p) {
+  pr_json_start(task);
+  pr_json(pid, "%d", task_pid_nr(p));
+  pr_json(on_cpu, "%5s", p->on_cpu ? "true" : "false");
+  pr_json(cpu, "%d", task_cpu(p));
+  pr_json(state, "\"%c\"", task_state_to_char(p));
+  pr_json(vruntime, "%12lld", p->se.vruntime);
+  pr_json(sum_exec, "%12lld", p->se.sum_exec_runtime);
+  pr_json_end();
+}
+
 void kstep_print_tasks(void) {
   struct task_struct *p;
-
-  pr_info("\t%3s %c%s %5s %5s %12s %12s %9s\n", "CPU", ' ', "S", "PID", "PPID",
-          "vruntime", "sum-exec", "switches");
-  pr_info("\t-------------------------------------------------------------\n");
-
   for_each_process(p) {
     if (task_cpu(p) == 0 || kstep_is_sys_kthread(p))
       continue;
-    pr_info("\tprint_tasks: %3d %c%c %5d %5d %12lld %12lld %4lu+%-4lu\n",
-            task_cpu(p), p->on_cpu ? '>' : ' ', task_state_to_char(p),
-            task_pid_nr(p), task_ppid_nr(p), p->se.vruntime,
-            p->se.sum_exec_runtime, p->nvcsw, p->nivcsw);
+    print_task(p);
   }
 }
 
