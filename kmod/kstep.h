@@ -30,9 +30,8 @@ void kstep_params_print(void);
 // driver.c
 struct kstep_driver {
   const char *name;
-  void (*pre_init)(void);
-  void (*init)(void);
-  void (*body)(void);
+  void (*setup)(void);
+  void (*run)(void);
 };
 struct kstep_driver *kstep_driver_get(const char *name);
 

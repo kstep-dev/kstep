@@ -9,12 +9,12 @@
 
 static struct task_struct *tasks[3];
 
-static void init(void) {
+static void setup(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
 }
 
-static void body(void) {
+static void run(void) {
   // pin tasks on cpu 1
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     kstep_task_pin(tasks[i], 1, 1);
@@ -48,6 +48,6 @@ static void body(void) {
 
 struct kstep_driver case_time_sensitive = {
     .name = "case_time_sensitive",
-    .init = init,
-    .body = body,
+    .setup = setup,
+    .run = run,
 };

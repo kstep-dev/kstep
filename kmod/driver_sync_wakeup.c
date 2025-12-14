@@ -19,7 +19,7 @@ static int waker_main(void *data) {
   return 0;
 }
 
-static void init(void) {
+static void setup(void) {
   other_task = kstep_task_create();
 
   // Create a waker on cpu 1
@@ -44,7 +44,7 @@ static void *is_ineligible(void) {
   return NULL;
 }
 
-static void body(void) {
+static void run(void) {
   kstep_task_pin(other_task, 1, 1);
 
   kstep_tick_repeat(20);
@@ -64,6 +64,6 @@ static void body(void) {
 
 struct kstep_driver sync_wakeup = {
     .name = "sync_wakeup",
-    .init = init,
-    .body = body,
+    .setup = setup,
+    .run = run,
 };

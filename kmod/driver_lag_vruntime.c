@@ -3,7 +3,7 @@
 static struct task_struct *target_task;
 static struct task_struct *tasks[3];
 
-static void init(void) {
+static void setup(void) {
   // Create target task and add it to group g0
   target_task = kstep_task_create();
   kstep_cgroup_create_pinned("g0", "1");
@@ -14,7 +14,7 @@ static void init(void) {
     tasks[i] = kstep_task_create();
 }
 
-static void body(void) {
+static void run(void) {
   // Set priority of other tasks to 19
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     kstep_task_set_prio(tasks[i], 19);
@@ -30,6 +30,6 @@ static void body(void) {
 
 struct kstep_driver lag_vruntime = {
     .name = "lag_vruntime",
-    .init = init,
-    .body = body,
+    .setup = setup,
+    .run = run,
 };

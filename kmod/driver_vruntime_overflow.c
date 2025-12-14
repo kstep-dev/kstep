@@ -4,7 +4,7 @@ static struct task_struct *special_task;
 static struct task_struct *starved_task;
 static struct task_struct *other_task;
 
-static void init(void) {
+static void setup(void) {
   kstep_cgroup_create_pinned("g0", "1");
   kstep_cgroup_create_pinned("g1", "1");
   kstep_cgroup_set_weight("g0", 15);
@@ -26,7 +26,7 @@ static void *ineligible_group_with_eligible_tasks(void) {
   return NULL;
 }
 
-static void body(void) {
+static void run(void) {
   kstep_task_wakeup(special_task);
   kstep_task_wakeup(other_task);
 
@@ -50,6 +50,6 @@ static void body(void) {
 
 struct kstep_driver vruntime_overflow = {
     .name = "vruntime_overflow",
-    .init = init,
-    .body = body,
+    .setup = setup,
+    .run = run,
 };
