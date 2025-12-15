@@ -3,10 +3,6 @@
 static struct task_struct *tasks[2];
 
 static void setup(void) {
-  kstep_params.step_interval_us = 1000;
-  kstep_params.print_tasks = false;
-  kstep_params.print_rq_stats = true;
-
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
 }
@@ -38,4 +34,6 @@ struct kstep_driver util_avg = {
     .name = "util_avg",
     .setup = setup,
     .run = run,
+    .step_interval_us = 1000,
+    .print_rq = true,
 };

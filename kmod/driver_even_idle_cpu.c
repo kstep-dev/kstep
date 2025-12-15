@@ -3,12 +3,6 @@
 static struct task_struct *tasks[4];
 
 static void setup(void) {
-  kstep_params.step_interval_us = 1000;
-  kstep_params.print_load_balance = true;
-  kstep_params.print_nr_running = true;
-  kstep_params.print_tasks = false;
-  kstep_params.print_rq_stats = false;
-
   kstep_cpu_set_capacity(4, SCHED_CAPACITY_SCALE);
   kstep_cpu_set_capacity(5, SCHED_CAPACITY_SCALE / 2);
   kstep_cpu_set_capacity(6, SCHED_CAPACITY_SCALE);
@@ -41,4 +35,7 @@ struct kstep_driver even_idle_cpu = {
     .name = "even_idle_cpu",
     .setup = setup,
     .run = run,
+    .step_interval_us = 1000,
+    .print_load_balance = true,
+    .print_nr_running = true,
 };

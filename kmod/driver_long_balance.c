@@ -2,13 +2,7 @@
 
 static struct task_struct *busy_task;
 
-static void setup(void) {
-  kstep_params.print_tasks = false;
-  kstep_params.print_rq_stats = false;
-  kstep_params.print_sched_softirq = true;
-
-  busy_task = kstep_task_create();
-}
+static void setup(void) { busy_task = kstep_task_create(); }
 
 static void run(void) {
   kstep_task_pin(busy_task, 1, 1);
@@ -24,4 +18,6 @@ struct kstep_driver long_balance = {
     .name = "long_balance",
     .setup = setup,
     .run = run,
+    .step_interval_us = 10000,
+    .print_sched_softirq = true,
 };

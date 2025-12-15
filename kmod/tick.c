@@ -123,7 +123,9 @@ static void kstep_sched_timer_exit(void) {
 }
 
 void kstep_sleep(void) {
-  usleep_range(kstep_params.step_interval_us, kstep_params.step_interval_us);
+  if (kstep_driver->step_interval_us <= 0)
+    panic("Invalid step_interval_us %llu", kstep_driver->step_interval_us);
+  usleep_range(kstep_driver->step_interval_us, kstep_driver->step_interval_us);
 }
 
 static void kstep_sched_tick(void) {
@@ -153,11 +155,11 @@ void kstep_tick_exit(void) {
 u64 kstep_tick_count = 0;
 
 void kstep_tick(void) {
-  if (kstep_params.print_rq_stats)
-    kstep_print_rq_stats();
-  if (kstep_params.print_tasks)
+  if (kstep_driver->print_rq)
+    kstep_print_rq();
+  if (kstep_driver->print_tasks)
     kstep_print_tasks();
-  if (kstep_params.print_nr_running)
+  if (kstep_driver->print_nr_running)
     kstep_print_nr_running();
   kstep_sched_clock_tick();
   kstep_jiffies_tick();

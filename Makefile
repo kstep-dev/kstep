@@ -23,6 +23,9 @@ kmod:
 linux:
 	$(MAKE) -C linux
 
+.PHONY: all
+all: linux kstep
+
 .PHONY: clean
 clean:
 	$(MAKE) -C user clean
