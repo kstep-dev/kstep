@@ -19,6 +19,7 @@ struct kstep_driver default_driver = {
     .name = "default",
     .setup = setup,
     .run = run,
+    .step_interval_us = 1000,
     .print_rq = true,
     .print_tasks = true,
     .print_load_balance = true,
