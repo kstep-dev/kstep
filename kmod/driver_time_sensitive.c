@@ -50,4 +50,7 @@ struct kstep_driver case_time_sensitive = {
     .name = "case_time_sensitive",
     .setup = setup,
     .run = run,
+    .step_interval_us = 10000,
+    .print_tasks = true,
+    .print_rq = true,
 };

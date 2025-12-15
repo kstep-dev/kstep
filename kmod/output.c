@@ -41,7 +41,7 @@ static void print_rq(struct rq *rq) {
   pr_cont("}\n");
 }
 
-void kstep_print_rq_stats(void) {
+void kstep_print_rq(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++)
     print_rq(cpu_rq(cpu));
 }

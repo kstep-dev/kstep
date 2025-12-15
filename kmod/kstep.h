@@ -15,25 +15,22 @@
 #define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 
 // main.c
-struct kstep_params_t {
-  char driver[32];          // Name of the driver to run
-  u64 step_interval_us;     // Interval between steps in us
-  bool print_rq_stats;      // Whether to print rq stats
-  bool print_tasks;         // Whether to print tasks
-  bool print_nr_running;    // Whether to print nr_running
-  bool print_load_balance;  // Whether to print load balancing
-  bool print_sched_softirq; // Whether to print sched softirq latency
-};
-extern struct kstep_params_t kstep_params;
-void kstep_params_print(void);
+extern struct kstep_driver *kstep_driver;
 
 // driver.c
 struct kstep_driver {
-  const char *name;
-  void (*setup)(void);
-  void (*run)(void);
+  const char *name;         // Name of the driver
+  void (*setup)(void);      // Setup the driver (e.g., create tasks)
+  void (*run)(void);        // Run the driver
+  u64 step_interval_us;     // Time between steps in us (default: 10000)
+  bool print_rq;            // Print runqueue stats
+  bool print_tasks;         // Print task stats
+  bool print_nr_running;    // Print number of running tasks
+  bool print_load_balance;  // Print load balancing
+  bool print_sched_softirq; // Print sched softirq latency
 };
 struct kstep_driver *kstep_driver_get(const char *name);
+void kstep_driver_print(struct kstep_driver *driver);
 
 // tick.c
 extern u64 kstep_tick_count;
@@ -67,7 +64,7 @@ void kstep_freeze_task(struct task_struct *p);
 int kstep_eligible(struct sched_entity *se);
 
 // output.c
-void kstep_print_rq_stats(void);
+void kstep_print_rq(void);
 void kstep_print_tasks(void);
 void kstep_print_nr_running(void);
 void kstep_trace_sched_softirq(void);

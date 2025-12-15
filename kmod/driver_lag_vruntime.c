@@ -32,4 +32,7 @@ struct kstep_driver lag_vruntime = {
     .name = "lag_vruntime",
     .setup = setup,
     .run = run,
+    .step_interval_us = 10000,
+    .print_tasks = true,
+    .print_rq = true,
 };

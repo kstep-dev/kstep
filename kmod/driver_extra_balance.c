@@ -3,12 +3,6 @@
 static struct task_struct *tasks[5];
 
 static void setup(void) {
-  kstep_params.print_load_balance = true;
-  kstep_params.print_nr_running = true;
-  kstep_params.print_tasks = false;
-  kstep_params.print_rq_stats = false;
-  kstep_params.step_interval_us = 1000;
-
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
 }
@@ -29,4 +23,7 @@ struct kstep_driver extra_balance = {
     .name = "extra_balance",
     .setup = setup,
     .run = run,
+    .step_interval_us = 1000,
+    .print_load_balance = true,
+    .print_nr_running = true,
 };

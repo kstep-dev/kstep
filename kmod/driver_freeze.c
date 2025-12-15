@@ -3,8 +3,6 @@
 static struct task_struct *tasks[3];
 
 static void setup(void) {
-  kstep_params.step_interval_us = 50000;
-
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
 }
@@ -33,4 +31,7 @@ struct kstep_driver freeze = {
     .name = "freeze",
     .setup = setup,
     .run = run,
+    .step_interval_us = 50000,
+    .print_tasks = true,
+    .print_rq = true,
 };

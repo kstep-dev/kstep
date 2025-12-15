@@ -3,34 +3,18 @@
 
 #include "kstep.h"
 
-struct kstep_params_t kstep_params = {
-    .driver = "noop",
-    .step_interval_us = 10000,
-    .print_rq_stats = true,
-    .print_tasks = true,
-    .print_nr_running = false,
-};
-module_param_string(driver, kstep_params.driver, sizeof(kstep_params.driver),
-                    0644);
-module_param_named(step_interval_us, kstep_params.step_interval_us, ullong,
-                   0644);
-module_param_named(print_tasks, kstep_params.print_tasks, bool, 0644);
-module_param_named(print_nr_running, kstep_params.print_nr_running, bool, 0644);
+static char kstep_driver_name[32] = "default";
+module_param_string(driver, kstep_driver_name, sizeof(kstep_driver_name), 0644);
 
-void kstep_params_print(void) {
-  TRACE_INFO("kSTEP params:");
-  TRACE_INFO("- driver: %s", kstep_params.driver);
-  TRACE_INFO("- step_interval_us: %llu", kstep_params.step_interval_us);
-  TRACE_INFO("- print_rq_stats: %d", kstep_params.print_rq_stats);
-  TRACE_INFO("- print_tasks: %d", kstep_params.print_tasks);
-  TRACE_INFO("- print_nr_running: %d", kstep_params.print_nr_running);
-}
+struct kstep_driver *kstep_driver = NULL;
 
 static int __init kstep_main(void) {
   kstep_write("/proc/sys/kernel/printk", "7", 1);
-  TRACE_INFO("Initializing kSTEP");
   ksym_init();
-  struct kstep_driver *driver = kstep_driver_get(kstep_params.driver);
+
+  TRACE_INFO("Initializing kSTEP with driver %s", kstep_driver_name);
+  kstep_driver = kstep_driver_get(kstep_driver_name);
+  kstep_driver_print(kstep_driver);
 
   // Isolate the CPUs to avoid interference
   kstep_prealloc_kworkers();
@@ -39,9 +23,8 @@ static int __init kstep_main(void) {
 
   // Run userspace programs when we know the system is ready
   kstep_tasks_init();
-  driver->setup();
+  kstep_driver->setup();
 
-  kstep_params_print();
   kstep_topo_print();
 
   // Control timer ticks and clock
@@ -50,17 +33,17 @@ static int __init kstep_main(void) {
   // Reset the scheduler state to initial state
   kstep_reset_sched();
 
-  if (kstep_params.print_load_balance)
+  if (kstep_driver->print_load_balance)
     kstep_trace_load_balance();
-  if (kstep_params.print_sched_softirq)
+  if (kstep_driver->print_sched_softirq)
     kstep_trace_sched_softirq();
 
   // Enable printk time
   kstep_write("/sys/module/printk/parameters/time", "1", 1);
 
-  TRACE_INFO("Running driver %s", driver->name);
-  driver->run();
-  TRACE_INFO("Exiting driver %s", driver->name);
+  TRACE_INFO("Running driver %s", kstep_driver->name);
+  kstep_driver->run();
+  TRACE_INFO("Exiting driver %s", kstep_driver->name);
   kernel_restart(NULL);
 
   return 0;

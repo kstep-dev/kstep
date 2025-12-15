@@ -15,8 +15,12 @@ static void run(void) {
     kstep_tick();
 }
 
-struct kstep_driver noop = {
-    .name = "noop",
+struct kstep_driver default_driver = {
+    .name = "default",
     .setup = setup,
     .run = run,
+    .print_rq = true,
+    .print_tasks = true,
+    .print_load_balance = true,
+    .print_sched_softirq = true,
 };
