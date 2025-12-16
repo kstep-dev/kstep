@@ -1,24 +1,15 @@
 name: CI
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-  schedule:
-    - cron: '0 0 * * 0' # Every week
+  workflow_call:
+    inputs:
+      version:
+        type: string
+        required: true
 
 jobs:
   test:
-    strategy:
-      matrix:
-        version: # LTS versions at https://kernel.org/
-          - v6.18
-          - v6.12.60
-          - v6.6.118
-          - v6.1.158
-          - v5.15.196
-
-    name: Linux ${{matrix.version}}
+    name: Linux ${{inputs.version}}
     runs-on: ubuntu-latest
 
     steps:
@@ -29,11 +20,11 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: linux
-          key: ${{matrix.version}}-${{hashFiles('linux/config.kstep')}}
+          key: ${{inputs.version}}-${{hashFiles('linux/config.kstep')}}
 
       - name: Linux - Download
         if: steps.linux-cache.outputs.cache-hit != 'true'
-        run: ./checkout_linux.py ${{matrix.version}} --tarball
+        run: ./checkout_linux.py ${{inputs.version}} --tarball
 
       - name: Linux - Install build dependencies
         if: steps.linux-cache.outputs.cache-hit != 'true'
@@ -48,7 +39,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: linux
-          key: ${{matrix.version}}-${{hashFiles('linux/config.kstep')}}
+          key: ${{inputs.version}}-${{hashFiles('linux/config.kstep')}}
 
       - name: Build kSTEP
         run: make kstep

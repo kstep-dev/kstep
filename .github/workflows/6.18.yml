@@ -1,0 +1,13 @@
+name: "Linux 6.18"
+on:
+  push:
+    branches: [master]
+  pull_request:
+  schedule:
+    - cron: "0 0 * * 0" # Every week
+
+jobs:
+  test:
+    uses: ./.github/workflows/main.yml
+    with:
+      version: "v6.18"
