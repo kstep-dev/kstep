@@ -15,46 +15,48 @@ on:
         required: true
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Build kSTEP
-        run: ""
-      
-  test:
-    name: Test
+  linux:
+    name: Build Linux
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Linux - Restore cache
+      - name: Restore cache
         id: linux-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache@v5
         with:
           path: linux
           key: ${{inputs.version}}-${{hashFiles('linux/config.kstep')}}
+          lookup-only: true
 
-      - name: Linux - Download
+      - name: Checkout Linux
         if: steps.linux-cache.outputs.cache-hit != 'true'
         run: ./checkout_linux.py ${{inputs.version}} --tarball
 
-      - name: Linux - Install build dependencies
+      - name: Install build dependencies
         if: steps.linux-cache.outputs.cache-hit != 'true'
         run: ./install_deps.py ci-linux
 
-      - name: Linux - Build
+      - name: Build Linux
         if: steps.linux-cache.outputs.cache-hit != 'true'
         run: make linux
 
-      - name: Linux - Save cache
-        if: steps.linux-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: linux
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore Linux cache
+        id: linux-cache
+        uses: actions/cache/restore@v5
         with:
           path: linux
           key: ${{inputs.version}}-${{hashFiles('linux/config.kstep')}}
+          fail-on-cache-miss: true
 
       - name: Build kSTEP
         run: make kstep
