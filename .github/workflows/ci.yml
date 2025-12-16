@@ -75,12 +75,13 @@ jobs:
         timeout-minutes: 1
         run: ./run.py
 
-      - name: Upload logs
-        uses: actions/upload-artifact@v4
+      - name: Upload artifact
+        id: upload-artifact
+        uses: actions/upload-artifact@v6
         with:
           path: data/logs/latest.log
           name: ${{matrix.version}}.log
           if-no-files-found: error
 
-      - name: Save job summary
-        run: cat data/logs/latest.log >> $GITHUB_STEP_SUMMARY
+      - name: Write job summary
+        run: echo ${{steps.upload-artifact.outputs.artifact-url}} >> $GITHUB_STEP_SUMMARY
