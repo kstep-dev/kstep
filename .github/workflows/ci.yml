@@ -79,8 +79,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: data/logs/latest.log
-          name: logs
+          name: ${{matrix.version}}.log
           if-no-files-found: error
 
       - name: Save job summary
-        run: echo "### Hello world! :rocket:" >> $GITHUB_STEP_SUMMARY
+        run: cat data/logs/latest.log >> $GITHUB_STEP_SUMMARY
