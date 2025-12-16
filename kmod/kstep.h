@@ -10,8 +10,6 @@
 #include <kernel/sched/sched.h> // internal header
 #pragma GCC diagnostic pop
 
-#include "logging.h"
-
 #define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 
 // main.c
@@ -114,5 +112,11 @@ void ksym_init(void);
 #define this_rq() this_cpu_ptr(ksym.runqueues)
 #undef raw_rq
 #define raw_rq() raw_cpu_ptr(ksym.runqueues)
+
+#define TERM_GREEN "\033[92m"
+#define TERM_RESET "\033[0m"
+
+#define TRACE_INFO(fmt, ...)                                                   \
+  pr_info(TERM_GREEN "%24s: " fmt TERM_RESET "\n", __func__, ##__VA_ARGS__)
 
 #endif
