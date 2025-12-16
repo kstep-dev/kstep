@@ -4,6 +4,13 @@ on:
   workflow_call:
     inputs:
       version:
+        description: "Linux version"
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Linux version"
         type: string
         required: true
 
