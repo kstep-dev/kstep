@@ -78,9 +78,9 @@ jobs:
       - name: Upload logs
         uses: actions/upload-artifact@v4
         with:
-          path: data/logs
+          path: data/logs/latest.log
           name: logs
           if-no-files-found: error
 
       - name: Save job summary
-        run: echo data/logs/latest.log > $GITHUB_STEP_SUMMARY
+        run: echo "### Hello world! :rocket:" >> $GITHUB_STEP_SUMMARY
