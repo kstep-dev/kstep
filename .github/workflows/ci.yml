@@ -74,3 +74,13 @@ jobs:
       - name: Run kSTEP
         timeout-minutes: 1
         run: ./run.py
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v4
+        with:
+          path: data/logs
+          name: logs
+          if-no-files-found: error
+
+      - name: Save job summary
+        run: echo data/logs/latest.log > $GITHUB_STEP_SUMMARY
