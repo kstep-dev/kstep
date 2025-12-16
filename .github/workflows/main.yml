@@ -9,7 +9,6 @@ on:
 
 jobs:
   test:
-    name: Linux ${{inputs.version}}
     runs-on: ubuntu-latest
 
     steps:
