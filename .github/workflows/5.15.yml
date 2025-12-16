@@ -1,4 +1,4 @@
-name: "Linux 5.15"
+name: LTS
 on:
   push:
     branches: [master]
@@ -8,6 +8,7 @@ on:
 
 jobs:
   test:
+    name: Linux 5.15
     uses: ./.github/workflows/main.yml
     with:
-      version: "v5.15.196"
+      version: v5.15.196

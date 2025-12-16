@@ -1,4 +1,4 @@
-name: "Linux 6.6"
+name: LTS
 on:
   push:
     branches: [master]
@@ -8,6 +8,7 @@ on:
 
 jobs:
   test:
+    name: Linux 6.6
     uses: ./.github/workflows/main.yml
     with:
-      version: "v6.6.118"
+      version: v6.6.118

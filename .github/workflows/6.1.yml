@@ -1,4 +1,4 @@
-name: Linux 6.1
+name: LTS
 on:
   push:
     branches: [master]
@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: "-"
+    name: Linux 6.1
     uses: ./.github/workflows/main.yml
     with:
       version: v6.1.158
