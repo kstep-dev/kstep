@@ -20,7 +20,7 @@ static int wakee_main(void *data) {
 static int waker_main(void *data) {
   while (atomic_read(&wakeup_ready) == 0)
     yield();
-  wake_up_sync(&wq);
+  __wake_up_sync(&wq, TASK_NORMAL);
   return 0;
 }
 
