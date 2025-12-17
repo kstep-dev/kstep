@@ -2,7 +2,7 @@
 
 #include "kstep.h"
 
-void kstep_reset_task(struct task_struct *p) {
+static void kstep_reset_task(struct task_struct *p) {
   // reset generic task stats
   p->nivcsw = 0;
   p->nvcsw = 0;
