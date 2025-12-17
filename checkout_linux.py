@@ -30,6 +30,7 @@ def add_worktree(version: str, linux_dir: Path):
         logging.info(f"Linux {version} already cloned to {linux_dir}")
         return
 
+    system(f"cd {LINUX_MASTER_DIR} && git fetch")
     system(f"cd {LINUX_MASTER_DIR} && git worktree prune -v")
     system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {version}")
 
@@ -38,26 +39,7 @@ def reset_git(linux_dir: Path):
     system(f"cd {linux_dir} && git restore .")
 
 
-def download_linux(version: str, tarball_path: Path):
-    if tarball_path.exists():
-        logging.info(f"Linux tarball already exists at {tarball_path}")
-        return
-
-    version = version.removeprefix("v")
-    major = version.split(".", 1)[0]
-    url = f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
-    download(url, tarball_path)
-
-
-def decompress_linux(tarball_path: Path, linux_dir: Path):
-    if linux_dir.exists():
-        logging.info(f"Linux already decompressed to {linux_dir}")
-        return
-    decompress(tarball_path, linux_dir)
-
-
 def set_current_linux(linux_dir: Path):
-    """Set symlink for default version"""
     LINUX_CURR_DIR.unlink(missing_ok=True)
     LINUX_CURR_DIR.symlink_to(linux_dir)
     logging.info(f"Current Linux now points to {linux_dir}")
@@ -71,8 +53,13 @@ def checkout_linux(version: str, linux_dir: Path, reset: bool, tarball: bool = F
             reset_git(linux_dir)
     else:
         tarball_path = DATA_DIR / f"{version}.tar.xz"
-        download_linux(version, tarball_path)
-        decompress_linux(tarball_path, linux_dir)
+        version = version.removeprefix("v")
+        major = version.split(".", 1)[0]
+        url = (
+            f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
+        )
+        download(url, tarball_path)
+        decompress(tarball_path, linux_dir)
     set_current_linux(linux_dir)
 
 

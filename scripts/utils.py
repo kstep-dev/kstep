@@ -20,10 +20,17 @@ def system(cmd: str):
     logging.info(f"Running: `{TermColor.BLUE}{cmd}{TermColor.RESET}`")
     subprocess.run(cmd, shell=True, check=True)
 
+
 def download(url: str, output_path: Path):
+    if output_path.exists():
+        logging.info(f"File {output_path} already exists, skipping download")
+        return
     system(f"wget --no-verbose {url} -O {output_path}")
 
 
 def decompress(tarball_path: Path, output_dir: Path):
+    if output_dir.exists():
+        logging.info(f"Directory {output_dir} already exists, skipping decompression")
+        return
     system(f"mkdir -p {output_dir}")
     system(f"tar -xf {tarball_path} -C {output_dir} --strip-components=1")
