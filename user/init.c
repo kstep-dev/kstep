@@ -11,7 +11,7 @@
 
 #define MAX_PARAMS_LENGTH 512
 
-void mount_fs(const char *dir, const char *type) {
+static void mount_fs(const char *dir, const char *type) {
   if (mkdir(dir, 0755) < 0 && errno != EEXIST)
     panic("Failed to create directory %s", dir);
   if (mount("none", dir, type, 0, "") < 0)

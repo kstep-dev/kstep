@@ -70,7 +70,6 @@ void kstep_trace_load_balance(void);
 
 // reset.c
 void kstep_reset_sched(void);
-void kstep_reset_task(struct task_struct *p);
 
 // isolation.c
 void kstep_disable_workqueue(void);

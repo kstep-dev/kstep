@@ -23,8 +23,6 @@ KSYM_FUNC(void, tick_setup_sched_timer, bool hrtimer)
 KSYM_FUNC(int, workqueue_offline_cpu, int cpu)
 KSYM_FUNC(void, update_rq_clock, struct rq *rq)
 KSYM_FUNC(int, entity_eligible, struct cfs_rq *cfs_rq, struct sched_entity *se)
-KSYM_FUNC(int, try_to_wake_up, struct task_struct *p, unsigned int state,
-          int wake_flags)
 KSYM_FUNC(void, freeze_task, struct task_struct *p)
 KSYM_FUNC(void, dequeue_entities, struct cfs_rq *cfs_rq,
           struct sched_entity *se, int flags)

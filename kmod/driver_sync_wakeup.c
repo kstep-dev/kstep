@@ -1,12 +1,17 @@
 #include "kstep.h"
 
+#include <linux/wait.h>
+
 static struct task_struct *waker_task;
 static struct task_struct *wakee_task;
 static struct task_struct *other_task;
 
 static atomic_t wakeup_ready = ATOMIC_INIT(0);
+DECLARE_WAIT_QUEUE_HEAD(wq);
 
 static int wakee_main(void *data) {
+  // Sleep on a wait queue until the waker triggers a synchronous wakeup.
+  wait_event(wq, atomic_read(&wakeup_ready) != 0);
   while (1)
     __asm__("" : : : "memory");
   return 0;
@@ -15,7 +20,7 @@ static int wakee_main(void *data) {
 static int waker_main(void *data) {
   while (atomic_read(&wakeup_ready) == 0)
     yield();
-  ksym.try_to_wake_up(wakee_task, TASK_NORMAL, WF_SYNC);
+  wake_up_sync(&wq);
   return 0;
 }
 
@@ -26,16 +31,14 @@ static void setup(void) {
   waker_task = kthread_create_on_cpu(waker_main, NULL, 1, "waker");
   wake_up_process(waker_task);
 
-  // Create a wakee. Don't wake up the wakee immediately
+  // Create a wakee, blocked on the wait queue until the waker wakes it up.
   wakee_task = kthread_create(wakee_main, NULL, "wakee");
   struct cpumask mask;
   cpumask_copy(&mask, cpu_active_mask);
   cpumask_clear_cpu(0, &mask);
   set_cpus_allowed_ptr(wakee_task, &mask);
   wakee_task->wake_cpu = 2;
-
-  kstep_reset_task(waker_task);
-  kstep_reset_task(wakee_task);
+  wake_up_process(wakee_task);
 }
 
 static void *is_ineligible(void) {
