@@ -20,7 +20,7 @@ static int wakee_main(void *data) {
 static int waker_main(void *data) {
   while (atomic_read(&wakeup_ready) == 0)
     yield();
-  wake_up_sync(&wq);
+  __wake_up_sync(&wq, TASK_NORMAL);
   return 0;
 }
 
@@ -28,7 +28,8 @@ static void setup(void) {
   other_task = kstep_task_create();
 
   // Create a waker on cpu 1
-  waker_task = kthread_create_on_cpu(waker_main, NULL, 1, "waker");
+  waker_task = kthread_create(waker_main, NULL, "waker");
+  kthread_bind(waker_task, 1);
   wake_up_process(waker_task);
 
   // Create a wakee, blocked on the wait queue until the waker wakes it up.
