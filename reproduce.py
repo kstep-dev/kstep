@@ -81,6 +81,7 @@ bugs = [
         plot_format="min_vruntime",
         fixed=Config(version="5068d84"),
         buggy=Config(version="5068d84~1"),
+        smp="2",
     ),
     Bug(
         name="even_idle_cpu",

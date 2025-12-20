@@ -1,7 +1,7 @@
 #include "kstep.h"
 
 static struct task_struct *target_task;
-static struct task_struct *tasks[3];
+static struct task_struct *other_task;
 
 static void setup(void) {
   // Create target task and add it to group g0
@@ -10,14 +10,11 @@ static void setup(void) {
   kstep_cgroup_add_task("g0", target_task->pid);
 
   // Create other tasks
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    tasks[i] = kstep_task_create();
+  other_task = kstep_task_create();
 }
 
 static void run(void) {
-  // Set priority of other tasks to 19
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    kstep_task_set_prio(tasks[i], 19);
+  kstep_task_set_prio(other_task, 19);
 
   kstep_task_wakeup(target_task);
 
@@ -33,6 +30,5 @@ struct kstep_driver lag_vruntime = {
     .setup = setup,
     .run = run,
     .step_interval_us = 10000,
-    .print_tasks = true,
     .print_rq = true,
 };
