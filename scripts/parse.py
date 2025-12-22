@@ -10,37 +10,43 @@ from consts import LOG_LATEST
 LOG_PREFIX_LEN = 14
 
 
+def parse_line(prefix: str, line: str) -> list:
+    # Line format: [timestamp] prefix: {json}
+    if len(line) < LOG_PREFIX_LEN:
+        return []
+    if line[0] != "[" or line[LOG_PREFIX_LEN - 1] != "]":
+        return []
+    if not line.startswith(prefix, LOG_PREFIX_LEN + 1):
+        return []
+
+    # Parse JSON
+    json_str = line[LOG_PREFIX_LEN + 1 + len(prefix) :]
+    try:
+        obj = json.loads(json_str)
+    except json.JSONDecodeError:
+        raise ValueError(f"Invalid JSON at line {line}")
+
+    # Parse timestamp
+    ts_str = line[1 : LOG_PREFIX_LEN - 1]
+    ts = round((float(ts_str) - 10) * 1000)
+
+    # Add timestamp to object
+    if isinstance(obj, dict):
+        obj["timestamp"] = ts
+        return [obj]
+    elif isinstance(obj, list):
+        for item in obj:
+            item["timestamp"] = ts
+        return obj
+    else:
+        raise ValueError(f"Invalid object: {obj}")
+
+
 def parse_file(prefix: str, path: Path) -> pd.DataFrame:
     data = []
     with open(path, "r") as f:
         for line in f:
-            # Check format
-            if len(line) < LOG_PREFIX_LEN:
-                continue
-            if line[0] != "[" or line[LOG_PREFIX_LEN - 1] != "]":
-                continue
-            if not line.startswith(prefix, LOG_PREFIX_LEN + 1):
-                continue
-
-            # Parse JSON
-            json_str = line[LOG_PREFIX_LEN + 1 + len(prefix) :]
-            obj = json.loads(json_str)
-
-            # Parse timestamp
-            ts_str = line[1 : LOG_PREFIX_LEN - 1]
-            ts = round((float(ts_str) - 10) * 1000)
-
-            # Append to data
-            if isinstance(obj, dict):
-                obj["timestamp"] = ts
-                data.append(obj)
-            elif isinstance(obj, list):
-                for item in obj:
-                    item["timestamp"] = ts
-                    data.append(item)
-            else:
-                raise ValueError(f"Invalid object: {obj}")
-
+            data.extend(parse_line(prefix, line))
     return pd.DataFrame(data)
 
 

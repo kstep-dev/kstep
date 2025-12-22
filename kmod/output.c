@@ -66,8 +66,8 @@ void kstep_print_tasks(void) {
 }
 
 void kstep_print_nr_running(void) {
-  pr_info("nr_running: [");
   int nr_cpus = num_online_cpus();
+  pr_info("nr_running: [");
   for (int cpu = 1; cpu < nr_cpus; cpu++) {
     pr_cont("{" K(cpu) "%d, " K(val) "%d}%s", cpu, cpu_rq(cpu)->nr_running,
             cpu == nr_cpus - 1 ? "" : ", ");

@@ -5,48 +5,41 @@ import argparse
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 from consts import RESULTS_DIR
 from matplotlib import colors
 from parse import parse_load_balance, parse_nr_running
 from plot_utils import save_fig
 
-all_cpus = [1, 2, 3, 4]
+all_cpus = [4, 5, 6, 7]
 N_COLORS = 4
 cmap = plt.cm.get_cmap("Blues", N_COLORS)
 
 
-def build_nr_running_matrix(filename, time_start=0.0):
+def build_nr_running_matrix(filename):
     df = parse_nr_running(filename)
+    df = df[df["cpu"].isin(all_cpus)]
     nr_running_matrix = df.pivot_table(
         index="timestamp", columns="cpu", values="val", aggfunc="first"
     ).T
-    cpu_count = nr_running_matrix.shape[0]
-    time_count = nr_running_matrix.shape[1]
     all_timestamps = nr_running_matrix.columns
-    min_running = nr_running_matrix.min().min()
-    max_running = nr_running_matrix.max().max()
 
     return (
         nr_running_matrix,
-        cpu_count,
-        time_count,
         all_timestamps,
-        int(min_running),
-        int(max_running),
+        nr_running_matrix.min().min(),
+        nr_running_matrix.max().max(),
     )
 
 
-def parse_lb_events(filename, time_start=0.0):
+def parse_lb_events(filename):
     df = parse_load_balance(filename)
-    df = df[df["name"] == "MC"]
     df = df[df["timestamp"] != 0]
     return df
 
 
-def plot_color_matrix_with_lb(
-    ax, matrix, cpu_count, time_count, vmin, vmax, timestamps, title_str, lb_events
-):
+def plot_color_matrix_with_lb(ax, matrix, vmin, vmax, timestamps, title_str, lb_events):
     # x ticks: in ms, offsets from the time_start
     bounds = np.linspace(vmin - 0.5, vmax + 0.5, N_COLORS + 1)
     norm = colors.BoundaryNorm(boundaries=bounds, ncolors=cmap.N)
@@ -55,7 +48,7 @@ def plot_color_matrix_with_lb(
     y_min = all_cpus[0] - 0.7
     y_max = all_cpus[-1] + 0.7
 
-    im = ax.imshow(
+    ax.imshow(
         matrix,
         aspect="auto",
         interpolation="nearest",
@@ -67,7 +60,7 @@ def plot_color_matrix_with_lb(
     # Set y-ticks at each integer step, for clear tick marks for CPUs
     yticks = np.arange(all_cpus[0], all_cpus[-1] + 1)
     ax.set_yticks(yticks)
-    ax.set_yticklabels([str(cpu) for cpu in yticks])
+    ax.set_yticklabels([i + 1 for i in range(len(yticks))])
     ax.set_ylabel("CPU", fontsize=13)
 
     ax.set_title(title_str, fontsize=12, pad=3)
@@ -76,12 +69,9 @@ def plot_color_matrix_with_lb(
         ax.set_xticks([])
         ax.set_xlabel("")
     else:
-        tick_start = int(np.ceil(timestamps[0] / 100) * 100)
-        tick_end = int(np.floor(timestamps[-1] / 100) * 100)
-        x_ticks = list(range(tick_start, tick_end + 1, 100))
-        ax.set_xticks(x_ticks)
-        ax.set_xticklabels([f"{int(x)}" for x in x_ticks], fontsize=13)
-        ax.tick_params(axis="x", length=2, pad=1)  # Shorter ticks, labels closer
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(3))
+        # Shorter ticks, labels closer
+        ax.tick_params(axis="x", length=2, pad=1, labelsize=13)
         ax.set_xlabel("Time (ms)", labelpad=0.5, fontsize=13)
 
     ax.margins(0.03)
@@ -91,7 +81,6 @@ def plot_color_matrix_with_lb(
     # ----- Plot dots for lb events -----
     if bugId == "even_idle_cpu":
         dot_size = 10
-        ax.set_yticklabels([str(cpu - 4) for cpu in yticks])
     else:
         dot_size = 30
     ax.scatter(
@@ -107,12 +96,6 @@ def plot_color_matrix_with_lb(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--controller", type=str, default="extra_balance")  # 6d7e478
-    parser.add_argument(
-        "--time-start",
-        type=float,
-        default=10.10,
-        help="Only plot data from this time onward (in seconds)",
-    )
     args = parser.parse_args()
 
     bugId = args.controller
@@ -122,20 +105,29 @@ if __name__ == "__main__":
     title_fixed = "Fixed"
     output_file = RESULTS_DIR / f"{bugId}.pdf"
 
-    args.time_start = args.time_start if bugId != "even_idle_cpu" else 10.0
+    if bugId == "even_idle_cpu":
+        all_cpus = [1, 2, 3, 4]
+    elif bugId == "extra_balance":
+        all_cpus = [4, 5, 6, 7]
 
-    matrix_buggy, cpu_count, time_count, t_buggy, min_buggy, max_buggy = (
-        build_nr_running_matrix(log_file_buggy, time_start=args.time_start)
+    matrix_buggy, t_buggy, min_buggy, max_buggy = build_nr_running_matrix(
+        log_file_buggy
     )
-    matrix_fixed, _, _, t_fixed, min_fixed, max_fixed = build_nr_running_matrix(
-        log_file_fixed, time_start=args.time_start
+    matrix_fixed, t_fixed, min_fixed, max_fixed = build_nr_running_matrix(
+        log_file_fixed
     )
     vmin = min(min_buggy, min_fixed)
     vmax = max(max_buggy, max_fixed)
 
     # Parse LB events for overlays
-    lb_events_buggy = parse_lb_events(log_file_buggy, args.time_start)
-    lb_events_fixed = parse_lb_events(log_file_fixed, args.time_start)
+    lb_events_buggy = parse_lb_events(log_file_buggy)
+    lb_events_fixed = parse_lb_events(log_file_fixed)
+    if bugId == "even_idle_cpu":
+        lb_events_buggy = lb_events_buggy[lb_events_buggy["name"] == "MC"]
+        lb_events_fixed = lb_events_fixed[lb_events_fixed["name"] == "MC"]
+    elif bugId == "extra_balance":
+        lb_events_buggy = lb_events_buggy[lb_events_buggy["span"] == "4-7"]
+        lb_events_fixed = lb_events_fixed[lb_events_fixed["span"] == "4-7"]
 
     fig, axes = plt.subplots(
         2, 1, figsize=(3.5, 2), sharex=False, gridspec_kw={"hspace": 0.3}
@@ -144,8 +136,6 @@ if __name__ == "__main__":
     plot_color_matrix_with_lb(
         axes[0],
         matrix_buggy,
-        cpu_count,
-        time_count,
         vmin,
         vmax,
         t_buggy,
@@ -155,8 +145,6 @@ if __name__ == "__main__":
     plot_color_matrix_with_lb(
         axes[1],
         matrix_fixed,
-        cpu_count,
-        time_count,
         vmin,
         vmax,
         t_fixed,

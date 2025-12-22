@@ -9,10 +9,11 @@ import matplotlib.pyplot as plt
 from consts import RESULTS_DIR
 from parse import parse_rq
 
-init_timestamp = 10.0
+
 def parse_log_file(log_file):
     df = parse_rq(log_file)
     return df["timestamp"], df["avg_util"]
+
 
 def plot_util_avg(timestamps_buggy, util_avg_values_buggy, 
                   timestamps_fixed, util_avg_values_fixed, bugId, output_file):

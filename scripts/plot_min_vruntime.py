@@ -10,12 +10,12 @@ from consts import RESULTS_DIR
 from parse import parse_rq
 from plot_utils import save_fig
 
-init_timestamp = 10.0
 
 def parse_log_file(log_file):
     df = parse_rq(log_file)
     df = df[df["cpu"] == 1]
     return df["timestamp"], df["min_vruntime"], df["avg_vruntime"]
+
 
 def plot_min_avg_vruntime(
     timestamps_buggy, min_vruntime_buggy, avg_vruntime_buggy,
