@@ -3,8 +3,8 @@
 
 #include "kstep.h"
 
-#define pr_json_end(key, fmt, expr) pr_cont("\"" #key "\": " fmt, expr)
-#define pr_json_cont(key, fmt, expr) pr_json_end(key, fmt "  ,  ", expr)
+#define K(s) "\"" #s "\": "
+#define SEP "  ,  "
 
 static void print_rq(struct rq *rq) {
 // https://github.com/torvalds/linux/commit/c2a295bffeaf9461ecba76dc9e4780c898c94f03
@@ -30,14 +30,13 @@ static void print_rq(struct rq *rq) {
       rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
 
   pr_info("rq: {");
-  pr_json_cont(cpu, "%d", rq->cpu);
-  pr_json_cont(running, "%2d", rq->nr_running - (h_nr_queued - h_nr_runnable));
-  pr_json_cont(queued, "%2d", rq->nr_running);
-  pr_json_cont(avg_load, "%4llu", avg_load);
-  pr_json_cont(avg_util, "%4llu", avg_util);
-  pr_json_cont(min_vruntime, "%12lld", rq->cfs.min_vruntime - INIT_TIME_NS);
-  pr_json_cont(avg_vruntime, "%12lld", avg_vruntime);
-  pr_json_end(timestamp, "%4llu", kstep_tick_count);
+  pr_cont(K(cpu) "%d" SEP, rq->cpu);
+  pr_cont(K(running) "%2d" SEP, rq->nr_running - (h_nr_queued - h_nr_runnable));
+  pr_cont(K(queued) "%2d" SEP, rq->nr_running);
+  pr_cont(K(avg_load) "%4llu" SEP, avg_load);
+  pr_cont(K(avg_util) "%4llu" SEP, avg_util);
+  pr_cont(K(min_vruntime) "%12lld" SEP, rq->cfs.min_vruntime - INIT_TIME_NS);
+  pr_cont(K(avg_vruntime) "%12lld", avg_vruntime);
   pr_cont("}\n");
 }
 
@@ -48,13 +47,12 @@ void kstep_print_rq(void) {
 
 static void print_task(struct task_struct *p) {
   pr_info("task: {");
-  pr_json_cont(pid, "%d", task_pid_nr(p));
-  pr_json_cont(on_cpu, "%5s", p->on_cpu ? "true" : "false");
-  pr_json_cont(cpu, "%d", task_cpu(p));
-  pr_json_cont(state, "\"%c\"", task_state_to_char(p));
-  pr_json_cont(vruntime, "%12lld", p->se.vruntime);
-  pr_json_cont(sum_exec, "%12lld", p->se.sum_exec_runtime);
-  pr_json_end(timestamp, "%4llu", kstep_tick_count);
+  pr_cont(K(pid) "%d" SEP, task_pid_nr(p));
+  pr_cont(K(on_cpu) "%5s" SEP, p->on_cpu ? "true" : "false");
+  pr_cont(K(cpu) "%d" SEP, task_cpu(p));
+  pr_cont(K(state) "\"%c\"" SEP, task_state_to_char(p));
+  pr_cont(K(vruntime) "%12lld" SEP, p->se.vruntime);
+  pr_cont(K(sum_exec) "%12lld", p->se.sum_exec_runtime);
   pr_cont("}\n");
 }
 
@@ -68,10 +66,13 @@ void kstep_print_tasks(void) {
 }
 
 void kstep_print_nr_running(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    struct rq *rq = cpu_rq(cpu);
-    pr_info("print_nr_running: %d %d\n", cpu, rq->nr_running);
+  pr_info("nr_running: [");
+  int nr_cpus = num_online_cpus();
+  for (int cpu = 1; cpu < nr_cpus; cpu++) {
+    pr_cont("{" K(cpu) "%d, " K(val) "%d}%s", cpu, cpu_rq(cpu)->nr_running,
+            cpu == nr_cpus - 1 ? "" : ", ");
   }
+  pr_cont("]\n");
 }
 
 static DEFINE_PER_CPU(ktime_t, sched_softirq_starttime) = 0;
@@ -121,12 +122,12 @@ static void load_balance_enter(unsigned long ip, unsigned long parent_ip,
                                struct ftrace_ops *op,
                                struct ftrace_regs *fregs) {
   struct lb_env *env = (void *)regs_get_kernel_argument((void *)fregs, 0);
-  if (env->dst_cpu >= 4 && env->dst_cpu <= 7) {
-    pr_info("LB %d %d %d %d %d\n", env->dst_cpu, env->sd->span_weight,
-            env->sd->groups->group_weight,
-            cpumask_first(sched_domain_span(env->sd)),
-            cpumask_last(sched_domain_span(env->sd)));
-  }
+  if (env->dst_cpu == 0)
+    return;
+  pr_info("load_balance: {" K(dst_cpu) "%d" SEP K(span) "\"%*pbl\"" SEP K(
+              name) "\"%s\"}\n",
+          env->dst_cpu, cpumask_pr_args(sched_domain_span(env->sd)),
+          env->sd->name);
 }
 
 struct ftrace_ops load_balance_enter_op = {

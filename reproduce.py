@@ -86,7 +86,7 @@ bugs = [
     Bug(
         name="even_idle_cpu",
         plot_format="lb_nr_running",
-        smp="8",
+        smp="5",
         fixed=Config(version="v6.17", patches=[LINUX_ROOT_DIR / "even_idle_cpu.patch"]),
         buggy=Config(version="v6.17"),
     ),

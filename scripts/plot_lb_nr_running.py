@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import re
-from collections import defaultdict
 
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
@@ -10,63 +8,24 @@ import matplotlib.pyplot as plt
 import numpy as np
 from consts import RESULTS_DIR
 from matplotlib import colors
+from parse import parse_load_balance, parse_nr_running
 from plot_utils import save_fig
 
-all_cpus = [4, 5, 6, 7]
+all_cpus = [1, 2, 3, 4]
 N_COLORS = 4
 cmap = plt.cm.get_cmap("Blues", N_COLORS)
 
 
 def build_nr_running_matrix(filename, time_start=0.0):
-    pattern_nr_running = re.compile(
-        r"\[\s*(\d+\.\d+)\].*?print_nr_running:\s+(\d+)\s+(\d+)"
-    )
-    pattern_print_tasks = re.compile(
-        r"\[\s*(\d+\.\d+)\].*?print_rq_stats:.*?CPU\s+(\d+)\s+running=(\d+)"
-    )
-    cpu_ts2nr = defaultdict(dict)
-    all_timestamps = set()
-    min_running, max_running = float("inf"), float("-inf")
-
-    with open(filename, "r") as f:
-        for line in f:
-            m1 = pattern_nr_running.search(line)
-            m2 = pattern_print_tasks.search(line)
-            if m1:
-                ts = float(m1.group(1))
-                if ts < time_start:
-                    continue
-                cpu = int(m1.group(2))
-                nr_running = int(m1.group(3))
-                if cpu in all_cpus:
-                    cpu_ts2nr[cpu][ts] = nr_running
-                all_timestamps.add(ts)
-                min_running = min(min_running, nr_running)
-                max_running = max(max_running, nr_running)
-            elif m2:
-                ts = float(m2.group(1))
-                if ts < time_start:
-                    continue
-                cpu = int(m2.group(2))
-                nr_running = int(m2.group(3))
-                if cpu in all_cpus:
-                    cpu_ts2nr[cpu][ts] = nr_running
-                all_timestamps.add(ts)
-                min_running = min(min_running, nr_running)
-                max_running = max(max_running, nr_running)
-
-    all_timestamps = sorted(all_timestamps)
-    cpu_count = len(all_cpus)
-    time_count = len(all_timestamps)
-    nr_running_matrix = np.full((cpu_count, time_count), np.nan)
-    cpu_idx = {cpu: i for i, cpu in enumerate(all_cpus)}
-    for cpu in all_cpus:
-        for j, ts in enumerate(all_timestamps):
-            val = cpu_ts2nr[cpu].get(ts, np.nan)
-            nr_running_matrix[cpu_idx[cpu], j] = val
-            if not np.isnan(val):
-                min_running = min(min_running, val)
-                max_running = max(max_running, val)
+    df = parse_nr_running(filename)
+    nr_running_matrix = df.pivot_table(
+        index="timestamp", columns="cpu", values="val", aggfunc="first"
+    ).T
+    cpu_count = nr_running_matrix.shape[0]
+    time_count = nr_running_matrix.shape[1]
+    all_timestamps = nr_running_matrix.columns
+    min_running = nr_running_matrix.min().min()
+    max_running = nr_running_matrix.max().max()
 
     return (
         nr_running_matrix,
@@ -79,37 +38,20 @@ def build_nr_running_matrix(filename, time_start=0.0):
 
 
 def parse_lb_events(filename, time_start=0.0):
-    """
-    Return a set of (timestamp, cpu) for each LB event with weight == 4 and timestamp >= time_start.
-    """
-    pattern = re.compile(r"\[\s*([\d\.]+)\]\s+LB\s+(\d+)\s+(\d+)")
-    events = set()
-    with open(filename, "r") as f:
-        for line in f:
-            m = pattern.search(line)
-            if m:
-                ts = float(m.group(1))
-                cpu = int(m.group(2))
-                weight = int(m.group(3))
-                if bugId == "even_idle_cpu":
-                    target_weight = 8
-                else:
-                    target_weight = 4
-                if weight == target_weight and cpu in all_cpus and ts > time_start:
-                    events.add((ts, cpu))
-    return events
+    df = parse_load_balance(filename)
+    df = df[df["name"] == "MC"]
+    df = df[df["timestamp"] != 0]
+    return df
 
 
 def plot_color_matrix_with_lb(
     ax, matrix, cpu_count, time_count, vmin, vmax, timestamps, title_str, lb_events
 ):
     # x ticks: in ms, offsets from the time_start
-    time_start = timestamps[0]
-    timestamps_ms = [(t - time_start) * 1000 for t in timestamps]
     bounds = np.linspace(vmin - 0.5, vmax + 0.5, N_COLORS + 1)
     norm = colors.BoundaryNorm(boundaries=bounds, ncolors=cmap.N)
-    x_min = timestamps_ms[0]
-    x_max = timestamps_ms[-1]
+    x_min = timestamps[0]
+    x_max = timestamps[-1]
     y_min = all_cpus[0] - 0.7
     y_max = all_cpus[-1] + 0.7
 
@@ -134,9 +76,8 @@ def plot_color_matrix_with_lb(
         ax.set_xticks([])
         ax.set_xlabel("")
     else:
-        # print(x_min, x_max)
-        tick_start = int(np.ceil(timestamps_ms[0] / 100) * 100)
-        tick_end = int(np.floor((timestamps_ms[-1] + 1) / 100) * 100)
+        tick_start = int(np.ceil(timestamps[0] / 100) * 100)
+        tick_end = int(np.floor(timestamps[-1] / 100) * 100)
         x_ticks = list(range(tick_start, tick_end + 1, 100))
         ax.set_xticks(x_ticks)
         ax.set_xticklabels([f"{int(x)}" for x in x_ticks], fontsize=13)
@@ -148,35 +89,19 @@ def plot_color_matrix_with_lb(
     ax.set_ylim(y_min, y_max)
 
     # ----- Plot dots for lb events -----
-    if lb_events:
-        # Find mapping: timestamp->index lookup to allow LB dot overlay matching imshow col a time
-        ts2idx = {t: i for i, t in enumerate(timestamps)}
-        dot_xs = []
-        dot_ys = []
-        for lb_ts, lb_cpu in lb_events:
-            # Find closest timestamp in timestamps (within a small tolerance, e.g. 1ms)
-            idx = (
-                min(range(len(timestamps)), key=lambda i: abs(timestamps[i] - lb_ts))
-                if timestamps
-                else None
-            )
-            if idx is not None and abs(timestamps[idx] - lb_ts) < 0.005:
-                # Scatter dot at (timestamps_ms[idx], lb_cpu)
-                dot_xs.append(timestamps_ms[idx])
-                dot_ys.append(lb_cpu)
-        if bugId == "even_idle_cpu":
-            dot_size = 10
-            ax.set_yticklabels([str(cpu - 4) for cpu in yticks])
-        else:
-            dot_size = 30
-        ax.scatter(
-            dot_xs,
-            dot_ys,
-            s=dot_size,
-            c="#FF9013",
-            marker="o",
-            zorder=5,
-        )
+    if bugId == "even_idle_cpu":
+        dot_size = 10
+        ax.set_yticklabels([str(cpu - 4) for cpu in yticks])
+    else:
+        dot_size = 30
+    ax.scatter(
+        lb_events["timestamp"],
+        lb_events["dst_cpu"],
+        s=dot_size,
+        c="#FF9013",
+        marker="o",
+        zorder=5,
+    )
 
 
 if __name__ == "__main__":
