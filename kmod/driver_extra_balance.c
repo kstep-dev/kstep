@@ -13,10 +13,10 @@ static void run(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     kstep_task_pin(tasks[i], cpus[i], cpus[i]);
 
-  kstep_tick_repeat(1000);
+  kstep_tick_repeat(500);
   for (int i = 1; i <= 3; i++)
     kstep_task_pin(tasks[i], 4, 6);
-  kstep_tick_repeat(301);
+  kstep_tick_repeat(250);
 }
 
 struct kstep_driver extra_balance = {

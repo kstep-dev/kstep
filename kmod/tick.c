@@ -135,7 +135,7 @@ static void kstep_sched_tick(void) {
   void *sched_tick = (void *)ksym.scheduler_tick;
 #endif
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    smp_call_function_single(cpu, sched_tick, NULL, 0);
+    smp_call_function_single(cpu, sched_tick, NULL, 1);
     kstep_sleep();
   }
 }
@@ -152,8 +152,6 @@ void kstep_tick_exit(void) {
   kstep_sched_timer_exit();
 }
 
-u64 kstep_tick_count = 0;
-
 void kstep_tick(void) {
   if (kstep_driver->print_rq)
     kstep_print_rq();
@@ -164,7 +162,6 @@ void kstep_tick(void) {
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
   kstep_sched_tick();
-  kstep_tick_count++;
 }
 
 void kstep_tick_repeat(int n) {

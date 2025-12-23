@@ -4,24 +4,23 @@
 
 # 64-bit kernel
 CONFIG_64BIT=y
-# initramfs support
+# Load initramfs with ELF and kmod
 CONFIG_BLK_DEV_INITRD=y
-# run elf binaries
 CONFIG_BINFMT_ELF=y
-# load kernel modules
 CONFIG_MODULES=y
-# virtualization
+# Virtualization
 CONFIG_HYPERVISOR_GUEST=y
-# paravirtualization
 CONFIG_PARAVIRT=y
-# for kvm_sched_clock_read
+# For kvm_sched_clock_read
 CONFIG_KVM_GUEST=y
-# debug kernel
-CONFIG_DEBUG_KERNEL=y
-# BUG/WARN support
-CONFIG_BUG=y
-# expert settings
+# Expert settings
 CONFIG_EXPERT=y
+# Kernel debugging
+CONFIG_DEBUG_KERNEL=y
+# Panic with kernel backtrace
+CONFIG_DEBUG_BUGVERBOSE=y
+# CONFIG_DEBUG_INFO_DWARF5=y
+# CONFIG_GDB_SCRIPTS=y
 
 #
 # Output
@@ -29,64 +28,52 @@ CONFIG_EXPERT=y
 
 # TTY support
 CONFIG_TTY=y
-# x86 terminal support
+# Serial console for x86
 CONFIG_SERIAL_8250=y
 CONFIG_SERIAL_8250_CONSOLE=y
-# ARM terminal support
+# Serial console for ARM
 CONFIG_SERIAL_AMBA_PL011=y
 CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-# printk support with timestamp
+# printk with timestamp
 CONFIG_PRINTK=y
 CONFIG_PRINTK_TIME=y
+# BUG/WARN
+CONFIG_BUG=y
 
 #
 # File systems
 #
 
-# /proc
+# /proc and /proc/sys
 CONFIG_PROC_FS=y
-# /proc/sys
 CONFIG_PROC_SYSCTL=y
-# /sys
+# /sys and /sys/kernel/debug
 CONFIG_SYSFS=y
-# /sys/kernel/debug
 CONFIG_DEBUG_FS=y
 # /dev
 CONFIG_DEVTMPFS=y
 
 #
-# CPU and power management
+# CPU
 #
 
-# SMP support
+# SMP and NUMA
 CONFIG_SMP=y
-# NUMA support
 CONFIG_NUMA=y
-# ACPI support
+# ACPI for x86_64
 CONFIG_ACPI=y
-# ACPI processor support
 CONFIG_ACPI_PROCESSOR=y
-# ACPI CPU hotplug support
-CONFIG_ACPI_HOTPLUG_CPU=y
 # Frequency scaling
 CONFIG_CPU_FREQ=y
-# CPU hotplug support
+# CPU hotplug
 CONFIG_HOTPLUG_CPU=y
-# PM sleep support
-CONFIG_PM_SLEEP=y
-# PM sleep SMP support
-CONFIG_PM_SLEEP_SMP=y
-# Suspend support
-CONFIG_SUSPEND=y
-# Freezer support
-CONFIG_FREEZER=y
+
 
 #
 # Scheduler
 #
 
-# Core scheduler and sched classes
-CONFIG_SCHED_CORE=y
+# Sched classes
 CONFIG_FAIR_GROUP_SCHED=y
 CONFIG_CFS_BANDWIDTH=y
 CONFIG_RT_GROUP_SCHED=y
@@ -100,12 +87,20 @@ CONFIG_CGROUP_SCHED=y
 CONFIG_CPUSETS=y
 # High resolution timers
 CONFIG_HIGH_RES_TIMERS=y
-# tl->name
-CONFIG_SCHED_DEBUG=y
+# Fix frequency to 1000 Hz (1ms)
 CONFIG_HZ_1000=y
 # CONFIG_NO_HZ_IDLE is not set
 # CONFIG_NO_HZ_FULL is not set
 # CONFIG_NO_HZ is not set
+# CONFIG_SCHED_CORE is not set
+CONFIG_SCHED_DEBUG=y
+
+#
+# Power management
+#
+CONFIG_SUSPEND=y
+CONFIG_PM_SLEEP=y
+CONFIG_PM_SLEEP_SMP=y
 
 #
 # Tracing
@@ -116,7 +111,3 @@ CONFIG_FTRACE=y
 CONFIG_TRACEPOINTS=y
 CONFIG_DYNAMIC_FTRACE=y
 CONFIG_FUNCTION_TRACER=y
-
-# Debugging
-# CONFIG_DEBUG_INFO_DWARF5=y
-# CONFIG_GDB_SCRIPTS=y

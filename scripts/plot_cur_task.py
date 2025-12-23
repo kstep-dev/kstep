@@ -59,10 +59,9 @@ NAME_MAPS = {
 }
 
 
-def parse_curr_task(name: str, path: Path) -> pd.DataFrame:
+def parse_curr_task(path: Path) -> pd.DataFrame:
     df = parse_task(path)
     df = df[df["on_cpu"] == True]
-    df["name"] = name
     return df
 
 def build_pid_matrix(df: pd.DataFrame) -> pd.DataFrame:
@@ -122,8 +121,10 @@ def plot_cur_task(
     color_map: dict[int, str],
     name_map: dict[int, str],
 ):
-    df_buggy = parse_curr_task("buggy", log_file_buggy)
-    df_fixed = parse_curr_task("fixed", log_file_fixed)
+    df_buggy = parse_curr_task(log_file_buggy)
+    df_fixed = parse_curr_task(log_file_fixed)
+    df_buggy["name"] = "buggy"
+    df_fixed["name"] = "fixed"
     df = build_pid_matrix(pd.concat([df_buggy, df_fixed]))
 
     num_cpus = df.shape[1]

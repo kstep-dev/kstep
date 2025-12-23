@@ -26,3 +26,4 @@ $(kmod-build)/kstep.ko: $(kmod-srcs) $(wildcard $(src)/*.h)
 .PHONY: clean
 clean:
 	rm -rf build
+	rm -f compile_commands.json
