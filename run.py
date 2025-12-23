@@ -173,15 +173,16 @@ def main():
 
     if args.debug and not is_port_free(1234):
         logging.info("Port 1234 is already in use, running GDB...")
-        run_gdb(args.linux_dir)
+        run_gdb()
     else:
         make_kstep()
-        driver_keys = {
-            k.name
-            for k in dataclasses.fields(Driver)
-            if getattr(args, k.name) is not None
-        }
-        driver = Driver(**{k: getattr(args, k) for k in driver_keys})
+        driver = Driver(
+            **{
+                field.name: value
+                for field in dataclasses.fields(Driver)
+                if (value := getattr(args, field.name)) is not None
+            }
+        )
         run_qemu(driver=driver, debug=args.debug, log_file=args.log_file)
 
 
