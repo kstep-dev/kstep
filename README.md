@@ -7,12 +7,11 @@ kSTEP
 
 - Checkout Linux source: `./checkout_linux.py <branch|tag|commit> [<name>] [--tarball]`
 
-- Build kSTEP and Linux: `make [kstep|linux|all]` (default: `make kstep`)
+- Build Linux and kSTEP: `make linux kstep` (default target is `kstep`)
 
-- Run: `./run.py [--driver <name>] [--params <key=val>...]` (also triggers `make`)
+- Run: `./run.py <name> [--smp <smp>] [--mem_mb <mem_mb>] [--params <key=val>...]`
 
-    - `driver`: Driver name to run, see `kmod/driver.c` for available drivers
-    - `params`: Additional parameters to pass to the kernel module
-    - Example: `./run.py --driver sync_wakeup`
+    - `name`: Name of driver to run, see `kmod/driver.c` for available drivers
+    - Example: `./run.py sync_wakeup`
 
 - Debug: `./run.py --debug` in two different terminals starts QEMU and GDB

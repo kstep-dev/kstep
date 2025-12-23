@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
+import dataclasses
 import logging
 import os
 import shutil
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -18,20 +20,19 @@ from scripts import (
 )
 
 
-def make_kstep():
-    system(f"make -C {PROJ_DIR} kstep")
-
-
-def make_linux():
-    system(f"make -C {PROJ_DIR} linux")
+@dataclass(frozen=True)
+class Driver:
+    name: str = "default"
+    params: Iterable[str] = ()
+    smp: str = "2"
+    mem_mb: int = 256
 
 
 def get_qemu_path() -> Path:
-    arch = Arch.get()
     name = {
         Arch.X86_64: "qemu-system-x86_64",
         Arch.ARM64: "qemu-system-aarch64",
-    }[arch]
+    }[Arch.get()]
 
     path = shutil.which(name)
     if path is not None:
@@ -44,26 +45,25 @@ def get_qemu_path() -> Path:
     raise RuntimeError(f"QEMU executable not found: {name}")
 
 
+def get_kernel_image_path() -> Path:
+    return {
+        Arch.X86_64: Path("arch/x86/boot/bzImage"),
+        Arch.ARM64: Path("arch/arm64/boot/Image"),
+    }[Arch.get()]
+
+
 def run_qemu(
-    linux_dir: Path,
-    debug: bool = False,
+    driver: Driver,
     log_file: Optional[Path] = None,
-    driver: Optional[str] = None,
-    params: Iterable[str] = (),
-    smp: str = "3",
-    mem_mb: int = 256,
+    debug: bool = False,
+    linux_dir: Path = LINUX_CURR_DIR,
 ):
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
 
     qemu_path = get_qemu_path()
-
-    arch = Arch.get()
-    kernel_image_path = {
-        Arch.X86_64: linux_dir / "arch/x86/boot/bzImage",
-        Arch.ARM64: linux_dir / "arch/arm64/boot/Image",
-    }[arch]
+    kernel_image_path = linux_dir / get_kernel_image_path()
 
     boot_args = [
         "rw",
@@ -85,17 +85,16 @@ def run_qemu(
     # Everything after the `--` is passed to init
     # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
     boot_args += ["--"]
-    if driver:
-        boot_args += [f"driver={driver}"]
+    boot_args += [f"driver={driver.name}"]
 
-    if params:
-        boot_args.extend(params)
+    if driver.params:
+        boot_args.extend(driver.params)
 
     cmd = [
         str(qemu_path),
-        f"-smp {smp}",
+        f"-smp {driver.smp}",
         "-cpu max",
-        f"-m {mem_mb}M",
+        f"-m {driver.mem_mb}M",
         f"-kernel {kernel_image_path}",
         f"-initrd {ROOTFS_IMG}",
         f'-append "{" ".join(boot_args)}"',
@@ -139,7 +138,7 @@ def is_port_free(port: int) -> bool:
         return s.connect_ex(("localhost", port)) != 0
 
 
-def run_gdb(linux_dir: Path):
+def run_gdb(linux_dir: Path = LINUX_CURR_DIR):
     import signal
 
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -153,14 +152,23 @@ def run_gdb(linux_dir: Path):
     system(f"gdb {linux_dir}/vmlinux " + " ".join(args))
 
 
-if __name__ == "__main__":
+def make_kstep():
+    system(f"make -C {PROJ_DIR} kstep")
+
+
+def make_linux():
+    system(f"make -C {PROJ_DIR} linux")
+
+
+def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
     parser.add_argument("--debug", action="store_true")
-    parser.add_argument("--driver", type=str, default=None)
     parser.add_argument("--log_file", type=Path, default=create_log_path())
-    parser.add_argument("--smp", type=str, default="3")
-    parser.add_argument("--params", type=str, nargs="+")
+    # See driver config
+    parser.add_argument("name", type=str, default=None, nargs="?")
+    parser.add_argument("--smp", type=str, default=None)
+    parser.add_argument("--mem_mb", type=int, default=None)
+    parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 
     if args.debug and not is_port_free(1234):
@@ -168,4 +176,14 @@ if __name__ == "__main__":
         run_gdb(args.linux_dir)
     else:
         make_kstep()
-        run_qemu(**vars(args))
+        driver_keys = {
+            k.name
+            for k in dataclasses.fields(Driver)
+            if getattr(args, k.name) is not None
+        }
+        driver = Driver(**{k: getattr(args, k) for k in driver_keys})
+        run_qemu(driver=driver, debug=args.debug, log_file=args.log_file)
+
+
+if __name__ == "__main__":
+    main()
