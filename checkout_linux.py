@@ -9,6 +9,7 @@ from scripts import (
     LINUX_CURR_DIR,
     LINUX_MASTER_DIR,
     LINUX_ROOT_DIR,
+    PROJ_DIR,
     decompress,
     download,
     system,
@@ -42,7 +43,9 @@ def reset_git(linux_dir: Path):
 def set_current_linux(linux_dir: Path):
     LINUX_CURR_DIR.unlink(missing_ok=True)
     LINUX_CURR_DIR.symlink_to(linux_dir)
-    logging.info(f"Current Linux now points to {linux_dir}")
+    logging.info(
+        f"{LINUX_CURR_DIR.relative_to(PROJ_DIR)} now points to {linux_dir.relative_to(PROJ_DIR)}"
+    )
 
 
 def checkout_linux(version: str, linux_dir: Path, reset: bool, tarball: bool = False):
