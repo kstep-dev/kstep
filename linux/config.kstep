@@ -4,7 +4,7 @@
 
 # 64-bit kernel
 CONFIG_64BIT=y
-# Load initramfs with ELF binaries and kernel modules
+# Load initramfs with ELF and kmod
 CONFIG_BLK_DEV_INITRD=y
 CONFIG_BINFMT_ELF=y
 CONFIG_MODULES=y
@@ -54,7 +54,7 @@ CONFIG_DEBUG_FS=y
 CONFIG_DEVTMPFS=y
 
 #
-# CPU and power management
+# CPU
 #
 
 # SMP and NUMA
@@ -63,15 +63,10 @@ CONFIG_NUMA=y
 # ACPI for x86_64
 CONFIG_ACPI=y
 CONFIG_ACPI_PROCESSOR=y
-CONFIG_ACPI_HOTPLUG_CPU=y
 # Frequency scaling
 CONFIG_CPU_FREQ=y
 # CPU hotplug
 CONFIG_HOTPLUG_CPU=y
-# Power management
-CONFIG_SUSPEND=y
-CONFIG_PM_SLEEP=y
-CONFIG_PM_SLEEP_SMP=y
 
 
 #
@@ -99,6 +94,13 @@ CONFIG_HZ_1000=y
 # CONFIG_NO_HZ is not set
 # CONFIG_SCHED_CORE is not set
 CONFIG_SCHED_DEBUG=y
+
+#
+# Power management
+#
+CONFIG_SUSPEND=y
+CONFIG_PM_SLEEP=y
+CONFIG_PM_SLEEP_SMP=y
 
 #
 # Tracing
