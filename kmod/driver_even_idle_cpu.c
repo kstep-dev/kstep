@@ -18,7 +18,7 @@ static void setup(void) {
 }
 
 static void run(void) {
-  // making the nr_running on cpu 4-7 to [1, 0, 2, 1]
+  // making the nr_running on cpu 1-4 to [1, 0, 2, 1]
   kstep_task_pin(tasks[0], 1, 1);
   kstep_task_pin(tasks[1], 3, 3);
   kstep_task_pin(tasks[2], 3, 3);
