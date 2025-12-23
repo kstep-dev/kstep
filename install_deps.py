@@ -27,7 +27,6 @@ PACKAGES = [
 
 
 def apt_install(packages: list[str]):
-    system("sudo rm -f /var/lib/man-db/auto-update")
     system("sudo apt update")
     system(f"sudo apt install -y {' '.join(packages)}")
 
@@ -36,7 +35,7 @@ def install_uv():
     system("curl -LsSf https://astral.sh/uv/install.sh | sh")
 
 
-def qemu_install(
+def install_qemu(
     download_path: Path = DATA_DIR / "qemu.tar.xz",
     src_dir: Path = DATA_DIR / "qemu-src",
     build_dir: Path = DATA_DIR / "qemu-build",
@@ -70,4 +69,4 @@ if __name__ == "__main__":
         apt_install(["libelf-dev"])
     elif args.type == "ci-qemu":
         apt_install(["libglib2.0-dev", "ninja-build"])
-        qemu_install()
+        install_qemu()
