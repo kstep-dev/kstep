@@ -159,7 +159,6 @@ void kstep_tick(void) {
     kstep_print_tasks();
   if (kstep_driver->print_nr_running)
     kstep_print_nr_running();
-  kstep_sleep();
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
   kstep_sched_tick();
