@@ -67,12 +67,10 @@ void kstep_print_tasks(void) {
 
 void kstep_print_nr_running(void) {
   int nr_cpus = num_online_cpus();
-  pr_info("nr_running: [");
   for (int cpu = 1; cpu < nr_cpus; cpu++) {
-    pr_cont("{" K(cpu) "%d, " K(val) "%d}%s", cpu, cpu_rq(cpu)->nr_running,
-            cpu == nr_cpus - 1 ? "" : ", ");
+    pr_info("nr_running: {" K(cpu) "%d, " K(val) "%d}", cpu,
+            cpu_rq(cpu)->nr_running);
   }
-  pr_cont("]\n");
 }
 
 static DEFINE_PER_CPU(ktime_t, sched_softirq_starttime) = 0;

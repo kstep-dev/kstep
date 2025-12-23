@@ -10,14 +10,14 @@ from consts import LOG_LATEST
 LOG_PREFIX_LEN = 14
 
 
-def parse_line(prefix: str, line: str) -> list:
+def parse_line(prefix: str, line: str) -> dict | None:
     # Line format: [timestamp] prefix: {json}
     if len(line) < LOG_PREFIX_LEN:
-        return []
+        return None
     if line[0] != "[" or line[LOG_PREFIX_LEN - 1] != "]":
-        return []
+        return None
     if not line.startswith(prefix, LOG_PREFIX_LEN + 1):
-        return []
+        return None
 
     # Parse JSON
     json_str = line[LOG_PREFIX_LEN + 1 + len(prefix) :]
@@ -31,22 +31,18 @@ def parse_line(prefix: str, line: str) -> list:
     ts = round((float(ts_str) - 10) * 1000)
 
     # Add timestamp to object
-    if isinstance(obj, dict):
-        obj["timestamp"] = ts
-        return [obj]
-    elif isinstance(obj, list):
-        for item in obj:
-            item["timestamp"] = ts
-        return obj
-    else:
-        raise ValueError(f"Invalid object: {obj}")
+    obj["timestamp"] = ts
+    return obj
 
 
 def parse_file(prefix: str, path: Path) -> pd.DataFrame:
     data = []
     with open(path, "r") as f:
         for line in f:
-            data.extend(parse_line(prefix, line))
+            obj = parse_line(prefix, line)
+            if obj is None:
+                continue
+            data.append(obj)
     return pd.DataFrame(data)
 
 
