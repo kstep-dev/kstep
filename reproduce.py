@@ -66,7 +66,7 @@ bugs = [
     ),
     # https://github.com/torvalds/linux/commit/2feab2492deb2f14f9675dd6388e9e2bf669c27a
     Bug(
-        driver=Driver(name="long_balance", smp="2", mem_mb=4096),
+        driver=Driver(name="long_balance", smp="3", mem_mb=4096),
         linux=[
             Linux(name="buggy", version="2feab24~1"),
             Linux(name="fixed", version="2feab24"),
