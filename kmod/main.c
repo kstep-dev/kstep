@@ -28,7 +28,9 @@ static int __init kstep_main(void) {
   kstep_topo_print();
 
   // Control timer ticks and clock
-  kstep_tick_init();
+  kstep_sched_timer_init();
+  kstep_jiffies_init();
+  kstep_sched_clock_init();
 
   // Reset the scheduler state to initial state
   kstep_reset_sched();

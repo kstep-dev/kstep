@@ -14,14 +14,10 @@ static void kstep_sched_clock_tick(void) { kstep_sched_clock += TICK_NSEC; }
 // is a wrapper of `paravirt_sched_clock` which can be changed with
 // `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
 
-static void kstep_sched_clock_init(void) {
+void kstep_sched_clock_init(void) {
   *ksym.__sched_clock_offset = 0;
   ksym.paravirt_set_sched_clock(kstep_sched_clock_read);
   TRACE_INFO("Mocked sched clock");
-}
-
-static void kstep_sched_clock_exit(void) {
-  ksym.paravirt_set_sched_clock(ksym.kvm_sched_clock_read);
 }
 
 #elif defined(CONFIG_GENERIC_SCHED_CLOCK)
@@ -37,11 +33,8 @@ struct clock_data {
   u64 (*actual_read_sched_clock)(void);
 };
 
-static struct clock_data cd_backup;
-
-static void kstep_sched_clock_init(void) {
+void kstep_sched_clock_init(void) {
   struct clock_data *cd = ksym.cd;
-  memcpy(&cd_backup, cd, sizeof(struct clock_data));
   cd->actual_read_sched_clock = kstep_sched_clock_read;
   for (int i = 0; i < 2; i++) {
     struct clock_read_data *rd = &cd->read_data[i];
@@ -54,17 +47,13 @@ static void kstep_sched_clock_init(void) {
   TRACE_INFO("Mocked sched clock");
 }
 
-static void kstep_sched_clock_exit(void) {
-  memcpy(ksym.cd, &cd_backup, sizeof(struct clock_data));
-}
-
 #else
 #error "Sched clock mocking not supported for this platform"
 #endif
 
 static u64 kstep_jiffies = 0;
 
-static void kstep_jiffies_init(void) {
+void kstep_jiffies_init(void) {
   // Avoid calling `tick_do_update_jiffies64` and `do_timer` to update jiffies.
   // They are called by `tick_sched_do_timer` and `tick_periodic` respectively,
   // and guarded by `tick_do_timer_cpu == cpu` to check if the current CPU is
@@ -98,13 +87,7 @@ static void kstep_jiffies_tick(void) {
   smp_mb();
 }
 
-static void kstep_jiffies_exit(void) {
-  *ksym.tick_do_timer_cpu = 0;
-  *ksym.tick_next_period = 0;
-  TRACE_INFO("Enabled jiffies update");
-}
-
-static void kstep_sched_timer_init(void) {
+void kstep_sched_timer_init(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     // Ref: tick_sched_timer_dying in
     // https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L1606
@@ -112,13 +95,6 @@ static void kstep_sched_timer_init(void) {
     hrtimer_cancel(&ts->sched_timer);
     memset(ts, 0, sizeof(struct tick_sched));
     TRACE_INFO("Disabled timer ticks on CPU %d", cpu);
-  }
-}
-
-static void kstep_sched_timer_exit(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    smp_call_function_single(cpu, (void *)ksym.tick_setup_sched_timer,
-                             (void *)true, 0);
   }
 }
 
@@ -138,18 +114,6 @@ static void kstep_sched_tick(void) {
     smp_call_function_single(cpu, sched_tick, NULL, 1);
     kstep_sleep();
   }
-}
-
-void kstep_tick_init(void) {
-  kstep_sched_timer_init();
-  kstep_jiffies_init();
-  kstep_sched_clock_init();
-}
-
-void kstep_tick_exit(void) {
-  kstep_sched_clock_exit();
-  kstep_jiffies_exit();
-  kstep_sched_timer_exit();
 }
 
 void kstep_tick(void) {
