@@ -35,7 +35,6 @@ struct clock_data {
 
 static void kstep_sched_clock_init(void) {
   struct clock_data *cd = ksym.cd;
-  memcpy(&cd_backup, cd, sizeof(struct clock_data));
   cd->actual_read_sched_clock = kstep_sched_clock_read;
   for (int i = 0; i < 2; i++) {
     struct clock_read_data *rd = &cd->read_data[i];
