@@ -33,7 +33,7 @@ struct clock_data {
   u64 (*actual_read_sched_clock)(void);
 };
 
-static void kstep_sched_clock_init(void) {
+void kstep_sched_clock_init(void) {
   struct clock_data *cd = ksym.cd;
   cd->actual_read_sched_clock = kstep_sched_clock_read;
   for (int i = 0; i < 2; i++) {
