@@ -18,7 +18,6 @@ KSYM_FUNC(void, sched_tick, void)
 KSYM_FUNC(void, scheduler_tick, void)
 #endif
 KSYM_FUNC(void, paravirt_set_sched_clock, u64 (*func)(void))
-KSYM_FUNC(u64, kvm_sched_clock_read, void)
 KSYM_FUNC(void, tick_setup_sched_timer, bool hrtimer)
 KSYM_FUNC(int, workqueue_offline_cpu, int cpu)
 KSYM_FUNC(void, update_rq_clock, struct rq *rq)

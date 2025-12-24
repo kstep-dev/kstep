@@ -31,8 +31,9 @@ struct kstep_driver *kstep_driver_get(const char *name);
 void kstep_driver_print(struct kstep_driver *driver);
 
 // tick.c
-void kstep_tick_init(void);
-void kstep_tick_exit(void);
+void kstep_sched_timer_init(void);
+void kstep_jiffies_init(void);
+void kstep_sched_clock_init(void);
 void kstep_sleep(void);
 void kstep_tick(void);
 void kstep_tick_repeat(int n);
