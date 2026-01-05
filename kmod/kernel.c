@@ -6,7 +6,7 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 
-#include "kstep.h"
+#include "internal.h"
 
 #define CGROUP_ROOT "/sys/fs/cgroup/"
 #define CGROUP_CONTROL "+cpu +cpuset"

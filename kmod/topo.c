@@ -1,4 +1,4 @@
-#include "kstep.h"
+#include "internal.h"
 
 #define for_each_tl(tl) for (tl = *ksym.sched_domain_topology; tl->mask; tl++)
 

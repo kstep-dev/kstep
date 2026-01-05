@@ -1,6 +1,7 @@
-#include "kstep.h"
-
+#include <linux/kthread.h>
 #include <linux/wait.h>
+
+#include "driver.h"
 
 static struct task_struct *waker_task;
 static struct task_struct *wakee_task;

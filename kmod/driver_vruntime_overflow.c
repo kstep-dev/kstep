@@ -1,4 +1,5 @@
-#include "kstep.h"
+#include "driver.h"
+#include "internal.h" // dequeue_entities
 
 static struct task_struct *special_task;
 static struct task_struct *starved_task;

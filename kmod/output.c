@@ -1,7 +1,7 @@
 #include <linux/ftrace.h>
 #include <linux/tracepoint.h>
 
-#include "kstep.h"
+#include "internal.h"
 
 #define K(s) "\"" #s "\": "
 #define SEP "  ,  "

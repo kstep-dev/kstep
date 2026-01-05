@@ -1,7 +1,7 @@
 #include <linux/module.h>
 #include <linux/reboot.h>
 
-#include "kstep.h"
+#include "internal.h"
 
 static char kstep_driver_name[32] = "default";
 module_param_string(driver, kstep_driver_name, sizeof(kstep_driver_name), 0644);
@@ -22,7 +22,6 @@ static int __init kstep_main(void) {
   kstep_move_kthreads();
 
   // Run userspace programs when we know the system is ready
-  kstep_tasks_init();
   kstep_driver->setup();
 
   kstep_topo_print();

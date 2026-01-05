@@ -1,4 +1,5 @@
-#include "kstep.h"
+#include "driver.h"
+#include "internal.h" // cpu_rq
 
 static struct task_struct *busy_task;
 

@@ -1,4 +1,4 @@
-#include "kstep.h"
+#include "internal.h"
 
 void kstep_disable_workqueue(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
