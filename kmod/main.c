@@ -33,7 +33,10 @@ static int __init kstep_main(void) {
   kstep_sched_clock_init();
 
   // Reset the scheduler state to initial state
-  kstep_reset_sched();
+  kstep_reset_runqueues();
+  kstep_reset_cpumask();
+  kstep_reset_tasks();
+  kstep_patch_min_vruntime();
 
   if (kstep_driver->print_load_balance)
     kstep_trace_load_balance();

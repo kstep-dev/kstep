@@ -69,7 +69,10 @@ void kstep_trace_sched_softirq(void);
 void kstep_trace_load_balance(void);
 
 // reset.c
-void kstep_reset_sched(void);
+void kstep_reset_runqueues(void);
+void kstep_reset_cpumask(void);
+void kstep_reset_tasks(void);
+void kstep_patch_min_vruntime(void);
 
 // isolation.c
 void kstep_disable_workqueue(void);
