@@ -1,4 +1,4 @@
-#include "kstep.h"
+#include "internal.h"
 
 extern struct kstep_driver default_driver;
 extern struct kstep_driver even_idle_cpu;

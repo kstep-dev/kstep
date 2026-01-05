@@ -1,25 +1,26 @@
 #include <linux/umh.h>
 
-#include "kstep.h"
+#include "internal.h"
 #include "user.h"
-
-static struct file *console;
-
-void kstep_tasks_init(void) {
-  console = filp_open("/dev/console", O_RDWR, 0);
-  if (IS_ERR(console))
-    panic("Failed to open /dev/console");
-}
 
 static int task_init(struct subprocess_info *info, struct cred *new) {
   // Initialize stdin, stdout, and stderr to /dev/console
   // Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
+
+  static struct file *console = NULL;
+  if (console == NULL) {
+    console = filp_open("/dev/console", O_RDWR, 0);
+    if (IS_ERR(console))
+      panic("Failed to open /dev/console");
+  }
+
   for (int i = 0; i < 3; i++) { // stdin, stdout, stderr
     int fd = get_unused_fd_flags(0);
     if (fd < 0 || fd != i)
       panic("get_unused_fd_flags returned %d for fd %d", fd, i);
     fd_install(fd, get_file(console));
   }
+
   info->data = current;
   TRACE_INFO("Task created with pid %d", current->pid);
   return 0;

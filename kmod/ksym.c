@@ -1,6 +1,6 @@
 #include <linux/kprobes.h>
 
-#include "kstep.h"
+#include "internal.h"
 
 struct ksym_t ksym;
 static void *(*kallsyms_lookup_name_fn)(const char *name);
@@ -8,9 +8,9 @@ static void *(*kallsyms_lookup_name_fn)(const char *name);
 static void *ksym_get_kallsyms_lookup_name(void) {
   struct kprobe kp = {.symbol_name = "kallsyms_lookup_name"};
   int ret = register_kprobe(&kp);
-  if (ret < 0) 
+  if (ret < 0)
     panic("Failed to register kprobe: %d", ret);
-  
+
   unregister_kprobe(&kp);
   return (void *)kp.addr;
 }

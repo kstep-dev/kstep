@@ -1,6 +1,6 @@
 #include <linux/ftrace.h>
 
-#include "kstep.h"
+#include "internal.h"
 
 static void kstep_reset_task(struct task_struct *p) {
   // reset generic task stats

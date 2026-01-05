@@ -1,9 +1,7 @@
-#include "kstep.h"
-
 #include <linux/delay.h>
 #include <linux/sched_clock.h>
 
-#include <kernel/time/tick-sched.h> // internal header
+#include "internal.h"
 
 static u64 kstep_sched_clock = INIT_TIME_NS;
 static u64 kstep_sched_clock_read(void) { return kstep_sched_clock; }
