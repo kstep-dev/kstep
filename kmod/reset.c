@@ -26,60 +26,64 @@ static void kstep_reset_task(struct task_struct *p) {
   p->se.avg.load_avg = scale_load_down(p->se.load.weight);
 }
 
-static void kstep_reset_tasks(void) {
+void kstep_reset_tasks(void) {
   struct task_struct *p;
   for_each_process(p) {
     if (task_cpu(p) != 0)
       kstep_reset_task(p);
   }
+  TRACE_INFO("Reset tasks state");
 }
 
-static void kstep_reset_rq(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    struct rq *rq = cpu_rq(cpu);
+static void kstep_reset_runqueue(struct rq *rq) {
+  // reset rq
+  ksym.update_rq_clock(rq);
+  rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;
+  rq->max_idle_balance_cost = *ksym.sysctl_sched_migration_cost;
+  rq->nr_switches = 0;
+  rq->next_balance = INITIAL_JIFFIES + nsecs_to_jiffies(INIT_TIME_NS);
 
-    // reset rq
-    ksym.update_rq_clock(rq);
-    rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;
-    rq->max_idle_balance_cost = *ksym.sysctl_sched_migration_cost;
-    rq->nr_switches = 0;
-    rq->next_balance = INITIAL_JIFFIES + nsecs_to_jiffies(INIT_TIME_NS);
-
-    // reset cfs rq
-    rq->cfs.min_vruntime = INIT_TIME_NS;
+  // reset cfs rq
+  rq->cfs.min_vruntime = INIT_TIME_NS;
 
 // https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-    rq->cfs.avg_vruntime = 0;
-    rq->cfs.avg_load = 0;
+  rq->cfs.avg_vruntime = 0;
+  rq->cfs.avg_load = 0;
 #endif
-    memset(&rq->cfs.avg, 0, sizeof(struct sched_avg));
-    rq->cfs.avg.last_update_time = INIT_TIME_NS;
+  memset(&rq->cfs.avg, 0, sizeof(struct sched_avg));
+  rq->cfs.avg.last_update_time = INIT_TIME_NS;
 
-    // reset sched domain
-    struct sched_domain *sd;
-    for_each_domain(rq->cpu, sd) {
-      sd->last_balance = jiffies;
-      sd->balance_interval = sd->min_interval;
-      sd->nr_balance_failed = 0;
-      sd->max_newidle_lb_cost = 0;
+  // reset sched domain
+  struct sched_domain *sd;
+  for_each_domain(rq->cpu, sd) {
+    sd->last_balance = jiffies;
+    sd->balance_interval = sd->min_interval;
+    sd->nr_balance_failed = 0;
+    sd->max_newidle_lb_cost = 0;
 // https://github.com/torvalds/linux/commit/e60b56e46b384cee1ad34e6adc164d883049c6c3
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
-      sd->last_decay_max_lb_cost = jiffies;
+    sd->last_decay_max_lb_cost = jiffies;
 #else
-      sd->next_decay_max_lb_cost = jiffies;
+    sd->next_decay_max_lb_cost = jiffies;
 #endif
-    }
   }
 }
 
-static void kstep_reset_cpumask(void) {
+void kstep_reset_runqueues(void) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
+    kstep_reset_runqueue(cpu_rq(cpu));
+  TRACE_INFO("Reset runqueues state");
+}
+
+void kstep_reset_cpumask(void) {
 // https://github.com/torvalds/linux/commit/46a87b3851f0d6eb05e6d83d5c5a30df0eca8f76
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     int *ptr = per_cpu_ptr(ksym.distribute_cpu_mask_prev, cpu);
     *ptr = 0;
   }
+  TRACE_INFO("Reset cpumask");
 #endif
 }
 
@@ -96,7 +100,7 @@ static struct ftrace_ops set_min_vruntime_op = {
     .flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED | FTRACE_OPS_FL_RECURSION,
 };
 
-static void kstep_patch_min_vruntime(void) {
+void kstep_patch_min_vruntime(void) {
   // We trace `init_tg_cfs_entry` as it is called immediately after
   // `init_cfs_rq` to initialize the cfs_rq for the new task group.
   char *name = "init_tg_cfs_entry";
@@ -107,12 +111,4 @@ static void kstep_patch_min_vruntime(void) {
     panic("Failed to register ftrace function for %s", name);
 
   TRACE_INFO("Patched %s to set min vruntime", name);
-}
-
-void kstep_reset_sched(void) {
-  kstep_reset_rq();
-  kstep_reset_cpumask();
-  kstep_reset_tasks();
-  kstep_patch_min_vruntime();
-  TRACE_INFO("Reset scheduler state");
 }
