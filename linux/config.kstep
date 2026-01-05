@@ -11,6 +11,7 @@ CONFIG_MODULES=y
 # Virtualization
 CONFIG_HYPERVISOR_GUEST=y
 CONFIG_PARAVIRT=y
+CONFIG_KVM_GUEST=y
 # Expert settings
 CONFIG_EXPERT=y
 # Kernel debugging
