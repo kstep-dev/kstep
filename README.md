@@ -1,17 +1,65 @@
-kSTEP
-==============
+# kSTEP: Kernel Scheduler Test and Evaluation Platform
 
-- Install dependencies: `./install_deps.py`
+## 🚀 Getting Started
 
-- Reproduce bugs: `./reproduce.py <bug_name|all> [--run <buggy|fixed|plot>]`
+### 📦 Clone the repository
 
-- Checkout Linux source: `./checkout_linux.py <branch|tag|commit> [<name>] [--tarball]`
+```sh
+git clone https://github.com/ShawnZhong/kSTEP
+cd kSTEP
+git submodule update --init
+```
 
-- Build Linux and kSTEP: `make linux kstep` (default target is `kstep`)
+### 💾 Install dependencies
 
-- Run: `./run.py <name> [--smp <smp>] [--mem_mb <mem_mb>] [--params <key=val>...]`
+```sh
+./install_deps.py
+```
 
-    - `name`: Name of driver to run, see `kmod/driver.c` for available drivers
-    - Example: `./run.py sync_wakeup`
 
-- Debug: `./run.py --debug` in two different terminals starts QEMU and GDB
+### 🐞 Reproduce Known Bugs
+
+```sh
+./reproduce.py <name|all> [--run <buggy|fixed|plot>]
+```
+
+- `<name|all>`: Name of the bug to reproduce (see [`reproduce.py`](reproduce.py)), or `all` to reproduce all bugs.
+
+- `--run`: Choose which version or action to run (`buggy`, `fixed`, or generate a `plot`), default to all.
+
+- **Example:** `./reproduce.py sync_wakeup` checks out both the buggy and fixed kernels, builds kSTEP, runs the `sync_wakeup` driver, and plots the results.
+
+
+## 🔧 Developing Your Own Drivers
+
+### Checkout Linux source code
+
+```sh
+./checkout_linux.py <tag|commit> [<name>] [--tarball]
+```
+
+- `<tag|commit>`: Linux branch or commit hash to checkout (e.g., `v6.17`, `6d7e478`).
+
+- `<name>`: Name of the directory under `linux/`, defaults to `<tag|commit>`.
+
+- **Example:** `./checkout_linux.py v6.14` checks out Linux v6.14 under `linux/v6.14`, and symlinks `linux/current` to it.
+
+### Build Linux and kSTEP
+```sh
+make linux kstep
+```
+- The default target is `kstep`. See [`Makefile`](Makefile) for a full list of build targets.
+
+### Run kSTEP
+
+```sh
+./run.py <name> [--smp <num_cpus>] [--mem_mb <mem_mb>] [--log_file <path>] [--debug]
+```
+
+- `<name>`: Driver to run (see [`kmod/driver.c`](kmod/driver.c)).
+
+- `--log_file`: Path to the log file. Defaults to `data/logs/log-<timestamp>.log`.
+
+- `--debug`: Enables kernel debugging. Run the command in two separate terminals.
+
+- **Example:** `./run.py sync_wakeup` runs the `sync_wakeup` driver with default settings.
