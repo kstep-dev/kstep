@@ -46,11 +46,11 @@ void kstep_mkdir(const char *dir) {
 // https://github.com/torvalds/linux/commit/e12d203b8c880061c0bf0339cad51e5851a33442
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
   struct dentry *result = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755, NULL);
-  int err = IS_ERR(result);
+  int err = IS_ERR(result) ? PTR_ERR(result) : 0;
 // https://github.com/torvalds/linux/commit/c54b386969a58151765a9ffaaa0438e7b580283f
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
   struct dentry *result = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
-  int err = IS_ERR(result);
+  int err = IS_ERR(result) ? PTR_ERR(result) : 0;
 // https://github.com/torvalds/linux/commit/abf08576afe31506b812c8c1be9714f78613f300
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
   int err = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
