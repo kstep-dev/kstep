@@ -21,7 +21,7 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 ```
 
 
-#### 🐞 Reproduce Known Bugs
+#### 🐞 Reproduce known bugs
 
 ```sh
 ./reproduce.py <name|all> [--run <buggy|fixed|plot>]
