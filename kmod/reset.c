@@ -44,7 +44,12 @@ static void kstep_reset_runqueue(struct rq *rq) {
   rq->next_balance = INITIAL_JIFFIES + nsecs_to_jiffies(INIT_TIME_NS);
 
   // reset cfs rq
+// https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+  rq->cfs.zero_vruntime = INIT_TIME_NS;
+#else
   rq->cfs.min_vruntime = INIT_TIME_NS;
+#endif
 
 // https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
@@ -91,7 +96,12 @@ void kstep_reset_cpumask(void) {
 static void set_min_vruntime(unsigned long ip, unsigned long parent_ip,
                              struct ftrace_ops *op, struct ftrace_regs *fregs) {
   struct cfs_rq *cfs_rq = (void *)regs_get_kernel_argument((void *)fregs, 1);
+// https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+  cfs_rq->zero_vruntime = INIT_TIME_NS;
+#else
   cfs_rq->min_vruntime = INIT_TIME_NS;
+#endif
   TRACE_INFO("Set min vruntime to %llu ns", INIT_TIME_NS);
 }
 

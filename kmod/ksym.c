@@ -2,7 +2,7 @@
 
 #include "internal.h"
 
-struct ksym_t ksym;
+struct ksym ksym;
 static void *(*kallsyms_lookup_name_fn)(const char *name);
 
 static void *ksym_get_kallsyms_lookup_name(void) {

@@ -30,20 +30,27 @@ void kstep_write(const char *path, const char *buf, size_t size) {
 void kstep_mkdir(const char *dir) {
   struct path path;
   int flags = LOOKUP_DIRECTORY;
+
 // https://github.com/torvalds/linux/commit/3d18f80ce181ba27f37d0ec1c550b22acb01dd49
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
   struct dentry *dentry = start_creating_path(AT_FDCWD, dir, &path, flags);
 #else
   struct dentry *dentry = kern_path_create(AT_FDCWD, dir, &path, flags);
 #endif
+
   if (IS_ERR(dentry))
     panic("kern_path_create %s failed: %ld", dir, PTR_ERR(dentry));
 
   struct inode *inode = d_inode(path.dentry);
+
+// https://github.com/torvalds/linux/commit/e12d203b8c880061c0bf0339cad51e5851a33442
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+  struct dentry *result = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755, NULL);
+  int err = IS_ERR(result) ? PTR_ERR(result) : 0;
 // https://github.com/torvalds/linux/commit/c54b386969a58151765a9ffaaa0438e7b580283f
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
   struct dentry *result = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
-  int err = IS_ERR(result);
+  int err = IS_ERR(result) ? PTR_ERR(result) : 0;
 // https://github.com/torvalds/linux/commit/abf08576afe31506b812c8c1be9714f78613f300
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
   int err = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
@@ -53,10 +60,11 @@ void kstep_mkdir(const char *dir) {
 #else
   int err = vfs_mkdir(inode, dentry, 0755);
 #endif
+
   if (err)
     panic("mkdir %s failed: %d", dir, err);
 
-  // https://github.com/torvalds/linux/commit/3d18f80ce181ba27f37d0ec1c550b22acb01dd49
+// https://github.com/torvalds/linux/commit/3d18f80ce181ba27f37d0ec1c550b22acb01dd49
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
   end_creating_path(&path, dentry);
 #else
