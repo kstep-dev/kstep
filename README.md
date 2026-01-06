@@ -1,8 +1,8 @@
-# kSTEP: Kernel Scheduler Test and Evaluation Platform
+# kSTEP: Kernel Scheduler Test and Evaluation Platform [![CI](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml/badge.svg)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
 
 ## 🚀 Getting Started
 
-### 📦 Clone the repository
+#### 📦 Clone the repository
 
 ```sh
 git clone https://github.com/ShawnZhong/kSTEP
@@ -10,14 +10,14 @@ cd kSTEP
 git submodule update --init
 ```
 
-### 💾 Install dependencies
+#### 💾 Install dependencies
 
 ```sh
 ./install_deps.py
 ```
 
 
-### 🐞 Reproduce Known Bugs
+#### 🐞 Reproduce Known Bugs
 
 ```sh
 ./reproduce.py <name|all> [--run <buggy|fixed|plot>]
@@ -30,9 +30,9 @@ git submodule update --init
 - **Example:** `./reproduce.py sync_wakeup` checks out both the buggy and fixed kernels, builds kSTEP, runs the `sync_wakeup` driver, and plots the results.
 
 
-## 🔧 Developing Your Own Drivers
+## 💻 Developing Your Own Drivers
 
-### Checkout Linux source code
+#### 📂 Checkout Linux source code
 
 ```sh
 ./checkout_linux.py <tag|commit> [<name>] [--tarball]
@@ -44,13 +44,13 @@ git submodule update --init
 
 - **Example:** `./checkout_linux.py v6.14` checks out Linux v6.14 under `linux/v6.14`, and symlinks `linux/current` to it.
 
-### Build Linux and kSTEP
+#### 🛠️ Build Linux and kSTEP
 ```sh
 make linux kstep
 ```
 - The default target is `kstep`. See [`Makefile`](Makefile) for a full list of build targets.
 
-### Run kSTEP
+#### 🏃‍♂️ Run kSTEP
 
 ```sh
 ./run.py <name> [--smp <num_cpus>] [--mem_mb <mem_mb>] [--log_file <path>] [--debug]
