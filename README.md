@@ -5,9 +5,7 @@
 #### 📦 Clone the repository
 
 ```sh
-git clone https://github.com/ShawnZhong/kSTEP
-cd kSTEP
-git submodule update --init
+git clone --recursive https://github.com/ShawnZhong/kSTEP
 ```
 
 #### 💾 Install dependencies
