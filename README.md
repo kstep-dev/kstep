@@ -38,8 +38,6 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 - `<tag|commit>`: Linux branch or commit hash to checkout (e.g., `v6.17`, `6d7e478`).
 
-- `<name>`: Name of the directory under `linux/`, defaults to `<tag|commit>`.
-
 - **Example:** `./checkout_linux.py v6.14` checks out Linux v6.14 under `linux/v6.14`, and symlinks `linux/current` to it.
 
 #### 🛠️ Build Linux and kSTEP
@@ -55,8 +53,6 @@ make linux kstep
 ```
 
 - `<name>`: Driver to run (see [`kmod/driver.c`](kmod/driver.c)).
-
-- `--log_file`: Path to the log file. Defaults to `data/logs/log-<timestamp>.log`.
 
 - `--debug`: Enables kernel debugging. Run the command in two separate terminals.
 
