@@ -1,4 +1,10 @@
-# kSTEP: Kernel Scheduler Test and Evaluation Platform [![CI](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml/badge.svg)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
+# kSTEP: Kernel Scheduler Test and Evaluation Platform 
+[![v5.15](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v5.15)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
+[![v6.1](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v6.1)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
+[![v6.6](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v6.6)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
+[![v6.12](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v6.12)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
+[![v6.18](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v6.18)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
+
 
 ## 🚀 Getting Started
 
