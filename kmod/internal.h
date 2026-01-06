@@ -49,14 +49,14 @@ void kstep_prealloc_kworkers(void);
 bool kstep_is_sys_kthread(struct task_struct *p);
 
 // ksym.c
-struct ksym_t {
+struct ksym {
 #define KSYM_FUNC(ret_type, name, ...) ret_type (*name)(__VA_ARGS__);
 #define KSYM_VAR(type, name) type *name;
 #include "ksym.h"
 #undef KSYM_FUNC
 #undef KSYM_VAR
 };
-extern struct ksym_t ksym;
+extern struct ksym ksym;
 void ksym_init(void);
 
 #undef cpu_rq
