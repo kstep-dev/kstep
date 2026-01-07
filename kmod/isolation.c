@@ -1,9 +1,13 @@
 #include "internal.h"
 
+static void disable_workqueue(void *info) {
+  int *cpu = (int *)info;
+  ksym.workqueue_offline_cpu(*cpu);
+}
+
 void kstep_disable_workqueue(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    smp_call_function_single(cpu, (void *)ksym.workqueue_offline_cpu,
-                             (void *)(uintptr_t)cpu, 1);
+    smp_call_function_single(cpu, disable_workqueue, &cpu, 1);
     TRACE_INFO("Disabled workqueue on CPU %d", cpu);
   }
 }
