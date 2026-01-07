@@ -37,7 +37,8 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 #### Bug 1 & 8
 
-[aa3ee4f](https://github.com/torvalds/linux/commit/aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042) |
+[Official Fix: aa3ee4f](https://github.com/torvalds/linux/commit/aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042) |
+[Our Fix: sync_wakeup.patch](linux/sync_wakeup.patch) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/sync_wakeup_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/sync_wakeup_fixed.log)
 
@@ -91,6 +92,7 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 #### Bug 9
 
+[even_idle_cpu.patch](linux/even_idle_cpu.patch) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/even_idle_cpu_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/even_idle_cpu_fixed.log)
 
