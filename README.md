@@ -37,8 +37,9 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 #### Bug 1 & 8
 
-[Official Fix: aa3ee4f](https://github.com/torvalds/linux/commit/aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042) |
-[Our Fix: sync_wakeup.patch](linux/sync_wakeup.patch) |
+Official Fix: [aa3ee4f](https://github.com/torvalds/linux/commit/aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042) |
+Our Fix: [sync_wakeup.patch](linux/sync_wakeup.patch) |
+[driver_sync_wakeup.c](kmod/driver_sync_wakeup.c) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/sync_wakeup_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/sync_wakeup_fixed.log)
 
@@ -46,7 +47,8 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 #### Bug 2
 
-[bbce3de](https://github.com/torvalds/linux/commit/bbce3de72be56e4b5f68924b7da9630cc89aa1a8) |
+Fix: [bbce3de](https://github.com/torvalds/linux/commit/bbce3de72be56e4b5f68924b7da9630cc89aa1a8) |
+[driver_vruntime_overflow.c](kmod/driver_vruntime_overflow.c) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/vruntime_overflow_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/vruntime_overflow_fixed.log)
 
@@ -54,7 +56,8 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 #### Bug 3
 
-[cd9626e](https://github.com/torvalds/linux/commit/cd9626e9ebc77edec33023fe95dab4b04ffc819d) |
+Fix: [cd9626e](https://github.com/torvalds/linux/commit/cd9626e9ebc77edec33023fe95dab4b04ffc819d) |
+[driver_freeze.c](kmod/driver_freeze.c) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/freeze_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/freeze_fixed.log)
 
@@ -62,7 +65,8 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 #### Bug 4
 
-[6d7e478](https://github.com/torvalds/linux/commit/6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3) |
+Fix: [6d7e478](https://github.com/torvalds/linux/commit/6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3) |
+[driver_extra_balance.c](kmod/driver_extra_balance.c) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/extra_balance_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/extra_balance_fixed.log)
 
@@ -70,19 +74,22 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 #### Bug 5
 
-[17e3e88](https://github.com/torvalds/linux/commit/17e3e88ed0b6318fde0d1c14df1a804711cab1b5) |
+Fix: [17e3e88](https://github.com/torvalds/linux/commit/17e3e88ed0b6318fde0d1c14df1a804711cab1b5) |
+[driver_util_avg.c](kmod/driver_util_avg.c) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/util_avg_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/util_avg_fixed.log)
 
 #### Bug 6
 
-[2feab24](https://github.com/torvalds/linux/commit/2feab2492deb2f14f9675dd6388e9e2bf669c27a) |
+Fix: [2feab24](https://github.com/torvalds/linux/commit/2feab2492deb2f14f9675dd6388e9e2bf669c27a) |
+[driver_long_balance.c](kmod/driver_long_balance.c) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/long_balance_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/long_balance_fixed.log)
 
 #### Bug 7
 
-[5068d84](https://github.com/torvalds/linux/commit/5068d84054b766efe7c6202fc71b2350d1c326f1) |
+Fix: [5068d84](https://github.com/torvalds/linux/commit/5068d84054b766efe7c6202fc71b2350d1c326f1) |
+[driver_lag_vruntime.c](kmod/driver_lag_vruntime.c) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/lag_vruntime_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/lag_vruntime_fixed.log)
 
@@ -92,7 +99,8 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 #### Bug 9
 
-[even_idle_cpu.patch](linux/even_idle_cpu.patch) |
+Fix: [even_idle_cpu.patch](linux/even_idle_cpu.patch) |
+[driver_even_idle_cpu.c](kmod/driver_even_idle_cpu.c) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/even_idle_cpu_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/even_idle_cpu_fixed.log)
 
