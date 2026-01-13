@@ -111,10 +111,10 @@ Fix: [even_idle_cpu.patch](linux/even_idle_cpu.patch) |
 #### 📂 Checkout Linux source code
 
 ```sh
-./checkout_linux.py <tag|commit> [<name>] [--tarball]
+./checkout_linux.py <version> [<name>] [--tarball]
 ```
 
-- `<tag|commit>`: Linux branch or commit hash to checkout (e.g., `v6.17`, `6d7e478`).
+- `<version>`: Linux tag (e.g., `v6.14`) or commit hash (e.g., `6d7e478`).
 
 - **Example:** `./checkout_linux.py v6.14` checks out Linux v6.14 under `linux/v6.14`, and symlinks `linux/current` to it.
 
