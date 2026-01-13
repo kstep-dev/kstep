@@ -15,15 +15,13 @@ from scripts import (
     system,
 )
 
-LINUX_GIT_URL = "https://github.com/torvalds/linux.git"
-
 
 def clone_master():
     if LINUX_MASTER_DIR.exists():
         logging.info(f"Linux master already cloned to {LINUX_MASTER_DIR}")
         return
 
-    system(f"git clone {LINUX_GIT_URL} {LINUX_MASTER_DIR}")
+    system(f"git clone https://github.com/torvalds/linux.git {LINUX_MASTER_DIR}")
 
 
 def add_worktree(version: str, linux_dir: Path):
@@ -36,10 +34,6 @@ def add_worktree(version: str, linux_dir: Path):
     system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {version}")
 
 
-def reset_git(linux_dir: Path):
-    system(f"cd {linux_dir} && git restore .")
-
-
 def set_current_linux(linux_dir: Path):
     LINUX_CURR_DIR.unlink(missing_ok=True)
     LINUX_CURR_DIR.symlink_to(linux_dir)
@@ -48,19 +42,24 @@ def set_current_linux(linux_dir: Path):
     )
 
 
-def checkout_linux(version: str, linux_dir: Path, reset: bool, tarball: bool = False):
+def get_download_url(version: str) -> str:
+    if "." in version:
+        version = version.removeprefix("v")
+        major = version.split(".", 1)[0]
+        return (
+            f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
+        )
+    else:
+        return f"https://github.com/torvalds/linux/tarball/{version}"
+
+
+def checkout_linux(version: str, linux_dir: Path, tarball: bool = False):
     if not tarball:
         clone_master()
         add_worktree(version, linux_dir)
-        if reset:
-            reset_git(linux_dir)
     else:
         tarball_path = DATA_DIR / f"{version}.tar.xz"
-        version = version.removeprefix("v")
-        major = version.split(".", 1)[0]
-        url = (
-            f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
-        )
+        url = get_download_url(version)
         download(url, tarball_path)
         decompress(tarball_path, linux_dir)
     set_current_linux(linux_dir)
@@ -76,7 +75,6 @@ if __name__ == "__main__":
         default=None,
         help="Name of the directory (default: <version>)",
     )
-    parser.add_argument("--reset", action="store_true", default=False)
     parser.add_argument("--tarball", action="store_true", default=False)
     args = parser.parse_args()
 
@@ -86,6 +84,5 @@ if __name__ == "__main__":
     checkout_linux(
         version=args.version,
         linux_dir=LINUX_ROOT_DIR / args.name,
-        reset=args.reset,
         tarball=args.tarball,
     )

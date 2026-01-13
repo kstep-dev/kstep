@@ -122,6 +122,10 @@ def patch_linux(linux_dir: Path, patch_file: Path):
     )
 
 
+def reset_git(linux_dir: Path):
+    system(f"cd {linux_dir} && git restore .")
+
+
 def plot_data(python_script: str, controller: str):
     system(f"{PROJ_DIR}/scripts/plot_{python_script}.py --controller={controller}")
 
@@ -131,7 +135,9 @@ def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):
         linux_dir = LINUX_ROOT_DIR / f"{driver.name}_{linux.name}"
     else:
         linux_dir = LINUX_ROOT_DIR / linux.version
-    checkout_linux(linux.version, linux_dir=linux_dir, reset=reset)
+    checkout_linux(linux.version, linux_dir=linux_dir)
+    if reset:
+        reset_git(linux_dir)
     for patch in linux.patches:
         patch_linux(linux_dir, patch)
     if not skip_build:

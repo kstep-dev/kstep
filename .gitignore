@@ -1,7 +1,6 @@
 # Linux source code
 /linux/*/
 /linux/current
-/linux/*.tar.xz
 
 # Build artifacts
 /kmod/build
