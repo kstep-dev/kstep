@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 
 from scripts import (
-    DOWNLOAD_DIR,
+    DATA_DIR,
     LINUX_CURR_DIR,
     LINUX_MASTER_DIR,
     LINUX_ROOT_DIR,
@@ -58,7 +58,7 @@ def checkout_linux(version: str, linux_dir: Path, tarball: bool = False):
         clone_master()
         add_worktree(version, linux_dir)
     else:
-        tarball_path = DOWNLOAD_DIR / f"{version}"
+        tarball_path = DATA_DIR / f"{version}.tar.xz"
         url = get_download_url(version)
         download(url, tarball_path)
         decompress(tarball_path, linux_dir)

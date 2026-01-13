@@ -1,6 +1,7 @@
 # Linux source code
 /linux/*/
 /linux/current
+/linux/*.tar.xz
 
 # Build artifacts
 /kmod/build
@@ -10,9 +11,7 @@
 /data/rootfs.cpio
 /data/rootfs
 /data/logs/*
-!/data/logs/README.md
-/data/download/*
-!/data/download/README.md
+/data/*.tar.xz
 /data/qemu*
 
 # Python
