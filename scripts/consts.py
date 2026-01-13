@@ -19,6 +19,7 @@ LOGS_DIR = DATA_DIR / "logs"
 LOG_LATEST = LOGS_DIR / "latest.log"
 RESULTS_DIR = PROJ_DIR / "results"
 QEMU_DIR = DATA_DIR / "qemu"
+DOWNLOAD_DIR = DATA_DIR / "download"
 
 
 def create_log_path() -> Path:
