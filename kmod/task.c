@@ -83,9 +83,9 @@ void kstep_task_wakeup(struct task_struct *p) {
   TRACE_INFO("Waked up task %d", p->pid);
 }
 
-void kstep_task_sleep(struct task_struct *p, int n) {
-  kstep_task_signal(p, SIGCODE_SLEEP, n, 0, 0);
-  TRACE_INFO("Put task %d to sleep for %d seconds", p->pid, n);
+void kstep_task_usleep(struct task_struct *p, int us) {
+  kstep_task_signal(p, SIGCODE_USLEEP, us, 0, 0);
+  TRACE_INFO("Put task %d to sleep for %d us", p->pid, us);
 }
 
 void kstep_task_set_prio(struct task_struct *p, int prio) {
