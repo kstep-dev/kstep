@@ -23,8 +23,8 @@ static void handler(int signum, siginfo_t *info, void *context) {
       if (pid == 0) // child process
         return;
     }
-  } else if (code == SIGCODE_SLEEP) {
-    sleep(val);
+  } else if (code == SIGCODE_USLEEP) {
+    usleep(val);
   } else if (code == SIGCODE_EXIT) {
     _exit(0);
   } else if (code == SIGCODE_PAUSE) {

@@ -19,7 +19,7 @@ static void run(void) {
     kstep_task_wakeup(tasks[i]);
 
   struct task_struct *p = kstep_tick_until(is_ineligible);
-  kstep_task_sleep(p, 1);
+  kstep_task_usleep(p, 20000); // step_interval_us * 2
 
   kstep_freeze_task(p);
   kstep_task_wakeup(p);
@@ -31,7 +31,7 @@ struct kstep_driver freeze = {
     .name = "freeze",
     .setup = setup,
     .run = run,
-    .step_interval_us = 50000,
+    .step_interval_us = 10000,
     .print_tasks = true,
     .print_rq = true,
 };

@@ -8,7 +8,7 @@ struct kstep_driver {
   const char *name;         // Name of the driver
   void (*setup)(void);      // Setup the driver (e.g., create tasks)
   void (*run)(void);        // Run the driver
-  u64 step_interval_us;     // Time between steps in us (default: 10000)
+  u64 step_interval_us;     // Time between steps in us
   bool print_rq;            // Print runqueue stats
   bool print_tasks;         // Print task stats
   bool print_nr_running;    // Print number of running tasks
@@ -28,7 +28,7 @@ void kstep_task_fork(struct task_struct *p, int n);
 void kstep_task_fifo(struct task_struct *p);
 void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
-void kstep_task_sleep(struct task_struct *p, int n);
+void kstep_task_usleep(struct task_struct *p, int us);
 void kstep_task_set_prio(struct task_struct *p, int prio);
 
 // kernel.c
