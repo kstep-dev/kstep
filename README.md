@@ -79,12 +79,20 @@ Fix: [17e3e88](https://github.com/torvalds/linux/commit/17e3e88ed0b6318fde0d1c14
 [buggy.log](https://github.com/SchedStep/results/blob/main/util_avg_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/util_avg_fixed.log)
 
+<p align="center">
+<img src="https://github.com/SchedStep/results/raw/main/util_avg.png" style="width: 50%;">
+</p>
+
 #### Bug 6
 
 Fix: [2feab24](https://github.com/torvalds/linux/commit/2feab2492deb2f14f9675dd6388e9e2bf669c27a) |
 [driver_long_balance.c](kmod/driver_long_balance.c) |
 [buggy.log](https://github.com/SchedStep/results/blob/main/long_balance_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/long_balance_fixed.log)
+
+<p align="center">
+<img src="https://github.com/SchedStep/results/raw/main/long_balance.png" style="width: 50%;">
+</p>
 
 #### Bug 7
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env -S uv run --script
 
 import argparse
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List
@@ -9,10 +8,6 @@ from typing import Iterable, List
 from checkout_linux import checkout_linux
 from run import Driver, make_kstep, make_linux, run_qemu
 from scripts import LINUX_ROOT_DIR, PROJ_DIR, RESULTS_DIR, system
-
-# Enforce reproducible builds for matplotlib PDF output
-# https://reproducible-builds.org/docs/source-date-epoch/
-os.environ["SOURCE_DATE_EPOCH"] = "0"
 
 
 @dataclass(frozen=True)
