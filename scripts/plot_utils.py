@@ -4,11 +4,10 @@ from consts import RESULTS_DIR
 from matplotlib.figure import Figure
 
 
-def save_fig(fig: Figure, filename: Path | str):
-    if isinstance(filename, str):
-        filename = RESULTS_DIR / filename
-
-    paths = [filename.with_suffix(f".{ext}") for ext in ["pdf", "png"]]
+def save_fig(fig: Figure, filename: Path | str) -> list[Path]:
+    path = Path(filename) if isinstance(filename, str) else filename
+    path = path if path.is_absolute() else RESULTS_DIR / path
+    paths = [path.with_suffix(f".{ext}") for ext in ["pdf", "png"]]
 
     fig.tight_layout(pad=0)
     for path in paths:
