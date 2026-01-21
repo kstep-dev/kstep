@@ -24,7 +24,7 @@ class Linux:
 class Bug:
     driver: Driver
     linux: List[Linux]
-    plot_format: str
+    plot: str
 
 
 bugs = [
@@ -39,7 +39,7 @@ bugs = [
                 patches=[LINUX_ROOT_DIR / "sync_wakeup.patch"],
             ),
         ],
-        plot_format="cur_task",
+        plot="cur_task",
     ),
     # https://github.com/torvalds/linux/commit/cd9626e9ebc77edec33023fe95dab4b04ffc819d
     Bug(
@@ -48,7 +48,7 @@ bugs = [
             Linux(name="buggy", version="cd9626e~1"),
             Linux(name="fixed", version="cd9626e"),
         ],
-        plot_format="cur_task",
+        plot="cur_task",
     ),
     # https://github.com/torvalds/linux/commit/bbce3de72be56e4b5f68924b7da9630cc89aa1a8
     Bug(
@@ -57,7 +57,7 @@ bugs = [
             Linux(name="buggy", version="bbce3de~1"),
             Linux(name="fixed", version="bbce3de"),
         ],
-        plot_format="cur_task",
+        plot="cur_task",
     ),
     # https://github.com/torvalds/linux/commit/2feab2492deb2f14f9675dd6388e9e2bf669c27a
     Bug(
@@ -66,7 +66,7 @@ bugs = [
             Linux(name="buggy", version="2feab24~1"),
             Linux(name="fixed", version="2feab24"),
         ],
-        plot_format="rebalance",
+        plot="rebalance",
     ),
     # https://github.com/torvalds/linux/commit/17e3e88ed0b6318fde0d1c14df1a804711cab1b5
     Bug(
@@ -75,16 +75,16 @@ bugs = [
             Linux(name="buggy", version="17e3e88~1"),
             Linux(name="fixed", version="17e3e88"),
         ],
-        plot_format="util_avg",
+        plot="util_avg",
     ),
     # https://github.com/torvalds/linux/commit/5068d84054b766efe7c6202fc71b2350d1c326f1
     Bug(
         driver=Driver(name="lag_vruntime", smp="2"),
-        plot_format="min_vruntime",
         linux=[
             Linux(name="buggy", version="5068d84~1"),
             Linux(name="fixed", version="5068d84"),
         ],
+        plot="min_vruntime",
     ),
     Bug(
         driver=Driver(name="even_idle_cpu", smp="5"),
@@ -96,7 +96,7 @@ bugs = [
                 patches=[LINUX_ROOT_DIR / "even_idle_cpu.patch"],
             ),
         ],
-        plot_format="lb_nr_running",
+        plot="lb_nr_running",
     ),
     # https://github.com/torvalds/linux/commit/6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3
     Bug(
@@ -105,7 +105,7 @@ bugs = [
             Linux(name="buggy", version="6d7e478~1"),
             Linux(name="fixed", version="6d7e478"),
         ],
-        plot_format="lb_nr_running",
+        plot="lb_nr_running",
     ),
 ]
 
@@ -130,7 +130,7 @@ def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):
         linux_dir = LINUX_ROOT_DIR / f"{driver.name}_{linux.name}"
     else:
         linux_dir = LINUX_ROOT_DIR / linux.version
-    checkout_linux(linux.version, linux_dir=linux_dir)
+    checkout_linux(linux.version, linux_dir=linux_dir, tarball=True)
     if reset:
         reset_git(linux_dir)
     for patch in linux.patches:
@@ -149,7 +149,7 @@ def main(bug: Bug, run: List[str], reset: bool, skip_build: bool):
         reproduce(linux, bug.driver, reset, skip_build)
 
     if "plot" in run:
-        plot_data(bug.plot_format, bug.driver.name)
+        plot_data(bug.plot, bug.driver.name)
 
 
 if __name__ == "__main__":
