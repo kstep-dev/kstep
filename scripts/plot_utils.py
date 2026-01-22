@@ -4,8 +4,8 @@ from consts import RESULTS_DIR
 from matplotlib.figure import Figure
 
 
-def save_fig(fig: Figure, filename: Path | str) -> list[Path]:
-    path = Path(filename) if isinstance(filename, str) else filename
+def save_fig(fig: Figure, name: Path | str) -> list[Path]:
+    path = Path(name) if isinstance(name, str) else name
     path = path if path.is_absolute() else RESULTS_DIR / path
     paths = [path.with_suffix(f".{ext}") for ext in ["pdf", "png"]]
 

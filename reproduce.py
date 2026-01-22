@@ -121,8 +121,8 @@ def reset_git(linux_dir: Path):
     system(f"cd {linux_dir} && git restore .")
 
 
-def plot_data(python_script: str, controller: str):
-    system(f"{PROJ_DIR}/scripts/plot_{python_script}.py --controller={controller}")
+def plot_data(python_script: str, driver: str):
+    system(f"{PROJ_DIR}/scripts/plot_{python_script}.py {driver}")
 
 
 def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):

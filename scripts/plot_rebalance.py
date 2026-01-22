@@ -41,19 +41,17 @@ def plot_rebalance_comparison(buggy_df, fixed_df):
     return fig
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="long_balance")
-    args = parser.parse_args()
-
+def main(driver: str):
     target_cpu = 2
-    buggy_df = parse_log_file(f"{args.controller}_buggy.log", target_cpu=target_cpu)
-    fixed_df = parse_log_file(f"{args.controller}_fixed.log", target_cpu=target_cpu)
+    buggy_df = parse_log_file(f"{driver}_buggy.log", target_cpu=target_cpu)
+    fixed_df = parse_log_file(f"{driver}_fixed.log", target_cpu=target_cpu)
 
     fig = plot_rebalance_comparison(buggy_df, fixed_df)
-
-    save_fig(fig, args.controller)
+    save_fig(fig, driver)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("driver", type=str, default="long_balance", nargs="?")
+    args = parser.parse_args()
+    main(args.driver)

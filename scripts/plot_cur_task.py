@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 
 import argparse
-from pathlib import Path
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from consts import RESULTS_DIR
 from matplotlib import colors
 from parse import parse_log
 from plot_utils import save_fig
@@ -59,7 +57,7 @@ NAME_MAPS = {
 }
 
 
-def parse_curr_task(path: Path) -> pd.DataFrame:
+def parse_curr_task(path) -> pd.DataFrame:
     df = parse_log(path, prefix="task")
     df = df[df["on_cpu"] == True]
     return df
@@ -115,8 +113,8 @@ def plot_color_matrix(
 
 
 def plot_cur_task(
-    log_file_buggy: Path,
-    log_file_fixed: Path,
+    log_file_buggy,
+    log_file_fixed,
     title_buggy: str,
     title_fixed: str,
     color_map: dict[int, str],
@@ -165,18 +163,8 @@ def plot_cur_task(
     return fig
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="sync_wakeup")
-    args = parser.parse_args()
-
-    bugId = args.controller
-    log_file_buggy = RESULTS_DIR / f"{bugId}_buggy.log"
-    log_file_fixed = RESULTS_DIR / f"{bugId}_fixed.log"
-
-    output_file = RESULTS_DIR / f"{bugId}.pdf"
-
-    if bugId == "sync_wakeup":
+def main(driver: str):
+    if driver == "sync_wakeup":
         title_buggy = "Buggy and Official Fix"
         title_fixed = "Our Fix"
     else:
@@ -184,12 +172,19 @@ if __name__ == "__main__":
         title_fixed = "Fixed"
 
     fig = plot_cur_task(
-        log_file_buggy,
-        log_file_fixed,
-        title_buggy,
-        title_fixed,
-        color_map=COLOR_MAPS.get(bugId, {}),
-        name_map=NAME_MAPS.get(bugId, {}),
+        log_file_buggy=f"{driver}_buggy.log",
+        log_file_fixed=f"{driver}_fixed.log",
+        title_buggy=title_buggy,
+        title_fixed=title_fixed,
+        color_map=COLOR_MAPS.get(driver, {}),
+        name_map=NAME_MAPS.get(driver, {}),
     )
 
-    save_fig(fig, output_file)
+    save_fig(fig, driver)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("driver", type=str, default="sync_wakeup", nargs="?")
+    args = parser.parse_args()
+    main(args.driver)

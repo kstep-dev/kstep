@@ -7,27 +7,27 @@ from pathlib import Path
 import pandas as pd
 from consts import LOG_LATEST, RESULTS_DIR
 
-LOG_PREFIX_LEN = 14
+TIMESTAMP_LEN = 14
 
 
-def parse_line(prefix: str, line: str) -> dict | None:
+def parse_line(line: str, prefix: str) -> dict | None:
     # Line format: [timestamp] prefix: {json}
-    if len(line) < LOG_PREFIX_LEN:
+    if len(line) < TIMESTAMP_LEN:
         return None
-    if line[0] != "[" or line[LOG_PREFIX_LEN - 1] != "]":
+    if line[0] != "[" or line[TIMESTAMP_LEN - 1] != "]":
         return None
-    if not line.startswith(prefix, LOG_PREFIX_LEN + 1):
+    if not line.startswith(prefix, TIMESTAMP_LEN + 1):
         return None
 
     # Parse JSON
-    json_str = line[LOG_PREFIX_LEN + 1 + len(prefix) :].removeprefix(":")
+    json_str = line[TIMESTAMP_LEN + 1 + len(prefix) :].removeprefix(":")
     try:
         obj = json.loads(json_str)
     except json.JSONDecodeError:
         raise ValueError(f"Invalid JSON at line {line}")
 
     # Parse timestamp
-    ts_str = line[1 : LOG_PREFIX_LEN - 1]
+    ts_str = line[1 : TIMESTAMP_LEN - 1]
     ts = round((float(ts_str) - 10) * 1000)
 
     # Add timestamp to object
@@ -42,10 +42,12 @@ def parse_log(path: Path | str, prefix: str) -> pd.DataFrame:
     data = []
     with open(path, "r") as f:
         for line in f:
-            obj = parse_line(prefix, line)
+            obj = parse_line(line, prefix)
             if obj is None:
                 continue
             data.append(obj)
+    if not data:
+        print(f'No data found for {path} with prefix "{prefix}"')
     return pd.DataFrame(data)
 
 
