@@ -20,6 +20,8 @@ struct kstep_driver {
 void kstep_tick(void);
 void kstep_tick_repeat(int n);
 void *kstep_tick_until(void *(*fn)(void));
+void kstep_sleep(void);
+void *kstep_sleep_until(void *(*fn)(void));
 
 // task.c
 struct task_struct *kstep_task_create(void);

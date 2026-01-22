@@ -9,7 +9,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 from consts import RESULTS_DIR
 from matplotlib import colors
-from parse import parse_load_balance, parse_nr_running
+from parse import parse_log
 from plot_utils import save_fig
 
 all_cpus = [4, 5, 6, 7]
@@ -18,7 +18,7 @@ cmap = plt.cm.get_cmap("Blues", N_COLORS)
 
 
 def build_nr_running_matrix(filename):
-    df = parse_nr_running(filename)
+    df = parse_log(filename, prefix="nr_running")
     df = df[df["cpu"].isin(all_cpus)]
     nr_running_matrix = df.pivot_table(
         index="timestamp", columns="cpu", values="val", aggfunc="first"
@@ -34,7 +34,7 @@ def build_nr_running_matrix(filename):
 
 
 def parse_lb_events(filename):
-    df = parse_load_balance(filename)
+    df = parse_log(filename, prefix="load_balance")
     df = df[df["timestamp"] != 0]
     return df
 

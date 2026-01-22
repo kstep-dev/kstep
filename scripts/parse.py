@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
-from consts import LOG_LATEST
+from consts import LOG_LATEST, RESULTS_DIR
 
 LOG_PREFIX_LEN = 14
 
@@ -20,7 +20,7 @@ def parse_line(prefix: str, line: str) -> dict | None:
         return None
 
     # Parse JSON
-    json_str = line[LOG_PREFIX_LEN + 1 + len(prefix) :]
+    json_str = line[LOG_PREFIX_LEN + 1 + len(prefix) :].removeprefix(":")
     try:
         obj = json.loads(json_str)
     except json.JSONDecodeError:
@@ -35,7 +35,10 @@ def parse_line(prefix: str, line: str) -> dict | None:
     return obj
 
 
-def parse_file(prefix: str, path: Path) -> pd.DataFrame:
+def parse_log(path: Path | str, prefix: str) -> pd.DataFrame:
+    path = Path(path) if isinstance(path, str) else path
+    path = RESULTS_DIR / path if not path.is_absolute() else path
+    print(f'Parsing {path} with prefix "{prefix}"')
     data = []
     with open(path, "r") as f:
         for line in f:
@@ -46,33 +49,18 @@ def parse_file(prefix: str, path: Path) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 
-def parse_task(path: Path) -> pd.DataFrame:
-    print(f"Parsing task from {path}")
-    return parse_file("task: ", path)
-
-
-def parse_rq(path: Path) -> pd.DataFrame:
-    print(f"Parsing rq from {path}")
-    return parse_file("rq: ", path)
-
-
-def parse_load_balance(path: Path) -> pd.DataFrame:
-    print(f"Parsing load_balance from {path}")
-    return parse_file("load_balance: ", path)
-
-
-def parse_nr_running(path: Path) -> pd.DataFrame:
-    print(f"Parsing nr_running from {path}")
-    return parse_file("nr_running: ", path)
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path, default=LOG_LATEST, nargs="?")
+    parser.add_argument(
+        "--prefixes",
+        type=str,
+        default=["task", "rq", "load_balance", "nr_running", "sched_softirq"],
+        nargs="*",
+    )
     args = parser.parse_args()
-    for fn in [parse_task, parse_rq, parse_load_balance, parse_nr_running]:
-        print(f"Parsing {fn.__name__} from {args.path}")
-        df = fn(args.path)
+    for prefix in args.prefixes:
+        df = parse_log(args.path, prefix)
         with pd.option_context(
             "display.max_rows", None, "display.max_columns", None, "display.width", None
         ):
