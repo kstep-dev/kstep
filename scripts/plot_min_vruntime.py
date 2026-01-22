@@ -16,7 +16,7 @@ def parse_log_file(log_file):
     return df
 
 
-def plot_min_avg_vruntime(buggy_df, fixed_df):
+def plot_min_vruntime(buggy_df, fixed_df):
     fig, ax1 = plt.subplots(figsize=(1.95, 1.95))
 
     # Top subplot: min_vruntime using scatter
@@ -64,7 +64,7 @@ def main(driver: str):
     buggy_df = parse_log_file(f"{driver}_buggy.log")
     fixed_df = parse_log_file(f"{driver}_fixed.log")
 
-    fig = plot_min_avg_vruntime(buggy_df, fixed_df)
+    fig = plot_min_vruntime(buggy_df, fixed_df)
     save_fig(fig, driver)
 
 
