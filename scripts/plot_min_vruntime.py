@@ -6,7 +6,6 @@ Plot min_vruntime and avg_vruntime for CPU 2 over time from log files
 import argparse
 
 import matplotlib.pyplot as plt
-from consts import RESULTS_DIR
 from parse import parse_log
 from plot_utils import save_fig
 
@@ -68,23 +67,18 @@ def plot_min_avg_vruntime(
     return fig
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--controller", type=str, default="lag_vruntime")
-    args = parser.parse_args()
-
-    # Paths to the log files
-    buggy_log = RESULTS_DIR / f"{args.controller}_buggy.log"
-    fixed_log = RESULTS_DIR / f"{args.controller}_fixed.log"
-
-    timestamps_buggy, min_vruntime_buggy = parse_log_file(buggy_log)
-    timestamps_fixed, min_vruntime_fixed = parse_log_file(fixed_log)
+def main(driver: str):
+    timestamps_buggy, min_vruntime_buggy = parse_log_file(f"{driver}_buggy.log")
+    timestamps_fixed, min_vruntime_fixed = parse_log_file(f"{driver}_fixed.log")
 
     fig = plot_min_avg_vruntime(
         timestamps_buggy, min_vruntime_buggy, timestamps_fixed, min_vruntime_fixed
     )
-    save_fig(fig, args.controller)
+    save_fig(fig, driver)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("driver", type=str, default="lag_vruntime", nargs="?")
+    args = parser.parse_args()
+    main(args.driver)
