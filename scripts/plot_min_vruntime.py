@@ -13,23 +13,16 @@ from plot_utils import save_fig
 def parse_log_file(log_file):
     df = parse_log(log_file, prefix="rq")
     df = df[df["cpu"] == 1]
-    return df["timestamp"], df["min_vruntime"]
+    return df
 
 
-def plot_min_avg_vruntime(
-    timestamps_buggy, min_vruntime_buggy, timestamps_fixed, min_vruntime_fixed
-):
-    """
-    Plot min_vruntime and avg_vruntime for buggy and fixed in two subplots.
-    Top: min_vruntime as scatter.
-    Bottom: avg_vruntime as scatter using same shape, size.
-    """
+def plot_min_avg_vruntime(buggy_df, fixed_df):
     fig, ax1 = plt.subplots(figsize=(1.95, 1.95))
 
     # Top subplot: min_vruntime using scatter
     ax1.scatter(
-        timestamps_buggy,
-        min_vruntime_buggy,
+        buggy_df["timestamp"],
+        buggy_df["min_vruntime"],
         s=26,
         marker="o",
         facecolor="#A72703",
@@ -40,8 +33,8 @@ def plot_min_avg_vruntime(
         zorder=2,
     )
     ax1.scatter(
-        timestamps_fixed,
-        min_vruntime_fixed,
+        fixed_df["timestamp"],
+        fixed_df["min_vruntime"],
         s=60,
         marker="s",
         facecolor="none",
@@ -68,12 +61,10 @@ def plot_min_avg_vruntime(
 
 
 def main(driver: str):
-    timestamps_buggy, min_vruntime_buggy = parse_log_file(f"{driver}_buggy.log")
-    timestamps_fixed, min_vruntime_fixed = parse_log_file(f"{driver}_fixed.log")
+    buggy_df = parse_log_file(f"{driver}_buggy.log")
+    fixed_df = parse_log_file(f"{driver}_fixed.log")
 
-    fig = plot_min_avg_vruntime(
-        timestamps_buggy, min_vruntime_buggy, timestamps_fixed, min_vruntime_fixed
-    )
+    fig = plot_min_avg_vruntime(buggy_df, fixed_df)
     save_fig(fig, driver)
 
 
