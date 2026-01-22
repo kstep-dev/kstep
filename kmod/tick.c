@@ -140,3 +140,12 @@ void *kstep_tick_until(void *(*fn)(void)) {
     kstep_tick();
   }
 }
+
+void *kstep_sleep_until(void *(*fn)(void)) {
+  while (1) {
+    void *result = fn();
+    if (result)
+      return result;
+    kstep_sleep();
+  }
+}

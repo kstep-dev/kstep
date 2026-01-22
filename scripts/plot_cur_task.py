@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from consts import RESULTS_DIR
 from matplotlib import colors
-from parse import parse_task
+from parse import parse_log
 from plot_utils import save_fig
 
 COLOR_IDLE = (0.95, 0.95, 0.95)
@@ -60,9 +60,10 @@ NAME_MAPS = {
 
 
 def parse_curr_task(path: Path) -> pd.DataFrame:
-    df = parse_task(path)
+    df = parse_log(path, prefix="task")
     df = df[df["on_cpu"] == True]
     return df
+
 
 def build_pid_matrix(df: pd.DataFrame) -> pd.DataFrame:
     # Normalize pids to start from 0 and be consecutive

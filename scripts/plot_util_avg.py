@@ -7,12 +7,12 @@ import argparse
 
 import matplotlib.pyplot as plt
 from consts import RESULTS_DIR
-from parse import parse_rq
+from parse import parse_log
 from plot_utils import save_fig
 
 
 def parse_log_file(log_file):
-    df = parse_rq(log_file)
+    df = parse_log(log_file, prefix="rq")
     return df["timestamp"], df["avg_util"]
 
 

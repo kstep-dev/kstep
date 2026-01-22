@@ -97,9 +97,9 @@ static void sched_softirq_exit(void *ignore, unsigned int vec_nr) {
   if (!starttime)
     panic("sched_softirq_starttime is not set");
   this_cpu_write(sched_softirq_starttime, 0);
-  ktime_t duration = ktime_sub(endtime, starttime);
-  pr_info("run_rebalance_domains on CPU %d, latency: %lld ns\n",
-          smp_processor_id(), ktime_to_ns(duration));
+  u64 lat_ns = ktime_to_ns(ktime_sub(endtime, starttime));
+  pr_info("sched_softirq: {" K(cpu) "%d, " K(lat_us) "%lld.%03llu}\n",
+          smp_processor_id(), lat_ns / 1000, lat_ns % 1000);
 }
 
 void kstep_trace_sched_softirq(void) {

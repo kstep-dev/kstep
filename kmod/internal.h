@@ -27,7 +27,6 @@ void kstep_driver_print(struct kstep_driver *driver);
 void kstep_sched_timer_init(void);
 void kstep_jiffies_init(void);
 void kstep_sched_clock_init(void);
-void kstep_sleep(void);
 
 // output.c
 void kstep_print_rq(void);
