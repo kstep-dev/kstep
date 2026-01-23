@@ -114,6 +114,15 @@ Fix: [even_idle_cpu.patch](linux/even_idle_cpu.patch) |
 
 ![](https://github.com/SchedStep/results/blob/main/even_idle_cpu.png)
 
+#### Bug 10
+
+Fix: [9b58e97](https://github.com/torvalds/linux/commit/9b58e976b3b391c0cf02e038d53dd0478ed3013c) |
+[driver_rt_runtime_toggle.c](kmod/driver_rt_runtime_toggle.c) |
+[buggy.log](https://github.com/SchedStep/results/blob/main/rt_runtime_toggle_buggy.log) |
+[fixed.log](https://github.com/SchedStep/results/blob/main/rt_runtime_toggle_fixed.log)
+
+![](https://github.com/SchedStep/results/blob/main/rt_runtime_toggle.png)
+
 ## 💻 Developing Your Own Drivers
 
 #### 📂 Checkout Linux source code
