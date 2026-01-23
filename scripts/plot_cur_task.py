@@ -39,10 +39,7 @@ def build_matrix(df: pd.DataFrame, type: str, color_map: dict[int, str]) -> np.n
 
 
 def plot_color_matrix(
-    df: pd.DataFrame,
-    color_matrix: np.ndarray,
-    ax: plt.Axes,
-    title: str,
+    df: pd.DataFrame, color_matrix: np.ndarray, ax: plt.Axes, title: str
 ):
     ax.imshow(color_matrix, aspect="auto", interpolation="nearest")
 
