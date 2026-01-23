@@ -4,92 +4,47 @@ import argparse
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 from matplotlib import colors
 from parse import parse_log
 from plot_utils import save_fig
 
-COLOR_IDLE = (0.95, 0.95, 0.95)
-COLOR_YELLOW = "#FFE797"
-COLOR_GREEN = "#84994F"
-COLOR_ORANGE = "#FCB53B"
-COLOR_DARK_BLUE = "#4A70A9"
-COLOR_LIGHT_BLUE = "#8FABD4"
-COLOR_BUGGY = "tab:red"
 
-COLOR_MAPS = {
-    "sync_wakeup": {
-        -1: COLOR_IDLE,
-        0: COLOR_YELLOW,
-        1: COLOR_LIGHT_BLUE,
-        2: COLOR_BUGGY,
-    },
-    "freeze": {
-        0: COLOR_BUGGY,
-        1: COLOR_YELLOW,
-        2: COLOR_LIGHT_BLUE,
-    },
-    "vruntime_overflow": {
-        0: COLOR_YELLOW,
-        1: COLOR_BUGGY,
-        2: COLOR_LIGHT_BLUE,
-    },
-}
-
-NAME_MAPS = {
-    "sync_wakeup": {
-        -1: "Idle",
-        0: "Task 1",
-        1: "Task 2 (waker)",
-        2: "Task 3 (wakee)",
-    },
-    "freeze": {
-        0: "Task 1 (fail to freeze)",
-        1: "Task 2",
-        2: "Task 3",
-    },
-    "vruntime_overflow": {
-        0: "Task 1",
-        1: "Task 2 (starved)",
-        2: "Task 3",
-    },
-}
-
-
-def parse_curr_task(path) -> pd.DataFrame:
+def parse_curr_task(path, type: str) -> pd.DataFrame:
     df = parse_log(path, prefix="task")
     df = df[df["on_cpu"] == True]
+    df["type"] = type
     return df
 
 
-def build_pid_matrix(df: pd.DataFrame) -> pd.DataFrame:
-    # Normalize pids to start from 0 and be consecutive
+def build_matrix(df: pd.DataFrame, type: str, color_map: dict[int, str]) -> np.ndarray:
+    timestamps = df["timestamp"].unique()
+    cpus = df["cpu"].unique()
+
+    # Map pids to consecutive integers
     df["pid"], _ = pd.factorize(df["pid"], sort=True)
-    # Transform table to matrix
-    return (
-        df.pivot(
-            index=["name", "timestamp"],
-            columns=["cpu"],
-            values="pid",
-        )
-        .replace(np.nan, -1)
-        .astype(int)
-    )
+    df["cpu"] -= min(cpus)
+
+    matrix = np.full((len(cpus), len(timestamps)), -1)
+    for _, row in df[df["type"] == type].iterrows():
+        matrix[row["cpu"], row["timestamp"]] = row["pid"]
+
+    color_matrix = np.zeros((len(cpus), len(timestamps), 4))
+    for i in range(len(cpus)):
+        for j in range(len(timestamps)):
+            color_matrix[i, j, :] = colors.to_rgba(color_map[matrix[i, j]])
+    return color_matrix
 
 
 def plot_color_matrix(
-    pid_matrix: pd.DataFrame, ax: plt.Axes, title: str, color_map: dict[int, str]
+    df: pd.DataFrame, color_matrix: np.ndarray, ax: plt.Axes, title: str
 ):
-    # Map pids to colors and convert to numpy array
-    color_df = pid_matrix.map(lambda x: colors.to_rgba(color_map[x]))
-    color_matrix = np.array(color_df.T.values.tolist())
-
-    # Plot color matrix
     ax.imshow(color_matrix, aspect="auto", interpolation="nearest")
 
     # Adjust ticks
-    cpu_count = color_matrix.shape[0]
+    cpu_count = df["cpu"].nunique()
     ax.set_yticks(np.arange(cpu_count))
     ax.set_yticklabels([f"CPU {i + 1}" for i in range(cpu_count)])
 
@@ -98,14 +53,7 @@ def plot_color_matrix(
         ax.set_xticklabels([])
         ax.set_xlabel("")
     else:
-        time_count = color_matrix.shape[1]
-        xtick_locs = np.arange(0, time_count, 10)
-        # Ensure the last tick is included if not already
-        if len(xtick_locs) == 0 or xtick_locs[-1] != time_count - 1:
-            xtick_locs = np.append(xtick_locs, time_count - 1)
-
-        ax.set_xticks(xtick_locs)
-        ax.set_xticklabels([f"{i}" for i in xtick_locs])
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(5, steps=[1, 5, 10]))
         ax.tick_params(axis="x", length=2, pad=1)  # Shorter ticks, labels closer
         ax.set_xlabel("Time (ms)", labelpad=0.5)
 
@@ -120,15 +68,15 @@ def plot_cur_task(
     color_map: dict[int, str],
     name_map: dict[int, str],
 ):
-    df_buggy = parse_curr_task(log_file_buggy)
-    df_fixed = parse_curr_task(log_file_fixed)
-    df_buggy["name"] = "buggy"
-    df_fixed["name"] = "fixed"
-    df = build_pid_matrix(pd.concat([df_buggy, df_fixed]))
+    df_buggy = parse_curr_task(log_file_buggy, "buggy")
+    df_fixed = parse_curr_task(log_file_fixed, "fixed")
 
-    num_cpus = df.shape[1]
+    df = pd.concat([df_buggy, df_fixed])
+    matrix_buggy = build_matrix(df, "buggy", color_map)
+    matrix_fixed = build_matrix(df, "fixed", color_map)
 
-    if num_cpus == 1:
+    cpus = df["cpu"].unique()
+    if len(cpus) == 1:
         figsize = (4, 0.875)
     else:
         figsize = (4, 1.125)
@@ -137,12 +85,12 @@ def plot_cur_task(
         2, 1, figsize=figsize, gridspec_kw={"hspace": 0.75}
     )
 
-    plot_color_matrix(df.loc["buggy"], ax_buggy, title_buggy, color_map)
-    plot_color_matrix(df.loc["fixed"], ax_fixed, title_fixed, color_map)
+    plot_color_matrix(df, matrix_buggy, ax_buggy, title_buggy)
+    plot_color_matrix(df, matrix_fixed, ax_fixed, title_fixed)
 
     handles = []
     labels = []
-    unique_pids = np.unique(df.values.flatten())
+    unique_pids = sorted(df["pid"].unique())
     for pid in unique_pids:
         handles.append(mpatches.Patch(color=color_map[pid]))
         labels.append(name_map[pid])
@@ -152,7 +100,7 @@ def plot_cur_task(
         labels,
         loc="upper center",
         ncol=8,
-        bbox_to_anchor=(0.5, 1.25 if num_cpus == 2 else 1.3),
+        bbox_to_anchor=(0.5, 1.25 if len(cpus) == 2 else 1.3),
         fontsize=8,
         handlelength=1,
         handletextpad=0.25,
@@ -161,6 +109,58 @@ def plot_cur_task(
     )
 
     return fig
+
+
+COLOR_IDLE = (0.95, 0.95, 0.95)
+COLOR_YELLOW = "#FFE797"
+COLOR_LIGHT_BLUE = "#8FABD4"
+COLOR_BUGGY = "tab:red"
+
+COLOR_MAPS = {
+    "sync_wakeup": {
+        -1: COLOR_IDLE,
+        0: COLOR_YELLOW,
+        1: COLOR_LIGHT_BLUE,
+        2: COLOR_BUGGY,
+    },
+    "freeze": {
+        -1: COLOR_IDLE,
+        0: COLOR_BUGGY,
+        1: COLOR_YELLOW,
+        2: COLOR_LIGHT_BLUE,
+    },
+    "vruntime_overflow": {
+        -1: COLOR_IDLE,
+        0: COLOR_YELLOW,
+        1: COLOR_BUGGY,
+        2: COLOR_LIGHT_BLUE,
+    },
+    "rt_runtime_toggle": {
+        0: COLOR_LIGHT_BLUE,
+        -1: COLOR_IDLE,
+    },
+}
+
+NAME_MAPS = {
+    "sync_wakeup": {
+        0: "Task 1",
+        1: "Task 2 (waker)",
+        2: "Task 3 (wakee)",
+    },
+    "freeze": {
+        0: "Task 1 (fail to freeze)",
+        1: "Task 2",
+        2: "Task 3",
+    },
+    "vruntime_overflow": {
+        0: "Task 1",
+        1: "Task 2 (starved)",
+        2: "Task 3",
+    },
+    "rt_runtime_toggle": {
+        0: "Real-time Task",
+    },
+}
 
 
 def main(driver: str):
