@@ -34,7 +34,7 @@ To reproduce a bug that is fixed in commit `[hash]`, follow these steps:
    ```
 
 - **Check the fix:**
-   - Switch to the Linux source code with the fix.
+   - Switch to the Linux source code with the fix by running `./checkout_linux.py [hash]`.
    - Run your driver again.
    - Review the logs to confirm the bug is resolved.
 
