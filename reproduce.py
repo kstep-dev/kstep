@@ -107,6 +107,15 @@ bugs = [
         ],
         plot_format="lb_nr_running",
     ),
+    # https://github.com/torvalds/linux/commit/9b58e976b3b391c0cf02e038d53dd0478ed3013c
+    Bug(
+        driver=Driver(name="rt_runtime_toggle", smp="2"),
+        linux=[
+            Linux(name="buggy", version="9b58e976b3b391c0cf02e038d53dd0478ed3013c~1"),
+            Linux(name="fixed", version="9b58e976b3b391c0cf02e038d53dd0478ed3013c"),
+        ],
+        plot_format="cur_task",
+    ),
     # https://github.com/torvalds/linux/commit/0213b7083e81f4acd69db32cb72eb4e5f220329a
     Bug(
         driver=Driver(name="uclamp_inversion", smp="2"),

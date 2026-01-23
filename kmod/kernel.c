@@ -8,11 +8,12 @@
 
 #include "internal.h"
 
+#define SYSCTL_ROOT "/proc/sys/"
 #define CGROUP_ROOT "/sys/fs/cgroup/"
 #define CGROUP_CONTROL "+cpu +cpuset"
 
-#define MAX_CGROUP_PATH_LENGTH 64
-#define MAX_CGROUP_DATA_LENGTH 64
+#define MAX_PATH_LENGTH 64
+#define MAX_DATA_LENGTH 64
 
 void kstep_write(const char *path, const char *buf, size_t size) {
   TRACE_INFO("Writing %s: %s", path, buf);
@@ -21,8 +22,9 @@ void kstep_write(const char *path, const char *buf, size_t size) {
     panic("open %s failed: %ld", path, PTR_ERR(file));
 
   loff_t pos = 0;
-  if (kernel_write(file, buf, size, &pos) < 0)
-    panic("write %s failed: %s", path, buf);
+  ssize_t ret = kernel_write(file, buf, size, &pos);
+  if (ret < 0)
+    panic("write %s failed with return value %ld", path, ret);
 
   filp_close(file, NULL);
 }
@@ -74,10 +76,36 @@ void kstep_mkdir(const char *dir) {
   TRACE_INFO("Created directory %s", dir);
 }
 
+void kstep_sysctl_write(const char *name, const char *fmt, ...) {
+  char data[MAX_DATA_LENGTH] = {0};
+  char path[MAX_PATH_LENGTH] = {0};
+
+  // Format data with "\n" at the end
+  va_list args;
+  va_start(args, fmt);
+  int size = vsnprintf(data, sizeof(data) - 1, fmt, args);
+  va_end(args);
+  if (size <= 0 || size >= sizeof(data) - 1)
+    panic("failed to format sysctl data for %s", name);
+  data[size++] = '\n';
+  data[size] = '\0';
+
+  // Format path with "." replaced by "/"
+  size_t sysctl_root_len = strlen(SYSCTL_ROOT);
+  size_t name_len = strlen(name);
+  if (sysctl_root_len + name_len >= sizeof(path))
+    panic("failed to form sysctl file path for %s", name);
+  memcpy(path, SYSCTL_ROOT, sysctl_root_len);
+  for (size_t i = 0; i < name_len; i++)
+    path[sysctl_root_len + i] = (name[i] == '.') ? '/' : name[i];
+
+  kstep_write(path, data, size);
+}
+
 void kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
                         ...) {
-  char data[MAX_CGROUP_DATA_LENGTH] = {0};
-  char path[MAX_CGROUP_PATH_LENGTH] = {0};
+  char data[MAX_DATA_LENGTH] = {0};
+  char path[MAX_PATH_LENGTH] = {0};
 
   // Format data
   va_list args;
@@ -96,7 +124,7 @@ void kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
 }
 
 static void kstep_cgroup_mkdir(const char *name) {
-  char path[MAX_CGROUP_PATH_LENGTH] = {0};
+  char path[MAX_PATH_LENGTH] = {0};
   int ret = scnprintf(path, sizeof(path), CGROUP_ROOT "%s", name);
   if (ret <= 0 || ret >= sizeof(path))
     panic("failed to form cgroup file path for %s", name);
