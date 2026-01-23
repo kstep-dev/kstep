@@ -6,7 +6,7 @@ To reproduce a bug that is fixed in commit `[hash]`, follow these steps:
 
 - **Read the commit message:**
    ```sh
-   cd linux/master && git show -U32 [hash] | cat
+   cd linux/master && git show -U32 [hash]
    ```
    If the commit message contains a "Link: <url>", open the URL for further details. For `lore.kernel.org` links, be sure to review the entire discussion (with URL ending in `/T/#u`).
 
