@@ -25,7 +25,7 @@ To reproduce a bug that is fixed in commit `[hash]`, follow these steps:
    ```sh
    make linux
    make kstep
-   ./run.py [name]
+   ./run.py [driver_name]
    ```
 
 - **Analyze the logs to understand the bug:**
