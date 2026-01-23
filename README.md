@@ -128,7 +128,7 @@ Fix: [even_idle_cpu.patch](linux/even_idle_cpu.patch) |
 
 #### 🛠️ Build Linux and kSTEP
 ```sh
-make linux kstep
+make linux; make kstep
 ```
 - The default target is `kstep`. See [`Makefile`](Makefile) for a full list of build targets.
 

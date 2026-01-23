@@ -36,6 +36,7 @@ void kstep_task_set_prio(struct task_struct *p, int prio);
 // kernel.c
 void kstep_write(const char *path, const char *buf, size_t size);
 void kstep_mkdir(const char *dir);
+void kstep_sysctl_write(const char *name, const char *fmt, ...);
 void kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
                         ...);
 void kstep_cgroup_create_pinned(const char *name, const char *cpuset);
