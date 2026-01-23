@@ -4,11 +4,15 @@
 
 To reproduce a bug that is fixed in commit `[hash]`, follow these steps:
 
-- **Read the commit message:**
+- **Read the commit message and discussion:**
    ```sh
    cd linux/master && git show -U32 [hash]
    ```
-   If the commit message contains a "Link: <url>", open the URL for further details. For `lore.kernel.org` links, be sure to review the entire discussion (with URL ending in `/T/#u`).
+   If the commit message contains a "Link: <url>", open the URL for further details. 
+   For `lore.kernel.org` links, review the mailing list discussion by appending `/t.mbox.gz` to the end of the URL. For example:
+   ```sh
+   curl -sL https://lore.kernel.org/lkml/CAB8ipk_a6VFNjiEnHRHkUMBKbA+qzPQvhtNjJ_YNzQhqV_o8Zw@mail.gmail.com/t.mbox.gz | gunzip
+   ```
 
 - **Check out the Linux source code before the fix:**
    ```sh
@@ -43,7 +47,7 @@ To reproduce a bug that is fixed in commit `[hash]`, follow these steps:
 
 ## Driver Development
 
-- Prioritize concise, clear code over complex or verbose solutions.
+- Write concise, straightforward code. Focus on creating the simplest possible reproducer for the bug, avoiding unnecessary complexity.
 
 - Fail fast and early: prefer using `panic` to immediately abort the kernel instead of returning an error.
 
@@ -52,3 +56,7 @@ To reproduce a bug that is fixed in commit `[hash]`, follow these steps:
 - To help trace the bug, you may add logging (`printk`) or adapt the kernel source.
 
 - Do not include bug status reporting within the driver code; this will be handled by the Python scripts.
+
+## Caveats
+
+- Avoid pinning tasks to CPU 0, as it is reserved for running the driver. Therefore, QEMU must be configured with at least 2 CPUs.
