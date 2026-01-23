@@ -83,11 +83,12 @@ void kstep_sysctl_write(const char *name, const char *fmt, ...) {
   // Format data with "\n" at the end
   va_list args;
   va_start(args, fmt);
-  int size = vsnprintf(data, sizeof(data), fmt, args);
+  int size = vsnprintf(data, sizeof(data) - 1, fmt, args);
   va_end(args);
-  if (size <= 0 || size >= sizeof(data))
+  if (size <= 0 || size >= sizeof(data) - 1)
     panic("failed to format sysctl data for %s", name);
-  strlcat(data, "\n", sizeof(data));
+  data[size++] = '\n';
+  data[size] = '\0';
 
   // Format path with "." replaced by "/"
   size_t sysctl_root_len = strlen(SYSCTL_ROOT);
