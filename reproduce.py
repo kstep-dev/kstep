@@ -24,7 +24,7 @@ class Linux:
 class Bug:
     driver: Driver
     linux: List[Linux]
-    plot_format: str
+    plot_format: str | None = None
 
 
 bugs = [
@@ -107,6 +107,14 @@ bugs = [
         ],
         plot_format="lb_nr_running",
     ),
+    # https://github.com/torvalds/linux/commit/0213b7083e81f4acd69db32cb72eb4e5f220329a
+    Bug(
+        driver=Driver(name="uclamp_inversion", smp="2"),
+        linux=[
+            Linux(name="buggy", version="0213b70~1"),
+            Linux(name="fixed", version="0213b70"),
+        ],
+    ),
 ]
 
 
@@ -149,7 +157,10 @@ def main(bug: Bug, run: List[str], reset: bool, skip_build: bool):
         reproduce(linux, bug.driver, reset, skip_build)
 
     if "plot" in run:
-        plot_data(bug.plot_format, bug.driver.name)
+        if bug.plot_format:
+            plot_data(bug.plot_format, bug.driver.name)
+        else:
+            print(f"Plot format not specified for bug '{bug.driver.name}'")
 
 
 if __name__ == "__main__":
