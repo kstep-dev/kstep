@@ -3,7 +3,8 @@
 #include "driver.h"
 #include "internal.h" // rq
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+// https://github.com/torvalds/linux/commit/abc158c82ae555078aa5dd2d8407c3df0f868904
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
 
 static struct task_struct *target_task;
 static struct task_struct *other_task;
