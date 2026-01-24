@@ -22,8 +22,15 @@ To reproduce a bug that is fixed in commit `[hash]`, follow these steps:
    Carefully review the context of the bug fix.
 
 - **Implement a driver:**
-   - Write a driver in `kmod/driver_<name>.c` to trigger the bug.
-   - Review examples of existing drivers in the `kmod/` directory and consult the "Driver Development" section below for additional guidance.
+   - Create a driver in `kmod/driver_<name>.c` that reproduces the bug. Use existing drivers as examples for structure and implementation.
+
+   - Begin by triggering the bug in the kernel. Prefer to rely on public APIs in the kernel, available in userspace, or provided by kSTEP (`kmod/driver.h`). If it’s difficult to reproduce the bug naturally, you may temporarily manipulate the kernel internal state and then figure out the proper triggering condition. Always test your driver on both the buggy and fixed kernels to verify the presence of the bug.
+
+   - After successfully triggering the bug, demonstrate its impact. Rather than relying on internal state alone, focus on observable symptoms, such as differences in task scheduling behavior between the buggy and fixed kernels.
+
+   - Write concise, straightforward code. Focus on creating simple reproducers for the bug, avoiding unnecessary complexity.
+
+   - If a new feature could benefit a wider range of drivers, implement it within the framework rather than in a specific driver.
 
 - **Build and run the driver:**
    ```sh
@@ -44,20 +51,6 @@ To reproduce a bug that is fixed in commit `[hash]`, follow these steps:
 
 - **Integrate into Python scripts:**
    - Register the driver in `reproduce.py`, and ensure it is included in the plotting workflow.
-
-## Driver Development
-
-- Write concise, straightforward code. Focus on creating the simplest possible reproducer for the bug, avoiding unnecessary complexity.
-
-- Fail fast and early: prefer using `panic` to immediately abort the kernel instead of returning an error.
-
-- If a new feature could benefit a wider range of drivers, implement it within the framework rather than in a specific driver.
-
-- To help trace the bug, you may add logging (`printk`) or adapt the kernel source.
-
-- Do not include bug status reporting within the driver code; this will be handled by the Python scripts.
-
-- Checking only internal kernel state (e.g., `rq->cfs.h_nr_running`) is insufficient to confirm a bug. You MUST also verify observable symptoms, such as changes in task scheduling behavior between the buggy and fixed kernels.
 
 ## Caveats
 
