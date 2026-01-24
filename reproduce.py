@@ -124,6 +124,14 @@ bugs = [
             Linux(name="fixed", version="0213b70"),
         ],
     ),
+    # https://github.com/torvalds/linux/commit/3429dd57f0deb1a602c2624a1dd7c4c11b6c4734
+    Bug(
+        driver=Driver(name="h_nr_runnable", smp="2"),
+        linux=[
+            Linux(name="buggy", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734~1"),
+            Linux(name="fixed", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734"),
+        ],
+    ),
 ]
 
 

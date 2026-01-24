@@ -51,8 +51,8 @@ static void run(void) {
   }
 }
 
-struct kstep_driver case_time_sensitive = {
-    .name = "case_time_sensitive",
+struct kstep_driver time_sensitive = {
+    .name = "time_sensitive",
     .setup = setup,
     .run = run,
     .step_interval_us = 10000,

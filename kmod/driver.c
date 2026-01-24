@@ -4,22 +4,21 @@ extern struct kstep_driver default_driver;
 extern struct kstep_driver even_idle_cpu;
 extern struct kstep_driver extra_balance;
 extern struct kstep_driver freeze;
+extern struct kstep_driver h_nr_runnable;
 extern struct kstep_driver lag_vruntime;
 extern struct kstep_driver long_balance;
+extern struct kstep_driver rt_runtime_toggle;
 extern struct kstep_driver sync_wakeup;
+extern struct kstep_driver time_sensitive;
+extern struct kstep_driver uclamp_inversion;
 extern struct kstep_driver util_avg;
 extern struct kstep_driver vruntime_overflow;
-extern struct kstep_driver uclamp_inversion;
-extern struct kstep_driver case_time_sensitive;
-extern struct kstep_driver rt_runtime_toggle;
 
 static struct kstep_driver *drivers[] = {
-    &default_driver,    &even_idle_cpu,
-    &extra_balance,     &freeze,
-    &lag_vruntime,      &long_balance,
-    &sync_wakeup,       &util_avg,
-    &vruntime_overflow, &case_time_sensitive,
-    &rt_runtime_toggle, &uclamp_inversion,
+    &default_driver,    &even_idle_cpu,  &extra_balance,    &freeze,
+    &h_nr_runnable,     &lag_vruntime,   &long_balance,     &rt_runtime_toggle,
+    &sync_wakeup,       &time_sensitive, &uclamp_inversion, &util_avg,
+    &vruntime_overflow,
 };
 
 struct kstep_driver *kstep_driver_get(const char *name) {

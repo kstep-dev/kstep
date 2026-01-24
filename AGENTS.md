@@ -9,9 +9,9 @@ To reproduce a bug that is fixed in commit `[hash]`, follow these steps:
    cd linux/master && git show -U32 [hash]
    ```
    If the commit message contains a "Link: <url>", open the URL for further details. 
-   For `lore.kernel.org` links, review the mailing list discussion by appending `/t.mbox.gz` to the end of the URL. For example:
+   For LKML links (e.g., `lore.kernel.org` or `lkml.kernel.org`), extract the email ID from the URL and access the email with the following command:
    ```sh
-   curl -sL https://lore.kernel.org/lkml/CAB8ipk_a6VFNjiEnHRHkUMBKbA+qzPQvhtNjJ_YNzQhqV_o8Zw@mail.gmail.com/t.mbox.gz | gunzip
+   curl -sL https://lore.kernel.org/lkml/<email_id>/t.mbox.gz | gunzip
    ```
 
 - **Check out the Linux source code before the fix:**
@@ -56,6 +56,8 @@ To reproduce a bug that is fixed in commit `[hash]`, follow these steps:
 - To help trace the bug, you may add logging (`printk`) or adapt the kernel source.
 
 - Do not include bug status reporting within the driver code; this will be handled by the Python scripts.
+
+- Checking only internal kernel state (e.g., `rq->cfs.h_nr_running`) is insufficient to confirm a bug. You MUST also verify observable symptoms, such as changes in task scheduling behavior between the buggy and fixed kernels.
 
 ## Caveats
 
