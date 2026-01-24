@@ -3,7 +3,7 @@
 #include "driver.h"
 #include "internal.h" // rq
 
-// https://github.com/torvalds/linux/commit/abc158c82ae555078aa5dd2d8407c3df0f868904
+// https://github.com/torvalds/linux/commit/76f2f783294d7d55c2564e2dfb0a7279ba0bc264
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
 
 static struct task_struct *target_task;
@@ -37,13 +37,12 @@ static void run(void) {
   kstep_tick_until(group_ineligible);
   kstep_task_pause(target_task);
 
-  struct rq *rq = cpu_rq(1);
-  TRACE_INFO("rq->cfs.h_nr_running=%u, rq->cfs.h_nr_delayed=%u",
-             rq->cfs.h_nr_running, rq->cfs.h_nr_delayed);
-  if (rq->cfs.h_nr_delayed == 1)
-    TRACE_INFO("h_nr_runnable accounted incorrectly");
+  struct cfs_rq *cfs_rq = &cpu_rq(1)->cfs;
+  if (cfs_rq->h_nr_delayed == 1)
+    TRACE_INFO("h_nr_delayed == %u accounted incorrectly",
+               cfs_rq->h_nr_delayed);
   else
-    TRACE_INFO("h_nr_runnable accounted correctly");
+    TRACE_INFO("h_nr_delayed == %u accounted correctly", cfs_rq->h_nr_delayed);
 }
 
 #else
