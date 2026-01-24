@@ -1,7 +1,13 @@
 #ifndef KSTEP_DRIVER_H
 #define KSTEP_DRIVER_H
 
+#include <generated/utsrelease.h>
 #include <linux/sched.h>
+
+#define TERM_GREEN "\033[92m"
+#define TERM_RESET "\033[0m"
+#define TRACE_INFO(fmt, ...)                                                   \
+  pr_info(TERM_GREEN "%24s: " fmt TERM_RESET "\n", __func__, ##__VA_ARGS__)
 
 // driver.c
 struct kstep_driver {
@@ -15,6 +21,17 @@ struct kstep_driver {
   bool print_load_balance;  // Print load balancing
   bool print_sched_softirq; // Print sched softirq latency
 };
+
+static inline void kstep_driver_print(struct kstep_driver *driver) {
+  TRACE_INFO("- %-20s: %s", "Linux version", UTS_RELEASE);
+  TRACE_INFO("- %-20s: %s", "Driver name", driver->name);
+  TRACE_INFO("- %-20s: %llu", "step_interval_us", driver->step_interval_us);
+  TRACE_INFO("- %-20s: %d", "print_rq", driver->print_rq);
+  TRACE_INFO("- %-20s: %d", "print_tasks", driver->print_tasks);
+  TRACE_INFO("- %-20s: %d", "print_nr_running", driver->print_nr_running);
+  TRACE_INFO("- %-20s: %d", "print_load_balance", driver->print_load_balance);
+  TRACE_INFO("- %-20s: %d", "print_sched_softirq", driver->print_sched_softirq);
+}
 
 // tick.c
 void kstep_tick(void);
@@ -62,8 +79,4 @@ void kstep_topo_print(void);
 void kstep_cpu_set_freq(int cpu, int scale);
 void kstep_cpu_set_capacity(int cpu, int scale);
 
-#define TERM_GREEN "\033[92m"
-#define TERM_RESET "\033[0m"
-#define TRACE_INFO(fmt, ...)                                                   \
-  pr_info(TERM_GREEN "%24s: " fmt TERM_RESET "\n", __func__, ##__VA_ARGS__)
 #endif

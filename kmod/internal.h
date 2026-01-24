@@ -21,7 +21,6 @@ extern struct kstep_driver *kstep_driver;
 
 // driver.c
 struct kstep_driver *kstep_driver_get(const char *name);
-void kstep_driver_print(struct kstep_driver *driver);
 
 // tick.c
 void kstep_sched_timer_init(void);

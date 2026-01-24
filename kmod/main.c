@@ -9,10 +9,9 @@ module_param_string(driver, kstep_driver_name, sizeof(kstep_driver_name), 0644);
 struct kstep_driver *kstep_driver = NULL;
 
 static int __init kstep_main(void) {
-  kstep_write("/proc/sys/kernel/printk", "7", 1);
+  kstep_sysctl_write("kernel.printk", "%d", 7);
   ksym_init();
 
-  TRACE_INFO("Initializing kSTEP with driver %s", kstep_driver_name);
   kstep_driver = kstep_driver_get(kstep_driver_name);
   kstep_driver_print(kstep_driver);
 
