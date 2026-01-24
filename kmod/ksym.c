@@ -34,7 +34,6 @@ static void *ksym_get_addr(const char *name, void *default_addr) {
 #undef KSYM_VAR
 
 void ksym_init(void) {
-  TRACE_INFO("Initializing ksym");
   kallsyms_lookup_name_fn = ksym_get_kallsyms_lookup_name();
 
 #define KSYM_FUNC(type, name, ...)                                             \

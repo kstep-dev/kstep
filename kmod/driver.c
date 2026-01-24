@@ -27,13 +27,3 @@ struct kstep_driver *kstep_driver_get(const char *name) {
       return drivers[i];
   panic("Driver %s not found", name);
 }
-
-void kstep_driver_print(struct kstep_driver *driver) {
-  TRACE_INFO("- %-20s: %s", "name", driver->name);
-  TRACE_INFO("- %-20s: %llu", "step_interval_us", driver->step_interval_us);
-  TRACE_INFO("- %-20s: %d", "print_rq", driver->print_rq);
-  TRACE_INFO("- %-20s: %d", "print_tasks", driver->print_tasks);
-  TRACE_INFO("- %-20s: %d", "print_nr_running", driver->print_nr_running);
-  TRACE_INFO("- %-20s: %d", "print_load_balance", driver->print_load_balance);
-  TRACE_INFO("- %-20s: %d", "print_sched_softirq", driver->print_sched_softirq);
-}

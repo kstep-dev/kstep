@@ -6,6 +6,8 @@
 [![v6.18](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v6.18)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
 
 
+kSTEP is a framework for reproducing and testing Linux kernel scheduler bugs.
+
 ## 🚀 Getting Started
 
 #### 📦 Clone the repository
@@ -123,32 +125,50 @@ Fix: [9b58e97](https://github.com/torvalds/linux/commit/9b58e976b3b391c0cf02e038
 
 ![](https://github.com/SchedStep/results/blob/main/rt_runtime_toggle.png)
 
-## 💻 Developing Your Own Drivers
+## 💻 Running Your Own Drivers
 
-#### 📂 Checkout Linux source code
+For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended workflow and tips.
+
+#### 🐧 Checkout Linux source code
 
 ```sh
 ./checkout_linux.py <version> [<name>] [--tarball]
 ```
 
-- `<version>`: Linux tag (e.g., `v6.14`) or commit hash (e.g., `6d7e478`).
+- `<version>`: Linux tag (e.g., `v6.14`) or commit hash (e.g., `6d7e478`, `5068d84~1`).
 
 - **Example:** `./checkout_linux.py v6.14` checks out Linux v6.14 under `linux/v6.14`, and symlinks `linux/current` to it.
 
 #### 🛠️ Build Linux and kSTEP
 ```sh
-make linux; make kstep
+make linux  # Build kernel
+make kstep  # Build kmod + user; create rootfs (default target)
 ```
-- The default target is `kstep`. See [`Makefile`](Makefile) for a full list of build targets.
 
 #### 🏃‍♂️ Run kSTEP
 
 ```sh
-./run.py <name> [--smp <num_cpus>] [--mem_mb <mem_mb>] [--log_file <path>] [--debug]
+./run.py <driver_name> [--smp <cpus>] [--mem_mb <mb>] [--log_file <path>]
 ```
 
-- `<name>`: Driver to run (see [`kmod/driver.c`](kmod/driver.c)).
+- `<driver_name>`: Driver to run (see [`kmod/driver.c`](kmod/driver.c)).
 
-- `--debug`: Enables kernel debugging. Run the command in two separate terminals.
+- `[--log_file <path>]`: Log file to save the output, default to `data/logs/latest.log`.
 
-- **Example:** `./run.py sync_wakeup` runs the `sync_wakeup` driver with default settings.
+- **Example:** `./run.py sync_wakeup` runs the `sync_wakeup` driver with default parameters.
+
+## 📁 Directory Structure
+
+- **kmod/**: Kernel module (`kstep.ko`) loaded at boot
+  - `driver.c` + `driver_*.c`: Bug-specific drivers that setup and run test cases
+  - `driver.h`: Public API for drivers (task creation, ticking, sleeping, cgroups, etc.)
+  - `internal.h` and other `*.c` files: Framework primitives and utilities
+
+- **user/**: Minimal userspace (`init.c`) that mounts filesystems and loads `kstep.ko`
+
+- **linux/**: Git worktrees of Linux source
+  - `linux/master`: Main clone of Linux kernel
+  - `linux/current`: Symlink to active kernel version
+  - `linux/*.patch`: Fixes for specific bugs
+
+- **scripts/**: Python utilities for parsing logs and plotting results
