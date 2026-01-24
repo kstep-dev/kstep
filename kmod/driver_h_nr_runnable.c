@@ -4,9 +4,7 @@
 #include "internal.h" // rq
 
 // https://github.com/torvalds/linux/commit/76f2f783294d7d55c2564e2dfb0a7279ba0bc264
-// https://github.com/torvalds/linux/commit/9216582b0bfb17889eebcf96fb41cd67a3d71133
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) &&                          \
-    LINUX_VERSION_CODE < KERNEL_VERSION(6, 14, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
 
 static struct task_struct *target_task;
 static struct task_struct *other_task;
@@ -40,11 +38,18 @@ static void run(void) {
   kstep_task_pause(target_task);
 
   struct cfs_rq *cfs_rq = &cpu_rq(1)->cfs;
-  if (cfs_rq->h_nr_delayed == 1)
-    TRACE_INFO("h_nr_delayed == %u accounted incorrectly",
-               cfs_rq->h_nr_delayed);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
+  int h_nr_runnable = cfs_rq->h_nr_runnable;
+#else
+  int h_nr_runnable = cfs_rq->h_nr_running - cfs_rq->h_nr_delayed;
+#endif
+
+  TRACE_INFO("h_nr_runnable == %u", h_nr_runnable);
+  if (h_nr_runnable == 1)
+    TRACE_INFO("h_nr_runnable accounted correctly");
   else
-    TRACE_INFO("h_nr_delayed == %u accounted correctly", cfs_rq->h_nr_delayed);
+    TRACE_INFO("h_nr_runnable accounted incorrectly");
 }
 
 #else
