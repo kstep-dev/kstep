@@ -15,7 +15,7 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 #### Implementation Stage
 
 - Write a driver in `kmod/driver_<name>.c` that reproduces the bug. Refer to existing drivers for structure and style.
-- Focus on triggering the bug using public the APIs of the kernel or kSTEP (`kmod/driver.h`). You may add new interfaces to kSTEP if necessary. If this proves difficult, you may temporarily manipulate internal kernel state, but aim to establish an appropriate triggering condition.
+- Focus on triggering the bug using the public APIs of the kernel or kSTEP (`kmod/driver.h`). You may add new interfaces to kSTEP if necessary. If this proves difficult, you may temporarily manipulate internal kernel state, but aim to establish an appropriate triggering condition.
 - After successfully triggering the bug, demonstrate its impact using observable behavior (such as differences in task scheduling) rather than relying only on internal kernel state.
 
 #### Testing Stage
