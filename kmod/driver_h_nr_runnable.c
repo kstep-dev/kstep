@@ -1,4 +1,9 @@
-#include "internal.h"
+#include <linux/version.h>
+
+#include "driver.h"
+#include "internal.h" // rq
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 
 static struct task_struct *target_task;
 static struct task_struct *other_task;
@@ -39,6 +44,11 @@ static void run(void) {
   else
     TRACE_INFO("h_nr_runnable accounted correctly");
 }
+
+#else
+static void setup(void) { panic("unsupported kernel version"); }
+static void run(void) {}
+#endif
 
 struct kstep_driver h_nr_runnable = {
     .name = "h_nr_runnable",
