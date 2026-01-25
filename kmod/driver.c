@@ -30,6 +30,7 @@ static struct kstep_driver *drivers[] = {
     &time_sensitive,
     &uclamp_inversion,
     &util_avg,
+    &vlag_overflow,
     &vruntime_overflow,
 };
 
