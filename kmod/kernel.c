@@ -131,7 +131,7 @@ static void kstep_cgroup_mkdir(const char *name) {
   kstep_mkdir(path);
 }
 
-void kstep_cgroup_create_pinned(const char *name, const char *cpuset) {
+void kstep_cgroup_create_leaf_pinned(const char *name, const char *cpuset) {
   static bool root_initialized = false;
   if (!root_initialized) {
     kstep_cgroup_write("", "cgroup.subtree_control", CGROUP_CONTROL);
@@ -139,7 +139,15 @@ void kstep_cgroup_create_pinned(const char *name, const char *cpuset) {
   }
 
   kstep_cgroup_mkdir(name);
+  kstep_cgroup_set_cpuset(name, cpuset);
+}
+
+void kstep_cgroup_create_pinned(const char *name, const char *cpuset) {
+  kstep_cgroup_create_leaf_pinned(name, cpuset);
   kstep_cgroup_write(name, "cgroup.subtree_control", CGROUP_CONTROL);
+}
+
+void kstep_cgroup_set_cpuset(const char *name, const char *cpuset) {
   kstep_cgroup_write(name, "cpuset.cpus", "%s", cpuset);
 }
 

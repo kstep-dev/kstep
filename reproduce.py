@@ -140,6 +140,14 @@ bugs = [
             Linux(name="fixed", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe"),
         ],
     ),
+    # https://github.com/torvalds/linux/commit/956dfda6a70885f18c0f8236a461aa2bc4f556ad
+    Bug(
+        driver=Driver(name="throttled_limbo_list", smp="2"),
+        linux=[
+            Linux(name="buggy", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad~1"),
+            Linux(name="fixed", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad"),
+        ],
+    ),
 ]
 
 
