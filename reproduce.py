@@ -182,10 +182,6 @@ def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):
     log_file = RESULTS_DIR / f"{driver.name}_{linux.name}.log"
     run_qemu(linux_dir=linux_dir, driver=driver, log_file=log_file)
 
-    # Lightweight regression assertions for drivers that have clear signatures.
-    # No assertions for throttled_limbo_list: it is best-effort without
-    # kernel-internal bandwidth writes and may be timing-dependent.
-
 
 def main(bug: Bug, run: List[str], reset: bool, skip_build: bool):
     linux_map = {linux.name: linux for linux in bug.linux}
