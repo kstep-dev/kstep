@@ -4,32 +4,31 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 
 #### Planning Stage
 - Check out the Linux source code just before the fix: `./checkout_linux.py [hash]~1`.
-- Read the commit message and patch carefully: `cd linux/current && git show -U32 [hash]`.
-- Be sure to thoroughly understand the bug before writing a driver. Study changed files in the patch, especially those under `linux/current/kernel/sched`. Focus on the changes introduced by the commit. Figure out the call chain that triggers the bug. Understand what each function does and how they interact with each other.
-- If the commit message contains links, carefully review the content of ALL links as they may provide the additional information about the bug (especially the reproduction conditions). For LKML links (such as `lore.kernel.org` or `lkml.kernel.org`), extract the email ID and retrieve the message with:  
+- Read the commit message and patch carefully: `git -C linux/current show -U32 [hash]`.
+- Carefully analyze the changes introduced in the patch, focusing on modifications in `linux/current/kernel/sched`. Trace the call chain that leads to the bug, ensuring you understand the purpose of each function and how they interact. Clearly identify the conditions and system state required to trigger the bug.
+- If the commit message contains links, carefully review the content of ALL links as they may provide the additional information about the bug (especially the reproduction conditions). For LKML links (e.g., `lore.kernel.org`, `lkml.kernel.org`, `patch.msgid.link`), extract the email ID and retrieve the message with:  
   `curl -sL https://lore.kernel.org/lkml/<email_id>/t.mbox.gz | gunzip`
 - Thoughtfully analyze the conditions and mechanisms that trigger the bug, and plan an effective method to reproduce it within the kernel.
 
-#### Implementation Stage
+#### Development Stage
 
-- Write a driver in `kmod/driver_<name>.c` that reproduces the bug.
-- Focus on triggering the bug using the public APIs of the kernel or kSTEP (`kmod/driver.h`). You may add new interfaces to kSTEP if necessary. If this proves difficult, you may temporarily manipulate internal kernel state, but aim to establish an appropriate triggering condition.
-- After successfully triggering the bug, demonstrate its impact using observable behavior (such as differences in task scheduling) rather than relying only on internal kernel state.
-
-#### Testing Stage
-
-- Build and run the driver on the buggy kernel:  
-  `make linux && make kstep && ./run.py [driver_name]`
-- Check if the bug is reproduced by inspecting the logs:  
-  `cat data/logs/latest.log`  
-  If it is not, revisit your implementation. Incorporate detailed logging in the driver. If necessary, add logging within the kernel itself (e.g., `printk`).
-- Once the bug is reliably reproduced, test on the fixed kernel:  
+- Create a driver in `kmod/driver_[driver_name].c` that triggers the bug.
+- Initially, you may directly manipulate internal scheduler state to trigger the bug.
+- Add detailed logging in your driver for all relevant fields to aid debugging. If necessary, add kernel-side logging with `printk()`.
+- Build and execute the driver on the buggy kernel with:
+  `./checkout_linux.py [hash]~1 && make linux && make kstep && ./run.py [driver_name]`
+- Determine whether the bug is reproduced by examining the output logs:
+  `cat data/logs/latest.log`
+- If you do not observe the bug, refine your implementation and repeat the process.
+- After confirming that your driver triggers the bug, rerun the same driver on the fixed kernel:
   `./checkout_linux.py [hash] && make linux && make kstep && ./run.py [driver_name]`
-- Review the logs to confirm that the bug has been resolved. In rare cases, the bug may persist despite the fix. If you are confident the issue remains, document and report these instances.
+- Review the logs to ensure the bug no longer occurs. In rare cases where the issue persists despite the fix, provide clear documentation and report your findings.
 
-#### Final Stage
+#### Refinement Stage
 
-- Register your driver in `reproduce.py` and ensure it is included in the plotting and analysis workflow.
+- If you manually altered internal scheduler state to trigger the bug during the triggering stage, refine your driver to reproduce the bug using only public kernel APIs or kSTEP interfaces (`kmod/driver.h`). If needed, consider extending kSTEP to provide the required functionality.
+- After confirming your driver can trigger the bug, clearly demonstrate its impact through externally observable behavior, such as changes in task scheduling, rather than relying solely on kernel-internal state.
+- Once complete, add your driver to `reproduce.py` to enable automated testing.
 
 ## Coding Style
 

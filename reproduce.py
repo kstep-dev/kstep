@@ -132,12 +132,21 @@ bugs = [
             Linux(name="fixed", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734"),
         ],
     ),
+<<<<<<< HEAD
     # https://github.com/torvalds/linux/commit/1560d1f6eb6b398bddd80c16676776c0325fe5fe
     Bug(
         driver=Driver(name="vlag_overflow", smp="2"),
         linux=[
             Linux(name="buggy", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe~1"),
             Linux(name="fixed", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe"),
+=======
+    # https://github.com/torvalds/linux/commit/956dfda6a70885f18c0f8236a461aa2bc4f556ad
+    Bug(
+        driver=Driver(name="throttled_limbo_list", smp="2"),
+        linux=[
+            Linux(name="buggy", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad~1"),
+            Linux(name="fixed", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad"),
+>>>>>>> 38f9740 (Reproduce throttled_limbo_list)
         ],
     ),
 ]
@@ -173,6 +182,10 @@ def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):
     make_kstep()
     log_file = RESULTS_DIR / f"{driver.name}_{linux.name}.log"
     run_qemu(linux_dir=linux_dir, driver=driver, log_file=log_file)
+
+    # Lightweight regression assertions for drivers that have clear signatures.
+    # No assertions for throttled_limbo_list: it is best-effort without
+    # kernel-internal bandwidth writes and may be timing-dependent.
 
 
 def main(bug: Bug, run: List[str], reset: bool, skip_build: bool):

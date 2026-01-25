@@ -57,6 +57,8 @@ void kstep_sysctl_write(const char *name, const char *fmt, ...);
 void kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
                         ...);
 void kstep_cgroup_create_pinned(const char *name, const char *cpuset);
+void kstep_cgroup_create_leaf_pinned(const char *name, const char *cpuset);
+void kstep_cgroup_set_cpuset(const char *name, const char *cpuset);
 void kstep_cgroup_set_weight(const char *name, int weight);
 void kstep_cgroup_add_task(const char *name, int pid);
 void kstep_freeze_task(struct task_struct *p);
