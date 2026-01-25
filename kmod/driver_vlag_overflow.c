@@ -16,8 +16,8 @@ static struct task_struct *task0;
 static struct task_struct *task1;
 
 static void setup(void) {
-  kstep_cgroup_create_pinned("g0", "1");
-  kstep_cgroup_create_pinned("g1", "1");
+  kstep_cgroup_create("g0");
+  kstep_cgroup_create("g1");
   kstep_cgroup_set_weight("g0", 10000);
   kstep_cgroup_set_weight("g1", 100);
 
@@ -41,7 +41,7 @@ static void run(void) {
   // Create large negative vlag that will overflow when multiplied by weight
   // vlag = avruntime - vruntime, so set vruntime > avruntime
   s64 overflow_threshold = S64_MIN / (s64)weight;
-  s64 target_vlag = overflow_threshold / 2;  // Large negative vlag
+  s64 target_vlag = overflow_threshold / 2; // Large negative vlag
   se->vruntime = avruntime - target_vlag;
 
   u64 vruntime_before = se->vruntime;
@@ -52,7 +52,8 @@ static void run(void) {
   kstep_cgroup_set_weight("g0", 100);
 
   s64 vruntime_change = (s64)(se->vruntime - vruntime_before);
-  s64 expected_max = 600000000LL;  // 600ms (based on clamped vlag * weight ratio)
+  s64 expected_max =
+      600000000LL; // 600ms (based on clamped vlag * weight ratio)
 
   TRACE_INFO("vruntime_change=%lld ns", vruntime_change);
 
@@ -60,7 +61,8 @@ static void run(void) {
     TRACE_INFO("BUG: overflow detected (change=%lld sec)",
                vruntime_change / 1000000000LL);
   } else {
-    TRACE_INFO("OK: vruntime change bounded (%lld ms)", vruntime_change / 1000000);
+    TRACE_INFO("OK: vruntime change bounded (%lld ms)",
+               vruntime_change / 1000000);
   }
 
   kstep_tick_repeat(5);
