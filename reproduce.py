@@ -132,6 +132,14 @@ bugs = [
             Linux(name="fixed", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734"),
         ],
     ),
+    # https://github.com/torvalds/linux/commit/1560d1f6eb6b398bddd80c16676776c0325fe5fe
+    Bug(
+        driver=Driver(name="vlag_overflow", smp="2"),
+        linux=[
+            Linux(name="buggy", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe~1"),
+            Linux(name="fixed", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe"),
+        ],
+    ),
 ]
 
 
