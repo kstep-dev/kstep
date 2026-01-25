@@ -3,10 +3,6 @@
 #include "driver.h"
 #include "internal.h"
 
-/* Need kernel-internal cfs_rq fields (throttled_limbo_list, runtime_remaining).
- */
-#include <kernel/sched/sched.h>
-
 /*
  * Reproducer for Linux commit 956dfda6a708 (fixed):
  * sched/fair: Prevent cfs_rq from being unthrottled with zero runtime_remaining
