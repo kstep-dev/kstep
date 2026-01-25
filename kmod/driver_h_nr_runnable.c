@@ -10,8 +10,8 @@ static struct task_struct *target_task;
 static struct task_struct *other_task;
 
 static void setup(void) {
-  kstep_cgroup_create_pinned("g0", "1");
-  kstep_cgroup_create_pinned("g1", "1");
+  kstep_cgroup_create("g0");
+  kstep_cgroup_create("g1");
 
   target_task = kstep_task_create();
   other_task = kstep_task_create();

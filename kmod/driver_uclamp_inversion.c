@@ -24,7 +24,7 @@ static void set_task_uclamp(struct task_struct *p, unsigned int min,
 static void setup(void) {
   task = kstep_task_create();
 
-  kstep_cgroup_create_pinned("uclamp", "1");
+  kstep_cgroup_create("uclamp");
   kstep_cgroup_write("uclamp", "cpu.uclamp.min", "0.00");
   kstep_cgroup_write("uclamp", "cpu.uclamp.max", "50.00");
   kstep_cgroup_add_task("uclamp", task->pid);

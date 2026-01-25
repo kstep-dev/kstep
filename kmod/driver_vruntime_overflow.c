@@ -6,8 +6,8 @@ static struct task_struct *starved_task;
 static struct task_struct *other_task;
 
 static void setup(void) {
-  kstep_cgroup_create_pinned("g0", "1");
-  kstep_cgroup_create_pinned("g1", "1");
+  kstep_cgroup_create("g0");
+  kstep_cgroup_create("g1");
   kstep_cgroup_set_weight("g0", 15);
   kstep_cgroup_set_weight("g1", 15);
 

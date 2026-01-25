@@ -6,7 +6,7 @@ static struct task_struct *other_task;
 static void setup(void) {
   // Create target task and add it to group g0
   target_task = kstep_task_create();
-  kstep_cgroup_create_pinned("g0", "1");
+  kstep_cgroup_create("g0");
   kstep_cgroup_add_task("g0", target_task->pid);
 
   // Create other tasks

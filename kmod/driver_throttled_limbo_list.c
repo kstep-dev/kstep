@@ -31,10 +31,10 @@ static void setup(void) {
    *       |  \- C (quota enabled, initially empty)
    *       \- D (leaf, tasks start here)
    */
-  kstep_cgroup_create_pinned("A", "1");
-  kstep_cgroup_create_pinned("A/B", "1");
-  kstep_cgroup_create_leaf_pinned("A/B/C", "1");
-  kstep_cgroup_create_leaf_pinned("A/D", "1");
+  kstep_cgroup_create("A");
+  kstep_cgroup_create("A/B");
+  kstep_cgroup_create("A/B/C");
+  kstep_cgroup_create("A/D");
 
   /* A throttles quickly. period: 100ms, quota: 1ms (minimum accepted). */
   kstep_cgroup_write("A", "cpu.max", "1000 100000");
