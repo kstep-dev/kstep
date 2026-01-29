@@ -32,11 +32,14 @@ struct task_struct *kstep_task_create(void) {
   struct task_struct *p = NULL;
   struct subprocess_info *info = call_usermodehelper_setup(
       path, argv, NULL, GFP_KERNEL, task_init, NULL, &p);
-  if (info == NULL || p == NULL)
+  if (info == NULL)
     panic("Failed to setup user mode helper");
 
   if (call_usermodehelper_exec(info, UMH_WAIT_EXEC) < 0)
     panic("Failed to run user mode helper");
+
+  if (p == NULL)
+    panic("Failed to get task struct");
 
   // Wait for the task to start
   for (int i = 0; i < 100; i++) {
