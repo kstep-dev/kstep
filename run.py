@@ -139,7 +139,7 @@ def is_port_free(port: int) -> bool:
         return s.connect_ex(("localhost", port)) != 0
 
 
-def run_gdb(linux_dir: Path = LINUX_CURR_DIR):
+def run_gdb(linux_dir: Path):
     import signal
 
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -175,7 +175,7 @@ def main():
 
     if args.debug and not is_port_free(1234):
         logging.info("Port 1234 is already in use, running GDB...")
-        run_gdb()
+        run_gdb(linux_dir=args.linux_dir)
     else:
         make_kstep(linux_dir=args.linux_dir)
         driver = Driver(
