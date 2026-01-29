@@ -167,10 +167,7 @@ def plot_data(python_script: str, driver: str):
 
 
 def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):
-    if linux.patches:
-        linux_dir = LINUX_ROOT_DIR / f"{driver.name}_{linux.name}"
-    else:
-        linux_dir = LINUX_ROOT_DIR / linux.version
+    linux_dir = LINUX_ROOT_DIR / f"{driver.name}_{linux.name}"
     checkout_linux(linux.version, linux_dir=linux_dir)
     if reset:
         reset_git(linux_dir)

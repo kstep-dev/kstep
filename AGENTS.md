@@ -3,7 +3,7 @@
 To reproduce a bug fixed in commit `[hash]`, follow these steps:
 
 #### Planning Stage
-- Check out the Linux source code just before the fix: `./checkout_linux.py [hash]~1`.
+- Check out the Linux source code just before the fix: `./checkout_linux.py [hash]~1 [name]_buggy`.
 - Read the commit message and patch carefully: `git -C linux/current show -U32 [hash]`.
 - Carefully analyze the changes introduced in the patch, focusing on modifications in `linux/current/kernel/sched`. Trace the call chain that leads to the bug, ensuring you understand the purpose of each function and how they interact. Clearly identify the conditions and system state required to trigger the bug.
 - If the commit message contains links, carefully review the content of ALL links as they may provide the additional information about the bug (especially the reproduction conditions). For LKML links (e.g., `lore.kernel.org`, `lkml.kernel.org`, `patch.msgid.link`), extract the email ID and retrieve the message with:  
@@ -16,12 +16,12 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 - Initially, you may directly manipulate internal scheduler state to trigger the bug.
 - Add detailed logging in your driver for all relevant fields to aid debugging. If necessary, add kernel-side logging with `printk()`.
 - Build and execute the driver on the buggy kernel with:
-  `./checkout_linux.py [hash]~1 && make linux && make kstep && ./run.py [driver_name]`
+  `./checkout_linux.py [hash]~1 [name]_buggy && make linux && make kstep && ./run.py [driver_name]`
 - Determine whether the bug is reproduced by examining the output logs:
   `cat data/logs/latest.log`
 - If you do not observe the bug, refine your implementation and repeat the process.
 - After confirming that your driver triggers the bug, rerun the same driver on the fixed kernel:
-  `./checkout_linux.py [hash] && make linux && make kstep && ./run.py [driver_name]`
+  `./checkout_linux.py [hash] [name]_fixed && make linux && make kstep && ./run.py [driver_name]`
 - Review the logs to ensure the bug no longer occurs. In rare cases where the issue persists despite the fix, provide clear documentation and report your findings.
 
 #### Refinement Stage
