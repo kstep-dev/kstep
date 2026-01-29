@@ -13,7 +13,7 @@ from scripts import (
     LINUX_CURR_DIR,
     PROJ_DIR,
     QEMU_DIR,
-    ROOTFS_IMG,
+    ROOTFS_DIR,
     Arch,
     create_log_path,
     system,
@@ -54,9 +54,9 @@ def get_kernel_image_path() -> Path:
 
 def run_qemu(
     driver: Driver,
+    linux_dir: Path,
     log_file: Optional[Path] = None,
     debug: bool = False,
-    linux_dir: Path = LINUX_CURR_DIR,
 ):
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
@@ -90,13 +90,14 @@ def run_qemu(
     if driver.params:
         boot_args.extend(driver.params)
 
+    rootfs_img = ROOTFS_DIR / f"{linux_dir.resolve().name}.cpio"
     cmd = [
         str(qemu_path),
         f"-smp {driver.smp}",
         "-cpu max",
         f"-m {driver.mem_mb}M",
         f"-kernel {kernel_image_path}",
-        f"-initrd {ROOTFS_IMG}",
+        f"-initrd {rootfs_img}",
         f'-append "{" ".join(boot_args)}"',
         "-nographic",
         "-no-reboot",  # Prevent automatic reboot after panic
@@ -138,7 +139,7 @@ def is_port_free(port: int) -> bool:
         return s.connect_ex(("localhost", port)) != 0
 
 
-def run_gdb(linux_dir: Path = LINUX_CURR_DIR):
+def run_gdb(linux_dir: Path):
     import signal
 
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -152,18 +153,19 @@ def run_gdb(linux_dir: Path = LINUX_CURR_DIR):
     system(f"gdb {linux_dir}/vmlinux " + " ".join(args))
 
 
-def make_kstep():
-    system(f"make -C {PROJ_DIR} kstep")
+def make_kstep(linux_dir: Path):
+    system(f"make -C {PROJ_DIR} kstep LINUX_DIR={linux_dir}")
 
 
-def make_linux():
-    system(f"make -C {PROJ_DIR} linux")
+def make_linux(linux_dir: Path):
+    system(f"make -C {PROJ_DIR} linux LINUX_DIR={linux_dir}")
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
     parser.add_argument("--log_file", type=Path, default=create_log_path())
+    parser.add_argument("--debug", action="store_true")
     # See driver config
     parser.add_argument("name", type=str, default=None, nargs="?")
     parser.add_argument("--smp", type=str, default=None)
@@ -173,9 +175,9 @@ def main():
 
     if args.debug and not is_port_free(1234):
         logging.info("Port 1234 is already in use, running GDB...")
-        run_gdb()
+        run_gdb(linux_dir=args.linux_dir)
     else:
-        make_kstep()
+        make_kstep(linux_dir=args.linux_dir)
         driver = Driver(
             **{
                 field.name: value
@@ -183,7 +185,12 @@ def main():
                 if (value := getattr(args, field.name)) is not None
             }
         )
-        run_qemu(driver=driver, debug=args.debug, log_file=args.log_file)
+        run_qemu(
+            driver=driver,
+            linux_dir=args.linux_dir,
+            debug=args.debug,
+            log_file=args.log_file,
+        )
 
 
 if __name__ == "__main__":

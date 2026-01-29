@@ -141,9 +141,11 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 
 #### 🛠️ Build Linux and kSTEP
 ```sh
-make linux  # Build kernel
-make kstep  # Build kmod + user; create rootfs (default target)
+make linux [LINUX_DIR=<path>]  # Build kernel
+make kstep [LINUX_DIR=<path>]  # Build kSTEP rootfs (default target)
 ```
+
+- `[LINUX_DIR=<path>]`: Path to the Linux directory, default to `linux/current`.
 
 #### 🏃‍♂️ Run kSTEP
 
@@ -170,5 +172,9 @@ make kstep  # Build kmod + user; create rootfs (default target)
   - `linux/master`: Main clone of Linux kernel
   - `linux/current`: Symlink to active kernel version
   - `linux/*.patch`: Fixes for specific bugs
+
+- **data/**: Data directory
+  - `data/rootfs`: Root filesystem data files and images
+  - `data/logs`: QEMU log files
 
 - **scripts/**: Python utilities for parsing logs and plotting results
