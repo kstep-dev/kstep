@@ -16,9 +16,13 @@ from scripts import (
 )
 
 
+def fmt_path(path: Path) -> str:
+    return f"`{path.relative_to(PROJ_DIR)}`"
+
+
 def clone_master():
     if LINUX_MASTER_DIR.exists():
-        logging.info(f"Linux master already cloned to {LINUX_MASTER_DIR}")
+        logging.info(f"Linux master already cloned to {fmt_path(LINUX_MASTER_DIR)}")
         return
 
     system(f"git clone https://github.com/torvalds/linux.git {LINUX_MASTER_DIR}")
@@ -26,7 +30,7 @@ def clone_master():
 
 def add_worktree(version: str, linux_dir: Path):
     if linux_dir.exists():
-        logging.info(f"Linux {version} already cloned to {linux_dir}")
+        logging.info(f"{fmt_path(linux_dir)} already exists")
         return
 
     system(f"cd {LINUX_MASTER_DIR} && git fetch")
@@ -37,9 +41,7 @@ def add_worktree(version: str, linux_dir: Path):
 def set_current_linux(linux_dir: Path):
     LINUX_CURR_DIR.unlink(missing_ok=True)
     LINUX_CURR_DIR.symlink_to(linux_dir)
-    logging.info(
-        f"{LINUX_CURR_DIR.relative_to(PROJ_DIR)} now points to {linux_dir.relative_to(PROJ_DIR)}"
-    )
+    logging.info(f"{fmt_path(LINUX_CURR_DIR)} now points to {fmt_path(linux_dir)}")
 
 
 def get_download_url(version: str) -> str:
