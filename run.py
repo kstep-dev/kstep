@@ -13,7 +13,7 @@ from scripts import (
     LINUX_CURR_DIR,
     PROJ_DIR,
     QEMU_DIR,
-    ROOTFS_IMG,
+    ROOTFS_DIR,
     Arch,
     create_log_path,
     system,
@@ -90,13 +90,14 @@ def run_qemu(
     if driver.params:
         boot_args.extend(driver.params)
 
+    rootfs_img = ROOTFS_DIR / f"{linux_dir.name}.cpio"
     cmd = [
         str(qemu_path),
         f"-smp {driver.smp}",
         "-cpu max",
         f"-m {driver.mem_mb}M",
         f"-kernel {kernel_image_path}",
-        f"-initrd {ROOTFS_IMG}",
+        f"-initrd {rootfs_img}",
         f'-append "{" ".join(boot_args)}"',
         "-nographic",
         "-no-reboot",  # Prevent automatic reboot after panic
