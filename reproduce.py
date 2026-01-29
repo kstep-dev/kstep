@@ -174,8 +174,8 @@ def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):
     for patch in linux.patches:
         patch_linux(linux_dir, patch)
     if not skip_build:
-        make_linux()
-    make_kstep()
+        make_linux(linux_dir=linux_dir)
+    make_kstep(linux_dir=linux_dir)
     log_file = RESULTS_DIR / f"{driver.name}_{linux.name}.log"
     run_qemu(linux_dir=linux_dir, driver=driver, log_file=log_file)
 

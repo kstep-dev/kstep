@@ -153,11 +153,11 @@ def run_gdb(linux_dir: Path = LINUX_CURR_DIR):
     system(f"gdb {linux_dir}/vmlinux " + " ".join(args))
 
 
-def make_kstep(linux_dir: Path = LINUX_CURR_DIR):
+def make_kstep(linux_dir: Path):
     system(f"make -C {PROJ_DIR} kstep LINUX_DIR={linux_dir}")
 
 
-def make_linux(linux_dir: Path = LINUX_CURR_DIR):
+def make_linux(linux_dir: Path):
     system(f"make -C {PROJ_DIR} linux LINUX_DIR={linux_dir}")
 
 
