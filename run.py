@@ -90,7 +90,7 @@ def run_qemu(
     if driver.params:
         boot_args.extend(driver.params)
 
-    rootfs_img = ROOTFS_DIR / f"{linux_dir.name}.cpio"
+    rootfs_img = ROOTFS_DIR / f"{linux_dir.resolve().name}.cpio"
     cmd = [
         str(qemu_path),
         f"-smp {driver.smp}",
