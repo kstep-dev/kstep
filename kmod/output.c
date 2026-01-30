@@ -29,9 +29,15 @@ static void print_rq(struct rq *rq) {
   u64 avg_util =
       rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
 
+// https://github.com/torvalds/linux/commit/9c0b4bb7f6303c9c4e2e34984c46f5a86478f84d
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+  u64 effective_util =
+      ksym.effective_cpu_util(rq->cpu, rq->cfs.avg.util_avg, NULL, NULL);
+#else
   u64 effective_util = ksym.effective_cpu_util(rq->cpu, rq->cfs.avg.util_avg,
                                                arch_scale_cpu_capacity(rq->cpu),
                                                FREQUENCY_UTIL, NULL);
+#endif
 
 // https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)

@@ -32,9 +32,14 @@ KSYM_FUNC(bool, arch_enable_hybrid_capacity_scale, void)
 KSYM_FUNC(void, arch_set_cpu_capacity, int cpu, unsigned long cap,
           unsigned long max_cap, unsigned long cap_freq,
           unsigned long base_freq)
+// https://github.com/torvalds/linux/commit/9c0b4bb7f6303c9c4e2e34984c46f5a86478f84d
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+KSYM_FUNC(unsigned long, effective_cpu_util, int cpu, unsigned long util_cfs,
+          unsigned long *min, unsigned long *max)
+#else
 KSYM_FUNC(unsigned long, effective_cpu_util, int cpu, unsigned long util_cfs,
           unsigned long max, enum cpu_util_type type, struct task_struct *p)
-
+#endif
 KSYM_VAR(struct rq, runqueues)
 #ifdef CONFIG_GENERIC_SCHED_CLOCK
 KSYM_VAR(void, cd)
