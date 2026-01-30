@@ -57,11 +57,4 @@ struct ksym {
 extern struct ksym ksym;
 void ksym_init(void);
 
-#undef cpu_rq
-#define cpu_rq(cpu) (per_cpu_ptr(ksym.runqueues, (cpu)))
-#undef this_rq
-#define this_rq() this_cpu_ptr(ksym.runqueues)
-#undef raw_rq
-#define raw_rq() raw_cpu_ptr(ksym.runqueues)
-
 #endif

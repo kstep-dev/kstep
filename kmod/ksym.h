@@ -67,10 +67,18 @@ KSYM_VAR(int, update_topology)
 KSYM_VAR(bool, x86_topology_update)
 #endif
 
+// shared
+KSYM_VAR(struct rq, runqueues)
+#undef cpu_rq
+#define cpu_rq(cpu) (per_cpu_ptr(ksym.runqueues, (cpu)))
+#undef this_rq
+#define this_rq() this_cpu_ptr(ksym.runqueues)
+#undef raw_rq
+#define raw_rq() raw_cpu_ptr(ksym.runqueues)
+
 // misc
 KSYM_FUNC(void, dequeue_entities, struct cfs_rq *cfs_rq,
           struct sched_entity *se, int flags)
-KSYM_VAR(struct rq, runqueues)
 
 #undef KSYM_FUNC
 #undef KSYM_VAR
