@@ -1,10 +1,8 @@
 CompileFlags:
     Remove:
-        [
-            -m*,
-            -f*,
-            -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang,
-        ]
+        - -m*
+        - -f*
+        - -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
 Diagnostics:
     ClangTidy:
         Remove: bugprone-sizeof-expression
