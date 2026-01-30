@@ -148,6 +148,14 @@ bugs = [
             Linux(name="fixed", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad"),
         ],
     ),
+    Bug(
+        driver=Driver(name="missing_load_decay", smp="2"),
+        linux=[
+            Linux(name="buggy", version="0258bdfaff5bd13c4d2383150b7097aecd6b6d82~1"),
+            Linux(name="fixed", version="0258bdfaff5bd13c4d2383150b7097aecd6b6d82"),
+        ],
+        plot_format="cur_task",
+    ),
 ]
 
 

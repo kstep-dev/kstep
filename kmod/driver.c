@@ -15,6 +15,7 @@ extern struct kstep_driver uclamp_inversion;
 extern struct kstep_driver util_avg;
 extern struct kstep_driver vlag_overflow;
 extern struct kstep_driver vruntime_overflow;
+extern struct kstep_driver missing_load_decay;
 
 static struct kstep_driver *drivers[] = {
     &default_driver,
@@ -32,6 +33,7 @@ static struct kstep_driver *drivers[] = {
     &util_avg,
     &vlag_overflow,
     &vruntime_overflow,
+    &missing_load_decay,
 };
 
 struct kstep_driver *kstep_driver_get(const char *name) {
