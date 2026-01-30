@@ -185,7 +185,7 @@ make kstep [LINUX_DIR=<path>]  # Build kSTEP rootfs (default target)
   - `linux/*.patch`: Fixes for specific bugs
 
 - **data/**: Data directory
-  - `data/rootfs`: Root filesystem data files and images
+  - `data/rootfs`: Root filesystem images
   - `data/logs`: QEMU log files
 
 - **scripts/**: Python utilities for parsing logs and plotting results

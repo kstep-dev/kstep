@@ -7,9 +7,10 @@
 /user/build
 
 # Data files
-/data/rootfs.cpio
-/data/rootfs
 /data/logs/*
+!/data/logs/README.md
+/data/rootfs/*
+!/data/rootfs/README.md
 /data/*.tar.xz
 /data/qemu*
 
