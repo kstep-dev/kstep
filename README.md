@@ -132,7 +132,9 @@ Fix: [0213b70](https://github.com/torvalds/linux/commit/0213b7083e81f4acd69db32c
 [buggy.log](https://github.com/SchedStep/results/blob/main/uclamp_inversion_buggy.log) |
 [fixed.log](https://github.com/SchedStep/results/blob/main/uclamp_inversion_fixed.log)
 
-![](https://github.com/SchedStep/results/blob/main/uclamp_inversion.png)
+<p align="center">
+<img src="https://github.com/SchedStep/results/raw/main/uclamp_inversion.png" style="width: 50%;">
+</p>
 
 ## 💻 Running Your Own Drivers
 
