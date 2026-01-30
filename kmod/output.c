@@ -29,6 +29,10 @@ static void print_rq(struct rq *rq) {
   u64 avg_util =
       rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
 
+  u64 effective_util = ksym.effective_cpu_util(rq->cpu, rq->cfs.avg.util_avg,
+                                               arch_scale_cpu_capacity(rq->cpu),
+                                               FREQUENCY_UTIL, NULL);
+
 // https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
   u64 min_vruntime = rq->cfs.zero_vruntime;
@@ -42,6 +46,7 @@ static void print_rq(struct rq *rq) {
   pr_cont(K(queued) "%2d" SEP, rq->nr_running);
   pr_cont(K(avg_load) "%4llu" SEP, avg_load);
   pr_cont(K(avg_util) "%4llu" SEP, avg_util);
+  pr_cont(K(effective_util) "%4llu" SEP, effective_util);
   pr_cont(K(min_vruntime) "%12lld" SEP, min_vruntime - INIT_TIME_NS);
   pr_cont(K(avg_vruntime) "%12lld", avg_vruntime);
   pr_cont("}\n");

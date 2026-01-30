@@ -26,11 +26,11 @@ static void setup(void) {
 
   kstep_cgroup_create("uclamp");
   kstep_cgroup_write("uclamp", "cpu.uclamp.min", "0.00");
-  kstep_cgroup_write("uclamp", "cpu.uclamp.max", "50.00");
+  kstep_cgroup_write("uclamp", "cpu.uclamp.max", "20.00");
   kstep_cgroup_add_task("uclamp", task->pid);
 
-  set_task_uclamp(task, SCHED_CAPACITY_SCALE * 60 / 100,
-                  SCHED_CAPACITY_SCALE * 80 / 100);
+  set_task_uclamp(task, SCHED_CAPACITY_SCALE * 80 / 100,
+                  SCHED_CAPACITY_SCALE * 100 / 100);
 }
 
 static bool is_uclamp_active(struct task_struct *p) {
@@ -50,6 +50,8 @@ static void run(void) {
     TRACE_INFO("uclamp inversion detected: min=%u max=%u", min, max);
   else
     TRACE_INFO("uclamp inversion not detected: min=%u max=%u", min, max);
+
+  kstep_tick_repeat(101);
 }
 
 struct kstep_driver uclamp_inversion = {
@@ -58,5 +60,4 @@ struct kstep_driver uclamp_inversion = {
     .run = run,
     .step_interval_us = 1000,
     .print_rq = true,
-    .print_tasks = true,
 };

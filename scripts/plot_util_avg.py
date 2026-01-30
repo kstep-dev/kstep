@@ -4,61 +4,57 @@ Plot util_avg for CPU 2 over time from log files
 """
 
 import argparse
+from pathlib import Path
 
 import matplotlib.pyplot as plt
+from consts import RESULTS_DIR
 from parse import parse_log
 from plot_utils import save_fig
 
 
-def parse_log_file(log_file):
+def parse_log_file(log_file: Path):
     return parse_log(log_file, prefix="rq")
 
 
-def plot_util_avg(buggy_df, fixed_df):
+def plot_util(buggy_df, fixed_df, field: str, ylabel: str):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(1.8, 1.8))
     xmax = max(max(buggy_df["timestamp"]), max(fixed_df["timestamp"]))
 
-    # Plot buggy version in first subplot
-    ax1.plot(
-        buggy_df["timestamp"],
-        buggy_df["avg_util"],
-        linewidth=3,
-        linestyle="-",
-        color="#A72703",
-    )
-    ax1.set_ylabel("Avg Util")
-    ax1.set_title("Buggy", fontsize=10, pad=3)
-    ax1.grid(True, alpha=0.3)
-    ax1.set_yticks([0, 1000])
-    ax1.set_yticklabels(["0", "1k"])
+    for ax, df, title, color in [
+        (ax1, buggy_df, "Buggy", "#A72703"),
+        (ax2, fixed_df, "Fixed", "#BBC863"),
+    ]:
+        ax.plot(
+            df["timestamp"],
+            df[field],
+            linewidth=3,
+            linestyle="-",
+            color=color,
+        )
+        ax.set_ylabel(ylabel)
+        ax.set_title(title, fontsize=10, pad=3)
+        ax.grid(True, alpha=0.3)
+        ax.set_yticks([0, 1000])
+        ax.set_yticklabels(["0", "1k"])
+        ax.set_xlim(0, xmax)
+
     ax1.set_xticklabels([])
-    ax1.set_xlim(0, xmax)
-
-    # Plot fixed version in second subplot
-    ax2.plot(
-        fixed_df["timestamp"],
-        fixed_df["avg_util"],
-        linewidth=3,
-        linestyle="-",
-        color="#BBC863",
-    )
     ax2.set_xlabel("Time (ms)")
-    ax2.set_ylabel("Avg Util")
-    ax2.set_yticks([0, 1000])
-    ax2.set_yticklabels(["0", "1k"])
-    ax2.set_title("Fixed", fontsize=10, pad=3)
-    ax2.grid(True, alpha=0.3)
-    ax2.set_xlim(0, xmax)
 
-    plt.tight_layout(pad=0.1)
     return fig
 
 
 def main(driver: str):
-    buggy_df = parse_log_file(f"{driver}_buggy.log")
-    fixed_df = parse_log_file(f"{driver}_fixed.log")
+    buggy_df = parse_log_file(RESULTS_DIR / f"{driver}_buggy.log")
+    fixed_df = parse_log_file(RESULTS_DIR / f"{driver}_fixed.log")
 
-    fig = plot_util_avg(buggy_df, fixed_df)
+    if driver == "uclamp_inversion":
+        field = "effective_util"
+        ylabel = "Eff. Util"
+    else:
+        field = "avg_util"
+        ylabel = "Avg Util"
+    fig = plot_util(buggy_df, fixed_df, field, ylabel)
     save_fig(fig, driver)
 
 

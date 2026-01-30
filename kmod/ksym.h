@@ -32,6 +32,8 @@ KSYM_FUNC(bool, arch_enable_hybrid_capacity_scale, void)
 KSYM_FUNC(void, arch_set_cpu_capacity, int cpu, unsigned long cap,
           unsigned long max_cap, unsigned long cap_freq,
           unsigned long base_freq)
+KSYM_FUNC(unsigned long, effective_cpu_util, int cpu, unsigned long util_cfs,
+          unsigned long max, enum cpu_util_type type, struct task_struct *p)
 
 KSYM_VAR(struct rq, runqueues)
 #ifdef CONFIG_GENERIC_SCHED_CLOCK

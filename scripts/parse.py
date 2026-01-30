@@ -35,9 +35,7 @@ def parse_line(line: str, prefix: str) -> dict | None:
     return obj
 
 
-def parse_log(path: Path | str, prefix: str) -> pd.DataFrame:
-    path = Path(path) if isinstance(path, str) else path
-    path = RESULTS_DIR / path if not path.is_absolute() else path
+def parse_log(path: Path, prefix: str) -> pd.DataFrame:
     print(f'Parsing {path} with prefix "{prefix}"')
     data = []
     with open(path, "r") as f:

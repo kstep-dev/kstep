@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 
 import argparse
+from pathlib import Path
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+from consts import RESULTS_DIR
 from matplotlib import colors
 from parse import parse_log
 from plot_utils import save_fig
 
 
-def parse_curr_task(path, type: str) -> pd.DataFrame:
+def parse_curr_task(path: Path, type: str) -> pd.DataFrame:
     df = parse_log(path, prefix="task")
     df = df[df["on_cpu"] == True]
     df["type"] = type
@@ -61,8 +63,8 @@ def plot_color_matrix(
 
 
 def plot_cur_task(
-    log_file_buggy,
-    log_file_fixed,
+    log_file_buggy: Path,
+    log_file_fixed: Path,
     title_buggy: str,
     title_fixed: str,
     color_map: dict[int, str],
@@ -172,8 +174,8 @@ def main(driver: str):
         title_fixed = "Fixed"
 
     fig = plot_cur_task(
-        log_file_buggy=f"{driver}_buggy.log",
-        log_file_fixed=f"{driver}_fixed.log",
+        log_file_buggy=RESULTS_DIR / f"{driver}_buggy.log",
+        log_file_fixed=RESULTS_DIR / f"{driver}_fixed.log",
         title_buggy=title_buggy,
         title_fixed=title_fixed,
         color_map=COLOR_MAPS.get(driver, {}),
