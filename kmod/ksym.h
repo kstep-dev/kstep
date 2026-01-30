@@ -40,8 +40,9 @@ KSYM_FUNC(void, freeze_task, struct task_struct *p)
 KSYM_VAR(bool, pm_freezing)
 
 // output.c
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 KSYM_FUNC(u64, avg_vruntime, struct cfs_rq *cfs_rq)
-// https://github.com/torvalds/linux/commit/9c0b4bb7f6303c9c4e2e34984c46f5a86478f84d
+#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
 KSYM_FUNC(unsigned long, effective_cpu_util, int cpu, unsigned long util_cfs,
           unsigned long *min, unsigned long *max)
