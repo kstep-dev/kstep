@@ -1,14 +1,12 @@
 #include <linux/version.h>
 
-// Define function symbols
-// KSYM_FUNC(ret_type, func_name, arg...) declares function `ksym.func_name`
 #ifndef KSYM_FUNC
+// Declares function `ksym.func_name`
 #define KSYM_FUNC(ret_type, func_name, arg...)
 #endif
 
-// Define variable symbols
-// KSYM_VAR(type, name) declares `ksym.name` as a *pointer* to the variable
 #ifndef KSYM_VAR
+// Declares `ksym.name` as a *pointer* to the variable
 #define KSYM_VAR(type, name)
 #endif
 
