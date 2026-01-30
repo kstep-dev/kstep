@@ -125,6 +125,17 @@ Fix: [9b58e97](https://github.com/torvalds/linux/commit/9b58e976b3b391c0cf02e038
 
 ![](https://github.com/SchedStep/results/blob/main/rt_runtime_toggle.png)
 
+#### Bug 11
+
+Fix: [0213b70](https://github.com/torvalds/linux/commit/0213b7083e81f4acd69db32cb72eb4e5f220329a) |
+[driver_uclamp_inversion.c](kmod/driver_uclamp_inversion.c) |
+[buggy.log](https://github.com/SchedStep/results/blob/main/uclamp_inversion_buggy.log) |
+[fixed.log](https://github.com/SchedStep/results/blob/main/uclamp_inversion_fixed.log)
+
+<p align="center">
+<img src="https://github.com/SchedStep/results/raw/main/uclamp_inversion.png" style="width: 50%;">
+</p>
+
 ## 💻 Running Your Own Drivers
 
 For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended workflow and tips.

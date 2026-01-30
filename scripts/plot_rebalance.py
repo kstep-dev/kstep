@@ -4,13 +4,15 @@ Script to parse rebalance domain logs and plot overhead over time.
 """
 
 import argparse
+from pathlib import Path
 
 import matplotlib.pyplot as plt
+from consts import RESULTS_DIR
 from parse import parse_log
 from plot_utils import save_fig
 
 
-def parse_log_file(path, target_cpu, time_start=1000):
+def parse_log_file(path: Path, target_cpu: int, time_start: int = 1000):
     df = parse_log(path, prefix="sched_softirq")
     df = df[df["timestamp"] > time_start]
     df["timestamp"] -= time_start
@@ -43,8 +45,8 @@ def plot_rebalance_comparison(buggy_df, fixed_df):
 
 def main(driver: str):
     target_cpu = 2
-    buggy_df = parse_log_file(f"{driver}_buggy.log", target_cpu=target_cpu)
-    fixed_df = parse_log_file(f"{driver}_fixed.log", target_cpu=target_cpu)
+    buggy_df = parse_log_file(RESULTS_DIR / f"{driver}_buggy.log", target_cpu)
+    fixed_df = parse_log_file(RESULTS_DIR / f"{driver}_fixed.log", target_cpu)
 
     fig = plot_rebalance_comparison(buggy_df, fixed_df)
     save_fig(fig, driver)

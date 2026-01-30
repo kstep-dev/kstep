@@ -4,14 +4,16 @@ Plot min_vruntime and avg_vruntime for CPU 2 over time from log files
 """
 
 import argparse
+from pathlib import Path
 
 import matplotlib.pyplot as plt
+from consts import RESULTS_DIR
 from parse import parse_log
 from plot_utils import save_fig
 
 
-def parse_log_file(log_file):
-    df = parse_log(log_file, prefix="rq")
+def parse_log_file(path: Path):
+    df = parse_log(path, prefix="rq")
     df = df[df["cpu"] == 1]
     return df
 
@@ -61,8 +63,8 @@ def plot_min_vruntime(buggy_df, fixed_df):
 
 
 def main(driver: str):
-    buggy_df = parse_log_file(f"{driver}_buggy.log")
-    fixed_df = parse_log_file(f"{driver}_fixed.log")
+    buggy_df = parse_log_file(RESULTS_DIR / f"{driver}_buggy.log")
+    fixed_df = parse_log_file(RESULTS_DIR / f"{driver}_fixed.log")
 
     fig = plot_min_vruntime(buggy_df, fixed_df)
     save_fig(fig, driver)

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+from pathlib import Path
 
 import matplotlib.lines as mlines
 import matplotlib.patches as mpatches
@@ -8,20 +9,21 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
+from consts import RESULTS_DIR
 from matplotlib import colors
 from parse import parse_log
 from plot_utils import save_fig
 
 
-def parse_nr_running(filename, cpus: list[int]):
-    df = parse_log(filename, prefix="nr_running")
+def parse_nr_running(path: Path, cpus: list[int]):
+    df = parse_log(path, prefix="nr_running")
     df = df[df["cpu"].isin(cpus)]
     df["cpu"] -= min(cpus)
     return df
 
 
-def parse_lb_events(filename, cpus: list[int], driver: str):
-    df = parse_log(filename, prefix="load_balance")
+def parse_lb_events(path: Path, cpus: list[int], driver: str):
+    df = parse_log(path, prefix="load_balance")
     df = df[df["timestamp"] != 0]
     df["dst_cpu"] -= min(cpus)
     if driver == "even_idle_cpu":
@@ -99,8 +101,8 @@ def plot_legend(fig, driver, cmap):
 
 
 def main(driver: str):
-    log_file_buggy = f"{driver}_buggy.log"
-    log_file_fixed = f"{driver}_fixed.log"
+    log_file_buggy = RESULTS_DIR / f"{driver}_buggy.log"
+    log_file_fixed = RESULTS_DIR / f"{driver}_fixed.log"
     cpus = [1, 2, 3, 4] if driver == "even_idle_cpu" else [4, 5, 6, 7]
 
     nr_running_buggy = parse_nr_running(log_file_buggy, cpus=cpus)
