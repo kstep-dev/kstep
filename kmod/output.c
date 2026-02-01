@@ -105,8 +105,8 @@ static void sched_softirq_exit(void *ignore, unsigned int vec_nr) {
 }
 
 void kstep_trace_sched_softirq(void) {
-  KSYM_IMPORT_TYPED(void, __tracepoint_softirq_entry);
-  KSYM_IMPORT_TYPED(void, __tracepoint_softirq_exit);
+  KSYM_IMPORT_TYPED(struct tracepoint, __tracepoint_softirq_entry);
+  KSYM_IMPORT_TYPED(struct tracepoint, __tracepoint_softirq_exit);
   if (tracepoint_probe_register(KSYM___tracepoint_softirq_entry,
                                 sched_softirq_entry, NULL))
     panic("Failed to register softirq_entry tracepoint");

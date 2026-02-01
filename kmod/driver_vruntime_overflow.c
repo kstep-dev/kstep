@@ -42,9 +42,9 @@ static void run(void) {
 
   // Dequeue ineligible group
   struct sched_entity *group_se = special_task->se.parent;
-  typedef void (*dequeue_entities_fn)(struct cfs_rq *cfs_rq,
-                                      struct sched_entity *se, int flags);
-  KSYM_IMPORT_TYPED(dequeue_entities_fn, dequeue_entities);
+  typedef void(dequeue_entities_type)(struct cfs_rq * cfs_rq,
+                                      struct sched_entity * se, int flags);
+  KSYM_IMPORT_TYPED(dequeue_entities_type, dequeue_entities);
   KSYM_dequeue_entities(group_se->cfs_rq, group_se, DEQUEUE_SLEEP);
 
   // Reweight the group
