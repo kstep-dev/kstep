@@ -38,7 +38,7 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 ## 📊 Results
 
 | Description | Figure |
-|-------------|--------|
+|-------------| :--------: |
 | [driver_sync_wakeup.c](kmod/driver_sync_wakeup.c) <br> Official Fix: [aa3ee4f](https://github.com/torvalds/linux/commit/aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042) <br> Our Fix: [sync_wakeup.patch](linux/sync_wakeup.patch)  <br> Logs: [buggy.log](https://github.com/SchedStep/results/blob/main/sync_wakeup_buggy.log), [fixed.log](https://github.com/SchedStep/results/blob/main/sync_wakeup_fixed.log) | ![](https://github.com/SchedStep/results/blob/main/sync_wakeup.png) |
 | [driver_vruntime_overflow.c](kmod/driver_vruntime_overflow.c) <br> Fix: [bbce3de](https://github.com/torvalds/linux/commit/bbce3de72be56e4b5f68924b7da9630cc89aa1a8) <br> Logs: [buggy.log](https://github.com/SchedStep/results/blob/main/vruntime_overflow_buggy.log), [fixed.log](https://github.com/SchedStep/results/blob/main/vruntime_overflow_fixed.log) | ![](https://github.com/SchedStep/results/blob/main/vruntime_overflow.png) |
 | [driver_freeze.c](kmod/driver_freeze.c) <br> Fix: [cd9626e](https://github.com/torvalds/linux/commit/cd9626e9ebc77edec33023fe95dab4b04ffc819d) <br> Logs: [buggy.log](https://github.com/SchedStep/results/blob/main/freeze_buggy.log), [fixed.log](https://github.com/SchedStep/results/blob/main/freeze_fixed.log) | ![](https://github.com/SchedStep/results/blob/main/freeze.png) |
