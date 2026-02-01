@@ -19,3 +19,6 @@ endif
 override LINUX_DIR := $(LINUX_DIR_REAL)
 
 LINUX_NAME := $(notdir $(LINUX_DIR))
+
+# Absolute path to the kmod directory
+KMOD_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/../kmod)

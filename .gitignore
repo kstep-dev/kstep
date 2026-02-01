@@ -5,6 +5,7 @@
 # Build artifacts
 /kmod/build
 /user/build
+/autotrace/build
 
 # Data files
 /data/download/*.tar.xz
@@ -20,3 +21,7 @@ compile_commands.json
 compile_commands.json.tmp
 compile_commands.events.json
 .cache
+
+# Generated files
+kmod/*_gen.h
+kmod/*_gen.c

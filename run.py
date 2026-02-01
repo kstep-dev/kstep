@@ -154,6 +154,7 @@ def run_gdb(linux_dir: Path):
 
 
 def make_kstep(linux_dir: Path):
+    system(f"make -C {PROJ_DIR} autotrace LINUX_DIR={linux_dir}")
     system(f"make -C {PROJ_DIR} kstep LINUX_DIR={linux_dir}")
 
 

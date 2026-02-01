@@ -40,6 +40,11 @@ static int __init kstep_main(void) {
   kstep_write("/sys/module/printk/parameters/time", "1", 1);
 
   TRACE_INFO("Running driver %s", kstep_driver->name);
+
+  // Enable auto trace of runqueue
+  if (kstep_driver->auto_trace)
+    kstep_rq_trace_init();
+
   kstep_driver->run();
   TRACE_INFO("Exiting driver %s", kstep_driver->name);
   kernel_restart(NULL);

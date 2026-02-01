@@ -64,4 +64,7 @@ extern KSYM_IMPORT_RAW(struct rq, runqueues);
 #undef raw_rq
 #define raw_rq() raw_cpu_ptr(KSYM_runqueues)
 
+// rq_fields_gen.c
+int kstep_rq_trace_init(void);
+
 #endif

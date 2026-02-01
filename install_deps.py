@@ -23,6 +23,8 @@ PACKAGES = [
     "bear",  # clangd completion
     "qemu-kvm",
     "gdb",
+    "dwarves", # btf tool
+    "libzstd-dev", # build bpftool statically
 ]
 
 
