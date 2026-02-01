@@ -53,7 +53,7 @@ bool kstep_is_sys_kthread(struct task_struct *p);
 // ksym.c
 void kstep_ksym_init(void);
 
-// Macros to import a kernel symbol `foo` as a POINTER `KSYM_foo`.
+// Macros to import a kernel symbol `type foo` as a POINTER `type *KSYM_foo`.
 // - KSYM_IMPORT(name) can be used if the type of the symbol is already known
 //   from some header file.
 // - KSYM_IMPORT_TYPED(type, name) allows manual type specification.
