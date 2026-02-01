@@ -23,5 +23,4 @@ struct kstep_driver default_driver = {
     .print_rq = true,
     .print_tasks = true,
     .print_load_balance = true,
-    .print_sched_softirq = true,
 };
