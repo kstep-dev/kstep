@@ -136,6 +136,17 @@ Fix: [0213b70](https://github.com/torvalds/linux/commit/0213b7083e81f4acd69db32c
 <img src="https://github.com/SchedStep/results/raw/main/uclamp_inversion.png" style="width: 50%;">
 </p>
 
+#### Bug 12
+
+Fix: [3429dd5](https://github.com/torvalds/linux/commit/3429dd57f0deb1a602c2624a1dd7c4c11b6c4734) |
+[driver_h_nr_runnable.c](kmod/driver_h_nr_runnable.c) |
+[buggy.log](https://github.com/SchedStep/results/blob/main/h_nr_runnable_buggy.log) |
+[fixed.log](https://github.com/SchedStep/results/blob/main/h_nr_runnable_fixed.log)
+
+<p align="center">
+<img src="https://github.com/SchedStep/results/raw/main/h_nr_runnable.png" style="width: 50%;">
+</p>
+
 ## 💻 Running Your Own Drivers
 
 For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended workflow and tips.

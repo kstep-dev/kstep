@@ -52,6 +52,7 @@ static void print_rq(struct rq *rq) {
   pr_cont(K(queued) "%2d" SEP, rq->nr_running);
   pr_cont(K(avg_load) "%4llu" SEP, avg_load);
   pr_cont(K(avg_util) "%4llu" SEP, avg_util);
+  pr_cont(K(runnable_avg) "%4lu" SEP, rq->cfs.avg.runnable_avg);
   pr_cont(K(effective_util) "%4llu" SEP, effective_util);
   pr_cont(K(min_vruntime) "%12lld" SEP, min_vruntime - INIT_TIME_NS);
   pr_cont(K(avg_vruntime) "%12lld", avg_vruntime);

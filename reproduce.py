@@ -132,6 +132,7 @@ bugs = [
             Linux(name="buggy", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734~1"),
             Linux(name="fixed", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734"),
         ],
+        plot_format="util_avg",
     ),
     # https://github.com/torvalds/linux/commit/1560d1f6eb6b398bddd80c16676776c0325fe5fe
     Bug(

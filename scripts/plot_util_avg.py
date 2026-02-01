@@ -4,21 +4,17 @@ Plot util_avg for CPU 2 over time from log files
 """
 
 import argparse
-from pathlib import Path
 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from consts import RESULTS_DIR
 from parse import parse_log
 from plot_utils import save_fig
 
 
-def parse_log_file(log_file: Path):
-    return parse_log(log_file, prefix="rq")
-
-
 def plot_util(buggy_df, fixed_df, field: str, ylabel: str):
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(1.8, 1.8))
-    xmax = max(max(buggy_df["timestamp"]), max(fixed_df["timestamp"]))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(1.8, 1.8), sharex=True, sharey=True)
+    ymax = max(max(buggy_df[field]), max(fixed_df[field]))
 
     for ax, df, title, color in [
         (ax1, buggy_df, "Buggy", "#A72703"),
@@ -31,29 +27,44 @@ def plot_util(buggy_df, fixed_df, field: str, ylabel: str):
             linestyle="-",
             color=color,
         )
-        ax.set_ylabel(ylabel)
         ax.set_title(title, fontsize=10, pad=3)
         ax.grid(True, alpha=0.3)
-        ax.set_yticks([0, 1000])
-        ax.set_yticklabels(["0", "1k"])
-        ax.set_xlim(0, xmax)
 
-    ax1.set_xticklabels([])
+        if ymax > 500:
+            ax.set_ylim(0, 1100)
+        else:
+            ax.set_ylim(0, int(round(ymax / 100.0)) * 100)
+        ax.margins(x=0)
+
+        ax.xaxis.set_major_locator(
+            ticker.MaxNLocator(3, steps=[1, 5, 10], integer=True)
+        )
+        ax.yaxis.set_major_locator(ticker.MaxNLocator(1, integer=True))
+        ax.yaxis.set_major_formatter(
+            ticker.FuncFormatter(
+                lambda x, pos: f"{x:.0f}" if x < 1000 else f"{int(x / 1000)}k"
+            )
+        )
+
     ax2.set_xlabel("Time (ms)")
+    fig.supylabel(ylabel, x=0)
 
     return fig
 
 
 def main(driver: str):
-    buggy_df = parse_log_file(RESULTS_DIR / f"{driver}_buggy.log")
-    fixed_df = parse_log_file(RESULTS_DIR / f"{driver}_fixed.log")
+    buggy_df = parse_log(RESULTS_DIR / f"{driver}_buggy.log", prefix="rq")
+    fixed_df = parse_log(RESULTS_DIR / f"{driver}_fixed.log", prefix="rq")
 
     if driver == "uclamp_inversion":
         field = "effective_util"
-        ylabel = "Eff. Util"
+        ylabel = "Effective Utilization"
+    elif driver == "h_nr_runnable":
+        field = "runnable_avg"
+        ylabel = "Runnable Avg"
     else:
         field = "avg_util"
-        ylabel = "Avg Util"
+        ylabel = "Average Utilization"
     fig = plot_util(buggy_df, fixed_df, field, ylabel)
     save_fig(fig, driver)
 

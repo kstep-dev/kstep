@@ -50,6 +50,8 @@ static void run(void) {
     TRACE_INFO("h_nr_runnable accounted correctly");
   else
     TRACE_INFO("h_nr_runnable accounted incorrectly");
+
+  kstep_tick_repeat(11);
 }
 
 #else
@@ -61,7 +63,6 @@ struct kstep_driver h_nr_runnable = {
     .name = "h_nr_runnable",
     .setup = setup,
     .run = run,
-    .step_interval_us = 10000,
+    .step_interval_us = 1000,
     .print_rq = true,
-    .print_tasks = true,
 };
