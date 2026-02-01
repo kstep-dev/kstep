@@ -4,7 +4,7 @@ import argparse
 from pathlib import Path
 
 from scripts import (
-    DATA_DIR,
+    DOWNLOAD_DIR,
     QEMU_DIR,
     decompress,
     download,
@@ -36,12 +36,13 @@ def install_uv():
 
 
 def install_qemu(
-    download_path: Path = DATA_DIR / "qemu.tar.xz",
-    src_dir: Path = DATA_DIR / "qemu-src",
-    build_dir: Path = DATA_DIR / "qemu-build",
-    install_dir: Path = QEMU_DIR,
+    version: str = "10.2.0",
+    download_path: Path = DOWNLOAD_DIR / "qemu.tar.xz",
+    src_dir: Path = QEMU_DIR / "src",
+    build_dir: Path = QEMU_DIR / "build",
+    install_dir: Path = QEMU_DIR / "install",
 ):
-    url = "https://download.qemu.org/qemu-10.1.3.tar.xz"
+    url = f"https://download.qemu.org/qemu-{version}.tar.xz"
     download(url, download_path)
     decompress(download_path, src_dir)
 
