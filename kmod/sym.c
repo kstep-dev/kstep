@@ -18,7 +18,7 @@ static void *get_kallsyms_lookup_name(void) {
   return (void *)kp.addr;
 }
 
-static void init_sym(const char *name, void **ptr) {
+static void init_ksym(const char *name, void **ptr) {
   if (strlen(name) > MAX_SYM_NAME_LENGTH)
     panic("Symbol name %s too long", name);
 
@@ -45,8 +45,8 @@ struct kstep_driver *kstep_sym_init(const char *driver_name) {
     void *addr = (void *)sym->st_value;
 
     if (strncmp(name, "KSYM_", 5) == 0) {
-      init_sym(name + 5, (void **)addr);
-    } else if (strncmp(name, "DRIVER", 6) == 0) {
+      init_ksym(name + 5, (void **)addr);
+    } else if (strcmp(name, "DRIVER") == 0) {
       if (strcmp(((struct kstep_driver *)addr)->name, driver_name) == 0) {
         if (driver != NULL)
           panic("Driver %s already found", driver_name);
