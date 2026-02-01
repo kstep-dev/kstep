@@ -17,7 +17,7 @@ static void *get_kallsyms_lookup_name(void) {
 void *kstep_ksym_get_addr(const char *name) {
   void *addr = (void *)kallsyms_lookup_name_fn(name);
   if (addr == NULL)
-    TRACE_INFO("Symbol %s not found", name);
+    panic("Symbol %s not found", name);
   return addr;
 }
 
