@@ -25,7 +25,7 @@ static void sched_softirq_exit(void *ignore, unsigned int vec_nr) {
     panic("sched_softirq_starttime is not set");
   this_cpu_write(sched_softirq_starttime, 0);
   u64 lat_ns = ktime_to_ns(ktime_sub(endtime, starttime));
-  pr_info("sched_softirq: {\"cpu\": %d, \"lat_us\": %lld.%03llu}\n",
+  pr_info("sched_softirq: {\"cpu\": %d, \"lat_us\": %llu.%03llu}\n",
           smp_processor_id(), lat_ns / 1000, lat_ns % 1000);
 }
 
@@ -67,7 +67,7 @@ static void run(void) {
   kstep_tick_repeat(3000);
 }
 
-struct kstep_driver long_balance = {
+KSTEP_DRIVER_DEFINE{
     .name = "long_balance",
     .setup = setup,
     .run = run,

@@ -115,7 +115,7 @@ static void setup(void) { panic("unsupported kernel version"); }
 static void run(void) {}
 #endif
 
-struct kstep_driver throttled_limbo_list = {
+KSTEP_DRIVER_DEFINE{
     .name = "throttled_limbo_list",
     .setup = setup,
     .run = run,

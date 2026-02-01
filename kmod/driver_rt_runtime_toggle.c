@@ -13,7 +13,7 @@ static void run(void) {
   kstep_tick_repeat(1501);
 }
 
-struct kstep_driver rt_runtime_toggle = {
+KSTEP_DRIVER_DEFINE{
     .name = "rt_runtime_toggle",
     .setup = setup,
     .run = run,

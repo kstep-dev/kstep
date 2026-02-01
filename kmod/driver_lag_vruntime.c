@@ -27,7 +27,7 @@ static void run(void) {
   kstep_tick_repeat(5);
 }
 
-struct kstep_driver lag_vruntime = {
+KSTEP_DRIVER_DEFINE{
     .name = "lag_vruntime",
     .setup = setup,
     .run = run,

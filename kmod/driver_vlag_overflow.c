@@ -78,7 +78,7 @@ static void setup(void) { panic("unsupported kernel version"); }
 static void run(void) {}
 #endif
 
-struct kstep_driver vlag_overflow = {
+KSTEP_DRIVER_DEFINE{
     .name = "vlag_overflow",
     .setup = setup,
     .run = run,

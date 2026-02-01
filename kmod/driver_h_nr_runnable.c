@@ -61,7 +61,7 @@ static void setup(void) { panic("unsupported kernel version"); }
 static void run(void) {}
 #endif
 
-struct kstep_driver h_nr_runnable = {
+KSTEP_DRIVER_DEFINE{
     .name = "h_nr_runnable",
     .setup = setup,
     .run = run,

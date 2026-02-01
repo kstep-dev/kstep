@@ -29,7 +29,7 @@ static void run(void) {
   kstep_tick_repeat(30);
 }
 
-struct kstep_driver freeze = {
+KSTEP_DRIVER_DEFINE{
     .name = "freeze",
     .setup = setup,
     .run = run,

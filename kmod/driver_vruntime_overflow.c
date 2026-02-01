@@ -60,7 +60,7 @@ static void setup(void) { panic("unsupported kernel version"); }
 static void run(void) {}
 #endif
 
-struct kstep_driver vruntime_overflow = {
+KSTEP_DRIVER_DEFINE{
     .name = "vruntime_overflow",
     .setup = setup,
     .run = run,

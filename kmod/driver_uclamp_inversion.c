@@ -71,7 +71,7 @@ static void on_tick(void) {
 #endif
 }
 
-struct kstep_driver uclamp_inversion = {
+KSTEP_DRIVER_DEFINE{
     .name = "uclamp_inversion",
     .setup = setup,
     .run = run,
