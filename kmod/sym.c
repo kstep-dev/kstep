@@ -19,11 +19,12 @@ static void *get_kallsyms_lookup_name(void) {
 }
 
 static void init_ksym(const char *name, void **ptr) {
-  if (strlen(name) > MAX_SYM_NAME_LENGTH)
-    panic("Symbol name %s too long", name);
-
   char buf[MAX_SYM_NAME_LENGTH];
-  strncpy(buf, name, sizeof(buf));
+  int size = snprintf(buf, sizeof(buf), "%s", name);
+  if (size <= 0 || size >= sizeof(buf))
+    panic("failed to format ksym name for %s: %d", name, size);
+
+  // Remove trailing dot if it exists
   char *dot = strchr(buf, '.');
   if (dot)
     *dot = '\0';
@@ -38,15 +39,19 @@ struct kstep_driver *kstep_sym_init(const char *driver_name) {
 
   kallsyms_lookup_name_fn = get_kallsyms_lookup_name();
 
+  // Inspect the module's symbol table
   struct mod_kallsyms *kallsyms = THIS_MODULE->kallsyms;
   for (int i = 0; i < kallsyms->num_symtab; i++) {
     Elf_Sym *sym = &kallsyms->symtab[i];
     const char *name = kallsyms->strtab + sym->st_name;
     void *addr = (void *)sym->st_value;
 
+    // Resolve symbols with KSYM_ prefix
     if (strncmp(name, "KSYM_", 5) == 0) {
       init_ksym(name + 5, (void **)addr);
-    } else if (strcmp(name, "DRIVER") == 0) {
+    }
+    // Find DRIVER with matching name
+    else if (strcmp(name, "DRIVER") == 0) {
       if (strcmp(((struct kstep_driver *)addr)->name, driver_name) == 0) {
         if (driver != NULL)
           panic("Driver %s already found", driver_name);
