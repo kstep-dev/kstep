@@ -16,12 +16,8 @@ static int __init kstep_main(void) {
   kstep_driver_print(kstep_driver);
 
   // Isolate the CPUs to avoid interference
-  TRACE_INFO("Isolating CPUs");
-  TRACE_INFO("Preallocating kworkers");
   kstep_prealloc_kworkers();
-  TRACE_INFO("Disabling workqueue");
   kstep_disable_workqueue();
-  TRACE_INFO("Moving kthreads");
   kstep_move_kthreads();
 
   // Run userspace programs when we know the system is ready
