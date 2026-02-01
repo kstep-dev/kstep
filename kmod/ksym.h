@@ -78,7 +78,7 @@ KSYM_AUTO(runqueues)
 #define raw_rq() raw_cpu_ptr(ksym.runqueues)
 
 // misc
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 KSYM_FUNC(void, dequeue_entities, struct cfs_rq *cfs_rq,
           struct sched_entity *se, int flags)
 #endif

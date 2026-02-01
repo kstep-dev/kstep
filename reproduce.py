@@ -50,7 +50,6 @@ bugs = [
         ],
         plot_format="cur_task",
     ),
-    # https://github.com/torvalds/linux/commit/bbce3de72be56e4b5f68924b7da9630cc89aa1a8
     Bug(
         driver=Driver(name="vruntime_overflow", smp="2"),
         linux=[
