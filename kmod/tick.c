@@ -2,6 +2,7 @@
 #include <linux/sched_clock.h>
 
 #include "internal.h"
+#include <linux/kprobes.h>
 
 static u64 kstep_sched_clock = INIT_TIME_NS;
 static u64 kstep_sched_clock_read(void) { return kstep_sched_clock; }
@@ -89,8 +90,28 @@ static void kstep_jiffies_tick(void) {
   smp_mb();
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+// kprobe tick_nohz_handler
+static int tick_nohz_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
+  struct hrtimer *timer = (struct hrtimer *)regs->di;
+  struct tick_sched *ts = container_of(timer, struct tick_sched, sched_timer);
+  ts->flags |= 2; // Set TS_FLAG_STOPPED flag
+  return 0;
+}
+
+static struct kprobe kstep_tick_nohz_kp = {
+  .symbol_name = "tick_nohz_handler",
+  .pre_handler = tick_nohz_pre_handler,
+};
+#endif
+
 void kstep_sched_timer_init(void) {
   KSYM_IMPORT(tick_get_tick_sched);
+  // Register kprobe for tick_nohz_handler to set TS_FLAG_STOPPED flag
+  // When only using hrtimer_cancel, there is still sched_tick called from tick_nohz_handler 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+  register_kprobe(&kstep_tick_nohz_kp);
+#endif
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     // Ref: tick_sched_timer_dying in
     // https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L1606
