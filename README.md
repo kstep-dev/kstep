@@ -79,7 +79,7 @@ make kstep [LINUX_DIR=<path>]  # Build kSTEP rootfs (default target)
 ./run.py <driver_name> [--smp <cpus>] [--mem_mb <mb>] [--log_file <path>]
 ```
 
-- `<driver_name>`: Driver to run.
+- `<driver_name>`: Driver to run (see `driver_*.c` files in the [`kmod/`](kmod/) directory).
 
 - `[--log_file <path>]`: Log file to save the output, default to `data/logs/latest.log`.
 
