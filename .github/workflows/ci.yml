@@ -7,8 +7,39 @@ on:
   schedule:
     - cron: '0 0 * * 0' # Every week
 
+env:
+  QEMU_CACHE_KEY: qemu-10.2.0
+  QEMU_INSTALL_PATH: data/qemu/install
+
 jobs:
+  qemu:
+    name: Build QEMU
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore cache
+        id: qemu-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.QEMU_INSTALL_PATH }}
+          key: ${{ env.QEMU_CACHE_KEY }}
+          lookup-only: true
+
+      - name: Install QEMU
+        if: steps.qemu-cache.outputs.cache-hit != 'true'
+        run: ./install_deps.py ci-qemu
+
+      - name: Save cache
+        if: steps.qemu-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.QEMU_INSTALL_PATH }}
+          key: ${{ env.QEMU_CACHE_KEY }}
+
   test:
+    needs: qemu
     strategy:
       matrix:
         version: # LTS versions at https://kernel.org/
@@ -53,23 +84,12 @@ jobs:
       - name: Build kSTEP
         run: make kstep
 
-      - name: QEMU - Restore cache
-        id: qemu-cache
+      - name: Install QEMU
         uses: actions/cache/restore@v4
         with:
-          path: data/qemu
-          key: qemu
-
-      - name: QEMU - Install
-        if: steps.qemu-cache.outputs.cache-hit != 'true'
-        run: ./install_deps.py ci-qemu
-
-      - name: QEMU - Save cache
-        if: steps.qemu-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: data/qemu
-          key: qemu
+          path: ${{ env.QEMU_INSTALL_PATH }}
+          key: ${{ env.QEMU_CACHE_KEY }}
+          fail-on-cache-miss: true
 
       - name: Run kSTEP
         timeout-minutes: 1

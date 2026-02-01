@@ -38,7 +38,7 @@ def get_qemu_path() -> Path:
     if path is not None:
         return Path(path)
 
-    path = QEMU_DIR / "bin" / name
+    path = QEMU_DIR / "install" / "bin" / name
     if path.exists():
         return path
 

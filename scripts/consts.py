@@ -14,6 +14,7 @@ USER_DIR = PROJ_DIR / "user"
 KMOD_DIR = PROJ_DIR / "kmod"
 
 DATA_DIR = PROJ_DIR / "data"
+DOWNLOAD_DIR = DATA_DIR / "download"
 ROOTFS_DIR = DATA_DIR / "rootfs"
 LOGS_DIR = DATA_DIR / "logs"
 LOG_LATEST = LOGS_DIR / "latest.log"
