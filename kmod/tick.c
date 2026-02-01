@@ -13,8 +13,10 @@ static void kstep_sched_clock_tick(void) { kstep_sched_clock += TICK_NSEC; }
 // `paravirt_set_sched_clock` (see `arch/x86/include/asm/paravirt.h`).
 
 void kstep_sched_clock_init(void) {
-  *ksym.__sched_clock_offset = 0;
-  ksym.paravirt_set_sched_clock(kstep_sched_clock_read);
+  KSYM_IMPORT(__sched_clock_offset);
+  KSYM_IMPORT(paravirt_set_sched_clock);
+  *KSYM___sched_clock_offset = 0;
+  KSYM_paravirt_set_sched_clock(kstep_sched_clock_read);
   TRACE_INFO("Mocked sched clock");
 }
 
@@ -32,10 +34,10 @@ struct clock_data {
 };
 
 void kstep_sched_clock_init(void) {
-  struct clock_data *cd = ksym.cd;
-  cd->actual_read_sched_clock = kstep_sched_clock_read;
+  KSYM_IMPORT_TYPED(struct clock_data, cd);
+  KSYM_cd->actual_read_sched_clock = kstep_sched_clock_read;
   for (int i = 0; i < 2; i++) {
-    struct clock_read_data *rd = &cd->read_data[i];
+    struct clock_read_data *rd = &KSYM_cd->read_data[i];
     rd->read_sched_clock = kstep_sched_clock_read;
     rd->mult = 1;
     rd->shift = 0;
@@ -62,13 +64,15 @@ void kstep_jiffies_init(void) {
   // `tick_do_timer_cpu`:https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-common.c#L51
 
   // Setting an invalid timerkeeper CPU to avoid (most of) jiffies updates.
-  *ksym.tick_do_timer_cpu = -1;
+  KSYM_IMPORT(tick_do_timer_cpu);
+  *KSYM_tick_do_timer_cpu = -1;
 
   // It's possible that a non-timekeeper CPU calls `tick_do_update_jiffies64`
   // https://github.com/torvalds/linux/commit/a1ff03cd6fb9c501fff63a4a2bface9adcfa81cd
   // We set `tick_next_period` to a large value to avoid such updates within
   // `tick_do_update_jiffies64`
-  *ksym.tick_next_period = KTIME_MAX;
+  KSYM_IMPORT(tick_next_period);
+  *KSYM_tick_next_period = KTIME_MAX;
 
   kstep_jiffies = nsecs_to_jiffies(kstep_sched_clock) + INITIAL_JIFFIES;
   jiffies = kstep_jiffies;
@@ -86,10 +90,11 @@ static void kstep_jiffies_tick(void) {
 }
 
 void kstep_sched_timer_init(void) {
+  KSYM_IMPORT(tick_get_tick_sched);
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     // Ref: tick_sched_timer_dying in
     // https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L1606
-    struct tick_sched *ts = ksym.tick_get_tick_sched(cpu);
+    struct tick_sched *ts = KSYM_tick_get_tick_sched(cpu);
     hrtimer_cancel(&ts->sched_timer);
     memset(ts, 0, sizeof(struct tick_sched));
     TRACE_INFO("Disabled timer ticks on CPU %d", cpu);
@@ -104,9 +109,11 @@ void kstep_sleep(void) {
 
 static void kstep_sched_tick(void) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
-  void *sched_tick = (void *)ksym.sched_tick;
+  KSYM_IMPORT(sched_tick);
+  void *sched_tick = KSYM_sched_tick;
 #else
-  void *sched_tick = (void *)ksym.scheduler_tick;
+  KSYM_IMPORT(scheduler_tick);
+  void *sched_tick = KSYM_scheduler_tick;
 #endif
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     smp_call_function_single(cpu, sched_tick, NULL, 1);

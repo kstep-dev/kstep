@@ -63,7 +63,8 @@ static void on_tick(void) {
 // https://github.com/torvalds/linux/commit/bb4479994945e9170534389a7762eb56149320ac
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
   struct rq *rq = cpu_rq(1);
-  u64 effective_util = ksym.effective_cpu_util(rq->cpu, rq->cfs.avg.util_avg,
+  KSYM_IMPORT(effective_cpu_util);
+  u64 effective_util = KSYM_effective_cpu_util(rq->cpu, rq->cfs.avg.util_avg,
                                                arch_scale_cpu_capacity(rq->cpu),
                                                FREQUENCY_UTIL, NULL);
   pr_info("on_tick: {\"effective_util\": %llu}\n", effective_util);

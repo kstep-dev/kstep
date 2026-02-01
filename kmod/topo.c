@@ -1,6 +1,7 @@
 #include "internal.h"
 
-#define for_each_tl(tl) for (tl = *ksym.sched_domain_topology; tl->mask; tl++)
+KSYM_IMPORT_TYPED(struct sched_domain_topology_level *, sched_domain_topology);
+#define for_each_tl(tl) for (tl = *KSYM_sched_domain_topology; tl->mask; tl++)
 
 static void print_sd_flags(int flags) {
 #define SD_FLAG(name, meta_flag)                                               \
@@ -145,14 +146,17 @@ void kstep_topo_set_level(enum kstep_topo_type type, const char *cpulists[],
 void kstep_topo_apply(void) {
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
   // https://elixir.bootlin.com/linux/v6.17.8/source/drivers/base/arch_topology.c#L205-L222
-  *ksym.update_topology = 1;
+  KSYM_IMPORT(update_topology);
+  *KSYM_update_topology = 1;
 #else
   // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/itmt.c#L55-L56
   // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/smpboot.c#L129-L138
-  *ksym.x86_topology_update = true;
+  KSYM_IMPORT(x86_topology_update);
+  *KSYM_x86_topology_update = true;
 #endif
 
-  ksym.rebuild_sched_domains();
+  KSYM_IMPORT(rebuild_sched_domains);
+  KSYM_rebuild_sched_domains();
 }
 
 void kstep_cpu_set_freq(int cpu, int scale) {
@@ -162,7 +166,8 @@ void kstep_cpu_set_freq(int cpu, int scale) {
   // https://elixir.bootlin.com/linux/v6.14.11/source/arch/x86/include/asm/topology.h#L287-L293
   // generic:
   // https://elixir.bootlin.com/linux/v6.14.11/source/include/linux/arch_topology.h#L33-L38
-  *per_cpu_ptr(ksym.arch_freq_scale, cpu) = scale;
+  KSYM_IMPORT(arch_freq_scale);
+  *per_cpu_ptr(KSYM_arch_freq_scale, cpu) = scale;
 }
 
 void kstep_cpu_set_capacity(int cpu, int scale) {
@@ -176,9 +181,11 @@ void kstep_cpu_set_capacity(int cpu, int scale) {
   static bool enabled = false;
   if (!enabled) {
     enabled = true;
-    ksym.arch_enable_hybrid_capacity_scale();
+    KSYM_IMPORT(arch_enable_hybrid_capacity_scale);
+    KSYM_arch_enable_hybrid_capacity_scale();
   }
-  ksym.arch_set_cpu_capacity(cpu, scale, SCHED_CAPACITY_SCALE, scale,
+  KSYM_IMPORT(arch_set_cpu_capacity);
+  KSYM_arch_set_cpu_capacity(cpu, scale, SCHED_CAPACITY_SCALE, scale,
                              SCHED_CAPACITY_SCALE);
 #else
   panic("arch_set_cpu_capacity not supported for this kernel");
