@@ -37,9 +37,11 @@ void kstep_reset_tasks(void) {
 
 static void kstep_reset_runqueue(struct rq *rq) {
   // reset rq
-  ksym.update_rq_clock(rq);
-  rq->avg_idle = 2 * *ksym.sysctl_sched_migration_cost;
-  rq->max_idle_balance_cost = *ksym.sysctl_sched_migration_cost;
+  KSYM_IMPORT(update_rq_clock);
+  KSYM_IMPORT(sysctl_sched_migration_cost);
+  KSYM_update_rq_clock(rq);
+  rq->avg_idle = 2 * *KSYM_sysctl_sched_migration_cost;
+  rq->max_idle_balance_cost = *KSYM_sysctl_sched_migration_cost;
   rq->nr_switches = 0;
   rq->next_balance = INITIAL_JIFFIES + nsecs_to_jiffies(INIT_TIME_NS);
 
@@ -82,10 +84,11 @@ void kstep_reset_runqueues(void) {
 }
 
 void kstep_reset_cpumask(void) {
+  KSYM_IMPORT_TYPED(int, distribute_cpu_mask_prev);
 // https://github.com/torvalds/linux/commit/46a87b3851f0d6eb05e6d83d5c5a30df0eca8f76
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    int *ptr = per_cpu_ptr(ksym.distribute_cpu_mask_prev, cpu);
+    int *ptr = per_cpu_ptr(KSYM_distribute_cpu_mask_prev, cpu);
     *ptr = 0;
   }
   TRACE_INFO("Reset cpumask");

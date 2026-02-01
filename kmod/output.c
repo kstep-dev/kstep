@@ -20,7 +20,8 @@ static void print_rq(struct rq *rq) {
 // https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
   u64 avg_load = rq->cfs.avg_load;
-  u64 avg_vruntime = ksym.avg_vruntime(&rq->cfs) - INIT_TIME_NS;
+  KSYM_IMPORT(avg_vruntime);
+  u64 avg_vruntime = KSYM_avg_vruntime(&rq->cfs) - INIT_TIME_NS;
 #else
   u64 avg_load = 0;
   u64 avg_vruntime = 0;
@@ -104,11 +105,13 @@ static void sched_softirq_exit(void *ignore, unsigned int vec_nr) {
 }
 
 void kstep_trace_sched_softirq(void) {
-  if (tracepoint_probe_register((void *)ksym.__tracepoint_softirq_entry,
+  KSYM_IMPORT_TYPED(void, __tracepoint_softirq_entry);
+  KSYM_IMPORT_TYPED(void, __tracepoint_softirq_exit);
+  if (tracepoint_probe_register(KSYM___tracepoint_softirq_entry,
                                 sched_softirq_entry, NULL))
     panic("Failed to register softirq_entry tracepoint");
 
-  if (tracepoint_probe_register((void *)ksym.__tracepoint_softirq_exit,
+  if (tracepoint_probe_register(KSYM___tracepoint_softirq_exit,
                                 sched_softirq_exit, NULL))
     panic("Failed to register softirq_exit tracepoint");
 

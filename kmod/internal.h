@@ -51,15 +51,22 @@ void kstep_prealloc_kworkers(void);
 bool kstep_is_sys_kthread(struct task_struct *p);
 
 // ksym.c
-struct ksym {
-#define KSYM_FUNC(ret_type, name, ...) ret_type (*name)(__VA_ARGS__);
-#define KSYM_VAR(type, name) type *name;
-#include "ksym.h"
-#undef KSYM_FUNC
-#undef KSYM_VAR
-};
-extern struct ksym ksym;
 void kstep_ksym_init(void);
-void *kstep_ksym_get_addr(const char *name);
+
+// Macros to import a kernel symbol `foo` as a POINTER `KSYM_foo`.
+// - KSYM_IMPORT(name) can be used if the type of the symbol is already known
+//   from some header file.
+// - KSYM_IMPORT_TYPED(type, name) allows manual type specification.
+#define KSYM_IMPORT(name) KSYM_IMPORT_TYPED(typeof(name), name)
+#define KSYM_IMPORT_TYPED(type, name) static KSYM_IMPORT_RAW(type, name) __used
+#define KSYM_IMPORT_RAW(type, name) type *KSYM_##name
+
+extern KSYM_IMPORT_RAW(struct rq, runqueues);
+#undef cpu_rq
+#define cpu_rq(cpu) (per_cpu_ptr(KSYM_runqueues, (cpu)))
+#undef this_rq
+#define this_rq() this_cpu_ptr(KSYM_runqueues)
+#undef raw_rq
+#define raw_rq() raw_cpu_ptr(KSYM_runqueues)
 
 #endif

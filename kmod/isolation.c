@@ -1,9 +1,9 @@
 #include "internal.h"
 
 void kstep_disable_workqueue(void) {
+  KSYM_IMPORT_TYPED(void, workqueue_offline_cpu);
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    work_on_cpu(cpu, (void *)ksym.workqueue_offline_cpu,
-                (void *)(uintptr_t)cpu);
+    work_on_cpu(cpu, KSYM_workqueue_offline_cpu, (void *)(uintptr_t)cpu);
     TRACE_INFO("Disabled workqueue on CPU %d", cpu);
   }
 }

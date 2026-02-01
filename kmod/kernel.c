@@ -162,12 +162,15 @@ void kstep_freeze_task(struct task_struct *p) {
   atomic_inc(&system_freezing_cnt);
 #endif
 
-  *ksym.pm_freezing = true;
+  KSYM_IMPORT(pm_freezing);
+  KSYM_IMPORT(freeze_task);
+
+  *KSYM_pm_freezing = true;
 
   TRACE_INFO("Freezing task %d", p->pid);
-  ksym.freeze_task(p);
+  KSYM_freeze_task(p);
 
-  *ksym.pm_freezing = false;
+  *KSYM_pm_freezing = false;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
   static_branch_dec(&freezer_active);
 #else
@@ -178,7 +181,8 @@ void kstep_freeze_task(struct task_struct *p) {
 int kstep_eligible(struct sched_entity *se) {
 // https://github.com/torvalds/linux/commit/147f3efaa24182a21706bca15eab2f3f4630b5fe
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-  return ksym.entity_eligible(se->cfs_rq, se);
+  KSYM_IMPORT(entity_eligible);
+  return KSYM_entity_eligible(se->cfs_rq, se);
 #else
   panic("unsupported kernel");
 #endif

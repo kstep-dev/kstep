@@ -39,7 +39,8 @@ static void run(void) {
   kstep_task_wakeup(task1);
   kstep_tick_repeat(10);
 
-  u64 avruntime = ksym.avg_vruntime(cfs_rq);
+  KSYM_IMPORT(avg_vruntime);
+  u64 avruntime = KSYM_avg_vruntime(cfs_rq);
   unsigned long weight = se->load.weight;
 
   // Create large negative vlag that will overflow when multiplied by weight
