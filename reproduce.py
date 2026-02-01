@@ -28,7 +28,6 @@ class Bug:
 
 
 bugs = [
-    # https://github.com/torvalds/linux/commit/aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042
     Bug(
         driver=Driver(name="sync_wakeup", smp="3"),
         linux=[
@@ -41,7 +40,6 @@ bugs = [
         ],
         plot_format="cur_task",
     ),
-    # https://github.com/torvalds/linux/commit/cd9626e9ebc77edec33023fe95dab4b04ffc819d
     Bug(
         driver=Driver(name="freeze", smp="2"),
         linux=[
@@ -58,7 +56,6 @@ bugs = [
         ],
         plot_format="cur_task",
     ),
-    # https://github.com/torvalds/linux/commit/2feab2492deb2f14f9675dd6388e9e2bf669c27a
     Bug(
         driver=Driver(name="long_balance", smp="3", mem_mb=4096),
         linux=[
@@ -67,7 +64,6 @@ bugs = [
         ],
         plot_format="rebalance",
     ),
-    # https://github.com/torvalds/linux/commit/17e3e88ed0b6318fde0d1c14df1a804711cab1b5
     Bug(
         driver=Driver(name="util_avg", smp="2"),
         linux=[
@@ -76,7 +72,6 @@ bugs = [
         ],
         plot_format="util_avg",
     ),
-    # https://github.com/torvalds/linux/commit/5068d84054b766efe7c6202fc71b2350d1c326f1
     Bug(
         driver=Driver(name="lag_vruntime", smp="2"),
         plot_format="min_vruntime",
@@ -97,7 +92,6 @@ bugs = [
         ],
         plot_format="lb_nr_running",
     ),
-    # https://github.com/torvalds/linux/commit/6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3
     Bug(
         driver=Driver(name="extra_balance", smp="8,sockets=2,cores=2,threads=2"),
         linux=[
@@ -106,7 +100,6 @@ bugs = [
         ],
         plot_format="lb_nr_running",
     ),
-    # https://github.com/torvalds/linux/commit/9b58e976b3b391c0cf02e038d53dd0478ed3013c
     Bug(
         driver=Driver(name="rt_runtime_toggle", smp="2"),
         linux=[
@@ -123,7 +116,6 @@ bugs = [
         ],
         plot_format="util_avg",
     ),
-    # https://github.com/torvalds/linux/commit/3429dd57f0deb1a602c2624a1dd7c4c11b6c4734
     Bug(
         driver=Driver(name="h_nr_runnable", smp="2"),
         linux=[
@@ -132,7 +124,6 @@ bugs = [
         ],
         plot_format="util_avg",
     ),
-    # https://github.com/torvalds/linux/commit/1560d1f6eb6b398bddd80c16676776c0325fe5fe
     Bug(
         driver=Driver(name="vlag_overflow", smp="2"),
         linux=[
@@ -140,7 +131,6 @@ bugs = [
             Linux(name="fixed", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe"),
         ],
     ),
-    # https://github.com/torvalds/linux/commit/956dfda6a70885f18c0f8236a461aa2bc4f556ad
     Bug(
         driver=Driver(name="throttled_limbo_list", smp="2"),
         linux=[
