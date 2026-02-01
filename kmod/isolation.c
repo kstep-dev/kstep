@@ -2,8 +2,8 @@
 
 void kstep_disable_workqueue(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    smp_call_function_single(cpu, (void *)ksym.workqueue_offline_cpu,
-                             (void *)(uintptr_t)cpu, 1);
+    work_on_cpu(cpu, (void *)ksym.workqueue_offline_cpu,
+                (void *)(uintptr_t)cpu);
     TRACE_INFO("Disabled workqueue on CPU %d", cpu);
   }
 }
