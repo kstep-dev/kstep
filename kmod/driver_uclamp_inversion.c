@@ -1,7 +1,11 @@
+// https://github.com/torvalds/linux/commit/0213b7083e81f4acd69db32cb72eb4e5f220329a
+
+#include <linux/version.h>
 #include <uapi/linux/sched.h>
 #include <uapi/linux/sched/types.h>
 
 #include "driver.h"
+#include "internal.h"
 
 static struct task_struct *task;
 
@@ -54,10 +58,22 @@ static void run(void) {
   kstep_tick_repeat(101);
 }
 
+static void on_tick(void) {
+// https://github.com/torvalds/linux/commit/9c0b4bb7f6303c9c4e2e34984c46f5a86478f84d
+// https://github.com/torvalds/linux/commit/bb4479994945e9170534389a7762eb56149320ac
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
+  struct rq *rq = cpu_rq(1);
+  u64 effective_util = ksym.effective_cpu_util(rq->cpu, rq->cfs.avg.util_avg,
+                                               arch_scale_cpu_capacity(rq->cpu),
+                                               FREQUENCY_UTIL, NULL);
+  pr_info("on_tick: {\"effective_util\": %llu}\n", effective_util);
+#endif
+}
+
 struct kstep_driver uclamp_inversion = {
     .name = "uclamp_inversion",
     .setup = setup,
     .run = run,
+    .on_tick = on_tick,
     .step_interval_us = 1000,
-    .print_rq = true,
 };

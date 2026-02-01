@@ -55,6 +55,7 @@ struct ksym {
 #undef KSYM_VAR
 };
 extern struct ksym ksym;
-void ksym_init(void);
+void kstep_ksym_init(void);
+void *kstep_ksym_get_addr(const char *name);
 
 #endif

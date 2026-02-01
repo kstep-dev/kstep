@@ -14,6 +14,7 @@ struct kstep_driver {
   const char *name;         // Name of the driver
   void (*setup)(void);      // Setup the driver (e.g., create tasks)
   void (*run)(void);        // Run the driver
+  void (*on_tick)(void);    // Callback on each tick
   u64 step_interval_us;     // Time between steps in us
   bool print_rq;            // Print runqueue stats
   bool print_tasks;         // Print task stats
