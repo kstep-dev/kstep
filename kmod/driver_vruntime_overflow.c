@@ -1,6 +1,9 @@
+// https://github.com/torvalds/linux/commit/bbce3de72be56e4b5f68924b7da9630cc89aa1a8
 #include "driver.h"
 #include "internal.h" // dequeue_entities
 
+// https://github.com/torvalds/linux/commit/fab4a808ba9fb59b691d7096eed9b1494812ffd6
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
 static struct task_struct *special_task;
 static struct task_struct *starved_task;
 static struct task_struct *other_task;
@@ -48,6 +51,11 @@ static void run(void) {
 
   kstep_tick_repeat(18);
 }
+
+#else
+static void setup(void) { panic("unsupported kernel version"); }
+static void run(void) {}
+#endif
 
 struct kstep_driver vruntime_overflow = {
     .name = "vruntime_overflow",

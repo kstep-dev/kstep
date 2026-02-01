@@ -2,6 +2,9 @@
 #define KSTEP_INTERNAL_H
 
 #include <linux/cpumask.h>
+#include <linux/cpuset.h>
+#include <linux/freezer.h>
+#include <linux/sched/clock.h>
 #include <linux/types.h>
 #include <linux/version.h>
 
@@ -9,6 +12,7 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
 #include <kernel/sched/sched.h>
+#include <kernel/time/tick-internal.h>
 #include <kernel/time/tick-sched.h>
 #pragma GCC diagnostic pop
 

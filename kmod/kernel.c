@@ -176,5 +176,10 @@ void kstep_freeze_task(struct task_struct *p) {
 }
 
 int kstep_eligible(struct sched_entity *se) {
+// https://github.com/torvalds/linux/commit/147f3efaa24182a21706bca15eab2f3f4630b5fe
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
   return ksym.entity_eligible(se->cfs_rq, se);
+#else
+  panic("unsupported kernel");
+#endif
 }

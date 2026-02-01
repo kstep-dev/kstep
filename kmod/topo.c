@@ -171,15 +171,16 @@ void kstep_cpu_set_capacity(int cpu, int scale) {
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
   // https://elixir.bootlin.com/linux/v6.17.8/source/include/linux/topology.h#L332-L339
   per_cpu(cpu_scale, cpu) = scale;
-#else
+// https://github.com/torvalds/linux/commit/5a9d10145a54f7a3fb6297c0082bf030e04db3bc
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
   static bool enabled = false;
   if (!enabled) {
     enabled = true;
-    // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/cpu/aperfmperf.c#L362-L393
     ksym.arch_enable_hybrid_capacity_scale();
   }
-  // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/cpu/aperfmperf.c#L395-L422
   ksym.arch_set_cpu_capacity(cpu, scale, SCHED_CAPACITY_SCALE, scale,
                              SCHED_CAPACITY_SCALE);
+#else
+  panic("arch_set_cpu_capacity not supported for this kernel");
 #endif
 }
