@@ -115,6 +115,8 @@ static void kstep_sched_tick(void) {
 }
 
 void kstep_tick(void) {
+  if (kstep_driver->on_tick)
+    kstep_driver->on_tick();
   if (kstep_driver->print_rq)
     kstep_print_rq();
   if (kstep_driver->print_tasks)

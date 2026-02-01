@@ -41,13 +41,7 @@ KSYM_VAR(bool, pm_freezing)
 
 // output.c
 KSYM_FUNC(u64, avg_vruntime, struct cfs_rq *cfs_rq)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
-KSYM_FUNC(unsigned long, effective_cpu_util, int cpu, unsigned long util_cfs,
-          unsigned long *min, unsigned long *max)
-#else
-KSYM_FUNC(unsigned long, effective_cpu_util, int cpu, unsigned long util_cfs,
-          unsigned long max, enum cpu_util_type type, struct task_struct *p)
-#endif
+KSYM_VAR(typeof(effective_cpu_util), effective_cpu_util)
 KSYM_VAR(void *, __tracepoint_softirq_entry)
 KSYM_VAR(void *, __tracepoint_softirq_exit)
 

@@ -10,7 +10,7 @@ struct kstep_driver *kstep_driver = NULL;
 
 static int __init kstep_main(void) {
   kstep_sysctl_write("kernel.printk", "%d", 7);
-  ksym_init();
+  kstep_ksym_init();
 
   kstep_driver = kstep_driver_get(kstep_driver_name);
   kstep_driver_print(kstep_driver);
