@@ -3,16 +3,14 @@
 
 #include "internal.h"
 
-static char kstep_driver_name[32] = "default";
-module_param_string(driver, kstep_driver_name, sizeof(kstep_driver_name), 0644);
-
 struct kstep_driver *kstep_driver = NULL;
+
+static char driver_name[DRIVER_NAME_LEN] = "default";
+module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
 
 static int __init kstep_main(void) {
   kstep_sysctl_write("kernel.printk", "%d", 7);
-  kstep_ksym_init();
-
-  kstep_driver = kstep_driver_get(kstep_driver_name);
+  kstep_driver = kstep_sym_init(driver_name);
   kstep_driver_print(kstep_driver);
 
   // Isolate the CPUs to avoid interference
@@ -22,7 +20,6 @@ static int __init kstep_main(void) {
 
   // Run userspace programs when we know the system is ready
   kstep_driver->setup();
-
   kstep_topo_print();
 
   // Control timer ticks and clock

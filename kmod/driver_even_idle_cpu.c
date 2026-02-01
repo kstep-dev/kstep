@@ -30,7 +30,7 @@ static void run(void) {
   kstep_tick_repeat(250);
 }
 
-struct kstep_driver even_idle_cpu = {
+KSTEP_DRIVER_DEFINE{
     .name = "even_idle_cpu",
     .setup = setup,
     .run = run,

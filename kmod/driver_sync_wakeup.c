@@ -69,7 +69,7 @@ static void run(void) {
   kstep_tick_repeat(10);
 }
 
-struct kstep_driver sync_wakeup = {
+KSTEP_DRIVER_DEFINE{
     .name = "sync_wakeup",
     .setup = setup,
     .run = run,

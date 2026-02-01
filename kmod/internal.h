@@ -23,9 +23,6 @@
 // main.c
 extern struct kstep_driver *kstep_driver;
 
-// driver.c
-struct kstep_driver *kstep_driver_get(const char *name);
-
 // tick.c
 void kstep_sched_timer_init(void);
 void kstep_jiffies_init(void);
@@ -49,9 +46,8 @@ void kstep_move_kthreads(void);
 void kstep_prealloc_kworkers(void);
 bool kstep_is_sys_kthread(struct task_struct *p);
 
-// ksym.c
-void kstep_ksym_init(void);
-
+// sym.c
+struct kstep_driver *kstep_sym_init(const char *driver_name);
 // Macros to import a kernel symbol `type foo` as a POINTER `type *KSYM_foo`.
 // - KSYM_IMPORT(name) can be used if the type of the symbol is already known
 //   from some header file.

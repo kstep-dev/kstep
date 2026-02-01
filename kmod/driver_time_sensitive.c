@@ -51,7 +51,7 @@ static void run(void) {
   }
 }
 
-struct kstep_driver time_sensitive = {
+KSTEP_DRIVER_DEFINE{
     .name = "time_sensitive",
     .setup = setup,
     .run = run,

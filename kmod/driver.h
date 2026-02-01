@@ -10,8 +10,9 @@
   pr_info(TERM_GREEN "%24s: " fmt TERM_RESET "\n", __func__, ##__VA_ARGS__)
 
 // driver.c
+#define DRIVER_NAME_LEN 32
 struct kstep_driver {
-  const char *name;         // Name of the driver
+  char name[DRIVER_NAME_LEN];
   void (*setup)(void);      // Setup the driver (e.g., create tasks)
   void (*run)(void);        // Run the driver
   void (*on_tick)(void);    // Callback on each tick
@@ -21,6 +22,7 @@ struct kstep_driver {
   bool print_nr_running;    // Print number of running tasks
   bool print_load_balance;  // Print load balancing
 };
+#define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 
 static inline void kstep_driver_print(struct kstep_driver *driver) {
   TRACE_INFO("- %-20s: %s", "Linux version", UTS_RELEASE);

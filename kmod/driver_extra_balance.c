@@ -21,7 +21,7 @@ static void run(void) {
   kstep_tick_repeat(250);
 }
 
-struct kstep_driver extra_balance = {
+KSTEP_DRIVER_DEFINE{
     .name = "extra_balance",
     .setup = setup,
     .run = run,

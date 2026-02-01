@@ -32,7 +32,7 @@ static void run(void) {
   kstep_tick_repeat(600);
 }
 
-struct kstep_driver util_avg = {
+KSTEP_DRIVER_DEFINE{
     .name = "util_avg",
     .setup = setup,
     .run = run,

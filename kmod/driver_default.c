@@ -15,7 +15,7 @@ static void run(void) {
     kstep_tick();
 }
 
-struct kstep_driver default_driver = {
+KSTEP_DRIVER_DEFINE{
     .name = "default",
     .setup = setup,
     .run = run,
