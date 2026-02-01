@@ -35,7 +35,6 @@ void kstep_sched_clock_init(void);
 void kstep_print_rq(void);
 void kstep_print_tasks(void);
 void kstep_print_nr_running(void);
-void kstep_trace_sched_softirq(void);
 void kstep_trace_load_balance(void);
 
 // reset.c

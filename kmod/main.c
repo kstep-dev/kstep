@@ -38,8 +38,6 @@ static int __init kstep_main(void) {
 
   if (kstep_driver->print_load_balance)
     kstep_trace_load_balance();
-  if (kstep_driver->print_sched_softirq)
-    kstep_trace_sched_softirq();
 
   // Enable printk time
   kstep_write("/sys/module/printk/parameters/time", "1", 1);

@@ -82,42 +82,6 @@ void kstep_print_nr_running(void) {
   }
 }
 
-static DEFINE_PER_CPU(ktime_t, sched_softirq_starttime) = 0;
-
-static void sched_softirq_entry(void *ignore, unsigned int vec_nr) {
-  if (vec_nr != SCHED_SOFTIRQ || smp_processor_id() == 0)
-    return;
-  this_cpu_write(sched_softirq_starttime, ktime_get());
-}
-
-static void sched_softirq_exit(void *ignore, unsigned int vec_nr) {
-  if (vec_nr != SCHED_SOFTIRQ || smp_processor_id() == 0)
-    return;
-
-  ktime_t endtime = ktime_get();
-  ktime_t starttime = this_cpu_read(sched_softirq_starttime);
-  if (!starttime)
-    panic("sched_softirq_starttime is not set");
-  this_cpu_write(sched_softirq_starttime, 0);
-  u64 lat_ns = ktime_to_ns(ktime_sub(endtime, starttime));
-  pr_info("sched_softirq: {" K(cpu) "%d, " K(lat_us) "%lld.%03llu}\n",
-          smp_processor_id(), lat_ns / 1000, lat_ns % 1000);
-}
-
-void kstep_trace_sched_softirq(void) {
-  KSYM_IMPORT_TYPED(struct tracepoint, __tracepoint_softirq_entry);
-  KSYM_IMPORT_TYPED(struct tracepoint, __tracepoint_softirq_exit);
-  if (tracepoint_probe_register(KSYM___tracepoint_softirq_entry,
-                                sched_softirq_entry, NULL))
-    panic("Failed to register softirq_entry tracepoint");
-
-  if (tracepoint_probe_register(KSYM___tracepoint_softirq_exit,
-                                sched_softirq_exit, NULL))
-    panic("Failed to register softirq_exit tracepoint");
-
-  TRACE_INFO("Tracing sched_softirq latency");
-}
-
 struct lb_env {
   struct sched_domain *sd;
   struct rq *src_rq;

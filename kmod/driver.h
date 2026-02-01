@@ -20,7 +20,6 @@ struct kstep_driver {
   bool print_tasks;         // Print task stats
   bool print_nr_running;    // Print number of running tasks
   bool print_load_balance;  // Print load balancing
-  bool print_sched_softirq; // Print sched softirq latency
 };
 
 static inline void kstep_driver_print(struct kstep_driver *driver) {
@@ -31,7 +30,6 @@ static inline void kstep_driver_print(struct kstep_driver *driver) {
   TRACE_INFO("- %-20s: %d", "print_tasks", driver->print_tasks);
   TRACE_INFO("- %-20s: %d", "print_nr_running", driver->print_nr_running);
   TRACE_INFO("- %-20s: %d", "print_load_balance", driver->print_load_balance);
-  TRACE_INFO("- %-20s: %d", "print_sched_softirq", driver->print_sched_softirq);
 }
 
 // tick.c
