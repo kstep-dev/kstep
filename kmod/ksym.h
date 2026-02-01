@@ -83,3 +83,4 @@ KSYM_FUNC(void, dequeue_entities, struct cfs_rq *cfs_rq,
 
 #undef KSYM_AUTO
 #undef KSYM_VAR
+#undef KSYM_FUNC
