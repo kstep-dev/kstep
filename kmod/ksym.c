@@ -27,6 +27,4 @@ void kstep_ksym_init(void) {
 #define KSYM_FUNC(type, name, ...) ksym.name = kstep_ksym_get_addr(#name);
 #define KSYM_VAR(type, name) ksym.name = kstep_ksym_get_addr(#name);
 #include "ksym.h"
-#undef KSYM_FUNC
-#undef KSYM_VAR
 }

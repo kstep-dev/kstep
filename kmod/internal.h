@@ -9,6 +9,7 @@
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wimplicit-function-declaration"
 #include <kernel/sched/sched.h>
+#include <kernel/time/tick-internal.h>
 #include <kernel/time/tick-sched.h>
 #pragma GCC diagnostic pop
 

@@ -12,6 +12,8 @@
  * then trigger a weight change to cause overflow in reweight_eevdf().
  */
 
+// https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 static struct task_struct *task0;
 static struct task_struct *task1;
 
@@ -67,6 +69,11 @@ static void run(void) {
 
   kstep_tick_repeat(5);
 }
+
+#else
+static void setup(void) { panic("unsupported kernel version"); }
+static void run(void) {}
+#endif
 
 struct kstep_driver vlag_overflow = {
     .name = "vlag_overflow",
