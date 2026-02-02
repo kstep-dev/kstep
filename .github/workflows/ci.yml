@@ -47,7 +47,7 @@ jobs:
           - v6.12
           - v6.6
           - v6.1
-          - v5.15
+          - v5.15.197
 
     name: Linux ${{matrix.version}}
     runs-on: ubuntu-latest

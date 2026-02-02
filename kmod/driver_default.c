@@ -38,7 +38,8 @@ static void kstep_btf_type_parse(u8 kind, const char *type_name,
   const struct btf_member *member = btf_type_member(t);
   for (int i = 0; i < btf_type_vlen(t); i++, member++) {
     const struct btf_type *member_type = KSYM_btf_type_by_id(btf, member->type);
-    if (!btf_type_is_int(member_type))
+    // Skip non-int fields and bitfields
+    if (!btf_type_is_int(member_type) || btf_member_bit_offset(t, i) % 8 != 0)
       continue;
 
     if (result->count >= MAX_INT_FIELDS)
