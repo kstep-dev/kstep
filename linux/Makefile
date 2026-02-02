@@ -7,7 +7,7 @@ IMAGE_DIR := $(abspath build)
 .PHONY: kernel
 kernel: config
 	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(BEAR_CMD) $(MAKE) LOCALVERSION=-kstep-$(LINUX_NAME) WERROR=0 HOSTCFLAGS=-Wno-error
-	mkdir -p $(IMAGE_DIR) && cp $(LINUX_DIR)/$(shell make -C $(LINUX_DIR) -s image_name) $(IMAGE_DIR)/$(LINUX_NAME)
+	mkdir -p $(IMAGE_DIR) && cp $(LINUX_DIR)/$$(make -C $(LINUX_DIR) -s image_name) $(IMAGE_DIR)/$(LINUX_NAME)
 
 .PHONY: config
 config: $(LINUX_CONFIG)
