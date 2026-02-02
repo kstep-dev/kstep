@@ -1,5 +1,6 @@
 #include <linux/delay.h>
 #include <linux/kprobes.h>
+#include <linux/sched/clock.h>
 #include <linux/sched_clock.h>
 
 #include "internal.h"
