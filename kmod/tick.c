@@ -91,18 +91,10 @@ static void kstep_jiffies_tick(void) {
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
-// kprobe tick_nohz_handler
 static int tick_nohz_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
-#if defined(CONFIG_X86_64)
-struct hrtimer *timer = (struct hrtimer *)regs->di;
-#elif defined(CONFIG_ARM64)
-  struct hrtimer *timer = (struct hrtimer *)regs->regs[0];
-#else
-#error "Unsupported architecture"
-#endif
-  struct tick_sched *ts = container_of(timer, struct tick_sched, sched_timer);
-  ts->flags |= TS_FLAG_STOPPED;
-  return 0;
+  if (smp_processor_id() == 0)
+    return 0;
+  panic("tick_nohz_handler called on CPU %d", smp_processor_id());
 }
 
 static struct kprobe kstep_tick_nohz_kp = {
@@ -113,11 +105,6 @@ static struct kprobe kstep_tick_nohz_kp = {
 
 void kstep_sched_timer_init(void) {
   KSYM_IMPORT(tick_get_tick_sched);
-  // Register kprobe for tick_nohz_handler to set TS_FLAG_STOPPED flag
-  // When only using hrtimer_cancel, there is still sched_tick called from tick_nohz_handler 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
-  register_kprobe(&kstep_tick_nohz_kp);
-#endif
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     // Ref: tick_sched_timer_dying in
     // https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L1606
@@ -126,6 +113,9 @@ void kstep_sched_timer_init(void) {
     memset(ts, 0, sizeof(struct tick_sched));
     TRACE_INFO("Disabled timer ticks on CPU %d", cpu);
   }
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+  register_kprobe(&kstep_tick_nohz_kp);
+#endif
 }
 
 void kstep_sleep(void) {
