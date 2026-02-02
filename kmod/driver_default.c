@@ -23,4 +23,5 @@ KSTEP_DRIVER_DEFINE{
     .print_rq = true,
     .print_tasks = true,
     .print_load_balance = true,
+    .print_sched_debug = true,
 };

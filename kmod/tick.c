@@ -139,6 +139,9 @@ static void kstep_sched_tick(void) {
 }
 
 void kstep_tick(void) {
+  KSYM_IMPORT(sysrq_sched_debug_show);
+  if (kstep_driver->print_sched_debug)
+    KSYM_sysrq_sched_debug_show();
   if (kstep_driver->on_tick)
     kstep_driver->on_tick();
   if (kstep_driver->print_rq)
