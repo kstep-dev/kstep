@@ -94,7 +94,7 @@ static void kstep_jiffies_tick(void) {
 // kprobe tick_nohz_handler
 static int tick_nohz_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
 #if defined(CONFIG_X86_64)
-  struct hrtimer *timer = (struct hrtimer *)PT_REGS_PARM1(regs);
+struct hrtimer *timer = (struct hrtimer *)regs->di;
 #elif defined(CONFIG_ARM64)
   struct hrtimer *timer = (struct hrtimer *)regs->regs[0];
 #else
