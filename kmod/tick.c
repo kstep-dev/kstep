@@ -93,7 +93,13 @@ static void kstep_jiffies_tick(void) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
 // kprobe tick_nohz_handler
 static int tick_nohz_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
+#if defined(CONFIG_X86_64)
   struct hrtimer *timer = (struct hrtimer *)PT_REGS_PARM1(regs);
+#elif defined(CONFIG_ARM64)
+  struct hrtimer *timer = (struct hrtimer *)regs->regs[0];
+#else
+#error "Unsupported architecture"
+#endif
   struct tick_sched *ts = container_of(timer, struct tick_sched, sched_timer);
   ts->flags |= TS_FLAG_STOPPED;
   return 0;
