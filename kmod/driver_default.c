@@ -1,3 +1,4 @@
+#include <linux/bpf.h>
 #include <linux/btf.h>
 
 #include "internal.h"
@@ -39,15 +40,16 @@ static void kstep_btf_type_parse(u8 kind, const char *type_name,
   for (int i = 0; i < btf_type_vlen(t); i++, member++) {
     const struct btf_type *member_type = KSYM_btf_type_by_id(btf, member->type);
     // Skip non-int fields and bitfields
-    if (!btf_type_is_int(member_type) || btf_member_bit_offset(t, i) % 8 != 0)
+    if (!btf_type_is_int(member_type) ||
+        BTF_MEMBER_BIT_OFFSET(member->offset) % 8 != 0)
       continue;
 
     if (result->count >= MAX_INT_FIELDS)
       panic("Too many int fields in %s", type_name);
     struct kstep_btf_field *f = &result->fields[result->count++];
     f->name = KSYM_btf_name_by_offset(btf, member->name_off);
-    f->offset = btf_member_bit_offset(t, i) / 8;
-    f->bits = btf_int_bits(member_type);
+    f->offset = BTF_MEMBER_BIT_OFFSET(member->offset) / 8;
+    f->bits = BTF_INT_BITS(*(__u32 *)(member_type + 1));
   }
 }
 
