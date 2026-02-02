@@ -31,6 +31,7 @@ static void kstep_btf_type_parse(u8 kind, const char *type_name,
     panic("Failed to find %s in BTF: %d", type_name, type_id);
 
   KSYM_IMPORT(btf_type_by_id);
+  KSYM_IMPORT(btf_type_skip_modifiers);
   const struct btf_type *t = KSYM_btf_type_by_id(btf, type_id);
   if (IS_ERR(t))
     panic("Failed to get BTF type for %s: %ld", type_name, PTR_ERR(t));
@@ -38,7 +39,9 @@ static void kstep_btf_type_parse(u8 kind, const char *type_name,
   KSYM_IMPORT(btf_name_by_offset);
   const struct btf_member *member = btf_type_member(t);
   for (int i = 0; i < btf_type_vlen(t); i++, member++) {
-    const struct btf_type *member_type = KSYM_btf_type_by_id(btf, member->type);
+    u32 type_id;
+    const struct btf_type *member_type = KSYM_btf_type_skip_modifiers(btf, member->type, &type_id);
+
     // Skip non-int fields and bitfields
     if (!btf_type_is_int(member_type) ||
         BTF_MEMBER_BIT_OFFSET(member->offset) % 8 != 0)
