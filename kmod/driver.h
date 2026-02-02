@@ -21,6 +21,7 @@ struct kstep_driver {
   bool print_tasks;         // Print task stats
   bool print_nr_running;    // Print number of running tasks
   bool print_load_balance;  // Print load balancing
+  bool print_sched_debug;   // Print sched debug
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 

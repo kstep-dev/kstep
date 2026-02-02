@@ -1,3 +1,5 @@
+#include <linux/cpuset.h>
+
 #include "internal.h"
 
 KSYM_IMPORT_TYPED(struct sched_domain_topology_level *, sched_domain_topology);

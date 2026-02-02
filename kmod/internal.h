@@ -1,11 +1,6 @@
 #ifndef KSTEP_INTERNAL_H
 #define KSTEP_INTERNAL_H
 
-#include <linux/cpumask.h>
-#include <linux/cpuset.h>
-#include <linux/freezer.h>
-#include <linux/sched/clock.h>
-#include <linux/types.h>
 #include <linux/version.h>
 
 // kernel internal headers
