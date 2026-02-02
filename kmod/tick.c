@@ -1,8 +1,8 @@
 #include <linux/delay.h>
+#include <linux/kprobes.h>
 #include <linux/sched_clock.h>
 
 #include "internal.h"
-#include <linux/kprobes.h>
 
 static u64 kstep_sched_clock = INIT_TIME_NS;
 static u64 kstep_sched_clock_read(void) { return kstep_sched_clock; }
@@ -93,9 +93,9 @@ static void kstep_jiffies_tick(void) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
 // kprobe tick_nohz_handler
 static int tick_nohz_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
-  struct hrtimer *timer = (struct hrtimer *)regs->di;
+  struct hrtimer *timer = (struct hrtimer *)PT_REGS_PARM1(regs);
   struct tick_sched *ts = container_of(timer, struct tick_sched, sched_timer);
-  ts->flags |= 2; // Set TS_FLAG_STOPPED flag
+  ts->flags |= TS_FLAG_STOPPED;
   return 0;
 }
 

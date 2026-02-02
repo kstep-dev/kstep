@@ -146,7 +146,7 @@ void kstep_topo_set_level(enum kstep_topo_type type, const char *cpulists[],
 void kstep_topo_apply(void) {
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
   // https://elixir.bootlin.com/linux/v6.17.8/source/drivers/base/arch_topology.c#L205-L222
-  KSYM_IMPORT(update_topology);
+  KSYM_IMPORT_TYPED(int, update_topology);
   *KSYM_update_topology = 1;
 #else
   // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/itmt.c#L55-L56
