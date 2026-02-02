@@ -11,6 +11,7 @@ from typing import Iterable, Optional
 
 from scripts import (
     LINUX_CURR_DIR,
+    LINUX_ROOT_DIR,
     PROJ_DIR,
     QEMU_DIR,
     ROOTFS_DIR,
@@ -45,13 +46,6 @@ def get_qemu_path() -> Path:
     raise RuntimeError(f"QEMU executable not found: {name}")
 
 
-def get_kernel_image_path() -> Path:
-    return {
-        Arch.X86_64: Path("arch/x86/boot/bzImage"),
-        Arch.ARM64: Path("arch/arm64/boot/Image"),
-    }[Arch.get()]
-
-
 def run_qemu(
     driver: Driver,
     linux_dir: Path,
@@ -63,7 +57,8 @@ def run_qemu(
         system(f"sudo chmod 666 {kvm_path}")
 
     qemu_path = get_qemu_path()
-    kernel_image_path = linux_dir / get_kernel_image_path()
+    linux_name = linux_dir.resolve().name
+    kernel_image_path = LINUX_ROOT_DIR / "build" / linux_name
 
     boot_args = [
         "rw",
@@ -90,7 +85,7 @@ def run_qemu(
     if driver.params:
         boot_args.extend(driver.params)
 
-    rootfs_img = ROOTFS_DIR / f"{linux_dir.resolve().name}.cpio"
+    rootfs_img = ROOTFS_DIR / f"{linux_name}.cpio"
     cmd = [
         str(qemu_path),
         f"-smp {driver.smp}",
