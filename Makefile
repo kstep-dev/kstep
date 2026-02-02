@@ -24,4 +24,5 @@ linux:
 clean:
 	$(MAKE) -C user clean
 	$(MAKE) -C kmod clean
+	$(MAKE) -C linux clean
 	rm -rf $(ROOTFS_DIR)/*.cpio

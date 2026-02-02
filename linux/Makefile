@@ -2,7 +2,7 @@ include ../scripts/common.mk
 
 LINUX_CONFIG := $(LINUX_DIR)/.config
 KSTEP_CONFIG := $(realpath config.kstep)
-IMAGE_DIR := $(realpath build)
+IMAGE_DIR := $(abspath build)
 
 .PHONY: kernel
 kernel: config
