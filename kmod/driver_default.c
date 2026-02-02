@@ -78,7 +78,7 @@ static void run(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     kstep_task_wakeup(tasks[i]);
 
-  for (int i = 0; i < 15; i++)
+  for (int i = 0; i < 5; i++)
     kstep_tick();
 }
 
@@ -92,4 +92,5 @@ KSTEP_DRIVER_DEFINE{
     .step_interval_us = 1000,
     .print_tasks = true,
     .print_load_balance = true,
+    .print_sched_debug = true,
 };
