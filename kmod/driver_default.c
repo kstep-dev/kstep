@@ -31,12 +31,12 @@ static void kstep_btf_type_parse(u8 kind, const char *type_name,
     panic("Failed to find %s in BTF: %d", type_name, type_id);
 
   KSYM_IMPORT(btf_type_by_id);
-  KSYM_IMPORT(btf_type_skip_modifiers);
   const struct btf_type *t = KSYM_btf_type_by_id(btf, type_id);
   if (IS_ERR(t))
     panic("Failed to get BTF type for %s: %ld", type_name, PTR_ERR(t));
 
   KSYM_IMPORT(btf_name_by_offset);
+  KSYM_IMPORT(btf_type_skip_modifiers);
   const struct btf_member *member = btf_type_member(t);
   for (int i = 0; i < btf_type_vlen(t); i++, member++) {
     u32 type_id;

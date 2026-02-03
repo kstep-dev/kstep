@@ -72,7 +72,7 @@ jobs:
 
       - name: Linux - Build
         if: steps.linux-cache.outputs.cache-hit != 'true'
-        run: make linux
+        run: make linux; make -C linux clean
 
       - name: Linux - Save cache
         if: steps.linux-cache.outputs.cache-hit != 'true'
