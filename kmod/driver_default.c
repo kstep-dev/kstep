@@ -18,6 +18,38 @@ struct kstep_btf_type {
   struct kstep_btf_field fields[MAX_INT_FIELDS];
 };
 
+static int kstep_btf_field_parse(struct btf *btf,
+                                 const struct btf_member *member,
+                                 struct kstep_btf_field *field) {
+  KSYM_IMPORT(btf_type_skip_modifiers);
+  const struct btf_type *type =
+      KSYM_btf_type_skip_modifiers(btf, member->type, NULL);
+
+  // Skip non-int fields and bitfields
+  if (!btf_type_is_int(type) || BTF_MEMBER_BIT_OFFSET(member->offset) % 8 != 0)
+    return -1;
+
+  KSYM_IMPORT(btf_name_by_offset);
+  field->name = KSYM_btf_name_by_offset(btf, member->name_off);
+  field->offset = BTF_MEMBER_BIT_OFFSET(member->offset) / 8;
+  u32 int_info = *(u32 *)(type + 1);
+  field->bits = BTF_INT_BITS(int_info);
+  return 0;
+}
+
+static void kstep_btf_field_print(struct kstep_btf_field *field, void *ptr) {
+  if (field->bits == 64)
+    pr_info("  %s = %lld", field->name, *(u64 *)(ptr + field->offset));
+  else if (field->bits == 32)
+    pr_info("  %s = %d", field->name, *(u32 *)(ptr + field->offset));
+  else if (field->bits == 16)
+    pr_info("  %s = %d", field->name, *(u16 *)(ptr + field->offset));
+  else if (field->bits == 8)
+    pr_info("  %s = %d", field->name, *(u8 *)(ptr + field->offset));
+  else
+    panic("Invalid bit size: %d", field->bits);
+}
+
 static void kstep_btf_type_parse(u8 kind, const char *type_name,
                                  struct kstep_btf_type *result) {
   KSYM_IMPORT(bpf_get_btf_vmlinux);
@@ -35,34 +67,18 @@ static void kstep_btf_type_parse(u8 kind, const char *type_name,
   if (IS_ERR(t))
     panic("Failed to get BTF type for %s: %ld", type_name, PTR_ERR(t));
 
-  KSYM_IMPORT(btf_name_by_offset);
-  KSYM_IMPORT(btf_type_skip_modifiers);
   const struct btf_member *member = btf_type_member(t);
   for (int i = 0; i < btf_type_vlen(t); i++, member++) {
-    u32 type_id;
-    const struct btf_type *member_type = KSYM_btf_type_skip_modifiers(btf, member->type, &type_id);
-
-    // Skip non-int fields and bitfields
-    if (!btf_type_is_int(member_type) ||
-        BTF_MEMBER_BIT_OFFSET(member->offset) % 8 != 0)
+    if (kstep_btf_field_parse(btf, member, &result->fields[result->count]) < 0)
       continue;
-
-    if (result->count >= MAX_INT_FIELDS)
+    if (result->count++ >= MAX_INT_FIELDS)
       panic("Too many int fields in %s", type_name);
-    struct kstep_btf_field *f = &result->fields[result->count++];
-    f->name = KSYM_btf_name_by_offset(btf, member->name_off);
-    f->offset = BTF_MEMBER_BIT_OFFSET(member->offset) / 8;
-    f->bits = BTF_INT_BITS(*(__u32 *)(member_type + 1));
   }
 }
 
 static void kstep_btf_type_print(struct kstep_btf_type *type, void *ptr) {
-  for (int i = 0; i < type->count; i++) {
-    struct kstep_btf_field *f = &type->fields[i];
-    u64 mask = f->bits == 64 ? ~0ULL : (1ULL << f->bits) - 1;
-    u64 val = *(u64 *)(ptr + f->offset) & mask;
-    pr_info("  int%d %s = %llu", f->bits, f->name, val);
-  }
+  for (int i = 0; i < type->count; i++)
+    kstep_btf_field_print(&type->fields[i], ptr);
 }
 
 static struct kstep_btf_type rq_type = {0};
