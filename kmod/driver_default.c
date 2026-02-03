@@ -30,7 +30,7 @@ static void run(void) {
     kstep_tick();
 }
 
-#define PRINT_BUF_SIZE 16 * 1024
+#define PRINT_BUF_SIZE 16384
 static char print_buf[PRINT_BUF_SIZE];
 
 static void on_tick(void) {
@@ -38,8 +38,8 @@ static void on_tick(void) {
   int len = KSYM_btf_type_snprintf_show(btf, rq_type_id, cpu_rq(1), print_buf,
                                         PRINT_BUF_SIZE,
                                         BTF_SHOW_PTR_RAW | BTF_SHOW_COMPACT);
-  for (int i = 0; i < len; i += 1024)
-    pr_info("%.*s", 1024, &print_buf[i]);
+  for (int i = 0; i < len; i += 1000)
+    pr_info("%.*s", 1000, &print_buf[i]);
 }
 
 KSTEP_DRIVER_DEFINE{
