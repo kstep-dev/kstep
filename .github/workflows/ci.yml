@@ -47,7 +47,7 @@ jobs:
           - v6.12
           - v6.6
           - v6.1
-          - v5.15
+          - v5.15.197
 
     name: Linux ${{matrix.version}}
     runs-on: ubuntu-latest
@@ -72,7 +72,7 @@ jobs:
 
       - name: Linux - Build
         if: steps.linux-cache.outputs.cache-hit != 'true'
-        run: make linux
+        run: make linux; make -C linux clean
 
       - name: Linux - Save cache
         if: steps.linux-cache.outputs.cache-hit != 'true'

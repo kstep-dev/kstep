@@ -23,6 +23,7 @@ PACKAGES = [
     "bear",  # clangd completion
     "qemu-kvm",
     "gdb",
+    "pahole",  # BTF support
 ]
 
 
@@ -67,7 +68,7 @@ if __name__ == "__main__":
         apt_install(PACKAGES)
         install_uv()
     elif args.type == "ci-linux":
-        apt_install(["libelf-dev"])
+        apt_install(["libelf-dev", "pahole"])
     elif args.type == "ci-qemu":
         apt_install(["libglib2.0-dev", "ninja-build"])
         install_qemu()
