@@ -6,17 +6,20 @@ import logging
 import os
 import shutil
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
 
 from scripts import (
     LINUX_BUILD_DIR,
     LINUX_CURR_DIR,
+    LOG_LATEST,
+    LOGS_DIR,
+    OUT_LATEST,
     PROJ_DIR,
     QEMU_DIR,
     ROOTFS_DIR,
     Arch,
-    create_log_path,
     system,
 )
 
@@ -46,6 +49,22 @@ def get_qemu_path() -> Path:
     raise RuntimeError(f"QEMU executable not found: {name}")
 
 
+def get_log_paths() -> tuple[Path, Path]:
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = LOGS_DIR / f"log-{timestamp}.log"
+    out_file = log_file.with_suffix(".out")
+
+    log_file.touch()
+    LOG_LATEST.unlink(missing_ok=True)
+    LOG_LATEST.symlink_to(log_file)
+
+    out_file.touch()
+    OUT_LATEST.unlink(missing_ok=True)
+    OUT_LATEST.symlink_to(out_file)
+
+    return log_file, out_file
+
+
 def run_qemu(
     driver: Driver,
     linux_dir: Path,
@@ -58,7 +77,13 @@ def run_qemu(
 
     qemu_path = get_qemu_path()
     linux_name = linux_dir.resolve().name
-    kernel_image_path = LINUX_BUILD_DIR / linux_name
+    kernel_img = LINUX_BUILD_DIR / linux_name
+    rootfs_img = ROOTFS_DIR / f"{linux_name}.cpio"
+
+    if not log_file:
+        log_file, out_file = get_log_paths()
+    else:
+        out_file = log_file.with_suffix(".out")
 
     boot_args = [
         "rw",
@@ -85,35 +110,32 @@ def run_qemu(
     if driver.params:
         boot_args.extend(driver.params)
 
-    rootfs_img = ROOTFS_DIR / f"{linux_name}.cpio"
     cmd = [
         str(qemu_path),
         f"-smp {driver.smp}",
         "-cpu max",
         f"-m {driver.mem_mb}M",
-        f"-kernel {kernel_image_path}",
+        f"-kernel {kernel_img}",
         f"-initrd {rootfs_img}",
         f'-append "{" ".join(boot_args)}"',
         "-nographic",
-        "-no-reboot",  # Prevent automatic reboot after panic
+        # Prevent automatic reboot after panic
+        "-no-reboot",
+        # log file
+        f"-chardev stdio,id=char0,mux=on,logfile={log_file},signal=off",
+        "-serial chardev:char0",
+        "-mon chardev=char0",
+        # trace file
+        f"-chardev file,id=char1,path={out_file}",
+        "-serial chardev:char1",
+        # acceleration
+        f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]
-
-    if kvm_path.exists():
-        cmd += ["-accel kvm"]
-    else:
-        cmd += ["-accel tcg"]
 
     if Arch.get() == Arch.ARM64:
         cmd += [
             "-machine virt",
             "-cpu cortex-a57",
-        ]
-
-    if log_file:
-        cmd += [
-            f"-chardev stdio,id=char0,mux=on,logfile={log_file},signal=off",
-            "-serial chardev:char0",
-            "-mon chardev=char0",
         ]
 
     if debug:
@@ -159,7 +181,7 @@ def make_linux(linux_dir: Path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
-    parser.add_argument("--log_file", type=Path, default=create_log_path())
+    parser.add_argument("--log_file", type=Path, default=None)
     parser.add_argument("--debug", action="store_true")
     # See driver config
     parser.add_argument("name", type=str, default=None, nargs="?")

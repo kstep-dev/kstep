@@ -1,3 +1,4 @@
+#include <linux/fs.h>
 #include <linux/ftrace.h>
 #include <linux/tracepoint.h>
 
@@ -5,6 +6,42 @@
 
 #define K(s) "\"" #s "\": "
 #define SEP "  ,  "
+#define OUTPUT_BUF_SIZE 4096
+
+static const char *output_paths[] = {
+    "/dev/ttyAMA1", // ARM PL011
+    "/dev/ttyS1",   // x86 8250
+    NULL,
+};
+
+static struct file *output_file;
+
+void kstep_output_init(void) {
+  for (const char **path = output_paths; *path; path++) {
+    output_file = filp_open(*path, O_WRONLY | O_NOCTTY, 0);
+    if (!IS_ERR(output_file))
+      return;
+  }
+  panic("trace output not available");
+}
+
+void kstep_output(const void *buf, size_t len) {
+  ssize_t ret = kernel_write(output_file, buf, len, NULL);
+  if (ret < 0)
+    panic("kstep_output failed: %ld", ret);
+}
+
+void kstep_outputf(const char *fmt, ...) {
+  static char buf[OUTPUT_BUF_SIZE];
+
+  va_list args;
+  va_start(args, fmt);
+  int len = vsnprintf(buf, OUTPUT_BUF_SIZE, fmt, args);
+  va_end(args);
+
+  if (len > 0 && len < OUTPUT_BUF_SIZE)
+    kstep_output(buf, len);
+}
 
 static void print_rq(struct rq *rq) {
 // https://github.com/torvalds/linux/commit/c2a295bffeaf9461ecba76dc9e4780c898c94f03

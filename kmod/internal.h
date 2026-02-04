@@ -24,6 +24,9 @@ void kstep_jiffies_init(void);
 void kstep_sched_clock_init(void);
 
 // output.c
+void kstep_output_init(void);
+void kstep_output(const void *buf, size_t len);
+void kstep_outputf(const char *fmt, ...);
 void kstep_print_rq(void);
 void kstep_print_tasks(void);
 void kstep_print_nr_running(void);
