@@ -38,8 +38,8 @@ static void on_tick(void) {
   int len = KSYM_btf_type_snprintf_show(btf, rq_type_id, cpu_rq(1), print_buf,
                                         PRINT_BUF_SIZE,
                                         BTF_SHOW_PTR_RAW | BTF_SHOW_COMPACT);
-  for (int i = 0; i < len; i += 1000)
-    pr_info("%.*s", 1000, &print_buf[i]);
+  kstep_output(print_buf, len);
+  kstep_output("\n", 1);
 }
 
 KSTEP_DRIVER_DEFINE{
