@@ -19,7 +19,7 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 #### 💾 Install dependencies
 
 ```sh
-./install_deps.py
+./install_deps.sh
 ```
 
 
