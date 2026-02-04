@@ -8,7 +8,7 @@ on:
     - cron: '0 0 * * 0' # Every week
 
 env:
-  QEMU_CACHE_KEY: qemu-10.2.0
+  QEMU_CACHE_KEY: qemu
   QEMU_INSTALL_PATH: data/qemu/install
 
 jobs:
@@ -27,9 +27,12 @@ jobs:
           key: ${{ env.QEMU_CACHE_KEY }}
           lookup-only: true
 
-      - name: Install QEMU
+      - name: Build QEMU
         if: steps.qemu-cache.outputs.cache-hit != 'true'
-        run: ./install_deps.py ci-qemu
+        run: |
+          sudo apt update
+          sudo apt install -y libglib2.0-dev ninja-build
+          ./scripts/build_qemu.py
 
       - name: Save cache
         if: steps.qemu-cache.outputs.cache-hit != 'true'
@@ -68,7 +71,7 @@ jobs:
 
       - name: Linux - Install build dependencies
         if: steps.linux-cache.outputs.cache-hit != 'true'
-        run: ./install_deps.py ci-linux
+        run: sudo apt update && sudo apt install -y libelf-dev pahole
 
       - name: Linux - Build
         if: steps.linux-cache.outputs.cache-hit != 'true'
@@ -84,7 +87,7 @@ jobs:
       - name: Build kSTEP
         run: make kstep
 
-      - name: Install QEMU
+      - name: Restore QEMU
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.QEMU_INSTALL_PATH }}
