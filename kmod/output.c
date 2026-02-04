@@ -17,6 +17,8 @@ static const char *output_paths[] = {
 static struct file *output_file;
 
 void kstep_output_init(void) {
+  kstep_sysctl_write("kernel.printk", "%d", 7);
+
   for (const char **path = output_paths; *path; path++) {
     output_file = filp_open(*path, O_WRONLY | O_NOCTTY, 0);
     if (!IS_ERR(output_file))
