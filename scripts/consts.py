@@ -1,5 +1,4 @@
 import os
-from datetime import datetime
 from enum import Enum
 from pathlib import Path
 
@@ -19,17 +18,9 @@ DOWNLOAD_DIR = DATA_DIR / "download"
 ROOTFS_DIR = DATA_DIR / "rootfs"
 LOGS_DIR = DATA_DIR / "logs"
 LOG_LATEST = LOGS_DIR / "latest.log"
+OUT_LATEST = LOGS_DIR / "latest.out"
 RESULTS_DIR = PROJ_DIR / "results"
 QEMU_DIR = DATA_DIR / "qemu"
-
-
-def create_log_path() -> Path:
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    actual = LOGS_DIR / f"log-{timestamp}.log"
-    actual.touch()
-    LOG_LATEST.unlink(missing_ok=True)
-    LOG_LATEST.symlink_to(actual)
-    return actual
 
 
 class Arch(Enum):

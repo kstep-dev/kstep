@@ -80,11 +80,8 @@ if __name__ == "__main__":
     parser.add_argument("--tarball", action="store_true", default=False)
     args = parser.parse_args()
 
-    if args.name is None:
-        args.name = args.version
-
     checkout_linux(
         version=args.version,
-        linux_dir=LINUX_ROOT_DIR / args.name,
+        linux_dir=LINUX_ROOT_DIR / (args.name if args.name else args.version),
         tarball=args.tarball,
     )

@@ -9,7 +9,7 @@ static char driver_name[DRIVER_NAME_LEN] = "default";
 module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
 
 static int __init kstep_main(void) {
-  kstep_sysctl_write("kernel.printk", "%d", 7);
+  kstep_output_init();
   kstep_driver = kstep_sym_init(driver_name);
   kstep_driver_print(kstep_driver);
 

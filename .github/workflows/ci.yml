@@ -103,9 +103,11 @@ jobs:
         id: upload-artifact
         uses: actions/upload-artifact@v6
         with:
-          path: data/logs/latest.log
-          name: ${{matrix.version}}.log
+          path: |
+            data/logs/latest.log
+            data/logs/latest.out
+          name: ${{matrix.version}}
           if-no-files-found: error
 
       - name: Write job summary
-        run: echo "[${{matrix.version}}.log](${{steps.upload-artifact.outputs.artifact-url}})" >> $GITHUB_STEP_SUMMARY
+        run: echo "[${{matrix.version}}](${{steps.upload-artifact.outputs.artifact-url}})" >> $GITHUB_STEP_SUMMARY
