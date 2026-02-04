@@ -5,7 +5,7 @@ on:
     branches: [master]
   pull_request:
   schedule:
-    - cron: '0 0 * * 0' # Every week
+    - cron: "0 0 * * 0" # Every week
 
 env:
   QEMU_CACHE_KEY: qemu
@@ -27,12 +27,13 @@ jobs:
           key: ${{ env.QEMU_CACHE_KEY }}
           lookup-only: true
 
+      - name: Install build dependencies
+        if: steps.qemu-cache.outputs.cache-hit != 'true'
+        run: sudo apt update && sudo apt install -y libglib2.0-dev ninja-build
+
       - name: Build QEMU
         if: steps.qemu-cache.outputs.cache-hit != 'true'
-        run: |
-          sudo apt update
-          sudo apt install -y libglib2.0-dev ninja-build
-          ./scripts/build_qemu.py
+        run: ./scripts/build_qemu.py
 
       - name: Save cache
         if: steps.qemu-cache.outputs.cache-hit != 'true'
