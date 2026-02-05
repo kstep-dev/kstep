@@ -1,13 +1,9 @@
 #ifndef KSTEP_DRIVER_H
 #define KSTEP_DRIVER_H
 
-#include <generated/utsrelease.h>
 #include <linux/sched.h>
 
-#define TERM_GREEN "\033[92m"
-#define TERM_RESET "\033[0m"
-#define TRACE_INFO(fmt, ...)                                                   \
-  pr_info(TERM_GREEN "%24s: " fmt TERM_RESET "\n", __func__, ##__VA_ARGS__)
+#define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
 
 // driver.c
 #define DRIVER_NAME_LEN 32
@@ -25,8 +21,7 @@ struct kstep_driver {
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 
 static inline void kstep_driver_print(struct kstep_driver *driver) {
-  TRACE_INFO("- %-20s: %s", "Linux version", UTS_RELEASE);
-  TRACE_INFO("- %-20s: %s", "Driver name", driver->name);
+  TRACE_INFO("- %-20s: %s", "name", driver->name);
   TRACE_INFO("- %-20s: %llu", "step_interval_us", driver->step_interval_us);
   TRACE_INFO("- %-20s: %d", "print_rq", driver->print_rq);
   TRACE_INFO("- %-20s: %d", "print_tasks", driver->print_tasks);

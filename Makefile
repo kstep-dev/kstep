@@ -5,7 +5,7 @@ ROOTFS_IMG := $(ROOTFS_DIR)/$(LINUX_NAME).cpio
 
 .PHONY: kstep
 kstep: user kmod
-	cd $(PROJ_DIR)/kmod/build/$(LINUX_NAME) && echo kstep.ko | cpio -o --format=newc > $(ROOTFS_IMG)
+	cd $(PROJ_DIR)/kmod/build/$(LINUX_NAME) && echo kmod.ko | cpio -o --format=newc > $(ROOTFS_IMG)
 	cd $(PROJ_DIR)/user/build && ls | cpio -o --format=newc >> $(ROOTFS_IMG)
 
 .PHONY: user
