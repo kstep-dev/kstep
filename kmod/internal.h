@@ -29,7 +29,6 @@ void kstep_output(const void *buf, size_t len);
 void kstep_outputf(const char *fmt, ...);
 void kstep_print_rq(void);
 void kstep_print_tasks(void);
-void kstep_print_nr_running(void);
 void kstep_trace_load_balance(void);
 
 // reset.c

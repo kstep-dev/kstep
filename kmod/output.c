@@ -5,7 +5,6 @@
 #include "internal.h"
 
 #define K(s) "\"" #s "\": "
-#define SEP "  ,  "
 #define OUTPUT_BUF_SIZE 4096
 
 static const char *output_paths[] = {
@@ -77,13 +76,12 @@ static void print_rq(struct rq *rq) {
 #endif
 
   pr_info("rq: {");
-  pr_cont(K(cpu) "%d" SEP, rq->cpu);
-  pr_cont(K(running) "%2d" SEP, rq->nr_running - (h_nr_queued - h_nr_runnable));
-  pr_cont(K(queued) "%2d" SEP, rq->nr_running);
-  pr_cont(K(avg_load) "%4llu" SEP, avg_load);
-  pr_cont(K(avg_util) "%4llu" SEP, avg_util);
-  pr_cont(K(runnable_avg) "%4lu" SEP, rq->cfs.avg.runnable_avg);
-  pr_cont(K(min_vruntime) "%12lld" SEP, min_vruntime - INIT_TIME_NS);
+  pr_cont(K(cpu) "%d, ", rq->cpu);
+  pr_cont(K(running) "%2d, ", rq->nr_running - (h_nr_queued - h_nr_runnable));
+  pr_cont(K(queued) "%2d, ", rq->nr_running);
+  pr_cont(K(avg_load) "%4llu, ", avg_load);
+  pr_cont(K(avg_util) "%4llu, ", avg_util);
+  pr_cont(K(min_vruntime) "%12lld, ", min_vruntime - INIT_TIME_NS);
   pr_cont(K(avg_vruntime) "%12lld", avg_vruntime);
   pr_cont("}\n");
 }
@@ -95,11 +93,11 @@ void kstep_print_rq(void) {
 
 static void print_task(struct task_struct *p) {
   pr_info("task: {");
-  pr_cont(K(pid) "%d" SEP, task_pid_nr(p));
-  pr_cont(K(on_cpu) "%5s" SEP, p->on_cpu ? "true" : "false");
-  pr_cont(K(cpu) "%d" SEP, task_cpu(p));
-  pr_cont(K(state) "\"%c\"" SEP, task_state_to_char(p));
-  pr_cont(K(vruntime) "%12lld" SEP, p->se.vruntime);
+  pr_cont(K(pid) "%d, ", task_pid_nr(p));
+  pr_cont(K(on_cpu) "%5s, ", p->on_cpu ? "true" : "false");
+  pr_cont(K(cpu) "%d, ", task_cpu(p));
+  pr_cont(K(state) "\"%c\", ", task_state_to_char(p));
+  pr_cont(K(vruntime) "%12lld, ", p->se.vruntime);
   pr_cont(K(sum_exec) "%12lld", p->se.sum_exec_runtime);
   pr_cont("}\n");
 }
@@ -110,14 +108,6 @@ void kstep_print_tasks(void) {
     if (task_cpu(p) == 0 || kstep_is_sys_kthread(p))
       continue;
     print_task(p);
-  }
-}
-
-void kstep_print_nr_running(void) {
-  int nr_cpus = num_online_cpus();
-  for (int cpu = 1; cpu < nr_cpus; cpu++) {
-    pr_info("nr_running: {" K(cpu) "%d, " K(val) "%d}", cpu,
-            cpu_rq(cpu)->nr_running);
   }
 }
 
@@ -136,7 +126,7 @@ static void load_balance_enter(unsigned long ip, unsigned long parent_ip,
   struct lb_env *env = (void *)regs_get_kernel_argument((void *)fregs, 0);
   if (env->dst_cpu == 0)
     return;
-  pr_info("load_balance: {" K(dst_cpu) "%d" SEP K(span) "\"%*pbl\"" SEP K(
+  pr_info("load_balance: {" K(dst_cpu) "%d, " K(span) "\"%*pbl\", " K(
               name) "\"%s\"}\n",
           env->dst_cpu, cpumask_pr_args(sched_domain_span(env->sd)),
           env->sd->name);
