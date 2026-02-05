@@ -3,7 +3,7 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List
+from typing import List
 
 from checkout_linux import checkout_linux
 from run import Driver, make_kstep, make_linux, run_qemu
@@ -16,8 +16,8 @@ class Linux:
     name: str
     # The version/commit of the kernel to use
     version: str
-    # The patches to apply to the kernel
-    patches: Iterable[Path] = ()
+    # The patch to apply to the kernel
+    patch: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ bugs = [
             Linux(
                 name="fixed",
                 version="v6.14",
-                patches=[LINUX_ROOT_DIR / "sync_wakeup.patch"],
+                patch=LINUX_ROOT_DIR / "sync_wakeup.patch",
             ),
         ],
         plot_format="cur_task",
@@ -87,7 +87,7 @@ bugs = [
             Linux(
                 name="fixed",
                 version="v6.17",
-                patches=[LINUX_ROOT_DIR / "even_idle_cpu.patch"],
+                patch=LINUX_ROOT_DIR / "even_idle_cpu.patch",
             ),
         ],
         plot_format="lb_nr_running",
@@ -141,22 +141,13 @@ bugs = [
 ]
 
 
-def patch_linux(linux_dir: Path, patch_file: Path):
-    system(
-        f"cd {linux_dir} && patch -p1 --forward --batch < {patch_file} || "
-        f"(cd {linux_dir} && patch -p1 --reverse --dry-run --batch < {patch_file} && echo '{patch_file} already applied')"
-    )
-
-
 def plot_data(python_script: str, driver: str):
     system(f"{PROJ_DIR}/scripts/plot_{python_script}.py {driver}")
 
 
 def reproduce(linux: Linux, driver: Driver, skip_build: bool):
     linux_dir = LINUX_ROOT_DIR / f"{driver.name}_{linux.name}"
-    checkout_linux(linux.version, linux_dir=linux_dir, tarball=True)
-    for patch in linux.patches:
-        patch_linux(linux_dir, patch)
+    checkout_linux(linux.version, linux_dir=linux_dir, patch=linux.patch, tarball=True)
     if not skip_build:
         make_linux(linux_dir=linux_dir)
     make_kstep(linux_dir=linux_dir)
