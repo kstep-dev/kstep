@@ -10,6 +10,7 @@
 /data/download/*.tar.xz
 /data/logs/*.log
 /data/logs/*.out
+/data/logs/*.jsonl
 /data/rootfs/*.cpio
 /data/qemu
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 from consts import RESULTS_DIR
-from parse import parse_log
+from parse_log import parse_log
 from plot_utils import save_fig
 
 

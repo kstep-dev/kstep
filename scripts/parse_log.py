@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 import pandas as pd
-from consts import LOG_LATEST, RESULTS_DIR
+from consts import LOG_LATEST
 
 TIMESTAMP_LEN = 14
 
