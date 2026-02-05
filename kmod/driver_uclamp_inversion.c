@@ -67,7 +67,7 @@ static void on_tick(void) {
   u64 effective_util = KSYM_effective_cpu_util(rq->cpu, rq->cfs.avg.util_avg,
                                                arch_scale_cpu_capacity(rq->cpu),
                                                FREQUENCY_UTIL, NULL);
-  pr_info("on_tick: {\"effective_util\": %llu}\n", effective_util);
+  pr_info("rq: {\"effective_util\": %llu}\n", effective_util);
 #endif
 }
 

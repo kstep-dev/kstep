@@ -56,18 +56,15 @@ def main(driver: str):
     if driver == "uclamp_inversion":
         field = "effective_util"
         ylabel = "Effective Utilization"
-        prefix = "on_tick"
     elif driver == "h_nr_runnable":
         field = "runnable_avg"
         ylabel = "Runnable Avg"
-        prefix = "rq"
     else:
         field = "avg_util"
         ylabel = "Average Utilization"
-        prefix = "rq"
 
-    buggy_df = parse_log(RESULTS_DIR / f"{driver}_buggy.log", prefix=prefix)
-    fixed_df = parse_log(RESULTS_DIR / f"{driver}_fixed.log", prefix=prefix)
+    buggy_df = parse_log(RESULTS_DIR / f"{driver}_buggy.log", prefix="rq")
+    fixed_df = parse_log(RESULTS_DIR / f"{driver}_fixed.log", prefix="rq")
 
     fig = plot_util(buggy_df, fixed_df, field, ylabel)
     save_fig(fig, driver)

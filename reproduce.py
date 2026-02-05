@@ -3,7 +3,7 @@
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List
+from typing import List
 
 from checkout_linux import checkout_linux
 from run import Driver, make_kstep, make_linux, run_qemu
@@ -16,8 +16,8 @@ class Linux:
     name: str
     # The version/commit of the kernel to use
     version: str
-    # The patches to apply to the kernel
-    patches: Iterable[Path] = ()
+    # The patch to apply to the kernel
+    patch: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ bugs = [
             Linux(
                 name="fixed",
                 version="v6.14",
-                patches=[LINUX_ROOT_DIR / "sync_wakeup.patch"],
+                patch=LINUX_ROOT_DIR / "sync_wakeup.patch",
             ),
         ],
         plot_format="cur_task",
@@ -43,32 +43,32 @@ bugs = [
     Bug(
         driver=Driver(name="freeze", smp="2"),
         linux=[
-            Linux(name="buggy", version="cd9626e~1"),
-            Linux(name="fixed", version="cd9626e"),
+            Linux(name="buggy", version="cd9626e9ebc77edec33023fe95dab4b04ffc819d~1"),
+            Linux(name="fixed", version="cd9626e9ebc77edec33023fe95dab4b04ffc819d"),
         ],
         plot_format="cur_task",
     ),
     Bug(
         driver=Driver(name="vruntime_overflow", smp="2"),
         linux=[
-            Linux(name="buggy", version="bbce3de~1"),
-            Linux(name="fixed", version="bbce3de"),
+            Linux(name="buggy", version="bbce3de72be56e4b5f68924b7da9630cc89aa1a8~1"),
+            Linux(name="fixed", version="bbce3de72be56e4b5f68924b7da9630cc89aa1a8"),
         ],
         plot_format="cur_task",
     ),
     Bug(
         driver=Driver(name="long_balance", smp="3", mem_mb=4096),
         linux=[
-            Linux(name="buggy", version="2feab24~1"),
-            Linux(name="fixed", version="2feab24"),
+            Linux(name="buggy", version="2feab2492deb2f14f9675dd6388e9e2bf669c27a~1"),
+            Linux(name="fixed", version="2feab2492deb2f14f9675dd6388e9e2bf669c27a"),
         ],
         plot_format="rebalance",
     ),
     Bug(
         driver=Driver(name="util_avg", smp="2"),
         linux=[
-            Linux(name="buggy", version="17e3e88~1"),
-            Linux(name="fixed", version="17e3e88"),
+            Linux(name="buggy", version="17e3e88ed0b6318fde0d1c14df1a804711cab1b5~1"),
+            Linux(name="fixed", version="17e3e88ed0b6318fde0d1c14df1a804711cab1b5"),
         ],
         plot_format="util_avg",
     ),
@@ -76,8 +76,8 @@ bugs = [
         driver=Driver(name="lag_vruntime", smp="2"),
         plot_format="min_vruntime",
         linux=[
-            Linux(name="buggy", version="5068d84~1"),
-            Linux(name="fixed", version="5068d84"),
+            Linux(name="buggy", version="5068d84054b766efe7c6202fc71b2350d1c326f1~1"),
+            Linux(name="fixed", version="5068d84054b766efe7c6202fc71b2350d1c326f1"),
         ],
     ),
     Bug(
@@ -87,7 +87,7 @@ bugs = [
             Linux(
                 name="fixed",
                 version="v6.17",
-                patches=[LINUX_ROOT_DIR / "even_idle_cpu.patch"],
+                patch=LINUX_ROOT_DIR / "even_idle_cpu.patch",
             ),
         ],
         plot_format="lb_nr_running",
@@ -95,8 +95,8 @@ bugs = [
     Bug(
         driver=Driver(name="extra_balance", smp="8,sockets=2,cores=2,threads=2"),
         linux=[
-            Linux(name="buggy", version="6d7e478~1"),
-            Linux(name="fixed", version="6d7e478"),
+            Linux(name="buggy", version="6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3~1"),
+            Linux(name="fixed", version="6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3"),
         ],
         plot_format="lb_nr_running",
     ),
@@ -111,8 +111,8 @@ bugs = [
     Bug(
         driver=Driver(name="uclamp_inversion", smp="2"),
         linux=[
-            Linux(name="buggy", version="0213b70~1"),
-            Linux(name="fixed", version="0213b70"),
+            Linux(name="buggy", version="0213b7083e81f4acd69db32cb72eb4e5f220329a~1"),
+            Linux(name="fixed", version="0213b7083e81f4acd69db32cb72eb4e5f220329a"),
         ],
         plot_format="util_avg",
     ),
@@ -141,28 +141,13 @@ bugs = [
 ]
 
 
-def patch_linux(linux_dir: Path, patch_file: Path):
-    system(
-        f"(cd {linux_dir} && git apply {patch_file}) || "
-        f"(cd {linux_dir} && git apply {patch_file} --reverse --check && echo '{patch_file} already applied')"
-    )
-
-
-def reset_git(linux_dir: Path):
-    system(f"cd {linux_dir} && git restore .")
-
-
 def plot_data(python_script: str, driver: str):
     system(f"{PROJ_DIR}/scripts/plot_{python_script}.py {driver}")
 
 
-def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):
+def reproduce(linux: Linux, driver: Driver, skip_build: bool):
     linux_dir = LINUX_ROOT_DIR / f"{driver.name}_{linux.name}"
-    checkout_linux(linux.version, linux_dir=linux_dir)
-    if reset:
-        reset_git(linux_dir)
-    for patch in linux.patches:
-        patch_linux(linux_dir, patch)
+    checkout_linux(linux.version, linux_dir=linux_dir, patch=linux.patch, tarball=True)
     if not skip_build:
         make_linux(linux_dir=linux_dir)
     make_kstep(linux_dir=linux_dir)
@@ -170,11 +155,11 @@ def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):
     run_qemu(linux_dir=linux_dir, driver=driver, log_file=log_file)
 
 
-def main(bug: Bug, run: List[str], reset: bool, skip_build: bool):
+def main(bug: Bug, run: List[str], skip_build: bool):
     linux_map = {linux.name: linux for linux in bug.linux}
     for r in [r for r in run if r != "plot"]:
         linux = linux_map.get(r, Linux(name=r, version=r))
-        reproduce(linux, bug.driver, reset, skip_build)
+        reproduce(linux, bug.driver, skip_build)
 
     if "plot" in run:
         if bug.plot_format:
@@ -198,7 +183,6 @@ if __name__ == "__main__":
         default=["buggy", "fixed", "plot"],
         nargs="+",
     )
-    parser.add_argument("--reset", action="store_true", default=False)
     parser.add_argument(
         "--skip_build",
         action="store_true",
@@ -209,9 +193,9 @@ if __name__ == "__main__":
 
     if args.name == "all":
         for bug in bugs:
-            main(bug=bug, run=args.run, reset=args.reset, skip_build=args.skip_build)
+            main(bug=bug, run=args.run, skip_build=args.skip_build)
     else:
         bug = next((bug for bug in bugs if bug.driver.name == args.name), None)
         if not bug:
             raise ValueError(f"Bug '{args.name}' not found.")
-        main(bug=bug, run=args.run, reset=args.reset, skip_build=args.skip_build)
+        main(bug=bug, run=args.run, skip_build=args.skip_build)

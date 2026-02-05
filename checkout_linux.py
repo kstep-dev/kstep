@@ -29,10 +29,6 @@ def clone_master():
 
 
 def add_worktree(version: str, linux_dir: Path):
-    if linux_dir.exists():
-        logging.info(f"{fmt_path(linux_dir)} already exists")
-        return
-
     system(f"cd {LINUX_MASTER_DIR} && git fetch")
     system(f"cd {LINUX_MASTER_DIR} && git worktree prune -v")
     system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {version}")
@@ -55,15 +51,30 @@ def get_download_url(version: str) -> str:
         return f"https://github.com/torvalds/linux/tarball/{version}"
 
 
-def checkout_linux(version: str, linux_dir: Path, tarball: bool = False):
-    if not tarball:
-        clone_master()
-        add_worktree(version, linux_dir)
+def patch_linux(linux_dir: Path, patch: Path):
+    system(f"cd {linux_dir} && patch -p1 --forward --batch < {patch}")
+
+
+def checkout_linux(
+    version: str,
+    linux_dir: Path,
+    patch: Path | None = None,
+    tarball: bool = False,
+):
+    if linux_dir.exists():
+        logging.info(f"{fmt_path(linux_dir)} already exists")
     else:
-        tarball_path = DOWNLOAD_DIR / f"{version}.tar.xz"
-        url = get_download_url(version)
-        download(url, tarball_path)
-        decompress(tarball_path, linux_dir)
+        if tarball:
+            tarball_path = DOWNLOAD_DIR / f"{version}.tar.xz"
+            url = get_download_url(version)
+            download(url, tarball_path)
+            decompress(tarball_path, linux_dir)
+        else:
+            clone_master()
+            add_worktree(version, linux_dir)
+
+        if patch:
+            patch_linux(linux_dir, patch)
     set_current_linux(linux_dir)
 
 
@@ -78,10 +89,12 @@ if __name__ == "__main__":
         help="Name of the directory (default: <version>)",
     )
     parser.add_argument("--tarball", action="store_true", default=False)
+    parser.add_argument("--patch", type=Path, default=None)
     args = parser.parse_args()
 
     checkout_linux(
         version=args.version,
         linux_dir=LINUX_ROOT_DIR / (args.name if args.name else args.version),
         tarball=args.tarball,
+        patch=args.patch,
     )
