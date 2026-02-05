@@ -143,24 +143,18 @@ bugs = [
 
 def patch_linux(linux_dir: Path, patch_file: Path):
     system(
-        f"(cd {linux_dir} && git apply {patch_file}) || "
-        f"(cd {linux_dir} && git apply {patch_file} --reverse --check && echo '{patch_file} already applied')"
+        f"cd {linux_dir} && patch -p1 --forward --batch < {patch_file} || "
+        f"(cd {linux_dir} && patch -p1 --reverse --dry-run --batch < {patch_file} && echo '{patch_file} already applied')"
     )
-
-
-def reset_git(linux_dir: Path):
-    system(f"cd {linux_dir} && git restore .")
 
 
 def plot_data(python_script: str, driver: str):
     system(f"{PROJ_DIR}/scripts/plot_{python_script}.py {driver}")
 
 
-def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):
+def reproduce(linux: Linux, driver: Driver, skip_build: bool):
     linux_dir = LINUX_ROOT_DIR / f"{driver.name}_{linux.name}"
-    checkout_linux(linux.version, linux_dir=linux_dir)
-    if reset:
-        reset_git(linux_dir)
+    checkout_linux(linux.version, linux_dir=linux_dir, tarball=True)
     for patch in linux.patches:
         patch_linux(linux_dir, patch)
     if not skip_build:
@@ -170,11 +164,11 @@ def reproduce(linux: Linux, driver: Driver, reset: bool, skip_build: bool):
     run_qemu(linux_dir=linux_dir, driver=driver, log_file=log_file)
 
 
-def main(bug: Bug, run: List[str], reset: bool, skip_build: bool):
+def main(bug: Bug, run: List[str], skip_build: bool):
     linux_map = {linux.name: linux for linux in bug.linux}
     for r in [r for r in run if r != "plot"]:
         linux = linux_map.get(r, Linux(name=r, version=r))
-        reproduce(linux, bug.driver, reset, skip_build)
+        reproduce(linux, bug.driver, skip_build)
 
     if "plot" in run:
         if bug.plot_format:
@@ -198,7 +192,6 @@ if __name__ == "__main__":
         default=["buggy", "fixed", "plot"],
         nargs="+",
     )
-    parser.add_argument("--reset", action="store_true", default=False)
     parser.add_argument(
         "--skip_build",
         action="store_true",
@@ -209,9 +202,9 @@ if __name__ == "__main__":
 
     if args.name == "all":
         for bug in bugs:
-            main(bug=bug, run=args.run, reset=args.reset, skip_build=args.skip_build)
+            main(bug=bug, run=args.run, skip_build=args.skip_build)
     else:
         bug = next((bug for bug in bugs if bug.driver.name == args.name), None)
         if not bug:
             raise ValueError(f"Bug '{args.name}' not found.")
-        main(bug=bug, run=args.run, reset=args.reset, skip_build=args.skip_build)
+        main(bug=bug, run=args.run, skip_build=args.skip_build)
