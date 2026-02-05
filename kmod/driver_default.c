@@ -35,9 +35,9 @@ static char print_buf[PRINT_BUF_SIZE];
 
 static void on_tick(void) {
   KSYM_IMPORT(btf_type_snprintf_show);
-  int len = KSYM_btf_type_snprintf_show(btf, rq_type_id, cpu_rq(1), print_buf,
-                                        PRINT_BUF_SIZE,
-                                        BTF_SHOW_PTR_RAW | BTF_SHOW_COMPACT);
+  int len = KSYM_btf_type_snprintf_show(
+      btf, rq_type_id, cpu_rq(1), print_buf, PRINT_BUF_SIZE,
+      BTF_SHOW_PTR_RAW | BTF_SHOW_COMPACT | BTF_SHOW_UNSAFE | BTF_SHOW_ZERO);
   if (len < 0)
     panic("btf_type_snprintf_show failed: %d", len);
   kstep_output(print_buf, len);

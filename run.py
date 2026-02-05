@@ -143,10 +143,12 @@ def run_qemu(
 
     system(" ".join(cmd))
 
-    if log_file:
-        with log_file.open() as f:
-            if any("Kernel panic" in line for line in f):
-                raise RuntimeError("Kernel exited with panic")
+    with log_file.open() as f:
+        if any("Kernel panic" in line for line in f):
+            raise RuntimeError("Kernel exited with panic")
+
+    print("Log saved to", log_file)
+    print("Output saved to", out_file)
 
 
 def is_port_free(port: int) -> bool:

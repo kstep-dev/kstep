@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 from consts import RESULTS_DIR
 from matplotlib import colors
-from parse import parse_log
+from parse_log import parse_log
 from plot_utils import save_fig
 
 
