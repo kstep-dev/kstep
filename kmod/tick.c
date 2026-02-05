@@ -149,8 +149,6 @@ void kstep_tick(void) {
     kstep_print_rq();
   if (kstep_driver->print_tasks)
     kstep_print_tasks();
-  if (kstep_driver->print_nr_running)
-    kstep_print_nr_running();
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
   kstep_sched_tick();

@@ -19,7 +19,6 @@ struct kstep_driver {
   u64 step_interval_us;     // Time between steps in us
   bool print_rq;            // Print runqueue stats
   bool print_tasks;         // Print task stats
-  bool print_nr_running;    // Print number of running tasks
   bool print_load_balance;  // Print load balancing
   bool print_sched_debug;   // Print sched debug
 };
@@ -31,7 +30,6 @@ static inline void kstep_driver_print(struct kstep_driver *driver) {
   TRACE_INFO("- %-20s: %llu", "step_interval_us", driver->step_interval_us);
   TRACE_INFO("- %-20s: %d", "print_rq", driver->print_rq);
   TRACE_INFO("- %-20s: %d", "print_tasks", driver->print_tasks);
-  TRACE_INFO("- %-20s: %d", "print_nr_running", driver->print_nr_running);
   TRACE_INFO("- %-20s: %d", "print_load_balance", driver->print_load_balance);
 }
 

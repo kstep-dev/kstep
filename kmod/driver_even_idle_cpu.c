@@ -1,4 +1,5 @@
 #include "driver.h"
+#include "internal.h" // cpu_rq
 
 static struct task_struct *tasks[4];
 
@@ -30,11 +31,18 @@ static void run(void) {
   kstep_tick_repeat(250);
 }
 
+static void on_tick(void) {
+  pr_info(
+      "nr_running: {\"cpu1\": %d, \"cpu2\": %d, \"cpu3\": %d, \"cpu4\": %d}\n",
+      cpu_rq(1)->nr_running, cpu_rq(2)->nr_running, cpu_rq(3)->nr_running,
+      cpu_rq(4)->nr_running);
+}
+
 KSTEP_DRIVER_DEFINE{
     .name = "even_idle_cpu",
     .setup = setup,
     .run = run,
+    .on_tick = on_tick,
     .step_interval_us = 1000,
     .print_load_balance = true,
-    .print_nr_running = true,
 };

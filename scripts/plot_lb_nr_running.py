@@ -10,19 +10,17 @@ import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 from consts import RESULTS_DIR
-from matplotlib import colors
 from parse_log import parse_log
 from plot_utils import save_fig
 
 
-def parse_nr_running(path: Path, cpus: list[int]):
+def parse_nr_running(path: Path) -> pd.DataFrame:
     df = parse_log(path, prefix="nr_running")
-    df = df[df["cpu"].isin(cpus)]
-    df["cpu"] -= min(cpus)
+    df = df.set_index("timestamp", drop=True)
     return df
 
 
-def parse_lb_events(path: Path, cpus: list[int], driver: str):
+def parse_lb_events(path: Path, cpus: list[int], driver: str) -> pd.DataFrame:
     df = parse_log(path, prefix="load_balance")
     df = df[df["timestamp"] != 0]
     df["dst_cpu"] -= min(cpus)
@@ -34,24 +32,28 @@ def parse_lb_events(path: Path, cpus: list[int], driver: str):
 
 
 def build_cmap(nr_running_df):
-    vmin = nr_running_df["val"].min()
-    vmax = nr_running_df["val"].max()
+    vmin = nr_running_df.min().min()
+    vmax = nr_running_df.max().max()
     nr_colors = vmax - vmin + 1
     cmap = plt.cm.get_cmap("Blues", nr_colors)
     return {i: cmap(i) for i in range(vmin, vmax + 1)}
 
 
 def plot_color_matrix_with_lb(
-    ax: plt.Axes, nr_running_df, lb_events, driver, cmap, title
+    ax: plt.Axes,
+    nr_running_df: pd.DataFrame,
+    lb_events: pd.DataFrame,
+    driver: str,
+    cmap,
+    title: str,
 ):
-    matrix = nr_running_df.pivot_table(
-        index="timestamp", columns="cpu", values="val", aggfunc="first"
-    )
-    matrix = matrix.map(lambda x: colors.to_rgba(cmap[x]))
-    matrix = np.array(matrix.T.values.tolist())
+    values = nr_running_df.to_numpy(dtype=int).T
+    matrix = np.empty((values.shape[0], values.shape[1], 4), dtype=float)
+    for k, rgba in cmap.items():
+        matrix[values == k] = rgba
     ax.imshow(matrix, aspect="auto", origin="lower")
 
-    ax.set_xlim(nr_running_df["timestamp"].min(), nr_running_df["timestamp"].max() + 1)
+    ax.set_xlim(nr_running_df.index.min(), nr_running_df.index.max() + 1)
     ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
     ax.set_ylabel("CPU", fontsize=13)
 
@@ -103,11 +105,12 @@ def plot_legend(fig, driver, cmap):
 def main(driver: str):
     log_file_buggy = RESULTS_DIR / f"{driver}_buggy.log"
     log_file_fixed = RESULTS_DIR / f"{driver}_fixed.log"
+
+
+    nr_running_buggy = parse_nr_running(log_file_buggy)
+    nr_running_fixed = parse_nr_running(log_file_fixed)
+
     cpus = [1, 2, 3, 4] if driver == "even_idle_cpu" else [4, 5, 6, 7]
-
-    nr_running_buggy = parse_nr_running(log_file_buggy, cpus=cpus)
-    nr_running_fixed = parse_nr_running(log_file_fixed, cpus=cpus)
-
     lb_events_buggy = parse_lb_events(log_file_buggy, cpus=cpus, driver=driver)
     lb_events_fixed = parse_lb_events(log_file_fixed, cpus=cpus, driver=driver)
 

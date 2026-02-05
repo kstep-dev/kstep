@@ -56,15 +56,20 @@ static void run(void) {
   kstep_tick_repeat(11);
 }
 
+static void on_tick(void) {
+  pr_info("rq: {\"runnable_avg\": %lu}\n", cpu_rq(1)->cfs.avg.runnable_avg);
+}
+
 #else
 static void setup(void) { panic("unsupported kernel version"); }
 static void run(void) {}
+static void on_tick(void) {}
 #endif
 
 KSTEP_DRIVER_DEFINE{
     .name = "h_nr_runnable",
     .setup = setup,
     .run = run,
+    .on_tick = on_tick,
     .step_interval_us = 1000,
-    .print_rq = true,
 };

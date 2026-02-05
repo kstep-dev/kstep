@@ -74,11 +74,11 @@ bugs = [
     ),
     Bug(
         driver=Driver(name="lag_vruntime", smp="2"),
-        plot_format="min_vruntime",
         linux=[
             Linux(name="buggy", version="5068d84054b766efe7c6202fc71b2350d1c326f1~1"),
             Linux(name="fixed", version="5068d84054b766efe7c6202fc71b2350d1c326f1"),
         ],
+        plot_format="min_vruntime",
     ),
     Bug(
         driver=Driver(name="even_idle_cpu", smp="5"),
