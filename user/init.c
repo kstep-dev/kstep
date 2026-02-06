@@ -28,7 +28,7 @@ static void load_kmod(const char *path, int argc, char *argv[], char *envp[]) {
     strlcat(params, envp[i], sizeof(params));
     strlcat(params, " ", sizeof(params));
   }
-  printf("Loading kernel module %s with params: %s\n", path, params);
+  printf("Loading %s with params: %s\n", path, params);
 
   int fd = open(path, O_RDONLY);
   if (fd < 0)
