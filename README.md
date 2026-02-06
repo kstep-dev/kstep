@@ -35,6 +35,9 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 - **Example:** `./reproduce.py sync_wakeup` checks out both the buggy and fixed kernels, builds kSTEP, runs the `sync_wakeup` driver, and plots the results.
 
+> [!NOTE]
+> Reproducing all bugs will require at least 64GB of available disk space.
+
 ## 📊 Results
 
 | Description | Figure |

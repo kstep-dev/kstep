@@ -1,3 +1,4 @@
+#include <generated/utsrelease.h>
 #include <linux/module.h>
 #include <linux/reboot.h>
 
@@ -10,6 +11,8 @@ module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
 
 static int __init kstep_main(void) {
   kstep_output_init();
+
+  TRACE_INFO("Linux version: %s", UTS_RELEASE);
   kstep_driver = kstep_sym_init(driver_name);
   kstep_driver_print(kstep_driver);
 
@@ -41,7 +44,7 @@ static int __init kstep_main(void) {
 
   TRACE_INFO("Running driver %s", kstep_driver->name);
   kstep_driver->run();
-  TRACE_INFO("Exiting driver %s", kstep_driver->name);
+  TRACE_INFO("Exiting driver %s on Linux %s", kstep_driver->name, UTS_RELEASE);
   kernel_restart(NULL);
 
   return 0;
