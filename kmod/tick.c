@@ -53,8 +53,10 @@ void kstep_sched_clock_init(void) {
 #error "Sched clock mocking not supported for this platform"
 #endif
 
-u64 kstep_jiffies = 0;
+static u64 kstep_jiffies = 0;
 static u64 kstep_jiffies_offset = 0;
+
+u64 kstep_jiffies_get(void) { return kstep_jiffies; }
 
 static void kstep_jiffies_set(u64 value) {
   kstep_jiffies = value;
@@ -103,8 +105,8 @@ static int tick_nohz_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
 }
 
 static struct kprobe kstep_tick_nohz_kp = {
-  .symbol_name = "tick_nohz_handler",
-  .pre_handler = tick_nohz_pre_handler,
+    .symbol_name = "tick_nohz_handler",
+    .pre_handler = tick_nohz_pre_handler,
 };
 #endif
 

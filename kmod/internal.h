@@ -20,6 +20,7 @@ extern struct kstep_driver *kstep_driver;
 
 // tick.c
 void kstep_sched_timer_init(void);
+u64 kstep_jiffies_get(void);
 void kstep_jiffies_init(void);
 void kstep_sched_clock_init(void);
 
