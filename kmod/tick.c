@@ -5,6 +5,54 @@
 
 #include "internal.h"
 
+// General rq checker infrastructure
+#define MAX_CPUS 16
+#define MAX_CHECKERS 8
+static s64 prev_checker_values[MAX_CHECKERS][MAX_CPUS];
+
+static void rq_checkers_save(void) {
+  struct kstep_checker *checkers = kstep_driver->checkers;
+  if (!checkers)
+    return;
+
+  for (int i = 0; checkers[i].name && i < MAX_CHECKERS; i++) {
+    switch (checkers[i].type) {
+      case TEMPORAL_DELTA:
+        for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++)
+          prev_checker_values[i][cpu] = checkers[i].get_value(cpu_rq(cpu));
+        break;
+      default:
+        panic("Unsupported checker type %d", checkers[i].type);
+    }
+  }
+}
+
+static void check_temporal_delta(int i, struct kstep_checker *checker) {
+  for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++) {
+    s64 delta = checker->get_value(cpu_rq(cpu)) - prev_checker_values[i][cpu];
+
+    if (abs(delta) > checker->max_delta)
+      pr_warn("CHECKER %d: %s on CPU %d: delta %lld, max %lld\n", i,
+              checker->name, cpu, delta, checker->max_delta);
+  }
+}
+
+static void rq_checkers_check(void) {
+  struct kstep_checker *checkers = kstep_driver->checkers;
+  if (!checkers)
+    return;
+
+  for (int i = 0; checkers[i].name && i < MAX_CHECKERS; i++) {
+    switch (checkers[i].type) {
+      case TEMPORAL_DELTA:
+        check_temporal_delta(i, &checkers[i]);
+        break;
+      default:
+        panic("Unsupported checker type %d", checkers[i].type);
+    }
+  }
+}
+
 static u64 kstep_sched_clock = INIT_TIME_NS;
 static u64 kstep_sched_clock_read(void) { return kstep_sched_clock; }
 static void kstep_sched_clock_tick(void) { kstep_sched_clock += TICK_NSEC; }
@@ -155,9 +203,11 @@ void kstep_tick(void) {
     kstep_print_rq();
   if (kstep_driver->print_tasks)
     kstep_print_tasks();
+  rq_checkers_save();
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
   kstep_sched_tick();
+  rq_checkers_check();
 }
 
 void kstep_tick_repeat(int n) {

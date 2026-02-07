@@ -1,6 +1,7 @@
 // https://github.com/torvalds/linux/commit/17e3e88ed0b6318fde0d1c14df1a804711cab1b5
 
 #include "driver.h"
+#include "internal.h"
 
 static struct task_struct *tasks[2];
 
@@ -32,10 +33,21 @@ static void run(void) {
   kstep_tick_repeat(600);
 }
 
+// Checker: detect cliff changes in util_avg
+static s64 get_util_avg(struct rq *rq) {
+  return rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
+}
+
+static struct kstep_checker checkers[] = {
+  { .name = "util_avg_cliff", .type = TEMPORAL_DELTA, .get_value = get_util_avg, .max_delta = 100 },
+  { NULL }  // Terminator
+};
+
 KSTEP_DRIVER_DEFINE{
     .name = "util_avg",
     .setup = setup,
     .run = run,
     .step_interval_us = 1000,
     .print_rq = true,
+    .checkers = checkers,
 };
