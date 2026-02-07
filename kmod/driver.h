@@ -5,6 +5,16 @@
 
 #define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
 
+enum kstep_checker_type {
+  TEMPORAL_DELTA, // Checker for comparing rq fields before and after a tick
+};
+struct kstep_checker {
+  const char *name;                 // Name for logging
+  enum kstep_checker_type type;  // Type of checker
+  s64 (*get_value)(struct rq *rq);  // Extract value from rq
+  s64 max_delta;                    // Max allowed change per tick (absolute value)
+};
+
 // driver.c
 #define DRIVER_NAME_LEN 32
 struct kstep_driver {
@@ -17,6 +27,7 @@ struct kstep_driver {
   bool print_tasks;         // Print task stats
   bool print_load_balance;  // Print load balancing
   bool print_sched_debug;   // Print sched debug
+  struct kstep_checker *checkers;  // Array of checkers
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 
