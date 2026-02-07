@@ -54,6 +54,15 @@ void kstep_sched_clock_init(void) {
 #endif
 
 static u64 kstep_jiffies = 0;
+static u64 kstep_jiffies_offset = 0;
+
+u64 kstep_jiffies_get(void) { return kstep_jiffies; }
+
+static void kstep_jiffies_set(u64 value) {
+  kstep_jiffies = value;
+  jiffies = kstep_jiffies + kstep_jiffies_offset;
+  smp_mb();
+}
 
 void kstep_jiffies_init(void) {
   // Avoid calling `tick_do_update_jiffies64` and `do_timer` to update jiffies.
@@ -76,19 +85,16 @@ void kstep_jiffies_init(void) {
   KSYM_IMPORT(tick_next_period);
   *KSYM_tick_next_period = KTIME_MAX;
 
-  kstep_jiffies = nsecs_to_jiffies(kstep_sched_clock) + INITIAL_JIFFIES;
-  jiffies = kstep_jiffies;
-  smp_mb();
+  kstep_jiffies_offset = nsecs_to_jiffies(kstep_sched_clock) + INITIAL_JIFFIES;
+  kstep_jiffies_set(0);
 
   TRACE_INFO("Disabled jiffies update");
 }
 
 static void kstep_jiffies_tick(void) {
-  if (jiffies != kstep_jiffies)
-    panic("%lu != %llu", jiffies, kstep_jiffies);
-  kstep_jiffies++;
-  jiffies = kstep_jiffies;
-  smp_mb();
+  if (jiffies != kstep_jiffies + kstep_jiffies_offset)
+    panic("%lu != %llu", jiffies, kstep_jiffies + kstep_jiffies_offset);
+  kstep_jiffies_set(kstep_jiffies + 1);
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
@@ -99,8 +105,8 @@ static int tick_nohz_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
 }
 
 static struct kprobe kstep_tick_nohz_kp = {
-  .symbol_name = "tick_nohz_handler",
-  .pre_handler = tick_nohz_pre_handler,
+    .symbol_name = "tick_nohz_handler",
+    .pre_handler = tick_nohz_pre_handler,
 };
 #endif
 
