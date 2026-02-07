@@ -29,6 +29,7 @@ static inline void kstep_driver_print(struct kstep_driver *driver) {
 }
 
 // tick.c
+extern u64 kstep_jiffies;
 void kstep_tick(void);
 void kstep_tick_repeat(int n);
 void *kstep_tick_until(void *(*fn)(void));
