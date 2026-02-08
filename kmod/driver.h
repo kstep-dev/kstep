@@ -15,7 +15,7 @@ struct kstep_checker {
   s64 max_delta;                    // Max allowed change per tick (absolute value)
 };
 
-// driver.c
+// main.c
 #define DRIVER_NAME_LEN 32
 struct kstep_driver {
   char name[DRIVER_NAME_LEN];
@@ -38,6 +38,9 @@ static inline void kstep_driver_print(struct kstep_driver *driver) {
   TRACE_INFO("- %-20s: %d", "print_tasks", driver->print_tasks);
   TRACE_INFO("- %-20s: %d", "print_load_balance", driver->print_load_balance);
 }
+
+void kstep_pass(void);
+void kstep_fail(const char *fmt, ...);
 
 // tick.c
 void kstep_tick(void);

@@ -32,16 +32,19 @@ void kstep_output(const void *buf, size_t len) {
     panic("kstep_output failed: %ld", ret);
 }
 
-void kstep_outputf(const char *fmt, ...) {
+void kstep_outputfv(const char *fmt, va_list args) {
   static char buf[OUTPUT_BUF_SIZE];
-
-  va_list args;
-  va_start(args, fmt);
   int len = vsnprintf(buf, OUTPUT_BUF_SIZE, fmt, args);
-  va_end(args);
 
   if (len > 0 && len < OUTPUT_BUF_SIZE)
     kstep_output(buf, len);
+}
+
+void kstep_outputf(const char *fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  kstep_outputfv(fmt, args);
+  va_end(args);
 }
 
 static void print_rq(struct rq *rq) {
