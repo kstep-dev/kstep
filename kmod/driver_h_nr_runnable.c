@@ -49,9 +49,9 @@ static void run(void) {
 
   TRACE_INFO("h_nr_runnable == %u", h_nr_runnable);
   if (h_nr_runnable == 1)
-    TRACE_INFO("h_nr_runnable accounted correctly");
+    kstep_pass();
   else
-    TRACE_INFO("h_nr_runnable accounted incorrectly");
+    kstep_fail("h_nr_runnable == %u", h_nr_runnable);
 
   kstep_tick_repeat(11);
 }

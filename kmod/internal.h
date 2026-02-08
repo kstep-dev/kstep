@@ -1,6 +1,7 @@
 #ifndef KSTEP_INTERNAL_H
 #define KSTEP_INTERNAL_H
 
+#include <linux/stdarg.h>
 #include <linux/version.h>
 
 // kernel internal headers
@@ -27,6 +28,7 @@ void kstep_sched_clock_init(void);
 // output.c
 void kstep_output_init(void);
 void kstep_output(const void *buf, size_t len);
+void kstep_outputfv(const char *fmt, va_list args);
 void kstep_outputf(const char *fmt, ...);
 void kstep_print_rq(void);
 void kstep_print_tasks(void);

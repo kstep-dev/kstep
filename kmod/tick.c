@@ -31,9 +31,12 @@ static void check_temporal_delta(int i, struct kstep_checker *checker) {
   for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++) {
     s64 delta = checker->get_value(cpu_rq(cpu)) - prev_checker_values[i][cpu];
 
-    if (abs(delta) > checker->max_delta)
+    if (abs(delta) > checker->max_delta) {
       pr_warn("CHECKER %d: %s on CPU %d: delta %lld, max %lld\n", i,
               checker->name, cpu, delta, checker->max_delta);
+      kstep_fail("CHECKER %d: %s on CPU %d: delta %lld, max %lld", i,
+                 checker->name, cpu, delta, checker->max_delta);
+    }
   }
 }
 
