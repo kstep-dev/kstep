@@ -34,7 +34,7 @@ static void check_temporal_delta(int i, struct kstep_checker *checker) {
     if (abs(delta) > checker->max_delta) {
       pr_warn("CHECKER %d: %s on CPU %d: delta %lld, max %lld\n", i,
               checker->name, cpu, delta, checker->max_delta);
-      kstep_fail("CHECKER %d: %s on CPU %d: delta %lld, max %lld\n", i,
+      kstep_fail("CHECKER %d: %s on CPU %d: delta %lld, max %lld", i,
                  checker->name, cpu, delta, checker->max_delta);
     }
   }

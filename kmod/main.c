@@ -70,13 +70,13 @@ void kstep_pass(void) {
 }
 
 void kstep_fail(const char *fmt, ...) {
+  status = KSTEP_STATUS_FAIL;
   kstep_outputf("{\"status\":\"fail\",\"message\":\"");
   va_list args;
   va_start(args, fmt);
   kstep_outputfv(fmt, args);
   va_end(args);
   kstep_outputf("\"}\n");
-  status = KSTEP_STATUS_FAIL;
 }
 
 MODULE_LICENSE("GPL");
