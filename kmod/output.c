@@ -1,5 +1,6 @@
 #include <linux/fs.h>
 #include <linux/ftrace.h>
+#include <linux/slab.h>
 #include <linux/tracepoint.h>
 
 #include "internal.h"
@@ -45,6 +46,52 @@ void kstep_outputf(const char *fmt, ...) {
   va_start(args, fmt);
   kstep_outputfv(fmt, args);
   va_end(args);
+}
+
+struct kstep_json {
+  char buf[OUTPUT_BUF_SIZE];
+  size_t len;
+};
+
+struct kstep_json *kstep_json_begin(void) {
+  struct kstep_json *json = kzalloc(sizeof(*json), GFP_KERNEL);
+  if (!json)
+    panic("Failed to allocate json");
+  kstep_json_field(json, "timestamp", "%lu", kstep_jiffies_get());
+  json->buf[0] = '{';
+  return json;
+}
+
+static void kstep_json_append(struct kstep_json *json, const char *buf,
+                              size_t len) {
+  if (json->len + len >= OUTPUT_BUF_SIZE)
+    panic("json buffer overflow");
+  memcpy(json->buf + json->len, buf, len);
+  json->len += len;
+}
+
+void kstep_json_field(struct kstep_json *json, const char *key, const char *fmt,
+                      ...) {
+  kstep_json_append(json, ",\"", 2);
+  kstep_json_append(json, key, strlen(key));
+  kstep_json_append(json, "\":", 2);
+
+  int rem = OUTPUT_BUF_SIZE - json->len;
+
+  va_list args;
+  va_start(args, fmt);
+  int len = vsnprintf(json->buf + json->len, rem, fmt, args);
+  va_end(args);
+
+  if (len < 0 || len >= rem)
+    panic("json formatting failed");
+  json->len += len;
+}
+
+void kstep_json_end(struct kstep_json *json) {
+  kstep_json_append(json, "}\n", 2);
+  kstep_output(json->buf, json->len);
+  kfree(json);
 }
 
 static void print_rq(struct rq *rq) {
