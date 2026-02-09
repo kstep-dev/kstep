@@ -2,6 +2,7 @@
 
 #include "driver.h"
 #include "internal.h"
+#include <linux/math.h>
 #include <linux/math64.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
@@ -27,10 +28,6 @@
 static struct task_struct *target_task;
 static struct task_struct *mover_task0;
 static struct task_struct *mover_task1;
-
-static s64 abs_s64(s64 x) { return x >= 0 ? x : -x; }
-
-static u64 abs_diff_u64(u64 a, u64 b) { return a > b ? a - b : b - a; }
 
 static u64 mul_u64_sat(u64 a, u64 b) {
   if (a && b > (~0ULL) / a)
@@ -125,8 +122,8 @@ static void run(void) {
     u64 avruntime = KSYM_avg_vruntime(cfs_rq_of(se));
     s64 raw_vlag = (s64)(avruntime - se->vruntime);
     s64 clamped_vlag = se->vlag;
-    s64 abs_raw = abs_s64(raw_vlag);
-    s64 abs_clamped = abs_s64(clamped_vlag);
+    s64 abs_raw = abs(raw_vlag);
+    s64 abs_clamped = abs(clamped_vlag);
     s64 limit_est = lag_limit_est(se);
     s64 over_by = abs_raw - limit_est;
 
@@ -161,8 +158,8 @@ static void run(void) {
       avruntime = KSYM_avg_vruntime(cfs_rq_of(se));
       raw_vlag = (s64)(avruntime - se->vruntime);
       clamped_vlag = se->vlag;
-      abs_raw = abs_s64(raw_vlag);
-      abs_clamped = abs_s64(clamped_vlag);
+      abs_raw = abs(raw_vlag);
+      abs_clamped = abs(clamped_vlag);
       if (!se->load.weight)
         panic("new weight is zero");
 
@@ -172,8 +169,8 @@ static void run(void) {
       expected_bug = mul_u64_sat(before_abs_raw, ratio);
       expected_fix = mul_u64_sat(before_abs_clamped, ratio);
       observed_after = abs_raw;
-      buggy_path = abs_diff_u64(observed_after, expected_bug) <
-                   abs_diff_u64(observed_after, expected_fix);
+      buggy_path = abs_diff(observed_after, expected_bug) <
+                   abs_diff(observed_after, expected_fix);
 
       TRACE_INFO("trigger_after_hot: avruntime=%llu vruntime=%llu "
                  "raw_vlag=%lld clamped_vlag=%lld weight=%lu",
