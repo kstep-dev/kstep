@@ -27,6 +27,7 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 #### Refinement Stage
 
 - If you manually altered internal scheduler state to trigger the bug during the triggering stage, refine your driver to reproduce the bug using only public kernel APIs or kSTEP interfaces (`kmod/driver.h`). If needed, consider extending kSTEP to provide the required functionality.
+- Make sure that the driver is deterministic, and produce the same trace on the same kernel. If not, investigate the root cause of the non-determinism.
 - After confirming your driver can trigger the bug, clearly demonstrate its impact through externally observable behavior, such as changes in task scheduling, rather than relying solely on kernel-internal state.
 - Once complete, add your driver to `reproduce.py` to enable automated testing.
 

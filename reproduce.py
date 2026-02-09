@@ -125,7 +125,7 @@ bugs = [
         plot_format="util_avg",
     ),
     Bug(
-        driver=Driver(name="vlag_overflow", smp="2"),
+        driver=Driver(name="vlag_overflow", smp="3"),
         linux=[
             Linux(name="buggy", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe~1"),
             Linux(name="fixed", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe"),
