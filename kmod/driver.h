@@ -38,9 +38,27 @@ static inline void kstep_driver_print(struct kstep_driver *driver) {
   TRACE_INFO("- %-20s: %d", "print_tasks", driver->print_tasks);
   TRACE_INFO("- %-20s: %d", "print_load_balance", driver->print_load_balance);
 }
+void kstep_status_set_pass(void); // use `kstep_pass(...)` instead
+void kstep_status_set_fail(void); // use `kstep_fail(...)` instead
 
-void kstep_pass(void);
-void kstep_fail(const char *fmt, ...);
+// output.c
+struct kstep_json;
+struct kstep_json *kstep_json_begin(void);
+void kstep_json_field(struct kstep_json *json, const char *key, const char *fmt,
+                      ...);
+void kstep_json_end(struct kstep_json *json);
+#define kstep_status_impl_message(fmt, ...)                                    \
+  kstep_json_field(json, "message", "\"" fmt "\"", ##__VA_ARGS__)
+#define kstep_status_impl(status, ...)                                         \
+  do {                                                                         \
+    kstep_status_set_##status();                                               \
+    struct kstep_json *json = kstep_json_begin();                              \
+    kstep_json_field(json, "status", "\"" #status "\"");                       \
+    __VA_OPT__(kstep_status_impl_message(__VA_ARGS__);)                        \
+    kstep_json_end(json);                                                      \
+  } while (0)
+#define kstep_pass(...) kstep_status_impl(pass, ##__VA_ARGS__)
+#define kstep_fail(...) kstep_status_impl(fail, ##__VA_ARGS__)
 
 // tick.c
 void kstep_tick(void);

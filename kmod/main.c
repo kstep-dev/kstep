@@ -17,6 +17,12 @@ enum kstep_status {
   KSTEP_STATUS_FAIL,
 };
 static enum kstep_status status = KSTEP_STATUS_PENDING;
+void kstep_status_set_pass(void) {
+  if (status == KSTEP_STATUS_FAIL)
+    panic("pass after fail not allowed");
+  status = KSTEP_STATUS_PASS;
+}
+void kstep_status_set_fail(void) { status = KSTEP_STATUS_FAIL; }
 
 static int __init kstep_main(void) {
   kstep_output_init();
@@ -53,31 +59,18 @@ static int __init kstep_main(void) {
 
   TRACE_INFO("Running driver %s", kstep_driver->name);
   kstep_driver->run();
-  if (status == KSTEP_STATUS_PENDING)
-    kstep_pass();
   TRACE_INFO("Exiting driver %s on Linux %s", kstep_driver->name, UTS_RELEASE);
+
+  if (status == KSTEP_STATUS_PENDING || status == KSTEP_STATUS_PASS)
+    kstep_pass();
+  else if (status == KSTEP_STATUS_FAIL)
+    kstep_fail();
+
   kernel_restart(NULL);
 
   return 0;
 }
 module_init(kstep_main);
-
-void kstep_pass(void) {
-  if (status == KSTEP_STATUS_FAIL)
-    panic("kstep_pass called after kstep_fail");
-  status = KSTEP_STATUS_PASS;
-  kstep_outputf("{\"status\":\"pass\"}\n");
-}
-
-void kstep_fail(const char *fmt, ...) {
-  status = KSTEP_STATUS_FAIL;
-  kstep_outputf("{\"status\":\"fail\",\"message\":\"");
-  va_list args;
-  va_start(args, fmt);
-  kstep_outputfv(fmt, args);
-  va_end(args);
-  kstep_outputf("\"}\n");
-}
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Shawn Zhong");

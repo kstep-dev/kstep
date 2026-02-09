@@ -33,21 +33,6 @@ void kstep_output(const void *buf, size_t len) {
     panic("kstep_output failed: %ld", ret);
 }
 
-void kstep_outputfv(const char *fmt, va_list args) {
-  static char buf[OUTPUT_BUF_SIZE];
-  int len = vsnprintf(buf, OUTPUT_BUF_SIZE, fmt, args);
-
-  if (len > 0 && len < OUTPUT_BUF_SIZE)
-    kstep_output(buf, len);
-}
-
-void kstep_outputf(const char *fmt, ...) {
-  va_list args;
-  va_start(args, fmt);
-  kstep_outputfv(fmt, args);
-  va_end(args);
-}
-
 struct kstep_json {
   char buf[OUTPUT_BUF_SIZE];
   size_t len;
