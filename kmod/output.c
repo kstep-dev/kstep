@@ -27,12 +27,6 @@ void kstep_output_init(void) {
   panic("trace output not available");
 }
 
-void kstep_output(const void *buf, size_t len) {
-  ssize_t ret = kernel_write(output_file, buf, len, NULL);
-  if (ret < 0)
-    panic("kstep_output failed: %ld", ret);
-}
-
 struct kstep_json {
   char buf[OUTPUT_BUF_SIZE];
   size_t len;
@@ -75,7 +69,9 @@ void kstep_json_field(struct kstep_json *json, const char *key, const char *fmt,
 
 void kstep_json_end(struct kstep_json *json) {
   kstep_json_append(json, "}\n", 2);
-  kstep_output(json->buf, json->len);
+  ssize_t ret = kernel_write(output_file, json->buf, json->len, NULL);
+  if (ret < 0)
+    panic("write to output file failed: %ld", ret);
   kfree(json);
 }
 
