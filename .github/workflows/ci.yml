@@ -46,12 +46,13 @@ jobs:
     needs: qemu
     strategy:
       matrix:
-        version: # LTS versions at https://kernel.org/
-          - v6.18
-          - v6.12
-          - v6.6
-          - v6.1
-          - v5.15.197
+        version:      # https://kernel.org/
+          - v6.19     # latest
+          - v6.18     # 2025 LTS
+          - v6.12     # 2024 LTS
+          - v6.6      # 2023 LTS
+          - v6.1      # 2022 LTS
+          - v5.15.197 # 2021 LTS
 
     name: Linux ${{matrix.version}}
     runs-on: ubuntu-latest
