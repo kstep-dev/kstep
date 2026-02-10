@@ -39,7 +39,8 @@
  * - Fixed kernel (d4ac164): PASS (hits == 0).
  */
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0) &&                          \
+    LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
 
 static struct task_struct *cfs_holder;
 static struct task_struct *rt_proc;
