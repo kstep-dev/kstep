@@ -138,6 +138,13 @@ bugs = [
             Linux(name="fixed", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad"),
         ],
     ),
+    Bug(
+        driver=Driver(name="over_schedule", smp="2"),
+        linux=[
+            Linux(name="buggy", version="d4ac164bde7a12ec0a238a7ead5aa26819bbb1c1~1"),
+            Linux(name="fixed", version="d4ac164bde7a12ec0a238a7ead5aa26819bbb1c1"),
+        ],
+    ),
 ]
 
 

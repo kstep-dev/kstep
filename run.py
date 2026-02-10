@@ -148,6 +148,7 @@ def run_qemu(
 
     # Print the last line for status
     with out_file.open() as f:
+        line = "status not found"
         for line in f:
             pass
         print(line.strip())
