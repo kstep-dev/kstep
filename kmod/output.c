@@ -8,23 +8,22 @@
 #define K(s) "\"" #s "\": "
 #define OUTPUT_BUF_SIZE 4096
 
-static const char *output_paths[] = {
-    "/dev/ttyAMA1", // ARM PL011
-    "/dev/ttyS1",   // x86 8250
-    NULL,
-};
-
 static struct file *output_file;
 
 void kstep_output_init(void) {
   kstep_sysctl_write("kernel.printk", "%d", 7);
 
-  for (const char **path = output_paths; *path; path++) {
-    output_file = filp_open(*path, O_WRONLY | O_NOCTTY, 0);
-    if (!IS_ERR(output_file))
-      return;
-  }
-  panic("trace output not available");
+#if defined(CONFIG_SERIAL_8250_CONSOLE) // x86 8250
+  const char *output_path = "/dev/ttyS1";
+#elif defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) // ARM PL011
+  const char *output_path = "/dev/ttyAMA1";
+#else
+#error "Unsupported serial console"
+#endif
+
+  output_file = filp_open(output_path, O_WRONLY | O_NOCTTY, 0);
+  if (IS_ERR(output_file))
+    panic("Failed to open %s: %ld", output_path, PTR_ERR(output_file));
 }
 
 struct kstep_json {
@@ -37,7 +36,7 @@ struct kstep_json *kstep_json_begin(void) {
   if (!json)
     panic("Failed to allocate json");
   kstep_json_field(json, "timestamp", "%lu", kstep_jiffies_get());
-  json->buf[0] = '{';
+  json->buf[0] = '{'; // overwrite the first ',' with '{'
   return json;
 }
 
