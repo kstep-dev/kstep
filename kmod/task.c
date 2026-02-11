@@ -18,22 +18,15 @@ void kstep_task_init(void) {
 // Initialize stdin to `/dev/null` and stdout/stderr to `/dev/console`
 // Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
 static int task_init(struct subprocess_info *info, struct cred *new) {
-  int fd;
+  const char *names[] = {"stdin", "stdout", "stderr"};
+  struct file *files[] = {null_file, console_file, console_file};
 
-  fd = get_unused_fd_flags(0);
-  if (fd < 0 || fd != 0)
-    panic("get_unused_fd_flags returned %d for stdin", fd);
-  fd_install(fd, get_file(null_file));
-
-  fd = get_unused_fd_flags(0);
-  if (fd < 0 || fd != 1)
-    panic("get_unused_fd_flags returned %d for stdout", fd);
-  fd_install(fd, get_file(console_file));
-
-  fd = get_unused_fd_flags(0);
-  if (fd < 0 || fd != 2)
-    panic("get_unused_fd_flags returned %d for stderr", fd);
-  fd_install(fd, get_file(console_file));
+  for (int i = 0; i < 3; i++) {
+    int fd = get_unused_fd_flags(0);
+    if (fd < 0 || fd != i)
+      panic("get_unused_fd_flags returned %d for %s", fd, names[i]);
+    fd_install(fd, get_file(files[i]));
+  }
 
   *(struct task_struct **)info->data = current;
   TRACE_INFO("Task created with pid %d", current->pid);
