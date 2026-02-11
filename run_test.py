@@ -5,6 +5,7 @@ from checkout_linux import Linux, checkout_linux
 from run import Driver, make_kstep, make_linux, pipe_to_qemu, print_run_results, run_qemu
 from scripts import LINUX_ROOT_DIR, LOGS_DIR
 from scripts import generate_input
+import time
 
 def smp_to_cpus(smp: str) -> int:
     try:
@@ -25,7 +26,7 @@ def run_test(
     make_linux(linux_dir=linux_dir)
 
     cpus = smp_to_cpus(smp)
-    spec_str = generate_input(
+    seq = generate_input(
         steps=steps,
         max_tasks=max_tasks,
         max_cgroups=max_cgroups,
@@ -42,9 +43,6 @@ def run_test(
     make_kstep(linux_dir=linux_dir)
 
     log_file = LOGS_DIR / f"test_{linux.name}.log"
-    if not spec_str.endswith("!"):
-        spec_str += "!"
-    stdin_payload = f"test_spec={spec_str}\n"
 
     proc = run_qemu(
         linux_dir=linux_dir,
@@ -52,10 +50,16 @@ def run_test(
         log_file=log_file,
     )
 
-    pipe_to_qemu(proc=proc, stdin_payload=stdin_payload)
+    time.sleep(1)
+
+    for op in seq:
+        pipe_to_qemu(proc=proc, stdin_payload=f"{op[0]},{op[1]},{op[2]},{op[3]}\n")
+
+    pipe_to_qemu(proc=proc, stdin_payload="EXECUTE\n")
+    pipe_to_qemu(proc=proc, stdin_payload="FINISH\n")
 
     return_code = proc.wait()
-    print(f"Reproduction returned with code: {return_code}")
+    print(f"QEMU returned with code: {return_code}")
     print_run_results(log_file=log_file)
 
 def main():
