@@ -20,6 +20,10 @@ def system(cmd: str):
     logging.info(f"Running: `{TermColor.BLUE}{cmd}{TermColor.RESET}`")
     subprocess.run(cmd, shell=True, check=True)
 
+def system_with_pipe(cmd: str):
+    logging.info(f"Running with Pipe: `{TermColor.BLUE}{cmd}{TermColor.RESET}`")
+    proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE)
+    return proc
 
 def download(url: str, output_path: Path):
     if output_path.exists():

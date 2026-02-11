@@ -2,6 +2,7 @@
 
 import argparse
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 
 from scripts import (
@@ -14,6 +15,15 @@ from scripts import (
     download,
     system,
 )
+
+@dataclass(frozen=True)
+class Linux:
+    # A descriptive name for the Linux version
+    name: str
+    # The version/commit of the kernel to use
+    version: str
+    # The patch to apply to the kernel
+    patch: Path | None = None
 
 
 def fmt_path(path: Path) -> str:

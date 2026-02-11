@@ -2,24 +2,11 @@
 
 import argparse
 from dataclasses import dataclass
-from pathlib import Path
 from typing import List
 
-from checkout_linux import checkout_linux
-from run import Driver, make_kstep, make_linux, run_qemu
+from checkout_linux import Linux, checkout_linux
+from run import Driver, make_kstep, make_linux, print_run_results, run_qemu
 from scripts import LINUX_ROOT_DIR, PROJ_DIR, RESULTS_DIR, system
-
-
-@dataclass(frozen=True)
-class Linux:
-    # A descriptive name for the Linux version
-    name: str
-    # The version/commit of the kernel to use
-    version: str
-    # The patch to apply to the kernel
-    patch: Path | None = None
-
-
 @dataclass(frozen=True)
 class Bug:
     driver: Driver
@@ -159,7 +146,10 @@ def reproduce(linux: Linux, driver: Driver, skip_build: bool):
         make_linux(linux_dir=linux_dir)
     make_kstep(linux_dir=linux_dir)
     log_file = RESULTS_DIR / f"{driver.name}_{linux.name}.log"
-    run_qemu(linux_dir=linux_dir, driver=driver, log_file=log_file)
+    proc = run_qemu(linux_dir=linux_dir, driver=driver, log_file=log_file)
+    return_code = proc.wait()
+    print(f"Reproduction returned with code: {return_code}")
+    print_run_results(log_file=log_file)
 
 
 def main(bug: Bug, run: List[str], skip_build: bool):

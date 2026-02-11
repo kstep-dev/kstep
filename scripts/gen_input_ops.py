@@ -1,0 +1,264 @@
+from typing import Callable, List, Optional
+from dataclasses import dataclass, field
+from enum import IntEnum
+
+from .gen_input_state import (
+    GenState,
+    TASK_SLEEPING,
+    TASK_RUNNABLE,
+)
+
+@dataclass
+class Op:
+    name: str
+    weight: int
+    # function that returns True if the operation is applicable to the current state
+    is_applicable: Callable
+    # function that emits the operation; change the generator state accordingly; returns the operation arguments
+    emit: Callable
+    # list of resources required by the operation
+    requires: List[str] = field(default_factory=list)
+    # list of resources produced by the operation
+    produces: List[str] = field(default_factory=list)
+    # list of argument types
+    arg_types: List[Optional[str]] = field(default_factory=lambda: [None, None, None])
+
+
+# Arguments
+ARG_TASK = "task"
+ARG_CGROUP = "cgroup"
+ARG_CPU = "cpu"
+ARG_INT = "int"
+
+# Resources
+RESOURCE_TASK = "task"
+RESOURCE_CGROUP = "cgroup"
+
+# Generator parameters
+MAX_TICK = 1000
+
+def op_task_create(m: GenState):
+    tid = m.next_task_id()
+    if tid is None:
+        return None
+    m.add_task(tid)
+    m.set_task_state(tid, TASK_SLEEPING)
+    return ("TASK_CREATE", tid, 0, 0)
+
+# Fork and create new tasks;
+# It will only be executed after the target task is actually running on a CPU;
+def op_task_fork(m: GenState):
+    tid = m.choose_task_in_state(TASK_RUNNABLE)
+    n = m.rnd.randint(1, 4)
+    for i in range(n):
+        new_tid = m.next_task_id()
+        if new_tid is None:
+            return ("TASK_FORK", tid, i, 0)
+        m.add_task(new_tid)
+        m.set_task_state(new_tid, TASK_RUNNABLE)
+    return ("TASK_FORK", tid, n, 0)
+
+
+def op_task_pin(m: GenState):
+    tid = m.choose_task_in_state(TASK_RUNNABLE)
+    rng = m.choose_cpuset()
+    if rng is None:
+        return None
+    begin, end = rng
+    return ("TASK_PIN", tid, begin, end)
+
+
+def op_task_fifo(m: GenState):
+    tid = m.choose_task_in_state(TASK_RUNNABLE)
+    return ("TASK_FIFO", tid, 0, 0)
+
+
+def op_task_pause(m: GenState):
+    tid = m.choose_task_in_state(TASK_RUNNABLE)
+    m.set_task_state(tid, TASK_SLEEPING)
+    return ("TASK_PAUSE", tid, 0, 0)
+
+
+def op_task_wakeup(m: GenState):
+    tid = m.choose_task_in_state(TASK_SLEEPING)
+    m.set_task_state(tid, TASK_RUNNABLE)
+    return ("TASK_WAKEUP", tid, 0, 0)
+
+
+def op_task_set_prio(m: GenState):
+    tid = m.choose_task_in_state(TASK_RUNNABLE)
+    prio = m.rnd.randint(0, 139)
+    return ("TASK_SET_PRIO", tid, prio, 0)
+
+
+def op_tick(m: GenState):
+    return ("TICK", 0, 0, 0)
+
+
+def op_tick_repeat(m: GenState):
+    n = m.rnd.randint(1, MAX_TICK)
+    return ("TICK_REPEAT", n, 0, 0)
+
+
+def op_cgroup_create(m: GenState):
+    child_id = m.next_cgroup_id()
+    parent_id = m.choose_parent_cgroup_id()
+    if child_id is None or parent_id is None:
+        return None
+    m.add_cgroup(parent_id, child_id)
+    return ("CGROUP_CREATE", parent_id, child_id, 0)
+
+
+def op_cgroup_set_cpuset(m: GenState):
+    cgroup_id = m.choose_cgroup()
+    begin, end = m.choose_cpuset_cgroup(cgroup_id)
+    m.cgroups[cgroup_id].cpuset = (begin, end)
+    return ("CGROUP_SET_CPUSET", cgroup_id, begin, end)
+
+
+def op_cgroup_set_weight(m: GenState):
+    cgroup_id = m.choose_cgroup()
+    weight = m.rnd.randint(1, 10000)
+    return ("CGROUP_SET_WEIGHT", cgroup_id, weight, 0)
+
+
+def op_cgroup_add_task(m: GenState):
+    cgroup_id = m.choose_cgroup()
+    tid = m.choose_task()
+    return ("CGROUP_ADD_TASK", cgroup_id, tid, 0)
+
+
+def op_cpu_set_freq(m: GenState):
+    cpu = m.choose_cpu()
+    scale = m.rnd.randint(1, 1024)
+    return ("CPU_SET_FREQ", cpu, scale, 0)
+
+
+def op_cpu_set_capacity(m: GenState):
+    cpu = m.choose_cpu()
+    scale = m.rnd.randint(1, 1024)
+    return ("CPU_SET_CAPACITY", cpu, scale, 0)
+
+
+OPS: List[Op] = [
+    Op(
+        name="TASK_CREATE",
+        weight=6,
+        is_applicable=lambda m: m.next_task_id() is not None,
+        emit=op_task_create,
+        produces=[RESOURCE_TASK],
+        arg_types=[ARG_TASK, None, None],
+    ),
+    Op(
+        name="TASK_FORK",
+        weight=3,
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE),
+        emit=op_task_fork,
+        requires=[RESOURCE_TASK],
+        produces=[RESOURCE_TASK],
+        arg_types=[ARG_TASK, ARG_INT, None],
+    ),
+    Op(
+        name="TASK_PIN",
+        weight=3,
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE) and m.cpus >= 2,
+        emit=op_task_pin,
+        requires=[RESOURCE_TASK],
+        arg_types=[ARG_TASK, ARG_CPU, ARG_CPU],
+    ),
+    Op(
+        name="TASK_FIFO",
+        weight=2,
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE),
+        emit=op_task_fifo,
+        requires=[RESOURCE_TASK],
+        arg_types=[ARG_TASK, ARG_INT, None],
+    ),
+    Op(
+        name="TASK_PAUSE",
+        weight=4,
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE),
+        emit=op_task_pause,
+        requires=[RESOURCE_TASK],
+        arg_types=[ARG_TASK, None, None],
+    ),
+    Op(
+        name="TASK_WAKEUP",
+        weight=4,
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_SLEEPING),
+        emit=op_task_wakeup,
+        requires=[RESOURCE_TASK],
+        arg_types=[ARG_TASK, None, None],
+    ),
+    Op(
+        name="TASK_SET_PRIO",
+        weight=3,
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE),
+        emit=op_task_set_prio,
+        requires=[RESOURCE_TASK],
+        arg_types=[ARG_TASK, ARG_INT, None],
+    ),
+    Op(
+        name="TICK",
+        weight=10,
+        is_applicable=lambda m: True,
+        emit=op_tick,
+    ),
+    Op(
+        name="TICK_REPEAT",
+        weight=4,
+        is_applicable=lambda m: True,
+        emit=op_tick_repeat,
+        arg_types=[ARG_INT, None, None],
+    ),
+    Op(
+        name="CGROUP_CREATE",
+        weight=2,
+        is_applicable=lambda m: m.next_cgroup_id() is not None,
+        emit=op_cgroup_create,
+        produces=[RESOURCE_CGROUP],
+        arg_types=[ARG_CGROUP, ARG_CGROUP, None],
+    ),
+    Op(
+        name="CGROUP_SET_CPUSET",
+        weight=2,
+        is_applicable=lambda m: m.has_cgroups() and m.cpus >= 2,
+        emit=op_cgroup_set_cpuset,
+        requires=[RESOURCE_CGROUP],
+        arg_types=[ARG_CGROUP, ARG_CPU, ARG_CPU],
+    ),
+    Op(
+        name="CGROUP_SET_WEIGHT",
+        weight=2,
+        is_applicable=lambda m: m.has_cgroups(),
+        emit=op_cgroup_set_weight,
+        requires=[RESOURCE_CGROUP],
+        arg_types=[ARG_CGROUP, ARG_INT, None],
+    ),
+    Op(
+        name="CGROUP_ADD_TASK",
+        weight=3,
+        is_applicable=lambda m: m.has_cgroups() and m.has_tasks(),
+        emit=op_cgroup_add_task,
+        requires=[RESOURCE_CGROUP, RESOURCE_TASK],
+        arg_types=[ARG_CGROUP, ARG_TASK, None],
+    ),
+    Op(
+        name="CPU_SET_FREQ",
+        weight=1,
+        is_applicable=lambda m: m.cpus >= 2,
+        emit=op_cpu_set_freq,
+        arg_types=[ARG_CPU, ARG_INT, None],
+    ),
+    Op(
+        name="CPU_SET_CAPACITY",
+        weight=1,
+        is_applicable=lambda m: m.cpus >= 2,
+        emit=op_cpu_set_capacity,
+        arg_types=[ARG_CPU, ARG_INT, None],
+    ),
+]
+
+
+def build_ops() -> List[Op]:
+    return OPS
