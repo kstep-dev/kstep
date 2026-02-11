@@ -8,6 +8,24 @@ from .gen_input_state import (
     TASK_RUNNABLE,
 )
 
+OP_NAME_TO_TYPE = {
+    "TASK_CREATE": 0,
+    "TASK_FORK": 1,
+    "TASK_PIN": 2,
+    "TASK_FIFO": 3,
+    "TASK_PAUSE": 4,
+    "TASK_WAKEUP": 5,
+    "TASK_SET_PRIO": 6,
+    "TICK": 7,
+    "TICK_REPEAT": 8,
+    "CGROUP_CREATE": 9,
+    "CGROUP_SET_CPUSET": 10,
+    "CGROUP_SET_WEIGHT": 11,
+    "CGROUP_ADD_TASK": 12,
+    "CPU_SET_FREQ": 13,
+    "CPU_SET_CAPACITY": 14,
+}
+
 @dataclass
 class Op:
     name: str
@@ -43,7 +61,7 @@ def op_task_create(m: GenState):
         return None
     m.add_task(tid)
     m.set_task_state(tid, TASK_SLEEPING)
-    return ("TASK_CREATE", tid, 0, 0)
+    return (OP_NAME_TO_TYPE["TASK_CREATE"], tid, 0, 0)
 
 # Fork and create new tasks;
 # It will only be executed after the target task is actually running on a CPU;
@@ -55,7 +73,7 @@ def op_task_fork(m: GenState):
         return None
     m.add_task(new_tid)
     m.set_task_state(new_tid, TASK_RUNNABLE)
-    return ("TASK_FORK", tid, new_tid, 0)
+    return (OP_NAME_TO_TYPE["TASK_FORK"], tid, new_tid, 0)
 
 
 def op_task_pin(m: GenState):
@@ -64,39 +82,39 @@ def op_task_pin(m: GenState):
     if rng is None:
         return None
     begin, end = rng
-    return ("TASK_PIN", tid, begin, end)
+    return (OP_NAME_TO_TYPE["TASK_PIN"], tid, begin, end)
 
 
 def op_task_fifo(m: GenState):
     tid = m.choose_task_in_state(TASK_RUNNABLE)
-    return ("TASK_FIFO", tid, 0, 0)
+    return (OP_NAME_TO_TYPE["TASK_FIFO"], tid, 0, 0)
 
 
 def op_task_pause(m: GenState):
     tid = m.choose_task_in_state(TASK_RUNNABLE)
     m.set_task_state(tid, TASK_SLEEPING)
-    return ("TASK_PAUSE", tid, 0, 0)
+    return (OP_NAME_TO_TYPE["TASK_PAUSE"], tid, 0, 0)
 
 
 def op_task_wakeup(m: GenState):
     tid = m.choose_task_in_state(TASK_SLEEPING)
     m.set_task_state(tid, TASK_RUNNABLE)
-    return ("TASK_WAKEUP", tid, 0, 0)
+    return (OP_NAME_TO_TYPE["TASK_WAKEUP"], tid, 0, 0)
 
 
 def op_task_set_prio(m: GenState):
     tid = m.choose_task_in_state(TASK_RUNNABLE)
     prio = m.rnd.randint(0, 139)
-    return ("TASK_SET_PRIO", tid, prio, 0)
+    return (OP_NAME_TO_TYPE["TASK_SET_PRIO"], tid, prio, 0)
 
 
 def op_tick(m: GenState):
-    return ("TICK", 0, 0, 0)
+    return (OP_NAME_TO_TYPE["TICK"], 0, 0, 0)
 
 
 def op_tick_repeat(m: GenState):
     n = m.rnd.randint(1, MAX_TICK)
-    return ("TICK_REPEAT", n, 0, 0)
+    return (OP_NAME_TO_TYPE["TICK_REPEAT"], n, 0, 0)
 
 
 def op_cgroup_create(m: GenState):
@@ -105,38 +123,38 @@ def op_cgroup_create(m: GenState):
     if child_id is None or parent_id is None:
         return None
     m.add_cgroup(parent_id, child_id)
-    return ("CGROUP_CREATE", parent_id, child_id, 0)
+    return (OP_NAME_TO_TYPE["CGROUP_CREATE"], parent_id, child_id, 0)
 
 
 def op_cgroup_set_cpuset(m: GenState):
     cgroup_id = m.choose_cgroup()
     begin, end = m.choose_cpuset_cgroup(cgroup_id)
     m.cgroups[cgroup_id].cpuset = (begin, end)
-    return ("CGROUP_SET_CPUSET", cgroup_id, begin, end)
+    return (OP_NAME_TO_TYPE["CGROUP_SET_CPUSET"], cgroup_id, begin, end)
 
 
 def op_cgroup_set_weight(m: GenState):
     cgroup_id = m.choose_cgroup()
     weight = m.rnd.randint(1, 10000)
-    return ("CGROUP_SET_WEIGHT", cgroup_id, weight, 0)
+    return (OP_NAME_TO_TYPE["CGROUP_SET_WEIGHT"], cgroup_id, weight, 0)
 
 
 def op_cgroup_add_task(m: GenState):
     cgroup_id = m.choose_cgroup()
     tid = m.choose_task()
-    return ("CGROUP_ADD_TASK", cgroup_id, tid, 0)
+    return (OP_NAME_TO_TYPE["CGROUP_ADD_TASK"], cgroup_id, tid, 0)
 
 
 def op_cpu_set_freq(m: GenState):
     cpu = m.choose_cpu()
     scale = m.rnd.randint(1, 1024)
-    return ("CPU_SET_FREQ", cpu, scale, 0)
+    return (OP_NAME_TO_TYPE["CPU_SET_FREQ"], cpu, scale, 0)
 
 
 def op_cpu_set_capacity(m: GenState):
     cpu = m.choose_cpu()
     scale = m.rnd.randint(1, 1024)
-    return ("CPU_SET_CAPACITY", cpu, scale, 0)
+    return (OP_NAME_TO_TYPE["CPU_SET_CAPACITY"], cpu, scale, 0)
 
 
 OPS: List[Op] = [

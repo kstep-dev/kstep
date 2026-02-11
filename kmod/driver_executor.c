@@ -1,6 +1,7 @@
 #include <linux/fs.h> // filp_open, filp_close
 #include <linux/kernel.h> // printk
 #include <linux/slab.h> // kmalloc, kfree, krealloc
+#include <linux/types.h> // ssize_t
 #include <linux/string.h> // strstr, strchr, strpbrk
 
 #include "driver.h"
@@ -23,170 +24,157 @@ enum kstep_op_type {
   OP_CPU_SET_CAPACITY,
 };
 
-struct kstep_op {
-  enum kstep_op_type type;
-  int a;
-  int b;
-  int c;
+enum line_type {
+  LINE_TYPE_BATCH,
+  LINE_TYPE_EXECUTE,
+  LINE_TYPE_FINISH,
 };
 
-static struct kstep_op *kstep_seq;
+struct kstep_op {
+  enum kstep_op_type type;
+  int a, b, c;
+};
+
+#define KSTEP_SEQ_MAX 1024
+static struct kstep_op kstep_seq[KSTEP_SEQ_MAX];
 static int kstep_seq_len;
-static struct task_struct **kstep_tasks;
-static int kstep_tasks_len;
+// static struct task_struct **kstep_tasks;
+// static int kstep_tasks_len;
+static struct file *console;
 
-static enum kstep_op_type parse_op_type(const char *name) {
-  if (!strcmp(name, "TASK_CREATE")) return OP_TASK_CREATE;
-  if (!strcmp(name, "TASK_FORK")) return OP_TASK_FORK;
-  if (!strcmp(name, "TASK_PIN")) return OP_TASK_PIN;
-  if (!strcmp(name, "TASK_FIFO")) return OP_TASK_FIFO;
-  if (!strcmp(name, "TASK_PAUSE")) return OP_TASK_PAUSE;
-  if (!strcmp(name, "TASK_WAKEUP")) return OP_TASK_WAKEUP;
-  if (!strcmp(name, "TASK_SET_PRIO")) return OP_TASK_SET_PRIO;
-  if (!strcmp(name, "TICK")) return OP_TICK;
-  if (!strcmp(name, "TICK_REPEAT")) return OP_TICK_REPEAT;
-  if (!strcmp(name, "CGROUP_CREATE")) return OP_CGROUP_CREATE;
-  if (!strcmp(name, "CGROUP_SET_CPUSET")) return OP_CGROUP_SET_CPUSET;
-  if (!strcmp(name, "CGROUP_SET_WEIGHT")) return OP_CGROUP_SET_WEIGHT;
-  if (!strcmp(name, "CGROUP_ADD_TASK")) return OP_CGROUP_ADD_TASK;
-  if (!strcmp(name, "CPU_SET_FREQ")) return OP_CPU_SET_FREQ;
-  if (!strcmp(name, "CPU_SET_CAPACITY")) return OP_CPU_SET_CAPACITY;
-  panic("Unknown op type: %s", name);
-  return OP_TICK;
+struct console_parse_state {
+  char line_buf[1024];
+  size_t line_len;
+  bool line_too_long;
+};
+
+static void execute_kstep_seq(void) {
+  for (int i = 0; i < kstep_seq_len; i++) {
+    struct kstep_op *op = &kstep_seq[i];
+    pr_info("Execute op %d: %d %d %d %d\n", i, op->type, op->a, op->b, op->c);
+  }
+  kstep_seq_len = 0;
 }
 
-static char *read_console_buf(struct file *console) {
-  size_t cap = 1024;
-  size_t len = 0;
-  char *buf = kmalloc(cap, GFP_KERNEL);
-  if (!buf)
-    panic("Failed to allocate console buffer");
+static bool append_kstep_op(const struct kstep_op *op) {
+  kstep_seq[kstep_seq_len] = *op;
+  kstep_seq_len++;
+  pr_info("Batch op %d: %d %d %d %d\n", kstep_seq_len, op->type, op->a, op->b, op->c);
 
-  while (true) {
-    if (len + 256 + 1 > cap) {
-      size_t new_cap = cap * 2;
-      char *new_buf = krealloc(buf, new_cap, GFP_KERNEL);
-      if (!new_buf) {
-        kfree(buf);
-        panic("Failed to grow console buffer");
+  if (kstep_seq_len == KSTEP_SEQ_MAX) {
+    pr_info("executor: kstep_seq reached max %d, auto execute\n", KSTEP_SEQ_MAX);
+    execute_kstep_seq();
+  }
+
+  return true;
+}
+
+static bool parse_int_token(char *token, int *out) {
+  if (!token || !*token)
+    return false;
+  return kstrtoint(token, 10, out) == 0;
+}
+
+static void parse_console_input(char *buf) {
+  char *cursor;
+  int fields[4];
+  struct kstep_op op;
+
+  if (!buf) return;
+
+  buf = strim(buf);
+  if (!*buf) return;
+
+  cursor = buf;
+  for (int i = 0; i < 4; i++) {
+    char *token = strsep(&cursor, ",");
+    if (!parse_int_token(token, &fields[i])) {
+      pr_warn("executor: ignore invalid line `%s`\n", buf);
+      return;
+    }
+  }
+
+  if (cursor && *cursor) {
+    pr_warn("executor: ignore invalid line `%s`\n", buf);
+    return;
+  }
+
+  if (fields[0] < OP_TASK_CREATE || fields[0] > OP_CPU_SET_CAPACITY) {
+    pr_warn("executor: ignore unknown op type %d in `%s`\n", fields[0], buf);
+    return;
+  }
+
+  op.type = fields[0];
+  op.a = fields[1];
+  op.b = fields[2];
+  op.c = fields[3];
+  if (!append_kstep_op(&op))
+    panic("Failed to append kstep op");
+
+}
+
+static enum line_type process_console_chunk(const char *buf, ssize_t nread, struct console_parse_state *state) {
+  int i;
+  for (i = 0; i < nread; i++) {
+    char ch = buf[i];
+    if (ch == '\r') continue;
+
+    if (ch == '\n') {
+      if (state->line_too_long) {
+        pr_warn("executor: ignore overlong input line\n");
+        state->line_too_long = false;
+        state->line_len = 0;
+        continue;
       }
-      buf = new_buf;
-      cap = new_cap;
+
+      state->line_buf[state->line_len] = '\0';
+      state->line_len = 0;
+      if (strcmp(state->line_buf, "EXECUTE") == 0)
+        return LINE_TYPE_EXECUTE;
+      if (strcmp(state->line_buf, "FINISH") == 0)
+        return LINE_TYPE_FINISH;
+
+      parse_console_input(state->line_buf);
+      continue;
     }
 
-    ssize_t n = kernel_read(console, buf + len, cap - len - 1, NULL);
-    if (n < 0) {
-      kfree(buf);
-      panic("Failed to read /dev/console: %zd", n);
+    if (state->line_too_long)
+      continue;
+    if (state->line_len + 1 >= sizeof(state->line_buf)) {
+      state->line_too_long = true;
+      continue;
     }
-    if (n == 0)
-      break;
-    len += n;
-    buf[len] = '\0';
-    if (strchr(buf, '!') || strpbrk(buf, "\n\r"))
-      break;
+    state->line_buf[state->line_len++] = ch;
   }
 
-  return buf;
-}
-
-// test_spec=TASK_CREATE,1,2,3|TASK_FORK,4,5,6|...|...!
-// | is the separator between ops
-// ! is the end of the command sequence string
-static void parse_test_spec(char *buf) {
-  char *spec = strstr(buf, "test_spec=");
-  if (!spec)
-    panic("Missing test_spec in console input");
-  spec += strlen("test_spec=");
-
-  char *end = strchr(spec, '!');
-  if (!end)
-    panic("Empty test_spec");
-  *end = '\0';
-
-  int count = 1;
-  for (char *p = spec; *p; p++) {
-    if (*p == '|')
-      count++;
-  }
-  kstep_seq = kcalloc(count, sizeof(*kstep_seq), GFP_KERNEL);
-  if (!kstep_seq)
-    panic("Failed to allocate kstep_seq");
-
-  char *cursor = spec;
-  int idx = 0;
-  while (cursor && *cursor) {
-    char *op_str = strsep(&cursor, "|");
-    if (!op_str || !*op_str)
-      panic("Empty op in test_spec");
-
-    char *name = strsep(&op_str, ",");
-    char *a_str = strsep(&op_str, ",");
-    char *b_str = strsep(&op_str, ",");
-    char *c_str = strsep(&op_str, ",");
-    if (!name || !a_str || !b_str || !c_str)
-      panic("Malformed op in test_spec");
-
-    int a, b, c;
-    if (kstrtoint(a_str, 10, &a) || kstrtoint(b_str, 10, &b) ||
-        kstrtoint(c_str, 10, &c))
-      panic("Invalid op args in test_spec");
-
-    kstep_seq[idx].type = parse_op_type(name);
-    kstep_seq[idx].a = a;
-    kstep_seq[idx].b = b;
-    kstep_seq[idx].c = c;
-    printk("parsed op %d: %s %d %d %d", idx, name, a, b, c);
-    idx++;
-  }
-  kstep_seq_len = idx;
-  printk("test_spec parsed ops: %d", kstep_seq_len);
+  return LINE_TYPE_BATCH;
 }
 
 static void setup(void) {
-  struct file *console = filp_open("/dev/console", O_RDONLY, 0);
-  if (IS_ERR(console))
-    panic("Failed to open /dev/console");
-
-  char *buf = read_console_buf(console);
-  parse_test_spec(buf);
-  filp_close(console, NULL);
-  kfree(buf);
+  console = filp_open("/dev/console", O_RDONLY, 0);
 }
 
 static void run(void) {
-  int max_tid = -1;
-  for (int i = 0; i < kstep_seq_len; i++) {
-    if (kstep_seq[i].type == OP_TASK_CREATE && kstep_seq[i].a > max_tid)
-      max_tid = kstep_seq[i].a;
-    if (kstep_seq[i].type == OP_TASK_FORK && kstep_seq[i].b > max_tid)
-      max_tid = kstep_seq[i].b;
-  }
-  if (max_tid >= 0) {
-    kstep_tasks_len = max_tid + 1;
-    kstep_tasks = kcalloc(kstep_tasks_len, sizeof(*kstep_tasks), GFP_KERNEL);
-    if (!kstep_tasks)
-      panic("Failed to allocate task array");
-  }
-
-  for (int i = 0; i < kstep_seq_len; i++) {
-    struct kstep_op *op = &kstep_seq[i];
-    switch (op->type) {
-      case OP_TASK_CREATE:
-        if (op->a < 0 || op->a >= kstep_tasks_len)
-          panic("Invalid task id %d", op->a);
-        if (kstep_tasks[op->a])
-          panic("Task id %d already created", op->a);
-        kstep_tasks[op->a] = kstep_task_create();
-        break;
-      case OP_TICK:
-        kstep_tick();
-        break;
-      default:
-        // TODO: Implement other op types
-        printk("Unimplemented op type: %d", op->type);
+  loff_t pos = 0;
+  kstep_seq_len = 0;
+  struct console_parse_state state = {};
+  if (IS_ERR(console))
+    panic("Failed to open /dev/console");
+  while (true) {
+    char buf[256];
+    ssize_t nread = kernel_read(console, buf, sizeof(buf), &pos);
+    if (nread <= 0)
+      continue;
+    enum line_type line_type = process_console_chunk(buf, nread, &state);
+    if (line_type == LINE_TYPE_FINISH) 
+      break;
+    if (line_type == LINE_TYPE_EXECUTE) {
+      execute_kstep_seq();
     }
   }
+
+  filp_close(console, NULL);
+
 }
 
 
@@ -195,5 +183,5 @@ KSTEP_DRIVER_DEFINE{
     .setup = setup,
     .run = run,
     .step_interval_us = 1000,
-    .print_rq = true,
+    .print_rq = false,
 };

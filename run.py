@@ -4,7 +4,6 @@ import argparse
 import dataclasses
 import logging
 import subprocess
-import time
 import os
 import shutil
 from dataclasses import dataclass
@@ -147,11 +146,10 @@ def run_qemu(
     return system_with_pipe(" ".join(cmd))
 
 def pipe_to_qemu(proc: subprocess.Popen, stdin_payload: str):
-    logging.info(f"Sending payload to qemu: `{stdin_payload}`")
-    time.sleep(1)
-    proc.communicate(input=stdin_payload.encode())
-    if proc.returncode != 0:
-        raise subprocess.CalledProcessError(proc.returncode, " ".join(cmd))
+    if not proc.stdin:
+        raise RuntimeError("QEMU stdin pipe is not available")
+    proc.stdin.write(stdin_payload.encode())
+    proc.stdin.flush()
 
 def print_run_results(log_file: Optional[Path]=None):
     if not log_file:
