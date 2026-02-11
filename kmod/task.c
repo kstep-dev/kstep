@@ -3,23 +3,37 @@
 #include "internal.h"
 #include "user.h"
 
+static struct file *console_file = NULL;
+static struct file *null_file = NULL;
+
+void kstep_task_init(void) {
+  console_file = filp_open("/dev/console", O_WRONLY, 0); // write only
+  if (IS_ERR(console_file))
+    panic("Failed to open /dev/console");
+  null_file = filp_open("/dev/null", O_RDONLY, 0); // read only
+  if (IS_ERR(null_file))
+    panic("Failed to open /dev/null");
+}
+
+// Initialize stdin to `/dev/null` and stdout/stderr to `/dev/console`
+// Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
 static int task_init(struct subprocess_info *info, struct cred *new) {
-  // Initialize stdin, stdout, and stderr to /dev/console
-  // Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
+  int fd;
 
-  static struct file *console = NULL;
-  if (console == NULL) {
-    console = filp_open("/dev/console", O_RDWR, 0);
-    if (IS_ERR(console))
-      panic("Failed to open /dev/console");
-  }
+  fd = get_unused_fd_flags(0);
+  if (fd < 0 || fd != 0)
+    panic("get_unused_fd_flags returned %d for stdin", fd);
+  fd_install(fd, get_file(null_file));
 
-  for (int i = 0; i < 3; i++) { // stdin, stdout, stderr
-    int fd = get_unused_fd_flags(0);
-    if (fd < 0 || fd != i)
-      panic("get_unused_fd_flags returned %d for fd %d", fd, i);
-    fd_install(fd, get_file(console));
-  }
+  fd = get_unused_fd_flags(0);
+  if (fd < 0 || fd != 1)
+    panic("get_unused_fd_flags returned %d for stdout", fd);
+  fd_install(fd, get_file(console_file));
+
+  fd = get_unused_fd_flags(0);
+  if (fd < 0 || fd != 2)
+    panic("get_unused_fd_flags returned %d for stderr", fd);
+  fd_install(fd, get_file(console_file));
 
   *(struct task_struct **)info->data = current;
   TRACE_INFO("Task created with pid %d", current->pid);
