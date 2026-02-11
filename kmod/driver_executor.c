@@ -32,6 +32,8 @@ struct kstep_op {
 
 static struct kstep_op *kstep_seq;
 static int kstep_seq_len;
+static struct task_struct **kstep_tasks;
+static int kstep_tasks_len;
 
 static enum kstep_op_type parse_op_type(const char *name) {
   if (!strcmp(name, "TASK_CREATE")) return OP_TASK_CREATE;
@@ -153,7 +155,38 @@ static void setup(void) {
 }
 
 static void run(void) {
-  // TODO: Implement the test driver
+  int max_tid = -1;
+  for (int i = 0; i < kstep_seq_len; i++) {
+    if (kstep_seq[i].type == OP_TASK_CREATE && kstep_seq[i].a > max_tid)
+      max_tid = kstep_seq[i].a;
+    if (kstep_seq[i].type == OP_TASK_FORK && kstep_seq[i].b > max_tid)
+      max_tid = kstep_seq[i].b;
+  }
+  if (max_tid >= 0) {
+    kstep_tasks_len = max_tid + 1;
+    kstep_tasks = kcalloc(kstep_tasks_len, sizeof(*kstep_tasks), GFP_KERNEL);
+    if (!kstep_tasks)
+      panic("Failed to allocate task array");
+  }
+
+  for (int i = 0; i < kstep_seq_len; i++) {
+    struct kstep_op *op = &kstep_seq[i];
+    switch (op->type) {
+      case OP_TASK_CREATE:
+        if (op->a < 0 || op->a >= kstep_tasks_len)
+          panic("Invalid task id %d", op->a);
+        if (kstep_tasks[op->a])
+          panic("Task id %d already created", op->a);
+        kstep_tasks[op->a] = kstep_task_create();
+        break;
+      case OP_TICK:
+        kstep_tick();
+        break;
+      default:
+        // TODO: Implement other op types
+        printk("Unimplemented op type: %d", op->type);
+    }
+  }
 }
 
 

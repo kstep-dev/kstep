@@ -49,14 +49,13 @@ def op_task_create(m: GenState):
 # It will only be executed after the target task is actually running on a CPU;
 def op_task_fork(m: GenState):
     tid = m.choose_task_in_state(TASK_RUNNABLE)
-    n = m.rnd.randint(1, 4)
-    for i in range(n):
-        new_tid = m.next_task_id()
-        if new_tid is None:
-            return ("TASK_FORK", tid, i, 0)
-        m.add_task(new_tid)
-        m.set_task_state(new_tid, TASK_RUNNABLE)
-    return ("TASK_FORK", tid, n, 0)
+    # Currently, assume each time fork only 1 task
+    new_tid = m.next_task_id()
+    if new_tid is None:
+        return None
+    m.add_task(new_tid)
+    m.set_task_state(new_tid, TASK_RUNNABLE)
+    return ("TASK_FORK", tid, new_tid, 0)
 
 
 def op_task_pin(m: GenState):
@@ -152,7 +151,7 @@ OPS: List[Op] = [
     Op(
         name="TASK_FORK",
         weight=3,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE),
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE) and m.next_task_id() is not None,
         emit=op_task_fork,
         requires=[RESOURCE_TASK],
         produces=[RESOURCE_TASK],
