@@ -164,6 +164,7 @@ def print_run_results(log_file: Optional[Path]=None):
 
     # Print the last line for status
     with out_file.open() as f:
+        line = "Not found"
         for line in f:
             pass
         print(line.strip())
