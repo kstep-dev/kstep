@@ -24,12 +24,6 @@ enum kstep_op_type {
   OP_CPU_SET_CAPACITY,
 };
 
-enum line_type {
-  LINE_TYPE_BATCH,
-  LINE_TYPE_EXECUTE,
-  LINE_TYPE_FINISH,
-};
-
 struct kstep_op {
   enum kstep_op_type type;
   int a, b, c;
@@ -113,7 +107,7 @@ static void parse_console_input(char *buf) {
 
 }
 
-static enum line_type process_console_chunk(const char *buf, ssize_t nread, struct console_parse_state *state) {
+static bool process_console_chunk(const char *buf, ssize_t nread, struct console_parse_state *state) {
   int i;
   for (i = 0; i < nread; i++) {
     char ch = buf[i];
@@ -129,12 +123,13 @@ static enum line_type process_console_chunk(const char *buf, ssize_t nread, stru
 
       state->line_buf[state->line_len] = '\0';
       state->line_len = 0;
-      if (strcmp(state->line_buf, "EXECUTE") == 0)
-        return LINE_TYPE_EXECUTE;
-      if (strcmp(state->line_buf, "FINISH") == 0)
-        return LINE_TYPE_FINISH;
-
-      parse_console_input(state->line_buf);
+      if (strcmp(state->line_buf, "EXECUTE") == 0) {
+        execute_kstep_seq();
+      } else if (strcmp(state->line_buf, "FINISH") == 0) {
+        return true;
+      } else {
+        parse_console_input(state->line_buf);
+      }
       continue;
     }
 
@@ -147,7 +142,7 @@ static enum line_type process_console_chunk(const char *buf, ssize_t nread, stru
     state->line_buf[state->line_len++] = ch;
   }
 
-  return LINE_TYPE_BATCH;
+  return false;
 }
 
 static void setup(void) {
@@ -165,12 +160,9 @@ static void run(void) {
     ssize_t nread = kernel_read(console, buf, sizeof(buf), &pos);
     if (nread <= 0)
       continue;
-    enum line_type line_type = process_console_chunk(buf, nread, &state);
-    if (line_type == LINE_TYPE_FINISH) 
+    bool finished = process_console_chunk(buf, nread, &state);
+    if (finished) 
       break;
-    if (line_type == LINE_TYPE_EXECUTE) {
-      execute_kstep_seq();
-    }
   }
 
   filp_close(console, NULL);
