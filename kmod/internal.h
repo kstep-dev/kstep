@@ -1,7 +1,6 @@
 #ifndef KSTEP_INTERNAL_H
 #define KSTEP_INTERNAL_H
 
-#include <linux/stdarg.h>
 #include <linux/version.h>
 
 // kernel internal headers
@@ -42,6 +41,9 @@ void kstep_disable_workqueue(void);
 void kstep_move_kthreads(void);
 void kstep_prealloc_kworkers(void);
 bool kstep_is_sys_kthread(struct task_struct *p);
+
+// task.c
+void kstep_task_init(void);
 
 // sym.c
 struct kstep_driver *kstep_sym_init(const char *driver_name);

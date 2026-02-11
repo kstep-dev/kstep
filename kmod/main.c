@@ -1,7 +1,6 @@
 #include <generated/utsrelease.h>
 #include <linux/module.h>
 #include <linux/reboot.h>
-#include <linux/stdarg.h>
 
 #include "driver.h"
 #include "internal.h"
@@ -37,6 +36,7 @@ static int __init kstep_main(void) {
   kstep_move_kthreads();
 
   // Run userspace programs when we know the system is ready
+  kstep_task_init();
   kstep_driver->setup();
   kstep_topo_print();
 
