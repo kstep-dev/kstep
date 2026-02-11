@@ -18,7 +18,7 @@ void kstep_output_init(void) {
 #elif defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) // ARM PL011
   const char *output_path = "/dev/ttyAMA1";
 #else
-  panic("Unsupported serial console");
+#error "Unsupported serial console"
 #endif
 
   output_file = filp_open(output_path, O_WRONLY | O_NOCTTY, 0);
