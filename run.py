@@ -3,6 +3,8 @@
 import argparse
 import dataclasses
 import logging
+import subprocess
+import time
 import os
 import shutil
 from dataclasses import dataclass
@@ -21,6 +23,7 @@ from scripts import (
     ROOTFS_DIR,
     Arch,
     system,
+    system_with_pipe,
 )
 
 
@@ -141,14 +144,26 @@ def run_qemu(
     if debug:
         cmd += ["-s", "-S"]
 
-    system(" ".join(cmd))
+    return system_with_pipe(" ".join(cmd))
+
+def pipe_to_qemu(proc: subprocess.Popen, stdin_payload: str):
+    logging.info(f"Sending payload to qemu: `{stdin_payload}`")
+    time.sleep(1)
+    proc.communicate(input=stdin_payload.encode())
+    if proc.returncode != 0:
+        raise subprocess.CalledProcessError(proc.returncode, " ".join(cmd))
+
+def print_run_results(log_file: Optional[Path]=None):
+    if not log_file:
+        log_file, out_file = get_log_paths()
+    else:
+        out_file = log_file.with_suffix(".out")
 
     print("Log saved to", log_file)
     print("Output saved to", out_file)
 
     # Print the last line for status
     with out_file.open() as f:
-        line = "status not found"
         for line in f:
             pass
         print(line.strip())
@@ -207,13 +222,16 @@ def main():
                 if (value := getattr(args, field.name)) is not None
             }
         )
-        run_qemu(
+        proc = run_qemu(
             driver=driver,
             linux_dir=args.linux_dir,
             debug=args.debug,
             log_file=args.log_file,
         )
 
+        return_code = proc.wait()
+        print(f"Qemu returned with code: {return_code}")
+        print_run_results(log_file=args.log_file)
 
 if __name__ == "__main__":
     main()
