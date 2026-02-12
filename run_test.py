@@ -52,11 +52,13 @@ def run_test(
 
     time.sleep(1)
 
-    for op in seq:
-        pipe_to_qemu(proc=proc, stdin_payload=f"{op[0]},{op[1]},{op[2]},{op[3]}\n")
-
-    pipe_to_qemu(proc=proc, stdin_payload="EXECUTE\n")
-    pipe_to_qemu(proc=proc, stdin_payload="FINISH\n")
+    # Supported commands:
+    # INT,INT,INT,INT: run single operation
+    # EXIT: exit the qemu
+    payload_str = "\n".join(f"{op[0]},{op[1]},{op[2]},{op[3]}" for op in seq) + "\n"
+    pipe_to_qemu(proc=proc, stdin_payload=payload_str)
+    
+    pipe_to_qemu(proc=proc, stdin_payload="EXIT\n")
 
     return_code = proc.wait()
     print(f"QEMU returned with code: {return_code}")
