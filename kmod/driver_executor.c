@@ -29,9 +29,6 @@ struct kstep_op {
   int a, b, c;
 };
 
-#define KSTEP_SEQ_MAX 1024
-static struct kstep_op kstep_seq[KSTEP_SEQ_MAX];
-static int kstep_seq_len;
 // static struct task_struct **kstep_tasks;
 // static int kstep_tasks_len;
 static struct file *console;
@@ -42,24 +39,9 @@ struct console_parse_state {
   bool line_too_long;
 };
 
-static void execute_kstep_seq(void) {
-  for (int i = 0; i < kstep_seq_len; i++) {
-    struct kstep_op *op = &kstep_seq[i];
-    pr_info("Execute op %d: %d %d %d %d\n", i, op->type, op->a, op->b, op->c);
-  }
-  kstep_seq_len = 0;
-}
-
-static bool append_kstep_op(const struct kstep_op *op) {
-  kstep_seq[kstep_seq_len] = *op;
-  kstep_seq_len++;
-  pr_info("Batch op %d: %d %d %d %d\n", kstep_seq_len, op->type, op->a, op->b, op->c);
-
-  if (kstep_seq_len == KSTEP_SEQ_MAX) {
-    pr_info("executor: kstep_seq reached max %d, auto execute\n", KSTEP_SEQ_MAX);
-    execute_kstep_seq();
-  }
-
+static bool execute_kstep_op(const struct kstep_op *op) {
+  pr_info("Execute op %d %d %d %d\n", op->type, op->a, op->b, op->c);
+  // TODO: implement the operation
   return true;
 }
 
@@ -102,9 +84,11 @@ static void parse_console_input(char *buf) {
   op.a = fields[1];
   op.b = fields[2];
   op.c = fields[3];
-  if (!append_kstep_op(&op))
-    panic("Failed to append kstep op");
 
+  if (!execute_kstep_op(&op))
+    pr_warn("Failed to execute kstep op");
+
+  return;
 }
 
 static bool process_console_chunk(const char *buf, ssize_t nread, struct console_parse_state *state) {
@@ -123,9 +107,7 @@ static bool process_console_chunk(const char *buf, ssize_t nread, struct console
 
       state->line_buf[state->line_len] = '\0';
       state->line_len = 0;
-      if (strcmp(state->line_buf, "EXECUTE") == 0) {
-        execute_kstep_seq();
-      } else if (strcmp(state->line_buf, "FINISH") == 0) {
+      if (strcmp(state->line_buf, "EXIT") == 0) {
         return true;
       } else {
         parse_console_input(state->line_buf);
@@ -151,7 +133,6 @@ static void setup(void) {
 
 static void run(void) {
   loff_t pos = 0;
-  kstep_seq_len = 0;
   struct console_parse_state state = {};
   if (IS_ERR(console))
     panic("Failed to open /dev/console");
@@ -160,13 +141,11 @@ static void run(void) {
     ssize_t nread = kernel_read(console, buf, sizeof(buf), &pos);
     if (nread <= 0)
       continue;
-    bool finished = process_console_chunk(buf, nread, &state);
-    if (finished) 
+    if (process_console_chunk(buf, nread, &state)) 
       break;
   }
 
   filp_close(console, NULL);
-
 }
 
 
