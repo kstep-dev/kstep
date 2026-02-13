@@ -5,11 +5,6 @@
 u64 cov_buffer[COV_BUFFER_SIZE];
 int cov_counter = 0; // no need to be atomic with serialized sched calls
 
-void kstep_cov_init(void) {
-  for (int i = 0; i < COV_BUFFER_SIZE; i += PAGE_SIZE / sizeof(cov_buffer[0]))
-    READ_ONCE(cov_buffer[i]);
-}
-
 static void kstep_cov_record(u64 ip) {
   if (smp_processor_id() == 0)
     return;
@@ -18,9 +13,15 @@ static void kstep_cov_record(u64 ip) {
   cov_buffer[cov_counter++] = ip;
 }
 
-extern void (*sanitizer_cov_trace_pc)(u64);
-void kstep_cov_enable(void) { sanitizer_cov_trace_pc = kstep_cov_record; }
-void kstep_cov_disable(void) { sanitizer_cov_trace_pc = NULL; }
+KSYM_IMPORT_TYPED(typeof(kstep_cov_record), sanitizer_cov_trace_pc);
+void kstep_cov_init(void) {
+  if (KSYM_sanitizer_cov_trace_pc == NULL)
+    panic("sanitizer_cov_trace_pc not found");
+  for (int i = 0; i < COV_BUFFER_SIZE; i += PAGE_SIZE / sizeof(cov_buffer[0]))
+    READ_ONCE(cov_buffer[i]);
+}
+void kstep_cov_enable(void) { KSYM_sanitizer_cov_trace_pc = kstep_cov_record; }
+void kstep_cov_disable(void) { KSYM_sanitizer_cov_trace_pc = NULL; }
 
 void kstep_cov_dump(void) {
   pr_info("cov_counter: %d\n", cov_counter);
