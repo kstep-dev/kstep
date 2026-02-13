@@ -1,23 +1,20 @@
 #!/usr/bin/env python3
 
+import argparse
 import json
 import subprocess
 from pathlib import Path
 
+from .consts import LATEST_COV, LATEST_COV_JSON, LINUX_CURR_DIR, update_latest
+
+
 def parse_kcov_pcs(log_file: Path) -> list[int]:
-    lines = log_file.read_text(encoding="utf-8", errors="ignore").splitlines()
+    raw = log_file.read_bytes()
+    usable_len = len(raw) - (len(raw) % 8)
     pcs: list[int] = []
 
-    for line in lines:
-        # a JSON line with "fork_kcov_pcs": ["ffffffff...", ..., "END"]
-        if line.startswith("{") and '"fork_kcov_pcs"' in line:
-            obj = json.loads(line)
-            raw_pcs = obj.get("fork_kcov_pcs")
-            for pc in raw_pcs:
-                if pc.startswith("END"):
-                    break
-                pcs.append(int(pc, 16))
-            continue
+    for i in range(0, usable_len, 8):
+        pcs.append(int.from_bytes(raw[i : i + 8], byteorder="little"))
 
     return pcs
 
@@ -56,20 +53,31 @@ def dump_pcs(entries: list[dict[str, str]], output: Path):
         json.dump(entries, f, indent=2)
 
 
-def kcov_symbolize(kstep_out_file: Path, linux_dir: Path, output_file: Path) -> None:
+def kcov_symbolize(cov_file: Path, linux_dir: Path) -> None:
+    output_file = Path(f"{cov_file.resolve()}.json")
     vmlinux = linux_dir / "vmlinux"
     if not vmlinux.exists():
         raise RuntimeError(f"Missing vmlinux: {vmlinux}")
 
-    pcs = parse_kcov_pcs(kstep_out_file)
+    pcs = parse_kcov_pcs(cov_file)
     if not pcs:
         raise RuntimeError("No KCOV PCs found in log")
 
     entries = symbolize_pcs(vmlinux, pcs)
 
-    if output_file is not None:
-        dump_pcs(entries, output_file)
-        print(f"Wrote {len(entries)} entries to {output_file}")
-    
-    return
+    dump_pcs(entries, output_file)
+    print(f"Wrote {len(entries)} entries to {output_file}")
+    update_latest(LATEST_COV_JSON, output_file)
 
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("cov_file", type=Path, default=LATEST_COV, nargs="?")
+    parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
+    args = parser.parse_args()
+
+    kcov_symbolize(cov_file=args.cov_file, linux_dir=args.linux_dir)
+
+
+if __name__ == "__main__":
+    main()

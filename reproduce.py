@@ -7,6 +7,8 @@ from typing import List
 from checkout_linux import Linux, checkout_linux
 from run import Driver, make_kstep, make_linux, print_run_results, run_qemu
 from scripts import LINUX_ROOT_DIR, PROJ_DIR, RESULTS_DIR, system
+
+
 @dataclass(frozen=True)
 class Bug:
     driver: Driver
@@ -149,7 +151,7 @@ def reproduce(linux: Linux, driver: Driver, skip_build: bool):
     proc = run_qemu(linux_dir=linux_dir, driver=driver, log_file=log_file)
     return_code = proc.wait()
     print(f"Reproduction returned with code: {return_code}")
-    print_run_results(log_file=log_file)
+    print_run_results()
 
 
 def main(bug: Bug, run: List[str], skip_build: bool):

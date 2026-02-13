@@ -3,26 +3,29 @@
 import argparse
 import dataclasses
 import logging
-import subprocess
 import os
 import shutil
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
 
 from scripts import (
+    LATEST_COV,
+    LATEST_LOG,
+    LATEST_OUT,
     LINUX_BUILD_DIR,
     LINUX_CURR_DIR,
-    LOG_LATEST,
     LOGS_DIR,
-    OUT_LATEST,
     PROJ_DIR,
     QEMU_DIR,
     ROOTFS_DIR,
     Arch,
+    kcov_symbolize,
     system,
     system_with_pipe,
+    update_latest,
 )
 
 
@@ -51,22 +54,6 @@ def get_qemu_path() -> Path:
     raise RuntimeError(f"QEMU executable not found: {name}")
 
 
-def get_log_paths() -> tuple[Path, Path]:
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = LOGS_DIR / f"log-{timestamp}.log"
-    out_file = log_file.with_suffix(".out")
-
-    log_file.touch()
-    LOG_LATEST.unlink(missing_ok=True)
-    LOG_LATEST.symlink_to(log_file)
-
-    out_file.touch()
-    OUT_LATEST.unlink(missing_ok=True)
-    OUT_LATEST.symlink_to(out_file)
-
-    return log_file, out_file
-
-
 def run_qemu(
     driver: Driver,
     linux_dir: Path,
@@ -82,10 +69,13 @@ def run_qemu(
     kernel_img = LINUX_BUILD_DIR / linux_name
     rootfs_img = ROOTFS_DIR / f"{linux_name}.cpio"
 
-    if not log_file:
-        log_file, out_file = get_log_paths()
-    else:
-        out_file = log_file.with_suffix(".out")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_file or LOGS_DIR / f"log-{timestamp}.log"
+    out_file = log_file.with_suffix(".out")
+    cov_file = log_file.with_suffix(".cov")
+    update_latest(LATEST_LOG, log_file)
+    update_latest(LATEST_OUT, out_file)
+    update_latest(LATEST_COV, cov_file)
 
     boot_args = [
         "rw",
@@ -127,23 +117,24 @@ def run_qemu(
         f"-chardev stdio,id=char0,mux=on,logfile={log_file},signal=off",
         "-serial chardev:char0",
         "-mon chardev=char0",
-        # trace file
+        # out file
         f"-chardev file,id=char1,path={out_file}",
         "-serial chardev:char1",
+        # cov file
+        f"-chardev file,id=char2,path={cov_file}",
+        "-serial chardev:char2",
         # acceleration
         f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]
 
     if Arch.get() == Arch.ARM64:
-        cmd += [
-            "-machine virt",
-            "-cpu cortex-a57",
-        ]
+        cmd += ["-machine virt", "-cpu cortex-a57"]
 
     if debug:
         cmd += ["-s", "-S"]
 
     return system_with_pipe(" ".join(cmd))
+
 
 def pipe_to_qemu(proc: subprocess.Popen, stdin_payload: str):
     if not proc.stdin:
@@ -151,21 +142,22 @@ def pipe_to_qemu(proc: subprocess.Popen, stdin_payload: str):
     proc.stdin.write(stdin_payload.encode())
     proc.stdin.flush()
 
-def print_run_results(log_file: Optional[Path]=None):
-    if not log_file:
-        log_file, out_file = get_log_paths()
-    else:
-        out_file = log_file.with_suffix(".out")
 
-    print("Log saved to", log_file)
-    print("Output saved to", out_file)
+def print_run_results():
+    print(f"Log: {LATEST_LOG}")
+    print(f"Out: {LATEST_OUT}")
+    print(f"Cov: {LATEST_COV}")
 
     # Print the last line for status
-    with out_file.open() as f:
+    with LATEST_OUT.open() as f:
         line = "Not found"
         for line in f:
             pass
         print(line.strip())
+
+    # check if cov is empty and call kcov_symbolize if it is not
+    if LATEST_COV.exists() and LATEST_COV.stat().st_size != 0:
+        kcov_symbolize(cov_file=LATEST_COV, linux_dir=LINUX_CURR_DIR)
 
 
 def is_port_free(port: int) -> bool:
@@ -230,7 +222,8 @@ def main():
 
         return_code = proc.wait()
         print(f"Qemu returned with code: {return_code}")
-        print_run_results(log_file=args.log_file)
+        print_run_results()
+
 
 if __name__ == "__main__":
     main()

@@ -13,17 +13,9 @@ static struct file *output_file;
 void kstep_output_init(void) {
   kstep_sysctl_write("kernel.printk", "%d", 7);
 
-#if defined(CONFIG_SERIAL_8250_CONSOLE) // x86 8250
-  const char *output_path = "/dev/ttyS1";
-#elif defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) // ARM PL011
-  const char *output_path = "/dev/ttyAMA1";
-#else
-#error "Unsupported serial console"
-#endif
-
-  output_file = filp_open(output_path, O_WRONLY | O_NOCTTY, 0);
+  output_file = filp_open(KSTEP_CONSOLE(1), O_WRONLY | O_NOCTTY, 0);
   if (IS_ERR(output_file))
-    panic("Failed to open %s: %ld", output_path, PTR_ERR(output_file));
+    panic("Failed to open %s: %ld", KSTEP_CONSOLE(1), PTR_ERR(output_file));
 }
 
 struct kstep_json {
