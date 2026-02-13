@@ -35,7 +35,7 @@ static int task_init(struct subprocess_info *info, struct cred *new) {
 
 struct task_struct *kstep_task_create(void) {
   char *path = "task";
-  
+
   char cov_mode_arg[2] = {0};
   cov_mode_arg[0] = kstep_cov_mode_enabled() ? '1' : '0';
   char *argv[] = {path, cov_mode_arg, NULL};
@@ -67,8 +67,10 @@ static void kstep_task_signal(struct task_struct *p, enum sigcode code,
   struct kernel_siginfo info = {
       .si_signo = SIGUSR1,
       .si_code = code,
-      ._sifields = {._rt = {._sigval = {val1}, ._pid = val2, ._uid = val3}}};
+      ._sifields = {._rt = {._sigval = {val1}, ._pid = val2, ._uid = val3}}}; 
+
   send_sig_info(SIGUSR1, &info, p);
+
   kstep_sleep();
 }
 
@@ -94,7 +96,13 @@ void kstep_task_pause(struct task_struct *p) {
 }
 
 void kstep_task_wakeup(struct task_struct *p) {
+  if (kstep_cov_mode_enabled()) {
+    kcov_start();
+  }
   kstep_task_signal(p, SIGCODE_WAKEUP, 0, 0, 0);
+  if (kstep_cov_mode_enabled()) {
+    kcov_stop();
+  }
   TRACE_INFO("Waked up task %d", p->pid);
 }
 

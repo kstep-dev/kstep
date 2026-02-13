@@ -154,6 +154,7 @@ static void run(void) {
     tasks[i] = kstep_task_create();
   }
   for (int i = 0; i < ARRAY_SIZE(tasks); i++) {
+    kstep_task_wakeup(tasks[i]);
     kstep_task_fork(tasks[i], 1);
   }
 }
@@ -167,7 +168,7 @@ static void post_run(void) {
     char kcov_file_path[64];
     snprintf(kcov_file_path, sizeof(kcov_file_path), "/kstep_kcov_%d.txt",
              tasks[i]->pid);
-    kcov_collect_pcs(kcov_file_path);
+    kcov_collect_pcs_file(kcov_file_path, KCOV_TYPE_USER);
   }
   kcov_flush_json();
 }

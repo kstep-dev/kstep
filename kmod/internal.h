@@ -54,7 +54,14 @@ void kstep_cov_disable(void);
 void kstep_cov_dump(void);
 
 // kcov.c
-void kcov_collect_pcs(const char *kcov_file_path);
+enum kcov_type {
+    KCOV_TYPE_USER,
+    KCOV_TYPE_KMOD,
+};
+void kcov_collect_pcs(unsigned long pc, enum kcov_type type);
+void kcov_collect_pcs_file(const char *kcov_file_path, enum kcov_type type);
+void kcov_start(void);
+void kcov_stop(void);
 void kcov_flush_json(void);
 
 // sym.c

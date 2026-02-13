@@ -1,4 +1,5 @@
 #include <linux/fs.h>     // filp_open, filp_close
+#include <linux/kcov.h>
 #include <linux/slab.h>   // kmalloc, kfree, krealloc
 #include <linux/string.h> // strlen, memcmp, strstr
 
@@ -11,10 +12,52 @@ struct kcov_unique_pcs {
   size_t cap;
 };
 
-static struct kcov_unique_pcs unique = {};
 
-static void kcov_unique_pcs_add(struct kcov_unique_pcs *set, const char *pc,
-                                 size_t pc_len) {
+#define KCOV_TYPE_MAX (KCOV_TYPE_KMOD + 1)
+static struct kcov_unique_pcs unique[KCOV_TYPE_MAX] = {};
+static struct file *module_kcov_file = NULL;
+
+#define MODULE_KCOV_WORDS (1u << 17)
+
+// Start coverage collection for the current module
+void kcov_start(void) {
+  if (module_kcov_file)
+    return;
+
+  module_kcov_file = filp_open("/sys/kernel/debug/kcov", O_RDWR, 0);
+  if (IS_ERR(module_kcov_file))
+    panic("Failed to open /sys/kernel/debug/kcov");
+  if (vfs_ioctl(module_kcov_file, KCOV_INIT_TRACE, MODULE_KCOV_WORDS))
+    panic("KCOV_INIT_TRACE failed for module coverage");
+
+  if (vfs_ioctl(module_kcov_file, KCOV_ENABLE, KCOV_TRACE_PC))
+    panic("KCOV_ENABLE failed for module coverage");
+}
+
+// Stop coverage collection for the current module
+void kcov_stop(void) {
+  unsigned long *area = current->kcov_area;
+  unsigned long words = current->kcov_size;
+
+  if (vfs_ioctl(module_kcov_file, KCOV_DISABLE, 0))
+    panic("KCOV_DISABLE failed for module coverage");
+
+  if (!area || words <= 1)
+    return;
+
+  unsigned long n = area[0];
+  if (n > words - 1)
+    n = words - 1;
+
+  for (unsigned long i = 0; i < n; i++)
+    kcov_collect_pcs(area[i + 1], KCOV_TYPE_KMOD);
+
+  module_kcov_file = NULL;
+}
+
+// Helper function to manage unique PCs for the current module and userspace tasks
+static void kcov_unique_pcs_add(const char *pc, size_t pc_len, enum kcov_type type) {
+  struct kcov_unique_pcs *set = &unique[type];
   if (!pc_len)
     return;
   if (pc_len == 3 && memcmp(pc, "END", 3) == 0)
@@ -42,7 +85,14 @@ static void kcov_unique_pcs_add(struct kcov_unique_pcs *set, const char *pc,
   set->pcs[set->len++] = copy;
 }
 
-static void kcov_collect_pcs_file(const char *kcov_file_path, struct kcov_unique_pcs *set) {
+void kcov_collect_pcs(unsigned long pc, enum kcov_type type) {
+  char pc_hex[sizeof("ffffffffffffffff")];
+  int len = scnprintf(pc_hex, sizeof(pc_hex), "%lx", pc);
+  kcov_unique_pcs_add(pc_hex, len, type);
+}
+
+static void kcov_collect_pcs_file_internal(const char *kcov_file_path,
+                                           enum kcov_type type) {
   struct file *file = filp_open(kcov_file_path, O_RDONLY, 0);
   if (IS_ERR(file))
     panic("Failed to open %s", kcov_file_path);
@@ -61,7 +111,7 @@ static void kcov_collect_pcs_file(const char *kcov_file_path, struct kcov_unique
 
     for (ssize_t i = 0; i < nread; i++) {
       if (buf[i] == '\n') {
-        kcov_unique_pcs_add(set, line, line_len);
+        kcov_unique_pcs_add(line, line_len, type);
         line_len = 0;
         continue;
       }
@@ -70,32 +120,11 @@ static void kcov_collect_pcs_file(const char *kcov_file_path, struct kcov_unique
     }
   }
   if (line_len > 0)
-    kcov_unique_pcs_add(set, line, line_len);
+    kcov_unique_pcs_add(line, line_len, type);
 
   kfree(buf);
   kfree(line);
   filp_close(file, NULL);
-}
-
-static void kcov_unique_pcs_json(const struct kcov_unique_pcs *set) {
-  struct kstep_json *json = kstep_json_begin();
-  struct kstep_json_list *list =
-      kstep_json_list_field_begin(json, "fork_kcov_pcs");
-
-  for (size_t i = 0; i < set->len; i++)
-    kstep_json_list_append_string(list, set->pcs[i], strlen(set->pcs[i]));
-
-  kstep_json_list_end(list);
-  kstep_json_end(json);
-}
-
-static void kcov_unique_pcs_free(struct kcov_unique_pcs *set) {
-  for (size_t i = 0; i < set->len; i++)
-    kfree(set->pcs[i]);
-  kfree(set->pcs);
-  set->pcs = NULL;
-  set->len = 0;
-  set->cap = 0;
 }
 
 static bool kcov_file_contains_end(const char *kcov_file_path) {
@@ -122,7 +151,7 @@ static bool kcov_file_contains_end(const char *kcov_file_path) {
   return found_end;
 }
 
-void kcov_collect_pcs(const char *kcov_file_path) {
+void kcov_collect_pcs_file(const char *kcov_file_path, enum kcov_type type) {
   bool found_kcov_file = false;
   
   for (int j = 0; j < 10000; j++) {
@@ -137,10 +166,28 @@ void kcov_collect_pcs(const char *kcov_file_path) {
     return;
   }
 
-  kcov_collect_pcs_file(kcov_file_path, &unique);
+  kcov_collect_pcs_file_internal(kcov_file_path, type);
+}
+
+
+// Helper function to convert unique PCs to JSON
+static void kcov_unique_pcs_json(enum kcov_type type) {
+  struct kcov_unique_pcs *set = &unique[type];
+  struct kstep_json *json = kstep_json_begin();
+  struct kstep_json_list *list = 
+      kstep_json_list_field_begin(json, 
+        type == KCOV_TYPE_USER ? "user_kcov_pcs" : 
+        type == KCOV_TYPE_KMOD ? "kmod_kcov_pcs" : 
+        NULL);
+
+  for (size_t i = 0; i < set->len; i++)
+    kstep_json_list_append_string(list, set->pcs[i], strlen(set->pcs[i]));
+
+  kstep_json_list_end(list);
+  kstep_json_end(json);
 }
 
 void kcov_flush_json(void) {
-  kcov_unique_pcs_json(&unique);
-  kcov_unique_pcs_free(&unique);
+  for (enum kcov_type type = 0; type < KCOV_TYPE_MAX; type++)
+    kcov_unique_pcs_json(type);
 }

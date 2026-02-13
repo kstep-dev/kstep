@@ -4,23 +4,24 @@ import json
 import subprocess
 from pathlib import Path
 
-def parse_kcov_pcs(log_file: Path) -> list[int]:
+def parse_kcov_pcs(log_file: Path) -> tuple[list[int], list[int]]:
     lines = log_file.read_text(encoding="utf-8", errors="ignore").splitlines()
-    pcs: list[int] = []
+    user_pcs: list[int] = []
+    kmod_pcs: list[int] = []
 
     for line in lines:
-        # a JSON line with "fork_kcov_pcs": ["ffffffff...", ..., "END"]
-        if line.startswith("{") and '"fork_kcov_pcs"' in line:
+        if line.startswith("{") and any(key in line for key in ["user_kcov_pcs", "kmod_kcov_pcs"]):
             obj = json.loads(line)
-            raw_pcs = obj.get("fork_kcov_pcs")
-            for pc in raw_pcs:
+            for pc in obj.get("user_kcov_pcs", []):
                 if pc.startswith("END"):
                     break
-                pcs.append(int(pc, 16))
-            continue
+                user_pcs.append(int(pc, 16))
+            for pc in obj.get("kmod_kcov_pcs", []):
+                if pc.startswith("END"):
+                    break
+                kmod_pcs.append(int(pc, 16))
 
-    return pcs
-
+    return user_pcs, kmod_pcs
 
 def symbolize_pcs(vmlinux: Path, pcs: list[int]) -> list[dict[str, str]]:
     if not pcs:
@@ -61,15 +62,17 @@ def kcov_symbolize(kstep_out_file: Path, linux_dir: Path, output_file: Path) -> 
     if not vmlinux.exists():
         raise RuntimeError(f"Missing vmlinux: {vmlinux}")
 
-    pcs = parse_kcov_pcs(kstep_out_file)
-    if not pcs:
-        raise RuntimeError("No KCOV PCs found in log")
+    user_pcs, kmod_pcs = parse_kcov_pcs(kstep_out_file)
 
-    entries = symbolize_pcs(vmlinux, pcs)
+    user_entries = symbolize_pcs(vmlinux, user_pcs)
+    kmod_entries = symbolize_pcs(vmlinux, kmod_pcs)
 
     if output_file is not None:
-        dump_pcs(entries, output_file)
-        print(f"Wrote {len(entries)} entries to {output_file}")
+        user_output_file = Path(f"{output_file}.user")
+        kmod_output_file = Path(f"{output_file}.module")
+        dump_pcs(user_entries, user_output_file)
+        dump_pcs(kmod_entries, kmod_output_file)
+        print(f"Wrote {len(user_entries)} entries to {user_output_file}")
+        print(f"Wrote {len(kmod_entries)} entries to {kmod_output_file}")
     
     return
-
