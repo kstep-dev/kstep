@@ -35,7 +35,11 @@ static int task_init(struct subprocess_info *info, struct cred *new) {
 
 struct task_struct *kstep_task_create(void) {
   char *path = "task";
-  char *argv[] = {path, NULL};
+  
+  char cov_mode_arg[2] = {0};
+  cov_mode_arg[0] = kstep_cov_mode_enabled() ? '1' : '0';
+  char *argv[] = {path, cov_mode_arg, NULL};
+
   struct task_struct *p = NULL;
   struct subprocess_info *info = call_usermodehelper_setup(
       path, argv, NULL, GFP_KERNEL, task_init, NULL, &p);
@@ -102,4 +106,9 @@ void kstep_task_usleep(struct task_struct *p, int us) {
 void kstep_task_set_prio(struct task_struct *p, int prio) {
   kstep_task_signal(p, SIGCODE_SET_PRIO, prio, 0, 0);
   TRACE_INFO("Set priority of task %d to %d", p->pid, prio);
+}
+
+void kstep_task_kcov_dump(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_KCOV_DUMP, 0, 0, 0);
+  TRACE_INFO("Dumped kcov of task %d", p->pid);
 }
