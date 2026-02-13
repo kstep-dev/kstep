@@ -31,6 +31,13 @@ void kstep_output_init(void);
 void kstep_print_rq(void);
 void kstep_print_tasks(void);
 void kstep_trace_load_balance(void);
+#if defined(CONFIG_SERIAL_8250_CONSOLE) // x86 8250
+#define KSTEP_CONSOLE(n) "/dev/ttyS" #n
+#elif defined(CONFIG_SERIAL_AMBA_PL011_CONSOLE) // ARM PL011
+#define KSTEP_CONSOLE(n) "/dev/ttyAMA" #n
+#else
+#error "Unsupported serial console"
+#endif
 
 // reset.c
 void kstep_reset_runqueues(void);

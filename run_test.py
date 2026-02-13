@@ -1,11 +1,19 @@
 #!/usr/bin/env python3
 
 import argparse
-from checkout_linux import Linux, checkout_linux
-from run import Driver, make_kstep, make_linux, pipe_to_qemu, print_run_results, run_qemu
-from scripts import LINUX_ROOT_DIR, LOGS_DIR, kcov_symbolize
-from scripts import generate_input
 import time
+
+from checkout_linux import Linux, checkout_linux
+from run import (
+    Driver,
+    make_kstep,
+    make_linux,
+    pipe_to_qemu,
+    print_run_results,
+    run_qemu,
+)
+from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input
+
 
 def smp_to_cpus(smp: str) -> int:
     try:
@@ -44,7 +52,6 @@ def run_test(
     make_kstep(linux_dir=linux_dir)
 
     log_file = LOGS_DIR / f"test_{linux.name}.log"
-    out_file = log_file.with_suffix(".out")
 
     proc = run_qemu(
         linux_dir=linux_dir,
@@ -64,13 +71,7 @@ def run_test(
 
     return_code = proc.wait()
     print(f"QEMU returned with code: {return_code}")
-    print_run_results(log_file=log_file)
-
-    if coverage:
-        symbolized_txt = log_file.with_suffix(".kcov")
-        kcov_symbolize(kstep_out_file=out_file, linux_dir=linux_dir, output_file=symbolized_txt)
-
-    return
+    print_run_results()
 
 def main():
     parser = argparse.ArgumentParser()

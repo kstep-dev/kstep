@@ -1,0 +1,1886 @@
+[
+  {
+    "fn": "__resched_curr",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:1089"
+  },
+  {
+    "fn": "cpu_of",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1333"
+  },
+  {
+    "fn": "set_nr_and_not_polling",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:954 (discriminator 15)"
+  },
+  {
+    "fn": "set_nr_and_not_polling",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:954 (discriminator 15)"
+  },
+  {
+    "fn": "__resched_curr",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:1114 (discriminator 1)"
+  },
+  {
+    "fn": "__sched_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4490"
+  },
+  {
+    "fn": "__sched_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4504"
+  },
+  {
+    "fn": "finish_task_switch",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:5280 (discriminator 1)"
+  },
+  {
+    "fn": "task_on_rq_migrating",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2318 (discriminator 2)"
+  },
+  {
+    "fn": "rq_pin_lock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1774"
+  },
+  {
+    "fn": "__task_rq_lock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:686"
+  },
+  {
+    "fn": "update_rq_clock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:800"
+  },
+  {
+    "fn": "update_rq_clock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:804"
+  },
+  {
+    "fn": "update_rq_clock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:806"
+  },
+  {
+    "fn": "update_rq_clock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:814"
+  },
+  {
+    "fn": "update_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:119 (discriminator 1)"
+  },
+  {
+    "fn": "assert_clock_updated",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1655 (discriminator 1)"
+  },
+  {
+    "fn": "_update_idle_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:76 (discriminator 1)"
+  },
+  {
+    "fn": "_update_idle_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:78 (discriminator 1)"
+  },
+  {
+    "fn": "rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:70"
+  },
+  {
+    "fn": "resched_curr",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:1124"
+  },
+  {
+    "fn": "enqueue_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2067"
+  },
+  {
+    "fn": "enqueue_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2070"
+  },
+  {
+    "fn": "wakeup_preempt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2188"
+  },
+  {
+    "fn": "wakeup_preempt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2192"
+  },
+  {
+    "fn": "resched_curr",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:1124"
+  },
+  {
+    "fn": "task_on_rq_queued",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2313 (discriminator 2)"
+  },
+  {
+    "fn": "task_on_rq_queued",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2313 (discriminator 2)"
+  },
+  {
+    "fn": "wakeup_preempt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2199 (discriminator 1)"
+  },
+  {
+    "fn": "rq_clock_skip_update",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1677"
+  },
+  {
+    "fn": "dup_user_cpus_ptr",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2793"
+  },
+  {
+    "fn": "dup_user_cpus_ptr",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2813"
+  },
+  {
+    "fn": "dup_user_cpus_ptr",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2815"
+  },
+  {
+    "fn": "dup_user_cpus_ptr",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2824"
+  },
+  {
+    "fn": "call_function_single_prep_ipi",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:3856 (discriminator 1)"
+  },
+  {
+    "fn": "set_nr_if_polling",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:969"
+  },
+  {
+    "fn": "call_function_single_prep_ipi",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:3862"
+  },
+  {
+    "fn": "call_function_single_prep_ipi",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:3861"
+  },
+  {
+    "fn": "sched_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4718"
+  },
+  {
+    "fn": "sched_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4736 (discriminator 1)"
+  },
+  {
+    "fn": "sched_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4756 (discriminator 1)"
+  },
+  {
+    "fn": "sched_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4762"
+  },
+  {
+    "fn": "sched_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4771"
+  },
+  {
+    "fn": "sched_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4787"
+  },
+  {
+    "fn": "sched_cgroup_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4797"
+  },
+  {
+    "fn": "set_task_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2165"
+  },
+  {
+    "fn": "set_task_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2167 (discriminator 4)"
+  },
+  {
+    "fn": "sched_cgroup_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4814"
+  },
+  {
+    "fn": "sched_cgroup_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4815"
+  },
+  {
+    "fn": "sched_cgroup_fork",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4815"
+  },
+  {
+    "fn": "uclamp_update_util_min_rt_default",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:1567 (discriminator 1)"
+  },
+  {
+    "fn": "wake_up_new_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4860"
+  },
+  {
+    "fn": "select_task_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:3579 (discriminator 1)"
+  },
+  {
+    "fn": "select_task_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:3580"
+  },
+  {
+    "fn": "is_cpu_allowed",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2442 (discriminator 1)"
+  },
+  {
+    "fn": "is_cpu_allowed",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2446"
+  },
+  {
+    "fn": "select_task_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:3596 (discriminator 2)"
+  },
+  {
+    "fn": "task_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2153"
+  },
+  {
+    "fn": "set_task_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2165"
+  },
+  {
+    "fn": "set_task_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2167 (discriminator 4)"
+  },
+  {
+    "fn": "wake_up_new_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4877"
+  },
+  {
+    "fn": "task_on_rq_migrating",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2318 (discriminator 2)"
+  },
+  {
+    "fn": "activate_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2117"
+  },
+  {
+    "fn": "activate_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2119 (discriminator 2)"
+  },
+  {
+    "fn": "wake_up_new_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4881"
+  },
+  {
+    "fn": "wake_up_new_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:4883"
+  },
+  {
+    "fn": "rq_unpin_lock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1785"
+  },
+  {
+    "fn": "rq_unpin_lock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1786"
+  },
+  {
+    "fn": "rq_unpin_lock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1785"
+  },
+  {
+    "fn": "vruntime_eligible",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:726"
+  },
+  {
+    "fn": "vruntime_eligible",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:730 (discriminator 1)"
+  },
+  {
+    "fn": "vruntime_eligible",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:731"
+  },
+  {
+    "fn": "vruntime_eligible",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:731 (discriminator 1)"
+  },
+  {
+    "fn": "entity_key",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:559"
+  },
+  {
+    "fn": "vruntime_eligible",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:737"
+  },
+  {
+    "fn": "__pick_root_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:868"
+  },
+  {
+    "fn": "update_min_vruntime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:780 (discriminator 1)"
+  },
+  {
+    "fn": "update_min_vruntime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:765"
+  },
+  {
+    "fn": "update_min_vruntime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:766"
+  },
+  {
+    "fn": "hrtick_update",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6802"
+  },
+  {
+    "fn": "__enqueue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:851"
+  },
+  {
+    "fn": "avg_vruntime_add",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:626 (discriminator 1)"
+  },
+  {
+    "fn": "entity_key",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:559"
+  },
+  {
+    "fn": "update_curr",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:1214"
+  },
+  {
+    "fn": "assert_clock_updated",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1655 (discriminator 1)"
+  },
+  {
+    "fn": "rq_clock_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1671"
+  },
+  {
+    "fn": "get_pelt_divider",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:45"
+  },
+  {
+    "fn": "se_weight",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:945 (discriminator 1)"
+  },
+  {
+    "fn": "attach_entity_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4675"
+  },
+  {
+    "fn": "se_weight",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:945 (discriminator 1)"
+  },
+  {
+    "fn": "enqueue_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:3752 (discriminator 1)"
+  },
+  {
+    "fn": "cpufreq_update_util",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:3327 (discriminator 2)"
+  },
+  {
+    "fn": "cfs_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:172 (discriminator 1)"
+  },
+  {
+    "fn": "rq_of",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1319"
+  },
+  {
+    "fn": "cfs_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:175 (discriminator 2)"
+  },
+  {
+    "fn": "update_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4738"
+  },
+  {
+    "fn": "update_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4738 (discriminator 1)"
+  },
+  {
+    "fn": "update_cfs_rq_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4578"
+  },
+  {
+    "fn": "update_cfs_rq_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4628"
+  },
+  {
+    "fn": "update_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4744"
+  },
+  {
+    "fn": "update_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4744 (discriminator 1)"
+  },
+  {
+    "fn": "update_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4756"
+  },
+  {
+    "fn": "update_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4763"
+  },
+  {
+    "fn": "update_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4753"
+  },
+  {
+    "fn": "update_tg_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4100"
+  },
+  {
+    "fn": "update_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4739"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10767"
+  },
+  {
+    "fn": "update_sg_wakeup_stats",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10656"
+  },
+  {
+    "fn": "sg_imbalanced",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10102"
+  },
+  {
+    "fn": "group_classify",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10170"
+  },
+  {
+    "fn": "group_classify",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10173"
+  },
+  {
+    "fn": "group_classify",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10176"
+  },
+  {
+    "fn": "group_has_capacity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10120"
+  },
+  {
+    "fn": "group_has_capacity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10124"
+  },
+  {
+    "fn": "group_has_capacity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10128"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10801"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10804"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10808"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10812"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10819"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10826"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10829"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10927"
+  },
+  {
+    "fn": "cpu_util",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7987 (discriminator 1)"
+  },
+  {
+    "fn": "update_sg_wakeup_stats",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10663 (discriminator 1)"
+  },
+  {
+    "fn": "cpu_load_without",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7230 (discriminator 3)"
+  },
+  {
+    "fn": "update_sg_wakeup_stats",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10666 (discriminator 1)"
+  },
+  {
+    "fn": "cpu_util",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7987 (discriminator 1)"
+  },
+  {
+    "fn": "cpu_util",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8007"
+  },
+  {
+    "fn": "cpu_util",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8010 (discriminator 2)"
+  },
+  {
+    "fn": "cpu_util",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8040"
+  },
+  {
+    "fn": "cpu_util",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8043 (discriminator 2)"
+  },
+  {
+    "fn": "cpu_util",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8046"
+  },
+  {
+    "fn": "cpu_runnable_without",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7253 (discriminator 3)"
+  },
+  {
+    "fn": "task_running_on_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10607 (discriminator 3)"
+  },
+  {
+    "fn": "update_sg_wakeup_stats",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10670"
+  },
+  {
+    "fn": "idle_cpu_without",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10625 (discriminator 1)"
+  },
+  {
+    "fn": "update_sg_wakeup_stats",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10682"
+  },
+  {
+    "fn": "update_sg_wakeup_stats",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10662 (discriminator 2)"
+  },
+  {
+    "fn": "group_is_overloaded",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10145"
+  },
+  {
+    "fn": "update_sg_wakeup_stats",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10689"
+  },
+  {
+    "fn": "cpu_util_without",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8075 (discriminator 3)"
+  },
+  {
+    "fn": "cfs_rq_load_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4816"
+  },
+  {
+    "fn": "cfs_rq_runnable_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4811"
+  },
+  {
+    "fn": "idle_cpu_without",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10636"
+  },
+  {
+    "fn": "update_sg_wakeup_stats",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10679"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10799"
+  },
+  {
+    "fn": "update_pick_idlest",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10710"
+  },
+  {
+    "fn": "update_pick_idlest",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10743"
+  },
+  {
+    "fn": "update_pick_idlest",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10747"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10801"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10875"
+  },
+  {
+    "fn": "update_pick_idlest",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10747 (discriminator 1)"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10906"
+  },
+  {
+    "fn": "sched_balance_find_dst_group",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:10921"
+  },
+  {
+    "fn": "select_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8564"
+  },
+  {
+    "fn": "select_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8566 (discriminator 4)"
+  },
+  {
+    "fn": "select_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8594 (discriminator 1)"
+  },
+  {
+    "fn": "select_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8594 (discriminator 4)"
+  },
+  {
+    "fn": "select_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8599 (discriminator 1)"
+  },
+  {
+    "fn": "select_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8613"
+  },
+  {
+    "fn": "select_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8619 (discriminator 1)"
+  },
+  {
+    "fn": "select_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8628"
+  },
+  {
+    "fn": "select_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8629"
+  },
+  {
+    "fn": "sched_balance_find_dst_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7494"
+  },
+  {
+    "fn": "sched_balance_find_dst_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7502"
+  },
+  {
+    "fn": "sched_balance_find_dst_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7507"
+  },
+  {
+    "fn": "sched_balance_find_dst_group_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7436"
+  },
+  {
+    "fn": "sched_balance_find_dst_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7514"
+  },
+  {
+    "fn": "sched_balance_find_dst_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7524 (discriminator 1)"
+  },
+  {
+    "fn": "sched_balance_find_dst_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7525"
+  },
+  {
+    "fn": "sched_balance_find_dst_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7497"
+  },
+  {
+    "fn": "sched_balance_find_dst_group_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7437 (discriminator 2)"
+  },
+  {
+    "fn": "avg_vruntime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:658"
+  },
+  {
+    "fn": "avg_vruntime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:662 (discriminator 1)"
+  },
+  {
+    "fn": "avg_vruntime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:669"
+  },
+  {
+    "fn": "avg_vruntime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:671"
+  },
+  {
+    "fn": "avg_vruntime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:676"
+  },
+  {
+    "fn": "avg_vruntime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:663"
+  },
+  {
+    "fn": "avg_vruntime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:663 (discriminator 1)"
+  },
+  {
+    "fn": "entity_key",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:559"
+  },
+  {
+    "fn": "update_entity_lag",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:699 (discriminator 1)"
+  },
+  {
+    "fn": "update_entity_lag",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:701"
+  },
+  {
+    "fn": "update_entity_lag",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:704 (discriminator 24)"
+  },
+  {
+    "fn": "update_entity_lag",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:704"
+  },
+  {
+    "fn": "update_entity_lag",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:704 (discriminator 28)"
+  },
+  {
+    "fn": "place_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5189 (discriminator 1)"
+  },
+  {
+    "fn": "place_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5204"
+  },
+  {
+    "fn": "place_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5204 (discriminator 1)"
+  },
+  {
+    "fn": "place_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5274"
+  },
+  {
+    "fn": "place_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5285"
+  },
+  {
+    "fn": "place_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5291"
+  },
+  {
+    "fn": "place_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5193"
+  },
+  {
+    "fn": "calc_delta_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:294 (discriminator 1)"
+  },
+  {
+    "fn": "place_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5285 (discriminator 1)"
+  },
+  {
+    "fn": "place_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5286"
+  },
+  {
+    "fn": "group_cfs_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1592"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5443"
+  },
+  {
+    "fn": "clear_buddies",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5381"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5446"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5467"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5479"
+  },
+  {
+    "fn": "se_update_runnable",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:908"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5484"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5490"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5492"
+  },
+  {
+    "fn": "account_entity_dequeue",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:3696"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5506"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5506"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5512"
+  },
+  {
+    "fn": "update_idle_cfs_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:161 (discriminator 1)"
+  },
+  {
+    "fn": "update_idle_cfs_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:164"
+  },
+  {
+    "fn": "update_idle_cfs_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:166"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5516"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5454"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5457"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5457 (discriminator 1)"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5459"
+  },
+  {
+    "fn": "entity_eligible",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:742"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5485 (discriminator 1)"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5507"
+  },
+  {
+    "fn": "dequeue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5509"
+  },
+  {
+    "fn": "task_on_rq_migrating",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2318 (discriminator 2)"
+  },
+  {
+    "fn": "put_prev_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5605"
+  },
+  {
+    "fn": "check_cfs_rq_runtime",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6454 (discriminator 1)"
+  },
+  {
+    "fn": "put_prev_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5618 (discriminator 1)"
+  },
+  {
+    "fn": "put_prev_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5619"
+  },
+  {
+    "fn": "put_prev_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8970 (discriminator 1)"
+  },
+  {
+    "fn": "put_prev_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8972"
+  },
+  {
+    "fn": "sched_idle_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6869"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7055"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7076 (discriminator 1)"
+  },
+  {
+    "fn": "cfs_rq_of",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1586"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7088"
+  },
+  {
+    "fn": "cfs_rq_throttled",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5796 (discriminator 1)"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7098"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7112"
+  },
+  {
+    "fn": "sub_nr_running",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2783"
+  },
+  {
+    "fn": "sub_nr_running",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2783"
+  },
+  {
+    "fn": "sub_nr_running",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2783"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7139"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7139 (discriminator 1)"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7143 (discriminator 1)"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7146"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7146 (discriminator 1)"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7162"
+  },
+  {
+    "fn": "idle_policy",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:193"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7140"
+  },
+  {
+    "fn": "dequeue_entities",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7140"
+  },
+  {
+    "fn": "sched_idle_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6869"
+  },
+  {
+    "fn": "sched_idle_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6869 (discriminator 1)"
+  },
+  {
+    "fn": "dequeue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7171"
+  },
+  {
+    "fn": "util_est_update",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4888"
+  },
+  {
+    "fn": "util_est_update",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4892 (discriminator 2)"
+  },
+  {
+    "fn": "dequeue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7175"
+  },
+  {
+    "fn": "dequeue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7182"
+  },
+  {
+    "fn": "dequeue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7183"
+  },
+  {
+    "fn": "dequeue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7184"
+  },
+  {
+    "fn": "util_est_dequeue",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4862"
+  },
+  {
+    "fn": "_task_util_est",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4833 (discriminator 2)"
+  },
+  {
+    "fn": "pick_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8828"
+  },
+  {
+    "fn": "pick_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8829"
+  },
+  {
+    "fn": "enqueue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5303"
+  },
+  {
+    "fn": "enqueue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5312"
+  },
+  {
+    "fn": "enqueue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5323"
+  },
+  {
+    "fn": "se_update_runnable",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:908"
+  },
+  {
+    "fn": "enqueue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5337"
+  },
+  {
+    "fn": "account_entity_enqueue",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:3674"
+  },
+  {
+    "fn": "update_load_add",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:169"
+  },
+  {
+    "fn": "account_entity_enqueue",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:3683"
+  },
+  {
+    "fn": "enqueue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5347"
+  },
+  {
+    "fn": "enqueue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5348"
+  },
+  {
+    "fn": "enqueue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5349"
+  },
+  {
+    "fn": "enqueue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5330"
+  },
+  {
+    "fn": "enqueue_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5336"
+  },
+  {
+    "fn": "check_enqueue_throttle",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6418"
+  },
+  {
+    "fn": "throttled_hierarchy",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5802 (discriminator 1)"
+  },
+  {
+    "fn": "rq_of",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1319"
+  },
+  {
+    "fn": "rq_of",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1319"
+  },
+  {
+    "fn": "idle_policy",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:193"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6936"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6946"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6949"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6952 (discriminator 1)"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6953"
+  },
+  {
+    "fn": "cfs_rq_of",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1586"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6969"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6970"
+  },
+  {
+    "fn": "__pick_root_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:873"
+  },
+  {
+    "fn": "cfs_rq_min_slice",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:792"
+  },
+  {
+    "fn": "cfs_rq_min_slice",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:793 (discriminator 2)"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6974"
+  },
+  {
+    "fn": "cfs_rq_throttled",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:5796 (discriminator 1)"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6952"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7008"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7008"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7008 (discriminator 1)"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7010"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7012"
+  },
+  {
+    "fn": "add_nr_running",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2766"
+  },
+  {
+    "fn": "add_nr_running",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2766"
+  },
+  {
+    "fn": "add_nr_running",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2774"
+  },
+  {
+    "fn": "add_nr_running",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2774 (discriminator 1)"
+  },
+  {
+    "fn": "assert_list_leaf_cfs_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:402"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7038"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7039"
+  },
+  {
+    "fn": "util_est_enqueue",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4846"
+  },
+  {
+    "fn": "_task_util_est",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4833 (discriminator 2)"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:6949 (discriminator 1)"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7011"
+  },
+  {
+    "fn": "enqueue_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:7011"
+  },
+  {
+    "fn": "init_entity_runnable_average",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:1041"
+  },
+  {
+    "fn": "init_entity_runnable_average",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:1050"
+  },
+  {
+    "fn": "init_entity_runnable_average",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:1050 (discriminator 1)"
+  },
+  {
+    "fn": "init_entity_runnable_average",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:1050 (discriminator 5)"
+  },
+  {
+    "fn": "cfs_rq_of",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1586"
+  },
+  {
+    "fn": "post_init_entity_util_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:1088"
+  },
+  {
+    "fn": "post_init_entity_util_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:1088"
+  },
+  {
+    "fn": "post_init_entity_util_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:1117"
+  },
+  {
+    "fn": "post_init_entity_util_avg",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:1113"
+  },
+  {
+    "fn": "set_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4177"
+  },
+  {
+    "fn": "set_task_rq_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:4187"
+  },
+  {
+    "fn": "sched_balance_newidle",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:12763"
+  },
+  {
+    "fn": "sched_balance_newidle",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:12776"
+  },
+  {
+    "fn": "sched_balance_newidle",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:12881"
+  },
+  {
+    "fn": "assert_clock_updated",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1655 (discriminator 1)"
+  },
+  {
+    "fn": "sched_balance_newidle",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:12784 (discriminator 1)"
+  },
+  {
+    "fn": "rq_unpin_lock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1785"
+  },
+  {
+    "fn": "sched_balance_newidle",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:12763"
+  },
+  {
+    "fn": "rq_unpin_lock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1786"
+  },
+  {
+    "fn": "sched_balance_newidle",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:12806"
+  },
+  {
+    "fn": "sched_balance_newidle",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:12870 (discriminator 2)"
+  },
+  {
+    "fn": "rq_repin_lock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1800"
+  },
+  {
+    "fn": "get_sd_balance_interval",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:12011 (discriminator 7)"
+  },
+  {
+    "fn": "update_next_balance",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:12023"
+  },
+  {
+    "fn": "pick_next_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8859"
+  },
+  {
+    "fn": "pick_next_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8913"
+  },
+  {
+    "fn": "pick_next_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8926"
+  },
+  {
+    "fn": "pick_next_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8916"
+  },
+  {
+    "fn": "pick_next_task_fair",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/fair.c:8936"
+  },
+  {
+    "fn": "update_idle_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:138"
+  },
+  {
+    "fn": "assert_clock_updated",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1655 (discriminator 1)"
+  },
+  {
+    "fn": "_update_idle_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:76 (discriminator 1)"
+  },
+  {
+    "fn": "_update_idle_rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:78 (discriminator 1)"
+  },
+  {
+    "fn": "rq_clock_pelt",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.h:70"
+  },
+  {
+    "fn": "pick_task_idle",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/idle.c:469 (discriminator 1)"
+  },
+  {
+    "fn": "assert_clock_updated",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1655 (discriminator 1)"
+  },
+  {
+    "fn": "rq_clock_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1671"
+  },
+  {
+    "fn": "rq_of_dl_se",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:74"
+  },
+  {
+    "fn": "start_dl_timer",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1158"
+  },
+  {
+    "fn": "start_dl_timer",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1167 (discriminator 2)"
+  },
+  {
+    "fn": "start_dl_timer",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1188 (discriminator 1)"
+  },
+  {
+    "fn": "start_dl_timer",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1139"
+  },
+  {
+    "fn": "start_dl_timer",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1193"
+  },
+  {
+    "fn": "start_dl_timer",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1194"
+  },
+  {
+    "fn": "start_dl_timer",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1159 (discriminator 1)"
+  },
+  {
+    "fn": "start_dl_timer",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1160"
+  },
+  {
+    "fn": "rq_of_dl_se",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:74"
+  },
+  {
+    "fn": "task_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:506"
+  },
+  {
+    "fn": "task_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:509"
+  },
+  {
+    "fn": "task_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:512"
+  },
+  {
+    "fn": "task_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:530"
+  },
+  {
+    "fn": "__add_running_bw",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:251"
+  },
+  {
+    "fn": "__add_running_bw",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:253 (discriminator 1)"
+  },
+  {
+    "fn": "cpufreq_update_util",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:3327 (discriminator 2)"
+  },
+  {
+    "fn": "rq_of_dl_se",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:74"
+  },
+  {
+    "fn": "task_non_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:445"
+  },
+  {
+    "fn": "task_non_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:448 (discriminator 1)"
+  },
+  {
+    "fn": "task_non_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:451 (discriminator 1)"
+  },
+  {
+    "fn": "task_non_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:454"
+  },
+  {
+    "fn": "task_non_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:467"
+  },
+  {
+    "fn": "task_non_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:436"
+  },
+  {
+    "fn": "task_non_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:491"
+  },
+  {
+    "fn": "task_non_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:496"
+  },
+  {
+    "fn": "enqueue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2017 (discriminator 2)"
+  },
+  {
+    "fn": "dl_server",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:58"
+  },
+  {
+    "fn": "enqueue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2027"
+  },
+  {
+    "fn": "dl_is_implicit",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1062"
+  },
+  {
+    "fn": "enqueue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2030"
+  },
+  {
+    "fn": "enqueue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2049"
+  },
+  {
+    "fn": "enqueue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2061"
+  },
+  {
+    "fn": "enqueue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2076"
+  },
+  {
+    "fn": "enqueue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2062"
+  },
+  {
+    "fn": "rq_of_dl_se",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:74"
+  },
+  {
+    "fn": "assert_clock_updated",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1655 (discriminator 1)"
+  },
+  {
+    "fn": "replenish_dl_new_period",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:805"
+  },
+  {
+    "fn": "enqueue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2076 (discriminator 1)"
+  },
+  {
+    "fn": "dl_entity_overflow",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1010 (discriminator 1)"
+  },
+  {
+    "fn": "update_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1110 (discriminator 1)"
+  },
+  {
+    "fn": "update_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1110 (discriminator 1)"
+  },
+  {
+    "fn": "update_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1115"
+  },
+  {
+    "fn": "rq_of_dl_se",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:74"
+  },
+  {
+    "fn": "__dequeue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2004"
+  },
+  {
+    "fn": "__update_load_avg_se",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.c:309"
+  },
+  {
+    "fn": "se_runnable",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:917"
+  },
+  {
+    "fn": "___update_load_sum",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.c:185"
+  },
+  {
+    "fn": "___update_load_sum",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.c:200"
+  },
+  {
+    "fn": "__update_load_avg_se",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.c:318"
+  },
+  {
+    "fn": "se_runnable",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:918"
+  },
+  {
+    "fn": "__update_load_avg_cfs_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.c:325"
+  },
+  {
+    "fn": "__update_load_avg_cfs_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.c:323 (discriminator 1)"
+  },
+  {
+    "fn": "___update_load_sum",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.c:185"
+  },
+  {
+    "fn": "___update_load_sum",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.c:200"
+  },
+  {
+    "fn": "__update_load_avg_cfs_rq",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/pelt.c:333"
+  },
+  {
+    "fn": "dl_scaled_delta_exec",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1475 (discriminator 1)"
+  },
+  {
+    "fn": "cpu_of",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1333"
+  },
+  {
+    "fn": "dl_scaled_delta_exec",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1487"
+  },
+  {
+    "fn": "dl_server_update_idle_time",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1617"
+  },
+  {
+    "fn": "dl_server_update_idle_time",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1621"
+  },
+  {
+    "fn": "assert_clock_updated",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1655 (discriminator 1)"
+  },
+  {
+    "fn": "dl_server_update_idle_time",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1624 (discriminator 1)"
+  },
+  {
+    "fn": "dl_server_update_idle_time",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1628"
+  },
+  {
+    "fn": "assert_clock_updated",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1655 (discriminator 1)"
+  },
+  {
+    "fn": "rq_clock_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1671"
+  },
+  {
+    "fn": "dl_server_stop",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1678"
+  },
+  {
+    "fn": "dequeue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2096"
+  },
+  {
+    "fn": "dequeue_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:2115"
+  },
+  {
+    "fn": "dl_server_stop",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1682"
+  },
+  {
+    "fn": "dl_server_start",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1649"
+  },
+  {
+    "fn": "dl_server_start",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1667"
+  },
+  {
+    "fn": "dl_server_start",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1667"
+  },
+  {
+    "fn": "dl_server_start",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1670"
+  },
+  {
+    "fn": "dl_server_start",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1672"
+  },
+  {
+    "fn": "dl_server_start",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1673"
+  },
+  {
+    "fn": "dl_server_start",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1674"
+  },
+  {
+    "fn": "init_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:3437"
+  },
+  {
+    "fn": "__init_waitqueue_head",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/wait.c:12"
+  },
+  {
+    "fn": "sched_clock_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/clock.c:394"
+  },
+  {
+    "fn": "sched_clock_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/clock.c:409"
+  },
+  {
+    "fn": "__schedule",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6655"
+  },
+  {
+    "fn": "__schedule",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6665"
+  },
+  {
+    "fn": "__schedule",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6692"
+  },
+  {
+    "fn": "__schedule",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6696"
+  },
+  {
+    "fn": "__schedule",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6712"
+  },
+  {
+    "fn": "__schedule",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6712 (discriminator 1)"
+  },
+  {
+    "fn": "__pick_next_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6018"
+  },
+  {
+    "fn": "__pick_next_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6029 (discriminator 1)"
+  },
+  {
+    "fn": "__pick_next_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6032"
+  },
+  {
+    "fn": "__pick_next_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6037"
+  },
+  {
+    "fn": "__schedule",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6755"
+  },
+  {
+    "fn": "task_on_rq_queued",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2313 (discriminator 2)"
+  },
+  {
+    "fn": "__schedule",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:5381"
+  },
+  {
+    "fn": "__schedule",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6771"
+  },
+  {
+    "fn": "__put_prev_set_next_dl_server",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2502"
+  },
+  {
+    "fn": "put_prev_set_next_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2518"
+  },
+  {
+    "fn": "put_prev_set_next_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2519"
+  },
+  {
+    "fn": "try_to_block_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6585"
+  },
+  {
+    "fn": "dequeue_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:2107"
+  },
+  {
+    "fn": "__schedule",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6714"
+  },
+  {
+    "fn": "__pick_next_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6038"
+  },
+  {
+    "fn": "__block_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2794"
+  },
+  {
+    "fn": "__block_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2797"
+  },
+  {
+    "fn": "__block_task",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:2832 (discriminator 4)"
+  },
+  {
+    "fn": "__schedule_loop",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6842"
+  },
+  {
+    "fn": "sched_update_worker",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6828"
+  },
+  {
+    "fn": "sched_submit_work",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6805"
+  },
+  {
+    "fn": "sched_submit_work",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:6815 (discriminator 2)"
+  },
+  {
+    "fn": "__cond_resched",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:7288 (discriminator 1)"
+  },
+  {
+    "fn": "__cond_resched",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:7306"
+  },
+  {
+    "fn": "__cond_resched",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/core.c:7307"
+  },
+  {
+    "fn": "task_contending",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:513"
+  },
+  {
+    "fn": "cancel_dl_timer",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:352 (discriminator 1)"
+  },
+  {
+    "fn": "update_dl_entity",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1102 (discriminator 2)"
+  },
+  {
+    "fn": "rq_clock",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/sched.h:1663"
+  },
+  {
+    "fn": "replenish_dl_new_period",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:797 (discriminator 2)"
+  },
+  {
+    "fn": "dl_server_update_idle_time",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/deadline.c:1633"
+  },
+  {
+    "fn": "idle_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/syscalls.c:204 (discriminator 1)"
+  },
+  {
+    "fn": "idle_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/syscalls.c:207"
+  },
+  {
+    "fn": "idle_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/syscalls.c:209"
+  },
+  {
+    "fn": "idle_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/syscalls.c:213"
+  },
+  {
+    "fn": "idle_cpu",
+    "loc": "/users/szhong/kSTEP/linux/test_default/kernel/sched/syscalls.c:218"
+  }
+]

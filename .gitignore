@@ -8,10 +8,9 @@
 
 # Data files
 /data/download/*.tar.xz
-/data/logs/*.log
-/data/logs/*.out
-/data/logs/*.kcov
-/data/logs/*.jsonl
+/data/logs/*
+!/data/logs/README.md
+/data/latest.*
 /data/rootfs/*.cpio
 /data/qemu
 
