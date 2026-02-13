@@ -12,7 +12,7 @@ from run import (
     print_run_results,
     run_qemu,
 )
-from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input, kcov_symbolize
+from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input
 
 
 def smp_to_cpus(smp: str) -> int:
@@ -72,9 +72,6 @@ def run_test(
     return_code = proc.wait()
     print(f"QEMU returned with code: {return_code}")
     print_run_results()
-
-    if coverage:
-        kcov_symbolize(cov_file=log_file.with_suffix(".cov"), linux_dir=linux_dir)
 
 def main():
     parser = argparse.ArgumentParser()
