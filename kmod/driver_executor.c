@@ -1,10 +1,9 @@
 #include <linux/fs.h> // filp_open, filp_close
 #include <linux/kernel.h> // printk
-#include <linux/slab.h> // kmalloc, kfree, krealloc
-#include <linux/types.h> // ssize_t
 #include <linux/string.h> // strstr, strchr, strpbrk
-
+#include <linux/types.h> // ssize_t
 #include "driver.h"
+#include "internal.h"
 
 enum kstep_op_type {
   OP_TASK_CREATE,
@@ -31,6 +30,7 @@ struct kstep_op {
 
 // static struct task_struct **kstep_tasks;
 // static int kstep_tasks_len;
+static struct task_struct *tasks[2];
 static struct file *console;
 
 struct console_parse_state {
@@ -91,7 +91,8 @@ static void parse_console_input(char *buf) {
   return;
 }
 
-static bool process_console_chunk(const char *buf, ssize_t nread, struct console_parse_state *state) {
+static bool process_console_chunk(const char *buf, ssize_t nread,
+                                  struct console_parse_state *state) {
   int i;
   for (i = 0; i < nread; i++) {
     char ch = buf[i];
@@ -141,18 +142,41 @@ static void run(void) {
     ssize_t nread = kernel_read(console, buf, sizeof(buf), &pos);
     if (nread <= 0)
       continue;
-    if (process_console_chunk(buf, nread, &state)) 
+    if (process_console_chunk(buf, nread, &state))
       break;
   }
 
   filp_close(console, NULL);
+
+  // temporary code for testing coverage collection
+  // TODO: remove this code after implementing the execute_kstep_op function
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++) {
+    tasks[i] = kstep_task_create();
+  }
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++) {
+    kstep_task_fork(tasks[i], 1);
+  }
 }
 
+static void post_run(void) {
+  if (!kstep_cov_mode_enabled()) {
+    return;
+  }
+  for (size_t i = 0; i < ARRAY_SIZE(tasks); i++) {
+    kstep_task_kcov_dump(tasks[i]);
+    char kcov_file_path[64];
+    snprintf(kcov_file_path, sizeof(kcov_file_path), "/kstep_kcov_%d.txt",
+             tasks[i]->pid);
+    kcov_collect_pcs(kcov_file_path);
+  }
+  kcov_flush_json();
+}
 
-KSTEP_DRIVER_DEFINE{
-    .name = "executor",
-    .setup = setup,
-    .run = run,
-    .step_interval_us = 1000,
-    .print_rq = false,
+KSTEP_DRIVER_DEFINE {
+  .name = "executor",
+  .setup = setup,
+  .run = run,
+  .post_run = post_run,
+  .step_interval_us = 1000,
+  .print_rq = false,
 };

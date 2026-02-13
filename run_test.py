@@ -3,7 +3,7 @@
 import argparse
 from checkout_linux import Linux, checkout_linux
 from run import Driver, make_kstep, make_linux, pipe_to_qemu, print_run_results, run_qemu
-from scripts import LINUX_ROOT_DIR, LOGS_DIR
+from scripts import LINUX_ROOT_DIR, LOGS_DIR, kcov_symbolize
 from scripts import generate_input
 import time
 
@@ -20,6 +20,7 @@ def run_test(
     max_tasks: int,
     max_cgroups: int,
     seed: int,
+    coverage: bool,
 ):
     linux_dir = LINUX_ROOT_DIR / f"test_{linux.name}"
     checkout_linux(linux.version, linux_dir=linux_dir, tarball=True)
@@ -36,13 +37,14 @@ def run_test(
 
     driver = Driver(
         name="executor",
-        params=(),
+        params=("cov_mode=1",) if coverage else (),
         smp=smp
     )
 
     make_kstep(linux_dir=linux_dir)
 
     log_file = LOGS_DIR / f"test_{linux.name}.log"
+    out_file = log_file.with_suffix(".out")
 
     proc = run_qemu(
         linux_dir=linux_dir,
@@ -64,6 +66,12 @@ def run_test(
     print(f"QEMU returned with code: {return_code}")
     print_run_results(log_file=log_file)
 
+    if coverage:
+        symbolized_txt = log_file.with_suffix(".kcov")
+        kcov_symbolize(kstep_out_file=out_file, linux_dir=linux_dir, output_file=symbolized_txt)
+
+    return
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--linux_name", type=str, default="default")
@@ -73,6 +81,7 @@ def main():
     parser.add_argument("--max_tasks", type=int, default=10)
     parser.add_argument("--max_cgroups", type=int, default=10)
     parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--coverage", action="store_true")
     args = parser.parse_args()
 
     linux = Linux(
@@ -87,6 +96,7 @@ def main():
         max_tasks=args.max_tasks,
         max_cgroups=args.max_cgroups,
         seed=args.seed,
+        coverage=args.coverage,
     )
 
 if __name__ == "__main__":

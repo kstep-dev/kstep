@@ -6,7 +6,7 @@
 #include "internal.h"
 
 #define K(s) "\"" #s "\": "
-#define OUTPUT_BUF_SIZE 4096
+#define OUTPUT_BUF_SIZE 65536
 
 static struct file *output_file;
 
@@ -29,6 +29,11 @@ void kstep_output_init(void) {
 struct kstep_json {
   char buf[OUTPUT_BUF_SIZE];
   size_t len;
+};
+
+struct kstep_json_list {
+  struct kstep_json *json;
+  bool first;
 };
 
 struct kstep_json *kstep_json_begin(void) {
@@ -64,6 +69,36 @@ void kstep_json_field(struct kstep_json *json, const char *key, const char *fmt,
   if (len < 0 || len >= rem)
     panic("json formatting failed");
   json->len += len;
+}
+
+struct kstep_json_list *kstep_json_list_field_begin(struct kstep_json *json,
+                                                    const char *key) {
+  struct kstep_json_list *list = kzalloc(sizeof(*list), GFP_KERNEL);
+  if (!list)
+    panic("Failed to allocate json list");
+
+  kstep_json_append(json, ",\"", 2);
+  kstep_json_append(json, key, strlen(key));
+  kstep_json_append(json, "\":[", 3);
+
+  list->json = json;
+  list->first = true;
+  return list;
+}
+
+void kstep_json_list_append_string(struct kstep_json_list *list, const char *str,
+                                   size_t str_len) {
+  if (!list->first)
+    kstep_json_append(list->json, ",", 1);
+  kstep_json_append(list->json, "\"", 1);
+  kstep_json_append(list->json, str, str_len);
+  kstep_json_append(list->json, "\"", 1);
+  list->first = false;
+}
+
+void kstep_json_list_end(struct kstep_json_list *list) {
+  kstep_json_append(list->json, "]", 1);
+  kfree(list);
 }
 
 void kstep_json_end(struct kstep_json *json) {

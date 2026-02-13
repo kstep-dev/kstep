@@ -1,6 +1,7 @@
 #ifndef KSTEP_INTERNAL_H
 #define KSTEP_INTERNAL_H
 
+#include <linux/types.h>
 #include <linux/version.h>
 
 // kernel internal headers
@@ -17,6 +18,7 @@
 
 // main.c
 extern struct kstep_driver *kstep_driver;
+bool kstep_cov_mode_enabled(void);
 
 // tick.c
 void kstep_sched_timer_init(void);
@@ -44,6 +46,10 @@ bool kstep_is_sys_kthread(struct task_struct *p);
 
 // task.c
 void kstep_task_init(void);
+
+// kcov.c
+void kcov_collect_pcs(const char *kcov_file_path);
+void kcov_flush_json(void);
 
 // sym.c
 struct kstep_driver *kstep_sym_init(const char *driver_name);
