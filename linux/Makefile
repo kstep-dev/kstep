@@ -25,16 +25,12 @@ $(LINUX_CONFIG): $(KSTEP_CONFIG)
 	./scripts/kconfig/merge_config.sh -n $(KSTEP_CONFIG) && \
 	touch $(LINUX_CONFIG)
 
-COV_SRC := $(abspath cov.c)
-COV_DST := $(LINUX_DIR)/kernel/sched/cov.c
-COV_MAKEFILE := $(LINUX_DIR)/kernel/sched/Makefile
 .PHONY: patch
-patch: $(COV_DST)
-$(COV_DST): $(COV_SRC)
-	ln -sf $(COV_SRC) $(COV_DST)
-	echo 'obj-y += cov.o' >> $(COV_MAKEFILE)
-	echo 'ccflags-y += -fsanitize-coverage=trace-pc' >> $(COV_MAKEFILE)
-	echo 'CFLAGS_REMOVE_cov.o := -fsanitize-coverage=trace-pc' >> $(COV_MAKEFILE)
+patch: $(LINUX_DIR)/kernel/cov.c
+$(LINUX_DIR)/kernel/cov.c: $(abspath cov.c)
+	ln -sf $< $@
+	echo 'obj-y += cov.o' >> $(LINUX_DIR)/kernel/Makefile
+	echo 'ccflags-y += -fsanitize-coverage=trace-pc' >> $(LINUX_DIR)/kernel/sched/Makefile
 
 .PHONY: clean
 clean:

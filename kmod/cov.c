@@ -3,7 +3,7 @@
 #define COV_BUFFER_SIZE (32 * 1024)
 
 u64 cov_buffer[COV_BUFFER_SIZE];
-int cov_counter = 0;
+int cov_counter = 0; // no need to be atomic with serialized sched calls
 
 void kstep_cov_init(void) {
   for (int i = 0; i < COV_BUFFER_SIZE; i += PAGE_SIZE / sizeof(cov_buffer[0]))
