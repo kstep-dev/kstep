@@ -100,8 +100,8 @@ jobs:
         timeout-minutes: 1
         run: ./run.py
 
-      - name: Symbolize
-        run: ./scripts/kcov_symbolize.py && cat data/latest.cov.json
+      - name: Print coverage
+        run: cat data/latest.cov.json
 
       - name: Upload artifact
         id: upload-artifact
