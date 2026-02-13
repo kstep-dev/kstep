@@ -47,6 +47,12 @@ bool kstep_is_sys_kthread(struct task_struct *p);
 // task.c
 void kstep_task_init(void);
 
+// cov.c
+void kstep_cov_init(void);
+void kstep_cov_enable(void);
+void kstep_cov_disable(void);
+void kstep_cov_dump(void);
+
 // kcov.c
 void kcov_collect_pcs(const char *kcov_file_path);
 void kcov_flush_json(void);
