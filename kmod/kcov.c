@@ -20,6 +20,7 @@ static struct file *module_kcov_file = NULL;
 #define MODULE_KCOV_WORDS (1u << 17)
 
 // Start coverage collection for the current module
+#ifdef CONFIG_KCOV
 void kcov_start(void) {
   if (module_kcov_file)
     return;
@@ -33,8 +34,14 @@ void kcov_start(void) {
   if (vfs_ioctl(module_kcov_file, KCOV_ENABLE, KCOV_TRACE_PC))
     panic("KCOV_ENABLE failed for module coverage");
 }
+#else
+void kcov_start(void) {
+  return;
+}
+#endif
 
 // Stop coverage collection for the current module
+#ifdef CONFIG_KCOV
 void kcov_stop(void) {
   unsigned long *area = current->kcov_area;
   unsigned long words = current->kcov_size;
@@ -54,6 +61,11 @@ void kcov_stop(void) {
 
   module_kcov_file = NULL;
 }
+#else
+void kcov_stop(void) {
+  return;
+}
+#endif
 
 // Helper function to manage unique PCs for the current module and userspace tasks
 static void kcov_unique_pcs_add(const char *pc, size_t pc_len, enum kcov_type type) {
