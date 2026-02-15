@@ -34,7 +34,7 @@ class Driver:
     name: str = "default"
     params: Iterable[str] = ()
     smp: str = "2"
-    mem_mb: int = 256
+    mem_mb: int = 512
 
 
 def get_qemu_path() -> Path:
@@ -89,10 +89,11 @@ def run_qemu(
         "panic=-1",  # Exit immediately on panic
         "quiet",  # Disable printk to be enabled later
         "printk.time=0",  # Disable printk time to be enabled later
+        "console=ttyS0",
     ]
 
     if Arch.get() == Arch.X86_64:
-        boot_args += ["console=ttyS0", "tsc=nowatchdog"]
+        boot_args += ["tsc=nowatchdog"]
 
     # Everything after the `--` is passed to init
     # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
@@ -101,6 +102,14 @@ def run_qemu(
 
     if driver.params:
         boot_args.extend(driver.params)
+
+    def serial_device(name: str):
+        if Arch.get() == Arch.X86_64:
+            return f"-serial chardev:{name}"
+        elif Arch.get() == Arch.ARM64:
+            return f"-device pci-serial,chardev={name}"
+        else:
+            raise RuntimeError(f"Unsupported architecture: {Arch.get()}")
 
     cmd = [
         str(qemu_path),
@@ -111,18 +120,19 @@ def run_qemu(
         f"-initrd {rootfs_img}",
         f'-append "{" ".join(boot_args)}"',
         "-nographic",
+        "-nodefaults",
         # Prevent automatic reboot after panic
         "-no-reboot",
         # log file
         f"-chardev stdio,id=char0,mux=on,logfile={log_file},signal=off",
-        "-serial chardev:char0",
         "-mon chardev=char0",
+        serial_device("char0"),
         # out file
         f"-chardev file,id=char1,path={out_file}",
-        "-serial chardev:char1",
+        serial_device("char1"),
         # cov file
         f"-chardev file,id=char2,path={cov_file}",
-        "-serial chardev:char2",
+        serial_device("char2"),
         # acceleration
         f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]

@@ -1,63 +1,37 @@
 #
 # Basic
 #
-
-# 64-bit kernel
 CONFIG_64BIT=y
-# Load initramfs with ELF and kmod
 CONFIG_BLK_DEV_INITRD=y
 CONFIG_BINFMT_ELF=y
 CONFIG_MODULES=y
-# Virtualization
-CONFIG_HYPERVISOR_GUEST=y
-CONFIG_PARAVIRT=y
-CONFIG_KVM_GUEST=y
-# Expert settings
 CONFIG_EXPERT=y
 
 #
 # Output
 #
-
-# TTY support
 CONFIG_TTY=y
-# Serial console for x86
 CONFIG_SERIAL_8250=y
 CONFIG_SERIAL_8250_CONSOLE=y
-# Serial console for ARM
-CONFIG_SERIAL_AMBA_PL011=y
-CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-# printk with timestamp
 CONFIG_PRINTK=y
 CONFIG_PRINTK_TIME=y
 
 #
-# File systems
+# /proc, /proc/sys, /sys, /sys/kernel/debug, /dev
 #
-
-# /proc and /proc/sys
 CONFIG_PROC_FS=y
 CONFIG_PROC_SYSCTL=y
-# /sys and /sys/kernel/debug
 CONFIG_SYSFS=y
 CONFIG_DEBUG_FS=y
-# /dev
 CONFIG_DEVTMPFS=y
 
 #
 # CPU
 #
-
-# SMP and NUMA
 CONFIG_SMP=y
 CONFIG_NUMA=y
-# ACPI for x86_64
-CONFIG_ACPI=y
-CONFIG_ACPI_PROCESSOR=y
-# Frequency scaling
 CONFIG_CPU_FREQ=y
 CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y
-# CPU hotplug
 CONFIG_HOTPLUG_CPU=y
 
 

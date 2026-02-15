@@ -22,8 +22,8 @@ kernel: config patch
 
 .PHONY: config
 config: $(LINUX_CONFIG)
-$(LINUX_CONFIG): $(KSTEP_CONFIG)
-	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $(KSTEP_CONFIG)
+$(LINUX_CONFIG): $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
+	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
 	touch $(LINUX_CONFIG)
 
 .PHONY: patch
