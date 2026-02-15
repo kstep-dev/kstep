@@ -56,7 +56,7 @@ void kstep_json_field(struct kstep_json *json, const char *key, const char *fmt,
   if (len < 0 || len >= rem)
     panic("json formatting failed");
   json->len += len;
-  
+
   kstep_json_append(json, ",", 1);
 }
 
@@ -82,6 +82,7 @@ static void kstep_json_replace_comma(struct kstep_json *json, char end) {
 
 void kstep_json_list_end(struct kstep_json *json) {
   kstep_json_replace_comma(json, ']');
+  kstep_json_append(json, ",", 1);
 }
 
 void kstep_json_end(struct kstep_json *json) {
