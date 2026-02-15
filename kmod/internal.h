@@ -18,6 +18,7 @@
 
 // main.c
 extern struct kstep_driver *kstep_driver;
+extern struct task_struct *controller;
 bool kstep_cov_mode_enabled(void);
 
 // tick.c
@@ -57,6 +58,8 @@ void kstep_task_init(void);
 // cov.c
 void kstep_cov_init(void);
 void kstep_cov_enable(void);
+void kstep_cov_enable_controller(void);
+void kstep_cov_disable_controller(void);
 void kstep_cov_disable(void);
 void kstep_cov_dump(void);
 

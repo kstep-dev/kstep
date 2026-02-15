@@ -68,7 +68,9 @@ static void kstep_task_signal(struct task_struct *p, enum sigcode code,
       .si_signo = SIGUSR1,
       .si_code = code,
       ._sifields = {._rt = {._sigval = {val1}, ._pid = val2, ._uid = val3}}};
+  kstep_cov_enable_controller();
   send_sig_info(SIGUSR1, &info, p);
+  kstep_cov_disable_controller();
   kstep_sleep();
 }
 
