@@ -79,13 +79,12 @@ static void kcov_collect_pcs_file(const char *kcov_file_path, struct kcov_unique
 
 static void kcov_unique_pcs_json(const struct kcov_unique_pcs *set) {
   struct kstep_json *json = kstep_json_begin();
-  struct kstep_json_list *list =
-      kstep_json_list_field_begin(json, "fork_kcov_pcs");
+  kstep_json_list_begin(json, "fork_kcov_pcs");
 
   for (size_t i = 0; i < set->len; i++)
-    kstep_json_list_append_string(list, set->pcs[i], strlen(set->pcs[i]));
+    kstep_json_list_append_str(json, set->pcs[i], strlen(set->pcs[i]));
 
-  kstep_json_list_end(list);
+  kstep_json_list_end(json);
   kstep_json_end(json);
 }
 
