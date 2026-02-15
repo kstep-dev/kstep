@@ -88,9 +88,9 @@ void kstep_cov_init(void) {
   if (KSYM_sanitizer_cov_trace_pc == NULL)
     panic("sanitizer_cov_trace_pc not found");
 
-  cov_file = filp_open(KSTEP_CONSOLE(2), O_WRONLY | O_NOCTTY, 0);
+  cov_file = filp_open("/dev/ttyS2", O_WRONLY | O_NOCTTY, 0);
   if (IS_ERR(cov_file))
-    panic("Failed to open %s: %ld", KSTEP_CONSOLE(2), PTR_ERR(cov_file));
+    panic("Failed to open /dev/ttyS2: %ld", PTR_ERR(cov_file));
 
   kstep_cov_console_raw_mode(cov_file);
 
