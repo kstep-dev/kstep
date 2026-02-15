@@ -21,12 +21,13 @@ from scripts import (
     PROJ_DIR,
     QEMU_DIR,
     ROOTFS_DIR,
-    Arch,
     kcov_symbolize,
     system,
     system_with_pipe,
     update_latest,
 )
+
+ARCH = os.uname().machine
 
 
 @dataclass(frozen=True)
@@ -38,10 +39,7 @@ class Driver:
 
 
 def get_qemu_path() -> Path:
-    name = {
-        Arch.X86_64: "qemu-system-x86_64",
-        Arch.ARM64: "qemu-system-aarch64",
-    }[Arch.get()]
+    name = f"qemu-system-{ARCH}"
 
     path = shutil.which(name)
     if path is not None:
@@ -92,7 +90,7 @@ def run_qemu(
         "console=ttyS0",
     ]
 
-    if Arch.get() == Arch.X86_64:
+    if ARCH == "x86_64":
         boot_args += ["tsc=nowatchdog"]
 
     # Everything after the `--` is passed to init
@@ -104,12 +102,9 @@ def run_qemu(
         boot_args.extend(driver.params)
 
     def serial_device(name: str):
-        if Arch.get() == Arch.X86_64:
-            return f"-serial chardev:{name}"
-        elif Arch.get() == Arch.ARM64:
+        if ARCH == "aarch64":
             return f"-device pci-serial,chardev={name}"
-        else:
-            raise RuntimeError(f"Unsupported architecture: {Arch.get()}")
+        return f"-serial chardev:{name}"
 
     cmd = [
         str(qemu_path),
@@ -137,7 +132,7 @@ def run_qemu(
         f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]
 
-    if Arch.get() == Arch.ARM64:
+    if ARCH == "aarch64":
         cmd += ["-machine virt", "-cpu cortex-a57"]
 
     if debug:
