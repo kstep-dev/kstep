@@ -1,7 +1,3 @@
-#
-# x86_64-specific options
-#
-
 CONFIG_ACPI=y
 CONFIG_ACPI_PROCESSOR=y
 CONFIG_HYPERVISOR_GUEST=y

@@ -1,6 +1,3 @@
-#
-# aarch64-specific options
-#
 # `qemu-system-aarch64 -M virt` only supports one ISA serial device (`-serial`).
 # To add more, we need to use PCI serial devices (e.g., `-device pci-serial`).
 CONFIG_SERIAL_8250_PCI=y
