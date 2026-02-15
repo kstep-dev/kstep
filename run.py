@@ -108,6 +108,8 @@ def run_qemu(
             return f"-serial chardev:{name}"
         elif Arch.get() == Arch.ARM64:
             return f"-device pci-serial,chardev={name}"
+        else:
+            raise RuntimeError(f"Unsupported architecture: {Arch.get()}")
 
     cmd = [
         str(qemu_path),
