@@ -65,7 +65,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: linux
-          key: ${{matrix.version}}-${{hashFiles('linux/**')}}
+          key: ${{matrix.version}}-${{hashFiles('linux/config.kstep**', 'linux/cov.c')}}
 
       - name: Linux - Download
         if: steps.linux-cache.outputs.cache-hit != 'true'
