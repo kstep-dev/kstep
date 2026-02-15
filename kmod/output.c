@@ -23,17 +23,12 @@ struct kstep_json {
   size_t len;
 };
 
-struct kstep_json_list {
-  struct kstep_json *json;
-  bool first;
-};
-
 struct kstep_json *kstep_json_begin(void) {
   struct kstep_json *json = kzalloc(sizeof(*json), GFP_KERNEL);
   if (!json)
     panic("Failed to allocate json");
+  json->buf[json->len++] = '{';
   kstep_json_field(json, "timestamp", "%lu", kstep_jiffies_get());
-  json->buf[0] = '{'; // overwrite the first ',' with '{'
   return json;
 }
 
@@ -47,7 +42,7 @@ static void kstep_json_append(struct kstep_json *json, const char *buf,
 
 void kstep_json_field(struct kstep_json *json, const char *key, const char *fmt,
                       ...) {
-  kstep_json_append(json, ",\"", 2);
+  kstep_json_append(json, "\"", 1);
   kstep_json_append(json, key, strlen(key));
   kstep_json_append(json, "\":", 2);
 
@@ -61,40 +56,37 @@ void kstep_json_field(struct kstep_json *json, const char *key, const char *fmt,
   if (len < 0 || len >= rem)
     panic("json formatting failed");
   json->len += len;
+  
+  kstep_json_append(json, ",", 1);
 }
 
-struct kstep_json_list *kstep_json_list_field_begin(struct kstep_json *json,
-                                                    const char *key) {
-  struct kstep_json_list *list = kzalloc(sizeof(*list), GFP_KERNEL);
-  if (!list)
-    panic("Failed to allocate json list");
-
-  kstep_json_append(json, ",\"", 2);
+void kstep_json_list_begin(struct kstep_json *json, const char *key) {
+  kstep_json_append(json, "\"", 1);
   kstep_json_append(json, key, strlen(key));
   kstep_json_append(json, "\":[", 3);
-
-  list->json = json;
-  list->first = true;
-  return list;
 }
 
-void kstep_json_list_append_string(struct kstep_json_list *list, const char *str,
-                                   size_t str_len) {
-  if (!list->first)
-    kstep_json_append(list->json, ",", 1);
-  kstep_json_append(list->json, "\"", 1);
-  kstep_json_append(list->json, str, str_len);
-  kstep_json_append(list->json, "\"", 1);
-  list->first = false;
+void kstep_json_list_append_str(struct kstep_json *json, const char *str,
+                               size_t str_len) {
+  kstep_json_append(json, "\"", 1);
+  kstep_json_append(json, str, str_len);
+  kstep_json_append(json, "\",", 2);
 }
 
-void kstep_json_list_end(struct kstep_json_list *list) {
-  kstep_json_append(list->json, "]", 1);
-  kfree(list);
+static void kstep_json_replace_comma(struct kstep_json *json, char end) {
+  if (json->len > 0 && json->buf[json->len - 1] == ',')
+    json->buf[json->len - 1] = end;
+  else
+    kstep_json_append(json, &end, 1);
+}
+
+void kstep_json_list_end(struct kstep_json *json) {
+  kstep_json_replace_comma(json, ']');
 }
 
 void kstep_json_end(struct kstep_json *json) {
-  kstep_json_append(json, "}\n", 2);
+  kstep_json_replace_comma(json, '}');
+  kstep_json_append(json, "\n", 1);
   ssize_t ret = kernel_write(output_file, json->buf, json->len, NULL);
   if (ret < 0)
     panic("write to output file failed: %ld", ret);
