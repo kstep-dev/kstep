@@ -28,6 +28,7 @@ from scripts import (
 )
 
 ARCH = os.uname().machine
+assert ARCH in ("x86_64", "aarch64"), f"Unsupported architecture: {ARCH}"
 
 
 @dataclass(frozen=True)
