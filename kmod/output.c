@@ -13,9 +13,9 @@ static struct file *output_file;
 void kstep_output_init(void) {
   kstep_sysctl_write("kernel.printk", "%d", 7);
 
-  output_file = filp_open(KSTEP_CONSOLE(1), O_WRONLY | O_NOCTTY, 0);
+  output_file = filp_open("/dev/ttyS1", O_WRONLY | O_NOCTTY, 0);
   if (IS_ERR(output_file))
-    panic("Failed to open %s: %ld", KSTEP_CONSOLE(1), PTR_ERR(output_file));
+    panic("Failed to open /dev/ttyS1: %ld", PTR_ERR(output_file));
 }
 
 struct kstep_json {
