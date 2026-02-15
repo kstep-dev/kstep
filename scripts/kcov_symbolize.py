@@ -7,18 +7,22 @@ from pathlib import Path
 from .consts import LATEST_COV_JSON, update_latest
 
 
-def parse_kcov_pcs(log_file: Path) -> list[int]:
+def parse_kcov_pcs(log_file: Path) -> list[tuple[int, int, int]]:
     bytes = log_file.read_bytes()
     return [
-        int.from_bytes(bytes[i : i + 8], byteorder="little")
-        for i in range(0, len(bytes), 8)
+        (
+            int.from_bytes(bytes[i : i + 4], byteorder="little"),
+            int.from_bytes(bytes[i + 4 : i + 8], byteorder="little"),
+            int.from_bytes(bytes[i + 8 : i + 16], byteorder="little"),
+        )
+        for i in range(0, len(bytes), 16)
     ]
 
 
-def symbolize_pcs(vmlinux: Path, pcs: list[int]) -> list[dict[str, str]]:
+def symbolize_pcs(vmlinux: Path, cov_entries: list[tuple[int, int, int]]) -> list[dict[str, str]]:
     proc = subprocess.run(
         ["addr2line", "-e", str(vmlinux), "-f", "-C"],
-        input="".join(f"0x{pc:x}\n" for pc in pcs),
+        input="".join(f"0x{entry[2]:x}\n" for entry in cov_entries),
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -26,18 +30,20 @@ def symbolize_pcs(vmlinux: Path, pcs: list[int]) -> list[dict[str, str]]:
     )
 
     lines = proc.stdout.splitlines()
-    
-    if len(lines) < 2 * len(pcs):
+
+    if len(lines) < 2 * len(cov_entries):
         raise RuntimeError(
-            f"addr2line output is shorter than expected: {len(lines)} lines for {len(pcs)} pcs"
+            f"addr2line output is shorter than expected: {len(lines)} lines for {len(cov_entries)} cov entries"
         )
 
     out: list[dict[str, str]] = []
-    for i in range(0, 2 * len(pcs), 2):
-        fn = lines[i].strip() or "??"
-        loc = lines[i + 1].strip() or "??:0"
-        if "kernel/sched" in loc:
-            out.append({"fn": fn, "loc": loc})
+    for i in range(0, 2 * len(cov_entries), 2):
+        fn = lines[i].strip()
+        loc = lines[i + 1].strip()
+        id = cov_entries[i // 2][0]
+        pid = cov_entries[i // 2][1]
+        assert "?" not in fn and "?" not in loc, f"fn contains ?: {fn}, loc contains ?: {loc}"
+        out.append({"fn": fn, "loc": loc, "pid": str(pid), "id": str(id)})
     return out
 
 
@@ -51,11 +57,12 @@ def kcov_symbolize(cov_file: Path, vmlinux: Path) -> None:
     if not vmlinux.exists():
         raise RuntimeError(f"Missing vmlinux: {vmlinux}")
 
-    pcs = parse_kcov_pcs(cov_file)
-    if not pcs:
+    cov_entries = parse_kcov_pcs(cov_file)
+
+    if not cov_entries:
         raise RuntimeError("No KCOV PCs found in log")
 
-    entries = symbolize_pcs(vmlinux, pcs)
+    entries = symbolize_pcs(vmlinux, cov_entries)
 
     dump_pcs(entries, output_file)
     print(f"Wrote {len(entries)} entries to {output_file}")
