@@ -1,5 +1,4 @@
 #include "internal.h"
-#include <linux/tty.h>
 
 #define COV_BUFFER_SIZE (32 * 1024)
 
@@ -53,37 +52,6 @@ static void kstep_cov_record(u64 ip) {
 
 KSYM_IMPORT_TYPED(typeof(&kstep_cov_record), sanitizer_cov_trace_pc);
 
-// set the console to raw mode to avoid tty translation
-// E.g. the default tty will be translated to \n(0x0a) to \r\n(0x0d0a).
-static void kstep_cov_console_raw_mode(struct file *file) {
-  KSYM_IMPORT(tty_set_termios);
-
-  if (KSYM_tty_set_termios == NULL) {
-    pr_warn("tty_set_termios not found; cov stream may be tty-translated\n");
-    return;
-  }
-
-  struct tty_file_private *tty_file = file->private_data;
-  if (!tty_file || !tty_file->tty) {
-    pr_warn("cov console is not a tty; skip raw mode\n");
-    return;
-  }
-
-  struct tty_struct *tty = tty_file->tty;
-  struct ktermios termios = tty->termios;
-
-  // Equivalent to "stty raw -echo -opost -onlcr -ocrnl -onlret".
-  termios.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR | IGNCR | ICRNL | IXON);
-  termios.c_oflag &= ~(OPOST | ONLCR | OCRNL | ONLRET);
-  termios.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
-  termios.c_cflag &= ~(CSIZE | PARENB);
-  termios.c_cflag |= CS8;
-  termios.c_cc[VMIN] = 1;
-  termios.c_cc[VTIME] = 0;
-
-  KSYM_tty_set_termios(tty, &termios);
-}
-
 void kstep_cov_init(void) {
   if (KSYM_sanitizer_cov_trace_pc == NULL)
     panic("sanitizer_cov_trace_pc not found");
@@ -91,8 +59,6 @@ void kstep_cov_init(void) {
   cov_file = filp_open("/dev/ttyS2", O_WRONLY | O_NOCTTY, 0);
   if (IS_ERR(cov_file))
     panic("Failed to open /dev/ttyS2: %ld", PTR_ERR(cov_file));
-
-  kstep_cov_console_raw_mode(cov_file);
 
   // Pre-fault each page in the buffer
   for (int cpu = 0; cpu < NR_CPUS; cpu++)
