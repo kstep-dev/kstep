@@ -50,7 +50,7 @@ static void set_tty_raw_output(const char *path) {
   if (tcgetattr(fd, &termios) < 0)
     panic("Failed to tcgetattr %s", path);
 
-  termios.c_oflag &= ~(OPOST); // Disable output post-processing
+  cfmakeraw(&termios);
   if (tcsetattr(fd, TCSANOW, &termios) < 0)
     panic("Failed to tcsetattr %s", path);
 
@@ -63,8 +63,8 @@ int main(int argc, char *argv[], char *envp[]) {
   mount_fs("/sys", "sysfs");
   mount_fs("/sys/kernel/debug", "debugfs");
   mount_fs("/sys/fs/cgroup", "cgroup2");
-  set_proc_affinity(0, 0); // bind to cpu 0
-  set_tty_raw_output("/dev/ttyS2");
+  set_proc_affinity(0, 0); // Bind to cpu 0
+  set_tty_raw_output("/dev/ttyS2"); // Disable output post-processing
   load_kmod("kmod.ko", argc, argv, envp);
   panic("Kernel module exited unexpectedly");
 }
