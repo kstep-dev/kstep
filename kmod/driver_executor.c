@@ -158,25 +158,10 @@ static void run(void) {
   }
 }
 
-static void post_run(void) {
-  if (!kstep_cov_mode_enabled()) {
-    return;
-  }
-  for (size_t i = 0; i < ARRAY_SIZE(tasks); i++) {
-    kstep_task_kcov_dump(tasks[i]);
-    char kcov_file_path[64];
-    snprintf(kcov_file_path, sizeof(kcov_file_path), "/kstep_kcov_%d.txt",
-             tasks[i]->pid);
-    kcov_collect_pcs(kcov_file_path);
-  }
-  kcov_flush_json();
-}
-
 KSTEP_DRIVER_DEFINE {
   .name = "executor",
   .setup = setup,
   .run = run,
-  .post_run = post_run,
   .step_interval_us = 1000,
   .print_rq = false,
 };

@@ -10,8 +10,6 @@ struct task_struct *controller = NULL;
 
 static char driver_name[DRIVER_NAME_LEN] = "default";
 module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
-static bool cov_mode = false;
-module_param(cov_mode, bool, 0644);
 
 enum kstep_status {
   KSTEP_STATUS_PENDING,
@@ -19,7 +17,6 @@ enum kstep_status {
   KSTEP_STATUS_FAIL,
 };
 static enum kstep_status status = KSTEP_STATUS_PENDING;
-bool kstep_cov_mode_enabled(void) { return cov_mode; }
 
 void kstep_status_set_pass(void) {
   if (status == KSTEP_STATUS_FAIL)
@@ -67,9 +64,6 @@ static int __init kstep_main(void) {
 
   TRACE_INFO("Running driver %s", kstep_driver->name);
   kstep_driver->run();
-
-  if (kstep_driver->post_run)
-    kstep_driver->post_run();
 
   TRACE_INFO("Exiting driver %s on Linux %s", kstep_driver->name, UTS_RELEASE);
 
