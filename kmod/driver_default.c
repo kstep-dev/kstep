@@ -28,6 +28,7 @@ static void run(void) {
   kstep_cgroup_add_task("cgroot/cg0", tasks[1]->pid);
   kstep_tick_repeat(4);
   kstep_cov_disable();
+  kstep_cov_dump();
   TRACE_INFO("Driver execution completed");
 }
 
