@@ -53,7 +53,7 @@ RESOURCE_TASK = "task"
 RESOURCE_CGROUP = "cgroup"
 
 # Generator parameters
-MAX_TICK = 1000
+MAX_TICK = 10
 
 def op_task_create(m: GenState):
     tid = m.next_task_id()

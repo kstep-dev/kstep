@@ -7,10 +7,38 @@
 #include "user.h"
 
 #define MAX_TASKS 1024
+#define MAX_CGROUPS 1024
+#define MAX_CGROUP_NAME_LEN 256
 
 static struct task_struct *kstep_tasks[MAX_TASKS];
+static int cgroup_parent[MAX_CGROUPS];
+static bool cgroup_exists[MAX_CGROUPS];
+static int cgroup_lineage[MAX_CGROUPS];
+static int cgroup_tasks[MAX_TASKS];
 
 static bool is_valid_task_id(int id) { return id >= 0 && id < MAX_TASKS; }
+static bool is_valid_cgroup_id(int id) { return id >= 0 && id < MAX_CGROUPS; }
+
+static bool build_cgroup_name(int id, char *buf) {
+  int depth = 0;
+  int cur = id;
+  int len = 0;
+
+  while (cur != -1) {
+    if (!is_valid_cgroup_id(cur) || !cgroup_exists[cur] || depth >= MAX_CGROUPS)
+      return false;
+    cgroup_lineage[depth++] = cur;
+    cur = cgroup_parent[cur];
+  }
+
+  for (int i = depth - 1; i >= 0; i--) {
+    len += scnprintf(buf + len, MAX_CGROUP_NAME_LEN - len, 
+                "cg%d%s", cgroup_lineage[i], (i > 0) ? "/" : "");
+    if (len >= MAX_CGROUP_NAME_LEN)
+      return false;
+  }
+  return true;
+}
 
 static bool pid_known(pid_t pid) {
   for (int i = 0; i < MAX_TASKS; i++) {
@@ -39,6 +67,7 @@ static bool op_task_create(int a, int b, int c) {
   if (!is_valid_task_id(a) || kstep_tasks[a])
     panic("Invalid task id");
   kstep_tasks[a] = kstep_task_create();
+  cgroup_tasks[a] = -1;
   return true;
 }
 
@@ -82,6 +111,10 @@ static bool op_task_fifo(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a])
     panic("Invalid task id");
+
+  // Move the task back to the root cgroup, otherwise the set_schedprio will fail
+  kstep_cgroup_add_task("", kstep_tasks[a]->pid);
+  cgroup_tasks[a] = -1;
   kstep_task_fifo(kstep_tasks[a]);
   return true;
 }
@@ -127,6 +160,89 @@ static bool op_tick_repeat(int a, int b, int c) {
   return true;
 }
 
+static bool op_cgroup_create(int a, int b, int c) {
+  int parent_id = a;
+  int child_id = b;
+  char name[MAX_CGROUP_NAME_LEN];
+  (void)c;
+
+  if (!is_valid_cgroup_id(child_id) || cgroup_exists[child_id])
+    panic("Invalid cgroup child id");
+  if (parent_id != -1 && (!is_valid_cgroup_id(parent_id) || !cgroup_exists[parent_id]))
+    panic("Invalid cgroup parent id");
+
+  cgroup_parent[child_id] = parent_id;
+  cgroup_exists[child_id] = true;
+
+  if (!build_cgroup_name(child_id, name))
+    panic("Failed to build cgroup name");
+
+  // Move the task back to the root cgroup: only the leaf cgroup has tasks in cgroupv2
+  for (int i = 0; i < MAX_TASKS; i++) {
+    if (kstep_tasks[i] && cgroup_tasks[i] == parent_id) {
+      kstep_cgroup_add_task("", kstep_tasks[i]->pid);
+      cgroup_tasks[i] = -1;
+    }
+  }
+
+  kstep_cgroup_create(name);
+  return true;
+}
+
+static bool op_cgroup_set_cpuset(int a, int b, int c) {
+  char name[MAX_CGROUP_NAME_LEN];
+  char cpuset[32];
+
+  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
+    panic("Invalid cgroup id");
+  if (!build_cgroup_name(a, name))
+    panic("Failed to build cgroup name");
+  if (b > c || b < 1 || c > num_online_cpus() - 1)
+    panic("Invalid cpuset range");
+
+  if (scnprintf(cpuset, sizeof(cpuset), "%d-%d", b, c) >= sizeof(cpuset))
+    panic("Failed to build cpuset range");
+
+  kstep_cgroup_set_cpuset(name, cpuset);
+  return true;
+}
+
+static bool op_cgroup_set_weight(int a, int b, int c) {
+  char name[MAX_CGROUP_NAME_LEN];
+  (void)c;
+
+  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
+    panic("Invalid cgroup id");
+  if (!build_cgroup_name(a, name))
+    panic("Failed to build cgroup name");
+  if (b <= 0 || b > 10000)
+    panic("Invalid cgroup weight");
+
+  kstep_cgroup_set_weight(name, b);
+  return true;
+}
+
+// TODO: kstep_cgroup_add_task stuck unless 
+// (1) it is called in setup or (2) cgroup_attach_lock is skipped
+static bool op_cgroup_add_task(int a, int b, int c) {
+  char name[MAX_CGROUP_NAME_LEN];
+  (void)c;
+
+  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
+    panic("Invalid cgroup id");
+  
+  if (!build_cgroup_name(a, name))
+    panic("Failed to build cgroup name");
+
+  if (!is_valid_task_id(b) || !kstep_tasks[b])
+    panic("Invalid task id");
+
+  kstep_cgroup_add_task(name, kstep_tasks[b]->pid);
+
+  cgroup_tasks[b] = a;
+  return true;
+}
+
 typedef bool (*op_handler_fn)(int a, int b, int c);
 
 static op_handler_fn op_handlers[OP_TYPE_NR] = {
@@ -139,10 +255,10 @@ static op_handler_fn op_handlers[OP_TYPE_NR] = {
     [OP_TASK_SET_PRIO] = op_task_set_prio,
     [OP_TICK] = op_tick,
     [OP_TICK_REPEAT] = op_tick_repeat,
-    [OP_CGROUP_CREATE] = NULL,
-    [OP_CGROUP_SET_CPUSET] = NULL,
-    [OP_CGROUP_SET_WEIGHT] = NULL,
-    [OP_CGROUP_ADD_TASK] = NULL,
+    [OP_CGROUP_CREATE] = op_cgroup_create,
+    [OP_CGROUP_SET_CPUSET] = op_cgroup_set_cpuset,
+    [OP_CGROUP_SET_WEIGHT] = op_cgroup_set_weight,
+    [OP_CGROUP_ADD_TASK] = op_cgroup_add_task,
     [OP_CPU_SET_FREQ] = NULL,
     [OP_CPU_SET_CAPACITY] = NULL,
 };
