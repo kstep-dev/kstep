@@ -2,8 +2,15 @@
 #include <linux/kernel.h> // printk
 #include <linux/string.h> // strstr, strchr, strpbrk
 #include <linux/types.h> // ssize_t
+#include <linux/ctype.h> // isdigit or alpha
 #include "driver.h"
-#include "internal.h"
+
+#define MAX_LINE_LENGTH 1024
+
+struct console_parse_state {
+  char line_buf[MAX_LINE_LENGTH];
+  size_t line_len;
+};
 
 enum kstep_op_type {
   OP_TASK_CREATE,
@@ -23,72 +30,43 @@ enum kstep_op_type {
   OP_CPU_SET_CAPACITY,
 };
 
-struct kstep_op {
-  enum kstep_op_type type;
-  int a, b, c;
-};
-
 // static struct task_struct **kstep_tasks;
 // static int kstep_tasks_len;
-static struct task_struct *tasks[2];
 static struct file *console;
 
-struct console_parse_state {
-  char line_buf[1024];
-  size_t line_len;
-  bool line_too_long;
-};
-
-static bool execute_kstep_op(const struct kstep_op *op) {
-  pr_info("Execute op %d %d %d %d\n", op->type, op->a, op->b, op->c);
+static bool execute_kstep_op(enum kstep_op_type type, int a, int b, int c) {
+  TRACE_INFO("EXECOP %d %d %d %d\n", type, a, b, c);
   // TODO: implement the operation
   return true;
-}
-
-static bool parse_int_token(char *token, int *out) {
-  if (!token || !*token)
-    return false;
-  return kstrtoint(token, 10, out) == 0;
 }
 
 static void parse_console_input(char *buf) {
   char *cursor;
   int fields[4];
-  struct kstep_op op;
 
-  if (!buf) return;
+  if (!buf)
+    return;
 
   buf = strim(buf);
-  if (!*buf) return;
+  if (!*buf)
+    return;
 
+  // parse 4 integers separated by commas: TYPE,ARG1,ARG2,ARG3
   cursor = buf;
   for (int i = 0; i < 4; i++) {
     char *token = strsep(&cursor, ",");
-    if (!parse_int_token(token, &fields[i])) {
-      pr_warn("executor: ignore invalid line `%s`\n", buf);
+    if (!token || !*token)
       return;
-    }
+    if (kstrtoint(token, 10, &fields[i]) != 0)
+      return;
   }
 
-  if (cursor && *cursor) {
-    pr_warn("executor: ignore invalid line `%s`\n", buf);
+  if (cursor && *cursor)
     return;
-  }
-
-  if (fields[0] < OP_TASK_CREATE || fields[0] > OP_CPU_SET_CAPACITY) {
-    pr_warn("executor: ignore unknown op type %d in `%s`\n", fields[0], buf);
+  if (fields[0] < OP_TASK_CREATE || fields[0] > OP_CPU_SET_CAPACITY)
     return;
-  }
 
-  op.type = fields[0];
-  op.a = fields[1];
-  op.b = fields[2];
-  op.c = fields[3];
-
-  if (!execute_kstep_op(&op))
-    pr_warn("Failed to execute kstep op");
-
-  return;
+  execute_kstep_op(fields[0], fields[1], fields[2], fields[3]);
 }
 
 static bool process_console_chunk(const char *buf, ssize_t nread,
@@ -96,33 +74,18 @@ static bool process_console_chunk(const char *buf, ssize_t nread,
   int i;
   for (i = 0; i < nread; i++) {
     char ch = buf[i];
-    if (ch == '\r') continue;
-
     if (ch == '\n') {
-      if (state->line_too_long) {
-        pr_warn("executor: ignore overlong input line\n");
-        state->line_too_long = false;
-        state->line_len = 0;
-        continue;
-      }
-
-      state->line_buf[state->line_len] = '\0';
-      state->line_len = 0;
-      if (strcmp(state->line_buf, "EXIT") == 0) {
-        return true;
-      } else {
+      if (state->line_len + 1 < MAX_LINE_LENGTH) {
+        state->line_buf[state->line_len] = '\0';
+        if (strcmp(state->line_buf, "EXIT") == 0)
+          return true;
         parse_console_input(state->line_buf);
       }
-      continue;
+      state->line_len = 0;
+    } else if (state->line_len + 1 < MAX_LINE_LENGTH && 
+               (isdigit(ch) || isalpha(ch) || ch == ',' || ch == '-')) {
+      state->line_buf[state->line_len++] = ch;
     }
-
-    if (state->line_too_long)
-      continue;
-    if (state->line_len + 1 >= sizeof(state->line_buf)) {
-      state->line_too_long = true;
-      continue;
-    }
-    state->line_buf[state->line_len++] = ch;
   }
 
   return false;
@@ -147,15 +110,6 @@ static void run(void) {
   }
 
   filp_close(console, NULL);
-
-  // temporary code for testing coverage collection
-  // TODO: remove this code after implementing the execute_kstep_op function
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++) {
-    tasks[i] = kstep_task_create();
-  }
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++) {
-    kstep_task_fork(tasks[i], 1);
-  }
 }
 
 KSTEP_DRIVER_DEFINE {
