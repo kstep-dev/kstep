@@ -4,41 +4,14 @@
 #include <linux/types.h> // ssize_t
 #include <linux/ctype.h> // isdigit or alpha
 #include "driver.h"
+#include "op_handler.h"
 
 #define MAX_LINE_LENGTH 1024
-
 struct console_parse_state {
   char line_buf[MAX_LINE_LENGTH];
   size_t line_len;
 };
-
-enum kstep_op_type {
-  OP_TASK_CREATE,
-  OP_TASK_FORK,
-  OP_TASK_PIN,
-  OP_TASK_FIFO,
-  OP_TASK_PAUSE,
-  OP_TASK_WAKEUP,
-  OP_TASK_SET_PRIO,
-  OP_TICK,
-  OP_TICK_REPEAT,
-  OP_CGROUP_CREATE,
-  OP_CGROUP_SET_CPUSET,
-  OP_CGROUP_SET_WEIGHT,
-  OP_CGROUP_ADD_TASK,
-  OP_CPU_SET_FREQ,
-  OP_CPU_SET_CAPACITY,
-};
-
-// static struct task_struct **kstep_tasks;
-// static int kstep_tasks_len;
 static struct file *console;
-
-static bool execute_kstep_op(enum kstep_op_type type, int a, int b, int c) {
-  TRACE_INFO("EXECOP %d %d %d %d\n", type, a, b, c);
-  // TODO: implement the operation
-  return true;
-}
 
 static void parse_console_input(char *buf) {
   char *cursor;
@@ -63,10 +36,11 @@ static void parse_console_input(char *buf) {
 
   if (cursor && *cursor)
     return;
-  if (fields[0] < OP_TASK_CREATE || fields[0] > OP_CPU_SET_CAPACITY)
+  if (fields[0] < OP_TASK_CREATE || fields[0] >= OP_TYPE_NR)
     return;
 
-  execute_kstep_op(fields[0], fields[1], fields[2], fields[3]);
+  TRACE_INFO("EXECOP %d %d %d %d\n", fields[0], fields[1], fields[2], fields[3]);
+  kstep_execute_op(fields[0], fields[1], fields[2], fields[3]);
 }
 
 static bool process_console_chunk(const char *buf, ssize_t nread,
