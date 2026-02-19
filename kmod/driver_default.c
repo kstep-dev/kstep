@@ -5,20 +5,30 @@ static struct task_struct *tasks[10];
 
 static void setup(void) {
   kstep_cov_init();
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    tasks[i] = kstep_task_create();
 }
 
 static void run(void) {
   kstep_cov_enable();
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    kstep_task_wakeup(tasks[i]);
-
-  for (int i = 0; i < 5; i++)
-    kstep_tick();
+  // A sequence of operations for debugging
+  tasks[0] = kstep_task_create();
+  kstep_tick_repeat(2);
+  kstep_tick();
+  kstep_cgroup_create("cgroot");
+  kstep_cgroup_create("cgroot/cg0");
+  kstep_cgroup_set_cpuset("cgroot/cg0", "2-9");
+  tasks[1] = kstep_task_create();
+  kstep_tick();
+  kstep_tick_repeat(1);
+  kstep_cgroup_set_weight("cgroot/cg0", 4364);
+  kstep_cgroup_add_task("cgroot/cg0", tasks[0]->pid);
+  kstep_task_wakeup(tasks[0]);
+  tasks[2] = kstep_task_create();
+  tasks[3] = kstep_task_create();
+  kstep_cgroup_set_cpuset("cgroot/cg0", "7-9");
+  kstep_cgroup_add_task("cgroot/cg0", tasks[1]->pid);
+  kstep_tick_repeat(4);
   kstep_cov_disable();
-
-  kstep_cov_dump();
+  TRACE_INFO("Driver execution completed");
 }
 
 KSTEP_DRIVER_DEFINE{
