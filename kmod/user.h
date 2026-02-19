@@ -10,7 +10,6 @@ enum sigcode {
   SIGCODE_SET_PRIO,
   SIGCODE_PIN,
   SIGCODE_FIFO,
-  SIGCODE_KCOV_DUMP,
 };
 
 #define TASK_READY_COMM "ready"

@@ -19,7 +19,6 @@
 // main.c
 extern struct kstep_driver *kstep_driver;
 extern struct task_struct *controller;
-bool kstep_cov_mode_enabled(void);
 
 // tick.c
 void kstep_sched_timer_init(void);
@@ -55,10 +54,6 @@ void kstep_cov_enable_controller(void);
 void kstep_cov_disable_controller(void);
 void kstep_cov_disable(void);
 void kstep_cov_dump(void);
-
-// kcov.c
-void kcov_collect_pcs(const char *kcov_file_path);
-void kcov_flush_json(void);
 
 // sym.c
 struct kstep_driver *kstep_sym_init(const char *driver_name);

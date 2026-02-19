@@ -28,7 +28,6 @@ def run_test(
     max_tasks: int,
     max_cgroups: int,
     seed: int,
-    coverage: bool,
 ):
     linux_dir = LINUX_ROOT_DIR / f"test_{linux.name}"
     checkout_linux(linux.version, linux_dir=linux_dir, tarball=True)
@@ -45,7 +44,6 @@ def run_test(
 
     driver = Driver(
         name="executor",
-        params=("cov_mode=1",) if coverage else (),
         smp=smp
     )
 
@@ -82,7 +80,6 @@ def main():
     parser.add_argument("--max_tasks", type=int, default=10)
     parser.add_argument("--max_cgroups", type=int, default=10)
     parser.add_argument("--seed", type=int, default=1)
-    parser.add_argument("--coverage", action="store_true")
     args = parser.parse_args()
 
     linux = Linux(
@@ -97,7 +94,6 @@ def main():
         max_tasks=args.max_tasks,
         max_cgroups=args.max_cgroups,
         seed=args.seed,
-        coverage=args.coverage,
     )
 
 if __name__ == "__main__":
