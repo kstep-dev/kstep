@@ -14,12 +14,27 @@ from run import (
 )
 from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input
 
-
 def smp_to_cpus(smp: str) -> int:
     try:
         return int(smp.split(",")[0])
     except (ValueError, AttributeError, IndexError):
         return 2
+
+def assert_exec_matches_generated(log_file, seq):
+    i = 0
+    f = open(log_file, "r")
+    for line in f:
+        exec_pos = line.find("EXECOP")
+        if exec_pos == -1:
+            continue
+        line = line[exec_pos + len("EXECOP") :].strip()
+        parts = line.split()
+        if len(parts) != 4 or tuple(int(v) for v in parts[:4]) != seq[i]:
+            raise AssertionError(f"EXECOP sequence mismatch. Expected {seq[i]}, got {parts[:4]}")
+        i += 1
+    f.close()
+    if i != len(seq):
+        raise AssertionError(f"EXECOP sequence mismatch. Expected {len(seq)} ops, got {i} ops.")
 
 def run_test(
     linux: Linux,
@@ -50,6 +65,8 @@ def run_test(
     make_kstep(linux_dir=linux_dir)
 
     log_file = LOGS_DIR / f"test_{linux.name}.log"
+    out_file = log_file.with_suffix(".out")
+    cov_file = log_file.with_suffix(".cov")
 
     proc = run_qemu(
         linux_dir=linux_dir,
@@ -64,12 +81,13 @@ def run_test(
     # EXIT: exit the qemu
     payload_str = "\n".join(f"{op[0]},{op[1]},{op[2]},{op[3]}" for op in seq) + "\n"
     pipe_to_qemu(proc=proc, stdin_payload=payload_str)
-    
     pipe_to_qemu(proc=proc, stdin_payload="EXIT\n")
 
     return_code = proc.wait()
     print(f"QEMU returned with code: {return_code}")
-    print_run_results()
+
+    print_run_results(log_file=log_file, out_file=out_file, cov_file=cov_file)
+    assert_exec_matches_generated(log_file, seq)
 
 def main():
     parser = argparse.ArgumentParser()

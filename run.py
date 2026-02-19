@@ -149,23 +149,23 @@ def pipe_to_qemu(proc: subprocess.Popen, stdin_payload: str):
     proc.stdin.flush()
 
 
-def print_run_results():
-    print(f"Log: {LATEST_LOG}")
-    print(f"Out: {LATEST_OUT}")
-    print(f"Cov: {LATEST_COV}")
+def print_run_results(log_file=LATEST_LOG, out_file=LATEST_OUT, cov_file=LATEST_COV):
+    print(f"Log: {log_file}")
+    print(f"Out: {out_file}")
+    print(f"Cov: {cov_file}")
 
     # Print the last line for status
-    with LATEST_OUT.open() as f:
+    with out_file.open() as f:
         line = "Not found"
         for line in f:
             pass
         print(line.strip())
 
     # check if cov is empty and call kcov_symbolize if it is not
-    if LATEST_COV.exists() and LATEST_COV.stat().st_size != 0:
+    if cov_file.exists() and cov_file.stat().st_size != 0:
         linux_name = LINUX_CURR_DIR.resolve().name
         vmlinux = LINUX_BUILD_DIR / f"{linux_name}.vmlinux"
-        kcov_symbolize(cov_file=LATEST_COV, vmlinux=vmlinux)
+        kcov_symbolize(cov_file=cov_file, vmlinux=vmlinux)
 
 
 def is_port_free(port: int) -> bool:
