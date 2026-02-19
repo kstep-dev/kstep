@@ -32,7 +32,8 @@ static bool build_cgroup_name(int id, char *buf) {
   }
 
   for (int i = depth - 1; i >= 0; i--) {
-    len += scnprintf(buf + len, MAX_CGROUP_NAME_LEN - len, "cg%d/", cgroup_lineage[i]);
+    len += scnprintf(buf + len, MAX_CGROUP_NAME_LEN - len, 
+                "cg%d%s", cgroup_lineage[i], (i > 0) ? "/" : "");
     if (len >= MAX_CGROUP_NAME_LEN)
       return false;
   }
