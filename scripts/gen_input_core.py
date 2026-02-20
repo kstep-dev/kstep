@@ -92,6 +92,9 @@ def validate_sequence(seq, max_tasks: int, max_cgroups: int, cpus: int) -> bool:
         elif name == OP_NAME_TO_TYPE["TASK_FIFO"]:
             if a not in tasks or task_state.get(a) != TASK_RUNNABLE:
                 return fail(idx, name, a, b, c, "task not runnable for fifo")
+        elif name == OP_NAME_TO_TYPE["TASK_CFS"]:
+            if a not in tasks or task_state.get(a) != TASK_RUNNABLE:
+                return fail(idx, name, a, b, c, "task not runnable for cfs")
         elif name == OP_NAME_TO_TYPE["TASK_PAUSE"]:
             if a not in tasks or task_state.get(a) != TASK_RUNNABLE:
                 return fail(idx, name, a, b, c, "task not runnable for pause")
