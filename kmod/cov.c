@@ -100,19 +100,24 @@ void kstep_cov_disable_controller(void) {
     kstep_cov_mode_set(COV_ENABLED);
 }
 
-void kstep_cov_dump(void) {
+void kstep_cov_dump_pcs(void) {
   for (int cpu = 0; cpu < num_possible_cpus(); cpu++) {
     kernel_write(cov_file, cov_buffer[cpu], cov_counter[cpu] * sizeof(cov_buffer[0][0]), 0);
     cov_counter[cpu] = 0;
   }
 }
 
-u32 kstep_cov_cmd_id_inc(void) {
+void kstep_cov_cmd_id_inc(void) {
   u32 next = READ_ONCE(cov_cmd_id) + 1;
   barrier();
   WRITE_ONCE(cov_cmd_id, next);
   barrier();
-  return next;
+}
+
+static u32 kstep_cov_cmd_id_get(void) {
+  u32 current_cmd_id = READ_ONCE(cov_cmd_id);
+  barrier();
+  return current_cmd_id;
 }
 
 void kstep_cov_reset(void) {
@@ -173,7 +178,8 @@ static __always_inline void kstep_cov_flush_sigs(u32 slot, u32 cmd_id) {
   slot_entries[slot].sig_count = 0;
 }
 
-void kstep_cov_dump_signal(u32 cmd_id) {
+void kstep_cov_dump_signal(void) {
+  u32 cmd_id = kstep_cov_cmd_id_get();
   if (IS_ERR(sig_file))
     return;
 
