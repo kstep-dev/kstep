@@ -296,7 +296,7 @@ static const char op_strs[OP_TYPE_NR][30] = {
 
 void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
   if (type < 0 || type >= OP_TYPE_NR)
-    panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
+    panic("Operation failed: %d %d %d %d\n", type, a, b, c);
   if (!op_handlers[type]) {
     TRACE_INFO("Operation not implemented: %d\n", type);
     return;
