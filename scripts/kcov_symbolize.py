@@ -40,10 +40,17 @@ def symbolize_pcs(vmlinux: Path, cov_entries: list[tuple[int, int, int]]) -> lis
     for i in range(0, 2 * len(cov_entries), 2):
         fn = lines[i].strip()
         loc = lines[i + 1].strip()
-        id = cov_entries[i // 2][0]
-        pid = cov_entries[i // 2][1]
+        pid = cov_entries[i // 2][0]
+        cmd_id = cov_entries[i // 2][1]
         assert "?" not in fn and "?" not in loc, f"fn contains ?: {fn}, loc contains ?: {loc}"
-        out.append({"fn": fn, "loc": loc, "pid": str(pid), "id": str(id)})
+        out.append(
+            {
+                "fn": fn,
+                "loc": loc,
+                "pid": str(pid),
+                "cmd_id": str(cmd_id),
+            }
+        )
     return out
 
 

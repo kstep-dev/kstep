@@ -67,6 +67,7 @@ def run_test(
     log_file = LOGS_DIR / f"test_{linux.name}.log"
     out_file = log_file.with_suffix(".out")
     cov_file = log_file.with_suffix(".cov")
+    signal_file = log_file.with_suffix(".signal")
 
     proc = run_qemu(
         linux_dir=linux_dir,
@@ -86,7 +87,12 @@ def run_test(
     return_code = proc.wait()
     print(f"QEMU returned with code: {return_code}")
 
-    print_run_results(log_file=log_file, out_file=out_file, cov_file=cov_file)
+    print_run_results(
+        log_file=log_file, 
+        out_file=out_file, 
+        cov_file=cov_file, 
+        signal_file=signal_file,
+    )
     assert_exec_matches_generated(log_file, seq)
 
 def main():

@@ -41,6 +41,7 @@ static void load_kmod(const char *path, int argc, char *argv[], char *envp[]) {
   close(fd);
 }
 
+// Disable output post-processing
 static void set_tty_raw_output(const char *path) {
   int fd = open(path, O_RDWR | O_NOCTTY);
   if (fd < 0)
@@ -64,7 +65,8 @@ int main(int argc, char *argv[], char *envp[]) {
   mount_fs("/sys/kernel/debug", "debugfs");
   mount_fs("/sys/fs/cgroup", "cgroup2");
   set_proc_affinity(0, 0); // Bind to cpu 0
-  set_tty_raw_output("/dev/ttyS2"); // Disable output post-processing
+  set_tty_raw_output("/dev/ttyS2"); // For code coverage data
+  set_tty_raw_output("/dev/ttyS3"); // For edge coverage data
   load_kmod("kmod.ko", argc, argv, envp);
   panic("Kernel module exited unexpectedly");
 }

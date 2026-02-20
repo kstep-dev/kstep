@@ -3,6 +3,7 @@
 #include <linux/string.h> // strcmp, strscpy
 
 #include "driver.h"
+#include "internal.h"
 #include "op_handler.h"
 #include "user.h"
 
@@ -11,7 +12,7 @@
 #define MAX_CGROUP_NAME_LEN 256
 
 static struct task_struct *kstep_tasks[MAX_TASKS];
-static int cgroup_parent[MAX_CGROUPS];
+static int cgroup_parent_id[MAX_CGROUPS];
 static bool cgroup_exists[MAX_CGROUPS];
 static int cgroup_lineage[MAX_CGROUPS];
 static int cgroup_tasks[MAX_TASKS];
@@ -28,7 +29,7 @@ static bool build_cgroup_name(int id, char *buf) {
     if (!is_valid_cgroup_id(cur) || !cgroup_exists[cur] || depth >= MAX_CGROUPS)
       return false;
     cgroup_lineage[depth++] = cur;
-    cur = cgroup_parent[cur];
+    cur = cgroup_parent_id[cur];
   }
 
   for (int i = depth - 1; i >= 0; i--) {
@@ -156,7 +157,8 @@ static bool op_tick(int a, int b, int c) {
 static bool op_tick_repeat(int a, int b, int c) {
   (void)b;
   (void)c;
-  kstep_tick_repeat(a);
+  for (int i = 0; i < a; i++)
+    kstep_execute_op(OP_TICK, 0, 0, 0);
   return true;
 }
 
@@ -171,7 +173,7 @@ static bool op_cgroup_create(int a, int b, int c) {
   if (parent_id != -1 && (!is_valid_cgroup_id(parent_id) || !cgroup_exists[parent_id]))
     panic("Invalid cgroup parent id");
 
-  cgroup_parent[child_id] = parent_id;
+  cgroup_parent_id[child_id] = parent_id;
   cgroup_exists[child_id] = true;
 
   if (!build_cgroup_name(child_id, name))
@@ -264,11 +266,27 @@ static op_handler_fn op_handlers[OP_TYPE_NR] = {
 };
 
 bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
+  u32 cmd_id;
+
   if (type < 0 || type >= OP_TYPE_NR)
     return false;
   if (!op_handlers[type]) {
     TRACE_INFO("Operation not implemented: %d\n", type);
     return false;
   }
-  return op_handlers[type](a, b, c);
+
+  if (type == OP_TICK_REPEAT)
+    return op_handlers[type](a, b, c);
+
+  cmd_id = kstep_cov_cmd_id_inc();
+  kstep_cov_enable();
+  if (!op_handlers[type](a, b, c)) {
+    kstep_cov_disable();
+    return false;
+  }
+  kstep_cov_disable();
+  kstep_cov_dump_signal(cmd_id);
+  kstep_cov_dump();
+  kstep_cov_reset();
+  return true;
 }

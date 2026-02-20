@@ -4,6 +4,7 @@
 #include <linux/types.h> // ssize_t
 #include <linux/ctype.h> // isdigit or alpha
 #include "driver.h"
+#include "internal.h"
 #include "op_handler.h"
 
 #define MAX_LINE_LENGTH 1024
@@ -67,6 +68,7 @@ static bool process_console_chunk(const char *buf, ssize_t nread,
 
 static void setup(void) {
   console = filp_open("/dev/console", O_RDONLY, 0);
+  kstep_cov_init();
 }
 
 static void run(void) {
