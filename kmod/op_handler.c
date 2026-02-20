@@ -83,10 +83,10 @@ static bool op_task_fork(int a, int b, int c) {
   struct task_struct *p;
   (void)c;
   
-  if (!is_valid_task_id(a) || !kstep_tasks[a])
-    panic("Invalid waker task id");
-  if (!is_valid_task_id(b) || kstep_tasks[b])
-    panic("Invalid wakee task id");
+  if (!is_valid_task_id(a) || !is_valid_task_id(b))
+    return false;
+  if (!kstep_tasks[a] || kstep_tasks[b])
+    return false;
 
   waker_task = kstep_tasks[a];
   kstep_tick_until(waker_on_cpu);
@@ -94,7 +94,7 @@ static bool op_task_fork(int a, int b, int c) {
   kstep_task_fork(waker_task, 1);
   p = find_new_child(kstep_tasks[a]);
   if (!p)
-    panic("Failed to find forked child");
+    return false;
 
   kstep_tasks[b] = p;
   return true;
@@ -102,7 +102,7 @@ static bool op_task_fork(int a, int b, int c) {
 
 static bool op_task_pin(int a, int b, int c) {
   if (!is_valid_task_id(a) || !kstep_tasks[a])
-    panic("Invalid task id");
+    return false;
   kstep_task_pin(kstep_tasks[a], b, c);
   return true;
 }
@@ -111,7 +111,7 @@ static bool op_task_fifo(int a, int b, int c) {
   (void)b;
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a])
-    panic("Invalid task id");
+    return false;
 
   // Move the task back to the root cgroup, otherwise the set_schedprio will fail
   kstep_cgroup_add_task("", kstep_tasks[a]->pid);
@@ -120,11 +120,20 @@ static bool op_task_fifo(int a, int b, int c) {
   return true;
 }
 
+static bool op_task_cfs(int a, int b, int c) {
+  (void)b;
+  (void)c;
+  if (!is_valid_task_id(a) || !kstep_tasks[a])
+    return false;
+  kstep_task_cfs(kstep_tasks[a]);
+  return true;
+}
+
 static bool op_task_pause(int a, int b, int c) {
   (void)b;
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a])
-    panic("Invalid task id");
+    return false;
   kstep_task_pause(kstep_tasks[a]);
   return true;
 }
@@ -133,7 +142,7 @@ static bool op_task_wakeup(int a, int b, int c) {
   (void)b;
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a])
-    panic("Invalid task id");
+    return false;
   kstep_task_wakeup(kstep_tasks[a]);
   return true;
 }
@@ -141,7 +150,9 @@ static bool op_task_wakeup(int a, int b, int c) {
 static bool op_task_set_prio(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a])
-    panic("Invalid task id");
+    return false;
+  if (b < -20 || b > 19)
+    return false;
   kstep_task_set_prio(kstep_tasks[a], b);
   return true;
 }
@@ -169,15 +180,15 @@ static bool op_cgroup_create(int a, int b, int c) {
   (void)c;
 
   if (!is_valid_cgroup_id(child_id) || cgroup_exists[child_id])
-    panic("Invalid cgroup child id");
+    return false;
   if (parent_id != -1 && (!is_valid_cgroup_id(parent_id) || !cgroup_exists[parent_id]))
-    panic("Invalid cgroup parent id");
+    return false;
 
   cgroup_parent_id[child_id] = parent_id;
   cgroup_exists[child_id] = true;
 
   if (!build_cgroup_name(child_id, name))
-    panic("Failed to build cgroup name");
+    return false;
 
   // Move the task back to the root cgroup: only the leaf cgroup has tasks in cgroupv2
   for (int i = 0; i < MAX_TASKS; i++) {
@@ -196,14 +207,14 @@ static bool op_cgroup_set_cpuset(int a, int b, int c) {
   char cpuset[32];
 
   if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
-    panic("Invalid cgroup id");
+    return false;
   if (!build_cgroup_name(a, name))
-    panic("Failed to build cgroup name");
+    return false;
   if (b > c || b < 1 || c > num_online_cpus() - 1)
-    panic("Invalid cpuset range");
+    return false;
 
   if (scnprintf(cpuset, sizeof(cpuset), "%d-%d", b, c) >= sizeof(cpuset))
-    panic("Failed to build cpuset range");
+    return false;
 
   kstep_cgroup_set_cpuset(name, cpuset);
   return true;
@@ -214,11 +225,11 @@ static bool op_cgroup_set_weight(int a, int b, int c) {
   (void)c;
 
   if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
-    panic("Invalid cgroup id");
+    return false;
   if (!build_cgroup_name(a, name))
-    panic("Failed to build cgroup name");
+    return false;
   if (b <= 0 || b > 10000)
-    panic("Invalid cgroup weight");
+    return false;
 
   kstep_cgroup_set_weight(name, b);
   return true;
@@ -231,13 +242,11 @@ static bool op_cgroup_add_task(int a, int b, int c) {
   (void)c;
 
   if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
-    panic("Invalid cgroup id");
-  
+    return false;
   if (!build_cgroup_name(a, name))
-    panic("Failed to build cgroup name");
-
+    return false;
   if (!is_valid_task_id(b) || !kstep_tasks[b])
-    panic("Invalid task id");
+    return false;
 
   kstep_cgroup_add_task(name, kstep_tasks[b]->pid);
 
@@ -252,6 +261,7 @@ static op_handler_fn op_handlers[OP_TYPE_NR] = {
     [OP_TASK_FORK] = op_task_fork,
     [OP_TASK_PIN] = op_task_pin,
     [OP_TASK_FIFO] = op_task_fifo,
+    [OP_TASK_CFS] = op_task_cfs,
     [OP_TASK_PAUSE] = op_task_pause,
     [OP_TASK_WAKEUP] = op_task_wakeup,
     [OP_TASK_SET_PRIO] = op_task_set_prio,
@@ -265,28 +275,44 @@ static op_handler_fn op_handlers[OP_TYPE_NR] = {
     [OP_CPU_SET_CAPACITY] = NULL,
 };
 
-bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
-  u32 cmd_id;
+static const char op_strs[OP_TYPE_NR][30] = {
+  [OP_TASK_CREATE] = "TASK_CREATE",
+  [OP_TASK_FORK] = "TASK_FORK",
+  [OP_TASK_PIN] = "TASK_PIN",
+  [OP_TASK_FIFO] = "TASK_FIFO",
+  [OP_TASK_CFS] = "TASK_CFS",
+  [OP_TASK_PAUSE] = "TASK_PAUSE",
+  [OP_TASK_WAKEUP] = "TASK_WAKEUP",
+  [OP_TASK_SET_PRIO] = "TASK_SET_PRIO",
+  [OP_TICK] = "TICK",
+  [OP_TICK_REPEAT] = "TICK_REPEAT",
+  [OP_CGROUP_CREATE] = "CGROUP_CREATE",
+  [OP_CGROUP_SET_CPUSET] = "CGROUP_SET_CPUSET",
+  [OP_CGROUP_SET_WEIGHT] = "CGROUP_SET_WEIGHT",
+  [OP_CGROUP_ADD_TASK] = "CGROUP_ADD_TASK",
+  [OP_CPU_SET_FREQ] = "CPU_SET_FREQ",
+  [OP_CPU_SET_CAPACITY] = "CPU_SET_CAPACITY",
+};
 
+void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
   if (type < 0 || type >= OP_TYPE_NR)
-    return false;
+    panic("Operation failed: %d %d %d %d\n", type, a, b, c);
   if (!op_handlers[type]) {
     TRACE_INFO("Operation not implemented: %d\n", type);
-    return false;
+    return;
   }
 
-  if (type == OP_TICK_REPEAT)
-    return op_handlers[type](a, b, c);
-
-  cmd_id = kstep_cov_cmd_id_inc();
-  kstep_cov_enable();
-  if (!op_handlers[type](a, b, c)) {
+  if (type == OP_TICK_REPEAT) {
+    op_handlers[type](a, b, c);
+  } else {
+    kstep_cov_cmd_id_inc();
+    kstep_cov_enable();
+    if (!op_handlers[type](a, b, c))
+      panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
+    
     kstep_cov_disable();
-    return false;
+    kstep_cov_dump_signal();
+    kstep_cov_dump_pcs();
+    kstep_cov_reset();
   }
-  kstep_cov_disable();
-  kstep_cov_dump_signal(cmd_id);
-  kstep_cov_dump();
-  kstep_cov_reset();
-  return true;
 }
