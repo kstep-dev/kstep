@@ -15,6 +15,7 @@ from scripts import (
     LATEST_COV,
     LATEST_LOG,
     LATEST_OUT,
+    LATEST_SIGNAL,
     LINUX_BUILD_DIR,
     LINUX_CURR_DIR,
     LOGS_DIR,
@@ -22,6 +23,7 @@ from scripts import (
     QEMU_DIR,
     ROOTFS_DIR,
     kcov_symbolize,
+    parse_signal_file,
     system,
     system_with_pipe,
     update_latest,
@@ -72,9 +74,11 @@ def run_qemu(
     log_file = log_file or LOGS_DIR / f"log-{timestamp}.log"
     out_file = log_file.with_suffix(".out")
     cov_file = log_file.with_suffix(".cov")
+    signal_file = log_file.with_suffix(".signal")
     update_latest(LATEST_LOG, log_file)
     update_latest(LATEST_OUT, out_file)
     update_latest(LATEST_COV, cov_file)
+    update_latest(LATEST_SIGNAL, signal_file)
 
     boot_args = [
         "rw",
@@ -129,6 +133,9 @@ def run_qemu(
         # cov file
         f"-chardev file,id=char2,path={cov_file}",
         serial_device("char2"),
+        # signal file
+        f"-chardev file,id=char3,path={signal_file}",
+        serial_device("char3"),
         # acceleration
         f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]
@@ -149,10 +156,17 @@ def pipe_to_qemu(proc: subprocess.Popen, stdin_payload: str):
     proc.stdin.flush()
 
 
-def print_run_results(log_file=LATEST_LOG, out_file=LATEST_OUT, cov_file=LATEST_COV):
+def print_run_results(
+    log_file=LATEST_LOG, 
+    out_file=LATEST_OUT, 
+    cov_file=LATEST_COV, 
+    signal_file=LATEST_SIGNAL,
+    vmlinux: Optional[Path] = None,
+):
     print(f"Log: {log_file}")
     print(f"Out: {out_file}")
     print(f"Cov: {cov_file}")
+    print(f"Signal: {signal_file}")
 
     # Print the last line for status
     with out_file.open() as f:
@@ -166,6 +180,10 @@ def print_run_results(log_file=LATEST_LOG, out_file=LATEST_OUT, cov_file=LATEST_
         linux_name = LINUX_CURR_DIR.resolve().name
         vmlinux = LINUX_BUILD_DIR / f"{linux_name}.vmlinux"
         kcov_symbolize(cov_file=cov_file, vmlinux=vmlinux)
+
+    # check if signal (edge coverage) is empty and parse it if it is not
+    if signal_file.exists() and signal_file.stat().st_size != 0:
+        parse_signal_file(signal_file)
 
 
 def is_port_free(port: int) -> bool:
