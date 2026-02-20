@@ -40,6 +40,10 @@ static void handler(int signum, siginfo_t *info, void *context) {
     struct sched_param sp = {.sched_priority = 80};
     if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0)
       panic("sched_setscheduler failed");
+  } else if (code == SIGCODE_CFS) {
+    struct sched_param sp = {.sched_priority = 0};
+    if (sched_setscheduler(0, SCHED_OTHER, &sp) != 0)
+      panic("sched_setscheduler failed");
   } else {
     panic("Unknown signal code: %d\n", code);
   }

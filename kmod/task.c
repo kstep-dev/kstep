@@ -81,6 +81,11 @@ void kstep_task_fifo(struct task_struct *p) {
   TRACE_INFO("Set task %d to FIFO", p->pid);
 }
 
+void kstep_task_cfs(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_CFS, 0, 0, 0);
+  TRACE_INFO("Set task %d to CFS", p->pid);
+}
+
 void kstep_task_pin(struct task_struct *p, int begin, int end) {
   kstep_task_signal(p, SIGCODE_PIN, begin, end, 0);
   // Avoid high-volume logs in migration-heavy reproducers.

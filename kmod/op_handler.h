@@ -8,6 +8,7 @@ enum kstep_op_type {
   OP_TASK_FORK,
   OP_TASK_PIN,
   OP_TASK_FIFO,
+  OP_TASK_CFS,
   OP_TASK_PAUSE,
   OP_TASK_WAKEUP,
   OP_TASK_SET_PRIO,

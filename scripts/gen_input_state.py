@@ -28,6 +28,7 @@ class GenState:
     tasks: List[int] = field(default_factory=list) # list of task ids
     task_state: dict = field(default_factory=dict) # key: task id, value: state
     cgroups: dict = field(default_factory=dict) # key: cgroup id, value: Cgroup
+    leaf_cgroups: list[int] = field(default_factory=list) # list of leaf cgroup ids
 
     # ======
     # Task related functions
@@ -104,6 +105,11 @@ class GenState:
 
     def choose_cgroup(self) -> int:
         return self.rnd.choice(list(self.cgroups.keys()))
+    
+    def choose_leaf_cgroup(self) -> int:
+        if not self.leaf_cgroups:
+            return self.choose_cgroup()
+        return self.rnd.choice(self.leaf_cgroups)
 
     def next_cgroup_id(self) -> Optional[int]:
         for i in range(self.max_cgroups):
@@ -126,6 +132,10 @@ class GenState:
             parent_id=parent_id,
             cpuset=cpuset,
         )
+        if child_id not in self.leaf_cgroups:
+            self.leaf_cgroups.append(child_id)
+        if parent_id != -1 and parent_id in self.leaf_cgroups:
+            self.leaf_cgroups.remove(parent_id)
 
     def cgroup_name(self, cgroup_id: int) -> str:
         parts = [f"cg{cgroup_id}"]
