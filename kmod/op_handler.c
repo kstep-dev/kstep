@@ -275,7 +275,7 @@ static op_handler_fn op_handlers[OP_TYPE_NR] = {
     [OP_CPU_SET_CAPACITY] = NULL,
 };
 
-static char *op_strs[OP_TYPE_NR] = {
+static const char op_strs[OP_TYPE_NR][30] = {
   [OP_TASK_CREATE] = "TASK_CREATE",
   [OP_TASK_FORK] = "TASK_FORK",
   [OP_TASK_PIN] = "TASK_PIN",
