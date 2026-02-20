@@ -126,7 +126,6 @@ void kstep_cov_reset(void) {
 // Hash map to track the previous PC and signals for each PID
 struct slot_entry {
   u32 pid;
-  bool used;
   u64 prev_pc;
   u32 sig_count;
   u64 sigs[SIG_CHUNK_SIZE];
@@ -148,11 +147,9 @@ static __always_inline int get_slot_by_pid(u32 pid) {
   u32 idx = pid & (PID_MAP_SIZE - 1);
   for (u32 i = 0; i < PID_MAP_SIZE; i++) {
     u32 pos = (idx + i) & (PID_MAP_SIZE - 1);
-    if (!slot_entries[pos].used) {
-      slot_entries[pos].used = true;
+    if (slot_entries[pos].sig_count == 0) {
       slot_entries[pos].pid = pid;
       slot_entries[pos].prev_pc = 0;
-      slot_entries[pos].sig_count = 0;
       return pos;
     }
     if (slot_entries[pos].pid == pid) {
@@ -173,7 +170,7 @@ static __always_inline void kstep_cov_flush_sigs(u32 slot, u32 cmd_id) {
   kernel_write(sig_file, &count, sizeof(u32), 0);
   kernel_write(sig_file, slot_entries[slot].sigs, count * sizeof(u64), 0);
 
-  slot_entries[slot].used = false;
+  slot_entries[slot].sig_count = 0;
 }
 
 void kstep_cov_dump_signal(u32 cmd_id) {
@@ -201,14 +198,14 @@ void kstep_cov_dump_signal(u32 cmd_id) {
 
       sig_count = slot_entries[slot].sig_count;
       slot_entries[slot].sigs[sig_count] = sig;
-      slot_entries[slot].sig_count = sig_count + 1;
-      if (sig_count == SIG_CHUNK_SIZE)
+      slot_entries[slot].sig_count++;
+      if (slot_entries[slot].sig_count == SIG_CHUNK_SIZE)
         kstep_cov_flush_sigs(slot, cmd_id);
     }
   }
 
   for (u32 slot = 0; slot < PID_MAP_SIZE; slot++) {
-    if (!slot_entries[slot].used)
+    if (slot_entries[slot].sig_count == 0)
       continue;
     kstep_cov_flush_sigs(slot, cmd_id);
   }
