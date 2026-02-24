@@ -12,7 +12,7 @@ from run import (
     print_run_results,
     run_qemu,
 )
-from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input
+from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input, GLOBAL_SIGNAL_CORPUS, parse_signal_file
 
 def smp_to_cpus(smp: str) -> int:
     try:
@@ -35,7 +35,7 @@ def assert_exec_matches_generated(log_file, seq):
     f.close()
     if i != len(seq):
         raise AssertionError(f"EXECOP sequence mismatch. Expected {len(seq)} ops, got {i} ops.")
-
+    
 def run_test(
     linux: Linux,
     smp: str,
@@ -87,13 +87,28 @@ def run_test(
     return_code = proc.wait()
     print(f"QEMU returned with code: {return_code}")
 
-    print_run_results(
-        log_file=log_file, 
-        out_file=out_file, 
-        cov_file=cov_file, 
-        signal_file=signal_file,
-    )
     assert_exec_matches_generated(log_file, seq)
+
+    cmd_task_signals, signals = parse_signal_file(signal_file)
+    new_signals = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
+        seq=seq,
+        signal_records=set(signals),
+        linux_version=linux.version,
+    )
+
+    GLOBAL_SIGNAL_CORPUS.analyze_per_task_signals(
+        seq=seq,
+        cmd_task_signals=cmd_task_signals,
+        new=new_signals if new_signals else set(),
+    )
+
+    print_run_results(
+        log_file=log_file,
+        out_file=out_file,
+        cov_file=cov_file,
+    )
+    
+    return new_signals
 
 def main():
     parser = argparse.ArgumentParser()

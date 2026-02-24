@@ -1,6 +1,7 @@
 import logging
 
 from .consts import *
+from .corpus import *
 from .gen_input_core import *
 from .kcov_symbolize import *
 from .kcov_parse_signal import *

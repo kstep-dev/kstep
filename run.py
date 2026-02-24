@@ -160,13 +160,11 @@ def print_run_results(
     log_file=LATEST_LOG, 
     out_file=LATEST_OUT, 
     cov_file=LATEST_COV, 
-    signal_file=LATEST_SIGNAL,
     vmlinux: Optional[Path] = None,
 ):
     print(f"Log: {log_file}")
     print(f"Out: {out_file}")
     print(f"Cov: {cov_file}")
-    print(f"Signal: {signal_file}")
 
     # Print the last line for status
     with out_file.open() as f:
@@ -180,10 +178,6 @@ def print_run_results(
         linux_name = LINUX_CURR_DIR.resolve().name
         vmlinux = LINUX_BUILD_DIR / f"{linux_name}.vmlinux"
         kcov_symbolize(cov_file=cov_file, vmlinux=vmlinux)
-
-    # check if signal (edge coverage) is empty and parse it if it is not
-    if signal_file.exists() and signal_file.stat().st_size != 0:
-        parse_signal_file(signal_file)
 
 
 def is_port_free(port: int) -> bool:
