@@ -2,12 +2,9 @@ import logging
 import random
 
 from .consts import LOGS_DIR
-from .gen_input_state import (
-    GenState,
-    TASK_RUNNABLE,
-    TASK_SLEEPING,
-)
-from .gen_input_ops import build_ops, RESOURCE_TASK, RESOURCE_CGROUP, OP_NAME_TO_TYPE
+from .gen_input_state import GenState, TASK_RUNNABLE, TASK_SLEEPING
+from .gen_input_ops import build_ops, RESOURCE_TASK, RESOURCE_CGROUP, OP_NAME_TO_TYPE, OP_TYPE_TO_NAME
+from .input_seq import InputSeq
 
 
 def choose_op(m: GenState, ops):
@@ -36,12 +33,12 @@ def pick_producer(ops, res: str):
     return None
 
 
-def generate_sequence(steps: int, max_tasks: int, max_cgroups: int, cpus: int, seed: int):
+def generate_sequence(steps: int, max_tasks: int, max_cgroups: int, cpus: int, seed: int) -> InputSeq:
     logger = logging.getLogger("gen_input")
     rnd = random.Random(seed)
     m = GenState(max_tasks=max_tasks, max_cgroups=max_cgroups, cpus=cpus, rnd=rnd)
     ops = build_ops()
-    seq = []
+    seq = InputSeq()
     while len(seq) < steps:
         op = choose_op(m, ops)
         for res in op.requires:
@@ -56,7 +53,7 @@ def generate_sequence(steps: int, max_tasks: int, max_cgroups: int, cpus: int, s
     return seq
 
 
-def validate_sequence(seq, max_tasks: int, max_cgroups: int, cpus: int) -> bool:
+def validate_sequence(seq: InputSeq, max_tasks: int, max_cgroups: int, cpus: int) -> bool:
     tasks = set()
     cgroups = set()
     cgroup_parent = {}
@@ -64,8 +61,8 @@ def validate_sequence(seq, max_tasks: int, max_cgroups: int, cpus: int) -> bool:
     task_state = {}
     logger = logging.getLogger("gen_input")
 
-    def fail(idx: int, name: str, a: int, b: int, c: int, msg: str) -> bool:
-        logger.error(f"validate op {idx}: ({name}, {a}, {b}, {c}) -> FAIL: {msg}")
+    def fail(idx: int, op_type: int, a: int, b: int, c: int, msg: str) -> bool:
+        logger.error(f"validate op {idx}: ({OP_TYPE_TO_NAME[op_type]}, {a}, {b}, {c}) -> FAIL: {msg}")
         return False
 
     def check_cpu_range(begin: int, end: int) -> bool:
@@ -156,7 +153,7 @@ def generate_input(
     max_cgroups: int,
     cpus: int,
     seed: int | None,
-) -> list[tuple[int, int, int, int]]:
+) -> InputSeq:
 
     log_path = LOGS_DIR / f"gen_input_{seed}.log"
     

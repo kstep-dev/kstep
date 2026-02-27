@@ -22,8 +22,7 @@ from scripts import (
     PROJ_DIR,
     QEMU_DIR,
     ROOTFS_DIR,
-    kcov_symbolize,
-    parse_signal_file,
+    cov_symbolize,
     system,
     system_with_pipe,
     update_latest,
@@ -160,13 +159,11 @@ def print_run_results(
     log_file=LATEST_LOG, 
     out_file=LATEST_OUT, 
     cov_file=LATEST_COV, 
-    signal_file=LATEST_SIGNAL,
     vmlinux: Optional[Path] = None,
 ):
     print(f"Log: {log_file}")
     print(f"Out: {out_file}")
     print(f"Cov: {cov_file}")
-    print(f"Signal: {signal_file}")
 
     # Print the last line for status
     with out_file.open() as f:
@@ -179,11 +176,7 @@ def print_run_results(
     if cov_file.exists() and cov_file.stat().st_size != 0:
         linux_name = LINUX_CURR_DIR.resolve().name
         vmlinux = LINUX_BUILD_DIR / f"{linux_name}.vmlinux"
-        kcov_symbolize(cov_file=cov_file, vmlinux=vmlinux)
-
-    # check if signal (edge coverage) is empty and parse it if it is not
-    if signal_file.exists() and signal_file.stat().st_size != 0:
-        parse_signal_file(signal_file)
+        cov_symbolize(cov_file=cov_file, vmlinux=vmlinux)
 
 
 def is_port_free(port: int) -> bool:

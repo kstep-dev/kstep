@@ -170,10 +170,19 @@ static __always_inline void kstep_cov_flush_sigs(u32 slot, u32 cmd_id) {
   if (count == 0)
     return;
 
-  kernel_write(sig_file, &slot_entries[slot].pid, sizeof(u32), 0);
-  kernel_write(sig_file, &cmd_id, sizeof(u32), 0);
-  kernel_write(sig_file, &count, sizeof(u32), 0);
-  kernel_write(sig_file, slot_entries[slot].sigs, count * sizeof(u64), 0);
+  struct {
+    u32 pid;
+    u32 cmd_id;
+    u64 sig;
+  } records[SIG_CHUNK_SIZE];
+
+  for (u32 i = 0; i < count; i++) {
+    records[i].pid = slot_entries[slot].pid;
+    records[i].cmd_id = cmd_id;
+    records[i].sig = slot_entries[slot].sigs[i];
+  }
+
+  kernel_write(sig_file, records, count * sizeof(records[0]), 0);
 
   slot_entries[slot].sig_count = 0;
 }

@@ -7,7 +7,7 @@ from pathlib import Path
 from .consts import LATEST_COV_JSON, update_latest
 
 
-def parse_kcov_pcs(log_file: Path) -> list[tuple[int, int, int]]:
+def cov_parse_pcs(log_file: Path) -> list[tuple[int, int, int]]:
     bytes = log_file.read_bytes()
     return [
         (
@@ -59,12 +59,12 @@ def dump_pcs(entries: list[dict[str, str]], output: Path):
         json.dump(entries, f, indent=2)
 
 
-def kcov_symbolize(cov_file: Path, vmlinux: Path) -> None:
+def cov_symbolize(cov_file: Path, vmlinux: Path) -> None:
     output_file = Path(f"{cov_file.resolve()}.json")
     if not vmlinux.exists():
         raise RuntimeError(f"Missing vmlinux: {vmlinux}")
 
-    cov_entries = parse_kcov_pcs(cov_file)
+    cov_entries = cov_parse_pcs(cov_file)
 
     if not cov_entries:
         raise RuntimeError("No KCOV PCs found in log")

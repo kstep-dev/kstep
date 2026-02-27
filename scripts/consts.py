@@ -17,6 +17,7 @@ DOWNLOAD_DIR = DATA_DIR / "download"
 ROOTFS_DIR = DATA_DIR / "rootfs"
 LOGS_DIR = DATA_DIR / "logs"
 QEMU_DIR = DATA_DIR / "qemu"
+CORPUS_DIR = DATA_DIR / "corpus"
 
 LATEST_LOG = DATA_DIR / "latest.log"
 LATEST_OUT = DATA_DIR / "latest.out"

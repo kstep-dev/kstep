@@ -12,7 +12,7 @@ from run import (
     print_run_results,
     run_qemu,
 )
-from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input
+from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input, GLOBAL_SIGNAL_CORPUS, cov_parse_signal
 
 def smp_to_cpus(smp: str) -> int:
     try:
@@ -35,7 +35,7 @@ def assert_exec_matches_generated(log_file, seq):
     f.close()
     if i != len(seq):
         raise AssertionError(f"EXECOP sequence mismatch. Expected {len(seq)} ops, got {i} ops.")
-
+    
 def run_test(
     linux: Linux,
     smp: str,
@@ -80,20 +80,40 @@ def run_test(
     # Supported commands:
     # INT,INT,INT,INT: run single operation
     # EXIT: exit the qemu
-    payload_str = "\n".join(f"{op[0]},{op[1]},{op[2]},{op[3]}" for op in seq) + "\n"
+    payload_str = seq.to_payload()
     pipe_to_qemu(proc=proc, stdin_payload=payload_str)
     pipe_to_qemu(proc=proc, stdin_payload="EXIT\n")
 
     return_code = proc.wait()
     print(f"QEMU returned with code: {return_code}")
 
-    print_run_results(
-        log_file=log_file, 
-        out_file=out_file, 
-        cov_file=cov_file, 
-        signal_file=signal_file,
-    )
     assert_exec_matches_generated(log_file, seq)
+
+    # Parse the signal file and get the signal records and list
+    signal_records, signal_list = cov_parse_signal(signal_file)
+
+    # Analyze the new signals for the test
+    new_signals = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
+        seq=seq,
+        signal_records=set(signal_list),
+        linux_version=linux.version,
+    )
+
+    # Analyze the per-action signals for the test if there are new signals
+    if new_signals:
+        GLOBAL_SIGNAL_CORPUS.analyze_per_action_signals(
+            seq=seq,
+            signal_records=signal_records,
+            new_signals=new_signals,
+        )
+
+    print_run_results(
+        log_file=log_file,
+        out_file=out_file,
+        cov_file=cov_file,
+    )
+    
+    return new_signals
 
 def main():
     parser = argparse.ArgumentParser()

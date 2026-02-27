@@ -26,6 +26,7 @@ OP_NAME_TO_TYPE = {
     "CPU_SET_FREQ": 14,
     "CPU_SET_CAPACITY": 15,
 }
+OP_TYPE_TO_NAME = {v: k for k, v in OP_NAME_TO_TYPE.items()}
 
 @dataclass
 class Op:
