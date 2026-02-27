@@ -22,8 +22,7 @@ from scripts import (
     PROJ_DIR,
     QEMU_DIR,
     ROOTFS_DIR,
-    kcov_symbolize,
-    parse_signal_file,
+    cov_symbolize,
     system,
     system_with_pipe,
     update_latest,
@@ -177,7 +176,7 @@ def print_run_results(
     if cov_file.exists() and cov_file.stat().st_size != 0:
         linux_name = LINUX_CURR_DIR.resolve().name
         vmlinux = LINUX_BUILD_DIR / f"{linux_name}.vmlinux"
-        kcov_symbolize(cov_file=cov_file, vmlinux=vmlinux)
+        cov_symbolize(cov_file=cov_file, vmlinux=vmlinux)
 
 
 def is_port_free(port: int) -> bool:

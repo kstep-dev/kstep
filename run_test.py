@@ -12,7 +12,7 @@ from run import (
     print_run_results,
     run_qemu,
 )
-from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input, GLOBAL_SIGNAL_CORPUS, parse_signal_file
+from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input, GLOBAL_SIGNAL_CORPUS, cov_parse_signal
 
 def smp_to_cpus(smp: str) -> int:
     try:
@@ -80,7 +80,7 @@ def run_test(
     # Supported commands:
     # INT,INT,INT,INT: run single operation
     # EXIT: exit the qemu
-    payload_str = "\n".join(f"{op[0]},{op[1]},{op[2]},{op[3]}" for op in seq) + "\n"
+    payload_str = seq.to_payload()
     pipe_to_qemu(proc=proc, stdin_payload=payload_str)
     pipe_to_qemu(proc=proc, stdin_payload="EXIT\n")
 
@@ -89,18 +89,23 @@ def run_test(
 
     assert_exec_matches_generated(log_file, seq)
 
-    cmd_task_signals, signals = parse_signal_file(signal_file)
+    # Parse the signal file and get the signal records and list
+    signal_records, signal_list = cov_parse_signal(signal_file)
+
+    # Analyze the new signals for the test
     new_signals = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
         seq=seq,
-        signal_records=set(signals),
+        signal_records=set(signal_list),
         linux_version=linux.version,
     )
 
-    GLOBAL_SIGNAL_CORPUS.analyze_per_task_signals(
-        seq=seq,
-        cmd_task_signals=cmd_task_signals,
-        new=new_signals if new_signals else set(),
-    )
+    # Analyze the per-action signals for the test if there are new signals
+    if new_signals:
+        GLOBAL_SIGNAL_CORPUS.analyze_per_action_signals(
+            seq=seq,
+            signal_records=signal_records,
+            new_signals=new_signals,
+        )
 
     print_run_results(
         log_file=log_file,

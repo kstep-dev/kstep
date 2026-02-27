@@ -1,86 +1,88 @@
-import hashlib
 import json
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Iterable
-
 from .consts import CORPUS_DIR
-from .gen_input_ops import OP_NAME_TO_TYPE
+from .gen_input_ops import OP_NAME_TO_TYPE, OP_TYPE_TO_NAME
+from .input_seq import InputSeq
 
 class SignalCorpus:
     def __init__(self):
         self.seen: set[int] = set()
         CORPUS_DIR.mkdir(parents=True, exist_ok=True)
 
-    def seq_digest(self, seq: Iterable[tuple[int, int, int, int]]) -> str:
-        return hashlib.sha256(json.dumps(seq, separators=(",", ":")).encode("utf-8")).hexdigest()
-
+    # Analyze the new signals for a test, return the new signals if any
     def analyze_new_signals(
         self,
-        seq: Iterable[tuple[int, int, int, int]],
+        seq: InputSeq,
         signal_records: set[int],
         linux_version: str,
     ) -> set[int] | None:
+        # Check if the records have been seen before or not
         new = set(signal_records) - self.seen
         if not new:
             print("signal: no new signals found")
             return None
-
         self.seen.update(new)
 
-        digest = self.seq_digest(seq)
-        entry_path = CORPUS_DIR / f"{digest}.json"
-
-        entry = {
-            "seq": seq, # input sequence
+        # Dump the test into the corpus directory if it hits new signals
+        save_path = CORPUS_DIR / f"{seq.digest()}.json"
+        data = {
+            "seq": seq.to_list(), # input sequence
             "new_signals": sorted(new), # new signals in the signal file
             "linux_version": linux_version,
         }
-
-        print(f"Signal: found {len(new)} new signals, dumping to {entry_path}")
-        with open(entry_path, "w", encoding="utf-8") as f:
-            json.dump(entry, f, indent=2)
+        print(f"Signal: found {len(new)} new signals, dumping to {save_path}")
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
 
         return new
 
-    def analyze_per_task_signals(
+    # Analyze the per-action (each command each pid's action is an action) signals for a test
+    # Save the new signal hit by each task
+    # If a task hits a new signal, the following tasks hit the same signal will not be recorded
+    def analyze_per_action_signals(
         self,
-        seq: Iterable[tuple[int, int, int, int]], # input sequence
-        cmd_task_signals: list[dict[str, int]], # cmd_id -> pid -> set of new signals, sorted by cmd_id and pid
-        new: set[int], # new signals
-    ) -> dict[int, dict] | None:
-        op_type_to_name = {v: k for k, v in OP_NAME_TO_TYPE.items()}
+        seq: InputSeq,
+        signal_records: list[dict[str, int]], # each entry is a signal record, cmd_id -> pid -> sig
+        new_signals: set[int],
+    ) -> dict[int, dict]:
         tick_repeat = OP_NAME_TO_TYPE["TICK_REPEAT"]
         cmd_meta: dict[int, dict] = {}
         cmd_id = 0
+
+        # Initialize the command metadata for each command in the sequence
+        # For tick_repeat, create multiple entries for each tick
         for op_type, a, b, c in seq:
-            common = {"new_signals": {}}  # pid -> set of new signals
-            entries: list[tuple[str, list[int]]] = []
+            cmd_entries: list[tuple[str, list[int]]] = []
             if op_type == tick_repeat:
-                entries.extend((f"TICK_REPEAT_{i}", [0, 0, 0]) for i in range(a))
+                cmd_entries.extend((f"TICK_REPEAT_{i}", [0, 0, 0]) for i in range(a))
             else:
-                entries.append((op_type_to_name.get(op_type, f"OP_{op_type}"), [a, b, c]))
+                cmd_entries.append((OP_TYPE_TO_NAME[op_type], [a, b, c]))
 
-            for cmd_name, cmd_args in entries:
+            for cmd_name, cmd_args in cmd_entries:
                 cmd_id += 1
-
                 cmd_meta[cmd_id] = {
                     "cmd_id": cmd_id,
                     "cmd_name": cmd_name,
                     "cmd_args": cmd_args,
-                    **common,
+                    "new_signals": {}, # pid -> set of new signals
                 }
                 
-        for rec in cmd_task_signals:
+        for rec in signal_records:
             if rec["cmd_id"] not in cmd_meta:
                 raise ValueError(f"command {rec["cmd_id"]} not found in cmd_meta")
-            if rec["sig"] in new:
-                cmd_meta[rec["cmd_id"]]["new_signals"].setdefault(rec["pid"], list[int]()).append(rec["sig"])
-                new.remove(rec["sig"])
+            if rec["sig"] in new_signals:
+                # Add the signal to the new signals for the action if the task hits that new signal
+                # Remove the signal from the new signals set if it has been recorded
+                # So that the following tasks hit the same signal will not be recorded
+                new_signals_by_action = cmd_meta[rec["cmd_id"]]["new_signals"]
+                if rec["pid"] not in new_signals_by_action:
+                    new_signals_by_action[rec["pid"]] = []
+                new_signals_by_action[rec["pid"]].append(rec["sig"])
+                new_signals.remove(rec["sig"])
 
-        digest = self.seq_digest(seq)
-        print(f"Signal: dumping per-task new signals to {CORPUS_DIR / f'{digest}_per_task.json'}")
-        with open(CORPUS_DIR / f"{digest}_per_task.json", "w", encoding="utf-8") as f:
+        # Dump the per-action new signals to the corpus directory
+        save_path = CORPUS_DIR / f"{seq.digest()}_per_action.json"  
+        print(f"Signal: dumping per-action new signals to {save_path}")
+        with open(save_path, "w", encoding="utf-8") as f:
             json.dump(cmd_meta, f, indent=2)
 
         return cmd_meta
