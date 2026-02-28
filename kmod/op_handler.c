@@ -311,8 +311,6 @@ void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
       panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
     
     kstep_cov_disable();
-    kstep_cov_dump_signal();
-    kstep_cov_dump_pcs();
-    kstep_cov_reset();
+    kstep_cov_dump();
   }
 }

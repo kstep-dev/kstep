@@ -175,8 +175,7 @@ def print_run_results(
     # check if cov is empty and call kcov_symbolize if it is not
     if cov_file.exists() and cov_file.stat().st_size != 0:
         linux_name = LINUX_CURR_DIR.resolve().name
-        vmlinux = LINUX_BUILD_DIR / f"{linux_name}.vmlinux"
-        cov_symbolize(cov_file=cov_file, vmlinux=vmlinux)
+        cov_symbolize(cov_file=cov_file, linux_name=linux_name)
 
 
 def is_port_free(port: int) -> bool:
