@@ -12,7 +12,7 @@ from run import (
     print_run_results,
     run_qemu,
 )
-from scripts import LINUX_ROOT_DIR, LOGS_DIR, generate_input, GLOBAL_SIGNAL_CORPUS, cov_parse_signal
+from scripts import LINUX_ROOT_DIR, LINUX_BUILD_DIR, LOGS_DIR, generate_input, GLOBAL_SIGNAL_CORPUS, cov_parse
 
 def smp_to_cpus(smp: str) -> int:
     try:
@@ -44,7 +44,7 @@ def run_test(
     max_cgroups: int,
     seed: int,
 ):
-    linux_dir = LINUX_ROOT_DIR / f"test_{linux.name}"
+    linux_dir = LINUX_ROOT_DIR / f"{linux.name}"
     checkout_linux(linux.version, linux_dir=linux_dir, tarball=True)
     make_linux(linux_dir=linux_dir)
 
@@ -64,10 +64,9 @@ def run_test(
 
     make_kstep(linux_dir=linux_dir)
 
-    log_file = LOGS_DIR / f"test_{linux.name}.log"
+    log_file = LOGS_DIR / f"{linux.name}.log"
     out_file = log_file.with_suffix(".out")
     cov_file = log_file.with_suffix(".cov")
-    signal_file = log_file.with_suffix(".signal")
 
     proc = run_qemu(
         linux_dir=linux_dir,
@@ -90,12 +89,18 @@ def run_test(
     assert_exec_matches_generated(log_file, seq)
 
     # Parse the signal file and get the signal records and list
-    signal_records, signal_list = cov_parse_signal(signal_file)
+    signal_records = cov_parse(cov_file)
+
+    # Symbolize the pcs
+    GLOBAL_SIGNAL_CORPUS.update_pc_symbolize(
+        signal_records=signal_records,
+        linux_name=linux.name,
+    )
 
     # Analyze the new signals for the test
     new_signals = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
         seq=seq,
-        signal_records=set(signal_list),
+        signal_records=signal_records,
         linux_version=linux.version,
     )
 
@@ -105,6 +110,7 @@ def run_test(
             seq=seq,
             signal_records=signal_records,
             new_signals=new_signals,
+            linux_name=linux.name,
         )
 
     print_run_results(
@@ -117,7 +123,7 @@ def run_test(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--linux_name", type=str, default="default")
+    parser.add_argument("--linux_name", type=str, default="test_default")
     parser.add_argument("--linux_version", type=str, default="v6.14")
     parser.add_argument("--smp", type=str, default="10")
     parser.add_argument("--steps", type=int, default=80)

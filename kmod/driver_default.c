@@ -18,7 +18,7 @@ static void run(void) {
     kstep_tick();
   kstep_cov_disable();
 
-  kstep_cov_dump_pcs();
+  kstep_cov_dump();
 }
 
 KSTEP_DRIVER_DEFINE{

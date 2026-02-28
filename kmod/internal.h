@@ -53,10 +53,10 @@ void kstep_cov_enable(void);
 void kstep_cov_enable_controller(void);
 void kstep_cov_disable_controller(void);
 void kstep_cov_disable(void);
-void kstep_cov_dump_pcs(void);
-void kstep_cov_dump_signal(void);
+// void kstep_cov_dump_pcs(void);
+// void kstep_cov_dump_signal(void);
+void kstep_cov_dump(void);
 void kstep_cov_cmd_id_inc(void);
-void kstep_cov_reset(void);
 
 // sym.c
 struct kstep_driver *kstep_sym_init(const char *driver_name);
