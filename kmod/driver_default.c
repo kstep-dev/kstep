@@ -11,11 +11,17 @@ static void setup(void) {
 
 static void run(void) {
   kstep_cov_enable();
-  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++) {
     kstep_task_wakeup(tasks[i]);
+    kstep_cov_dump();
+    kstep_cov_cmd_id_inc();
+  }
 
-  for (int i = 0; i < 5; i++)
+  for (int i = 0; i < 5; i++) {
     kstep_tick();
+    kstep_cov_dump();
+    kstep_cov_cmd_id_inc();
+  }
   kstep_cov_disable();
 
   kstep_cov_dump();

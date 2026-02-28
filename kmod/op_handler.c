@@ -305,12 +305,12 @@ void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
   if (type == OP_TICK_REPEAT) {
     op_handlers[type](a, b, c);
   } else {
-    kstep_cov_cmd_id_inc();
     kstep_cov_enable();
     if (!op_handlers[type](a, b, c))
       panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
     
     kstep_cov_disable();
     kstep_cov_dump();
+    kstep_cov_cmd_id_inc();
   }
 }
