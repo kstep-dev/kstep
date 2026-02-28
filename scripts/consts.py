@@ -23,8 +23,6 @@ LATEST_LOG = DATA_DIR / "latest.log"
 LATEST_OUT = DATA_DIR / "latest.out"
 LATEST_COV = DATA_DIR / "latest.cov"
 LATEST_COV_JSON = DATA_DIR / "latest.cov.json"
-LATEST_SIGNAL = DATA_DIR / "latest.signal"
-LATEST_SIGNAL_JSON = DATA_DIR / "latest.signal.json"
 
 
 def update_latest(latest_file: Path, new_file: Path):
@@ -33,8 +31,6 @@ def update_latest(latest_file: Path, new_file: Path):
         LATEST_OUT,
         LATEST_COV,
         LATEST_COV_JSON,
-        LATEST_SIGNAL,
-        LATEST_SIGNAL_JSON,
     )
     new_file.touch()
     latest_file.unlink(missing_ok=True)

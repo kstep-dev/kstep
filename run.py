@@ -15,7 +15,6 @@ from scripts import (
     LATEST_COV,
     LATEST_LOG,
     LATEST_OUT,
-    LATEST_SIGNAL,
     LINUX_BUILD_DIR,
     LINUX_CURR_DIR,
     LOGS_DIR,
@@ -77,7 +76,6 @@ def run_qemu(
     update_latest(LATEST_LOG, log_file)
     update_latest(LATEST_OUT, out_file)
     update_latest(LATEST_COV, cov_file)
-    update_latest(LATEST_SIGNAL, signal_file)
 
     boot_args = [
         "rw",
