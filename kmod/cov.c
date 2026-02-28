@@ -37,7 +37,7 @@ struct cov_entry {
 static struct cov_entry cov_buffer[NR_CPUS][COV_BUFFER_SIZE];
 static int cov_counter[NR_CPUS] = {0}; // no need to be atomic with serialized sched calls per CPU
 static struct file *cov_file = NULL;
-static u32 cov_cmd_id = -1;
+static u32 cov_cmd_id = 0;
 
 static void kstep_cov_record(u64 ip) {
   int cpu = smp_processor_id();

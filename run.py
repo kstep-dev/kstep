@@ -159,7 +159,6 @@ def print_run_results(
     log_file=LATEST_LOG, 
     out_file=LATEST_OUT, 
     cov_file=LATEST_COV, 
-    vmlinux: Optional[Path] = None,
 ):
     print(f"Log: {log_file}")
     print(f"Out: {out_file}")
