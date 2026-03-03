@@ -7,6 +7,7 @@ static void setup(void) {
   kstep_cov_init();
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
+  kstep_cgroup_create("g0");
 }
 
 static void run(void) {
@@ -16,12 +17,16 @@ static void run(void) {
     kstep_cov_dump();
     kstep_cov_cmd_id_inc();
   }
-
   for (int i = 0; i < 5; i++) {
     kstep_tick();
     kstep_cov_dump();
     kstep_cov_cmd_id_inc();
   }
+
+  kstep_cgroup_add_task("g0", tasks[0]->pid);
+  kstep_cov_dump();
+  kstep_cov_cmd_id_inc();
+
   kstep_cov_disable();
 
   kstep_cov_dump();

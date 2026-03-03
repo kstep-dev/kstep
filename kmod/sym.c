@@ -64,3 +64,9 @@ struct kstep_driver *kstep_sym_init(const char *driver_name) {
     panic("Driver %s not found", driver_name);
   return driver;
 }
+
+// Lookup a kernel symbol by name and store the pointer in the provided address
+// Don't panic if the symbol is not found
+void kstep_ksym_lookup(const char *name, void **ptr) {
+  *ptr = kallsyms_lookup_name_fn(name);
+}
