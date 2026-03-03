@@ -29,19 +29,7 @@ KSYM_IMPORT(cgroup_threadgroup_rwsem);
 struct percpu_rw_semaphore ** cgroup_threadgroup_rwsem_ptr = &KSYM_cgroup_threadgroup_rwsem;
 
 // Override the function with return if the argument for rcu writing lock is cgroup-related
-static int cgroup_attach_lock_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
-  void * cpuset_rwsem_ptr;
-  kstep_ksym_lookup("cpuset_rwsem", &cpuset_rwsem_ptr);
-
-  if (PT_REGS_PARM1(regs) != (unsigned long)*cgroup_threadgroup_rwsem_ptr &&
-      (!cpuset_rwsem_ptr || PT_REGS_PARM1(regs) != (unsigned long)cpuset_rwsem_ptr))
-    return 0;
-  
-  override_function_with_ret(regs);
-  return 1;
-}
-
-static int cgroup_attach_unlock_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
+static int skip_cgroup_rwsem(struct kprobe *kp, struct pt_regs *regs) {
   void * cpuset_rwsem_ptr;
   kstep_ksym_lookup("cpuset_rwsem", &cpuset_rwsem_ptr);
 
@@ -56,12 +44,12 @@ static int cgroup_attach_unlock_pre_handler(struct kprobe *kp, struct pt_regs *r
 
 static struct kprobe cgroup_attach_lock_kp = {
   .symbol_name = "percpu_down_write",
-  .pre_handler = cgroup_attach_lock_pre_handler,
+  .pre_handler = skip_cgroup_rwsem,
 };
 
 static struct kprobe cgroup_attach_unlock_kp = {
   .symbol_name = "percpu_up_write",
-  .pre_handler = cgroup_attach_unlock_pre_handler,
+  .pre_handler = skip_cgroup_rwsem,
 };
 
 void kstep_write(const char *path, const char *buf, size_t size) {
