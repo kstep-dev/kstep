@@ -28,36 +28,27 @@
 KSYM_IMPORT(cgroup_threadgroup_rwsem);
 struct percpu_rw_semaphore ** cgroup_threadgroup_rwsem_ptr = &KSYM_cgroup_threadgroup_rwsem;
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(6, 1, 0)
-KSYM_IMPORT_TYPED(struct percpu_rw_semaphore, cpuset_rwsem);
-struct percpu_rw_semaphore ** cpuset_rwsem_ptr = &KSYM_cpuset_rwsem;
-#endif
-
-
 // Override the function with return if the argument for rcu writing lock is cgroup-related
 static int cgroup_attach_lock_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(6, 1, 0)
+  void * cpuset_rwsem_ptr;
+  kstep_ksym_lookup("cpuset_rwsem", &cpuset_rwsem_ptr);
+
   if (PT_REGS_PARM1(regs) != (unsigned long)*cgroup_threadgroup_rwsem_ptr &&
-      PT_REGS_PARM1(regs) != (unsigned long)*cpuset_rwsem_ptr)
+      (!cpuset_rwsem_ptr || PT_REGS_PARM1(regs) != (unsigned long)cpuset_rwsem_ptr))
     return 0;
-#else
-  if (PT_REGS_PARM1(regs) != (unsigned long)*cgroup_threadgroup_rwsem_ptr)
-    return 0;
-#endif
   
   override_function_with_ret(regs);
   return 1;
 }
 
 static int cgroup_attach_unlock_pre_handler(struct kprobe *kp, struct pt_regs *regs) {
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(6, 1, 0)
+  void * cpuset_rwsem_ptr;
+  kstep_ksym_lookup("cpuset_rwsem", &cpuset_rwsem_ptr);
+
   if (PT_REGS_PARM1(regs) != (unsigned long)*cgroup_threadgroup_rwsem_ptr &&
-      PT_REGS_PARM1(regs) != (unsigned long)*cpuset_rwsem_ptr)
+      (!cpuset_rwsem_ptr || PT_REGS_PARM1(regs) != (unsigned long)cpuset_rwsem_ptr))
     return 0;
-#else
-  if (PT_REGS_PARM1(regs) != (unsigned long)*cgroup_threadgroup_rwsem_ptr)
-    return 0;
-#endif
+
   override_function_with_ret(regs);
   return 1;
 }
