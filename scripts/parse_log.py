@@ -6,32 +6,8 @@ from pathlib import Path
 
 import pandas as pd
 
-TIMESTAMP_LEN = 14
-
-
-def parse_line(line: str, prefix: str) -> dict | None:
-    # Line format: [timestamp] prefix: {json}
-    if len(line) < TIMESTAMP_LEN:
-        return None
-    if line[0] != "[" or line[TIMESTAMP_LEN - 1] != "]":
-        return None
-    if not line.startswith(prefix, TIMESTAMP_LEN + 1):
-        return None
-
-    # Parse JSON
-    json_str = line[TIMESTAMP_LEN + 1 + len(prefix) :].removeprefix(":")
-    try:
-        obj = json.loads(json_str)
-    except json.JSONDecodeError:
-        raise ValueError(f"Invalid JSON at line {line}")
-
-    # Parse timestamp
-    ts_str = line[1 : TIMESTAMP_LEN - 1]
-    ts = round((float(ts_str) - 10) * 1000)
-
-    # Add timestamp to object
-    obj["timestamp"] = ts
-    return obj
+from utils import parse_line
+from consts import LATEST_LOG
 
 
 def parse_log(path: Path, prefix: str) -> pd.DataFrame:
@@ -49,7 +25,6 @@ def parse_log(path: Path, prefix: str) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    from consts import LATEST_LOG
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path, default=LATEST_LOG, nargs="?")
     parser.add_argument(

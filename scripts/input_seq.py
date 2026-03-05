@@ -2,7 +2,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import Iterable, Iterator
 from pathlib import Path
-from scripts.parse_log import parse_line
+from .utils import parse_line
 
 OpTuple = tuple[int, int, int, int]
 

@@ -2,6 +2,7 @@ import logging
 import subprocess
 from enum import StrEnum
 from pathlib import Path
+import json
 
 
 class TermColor(StrEnum):
@@ -38,3 +39,30 @@ def decompress(tarball_path: Path, output_dir: Path):
         return
     system(f"mkdir -p {output_dir}")
     system(f"tar -xf {tarball_path} -C {output_dir} --strip-components=1")
+
+TIMESTAMP_LEN = 14
+
+# Parse a line from the log file
+def parse_line(line: str, prefix: str) -> dict | None:
+    # Line format: [timestamp] prefix: {json}
+    if len(line) < TIMESTAMP_LEN:
+        return None
+    if line[0] != "[" or line[TIMESTAMP_LEN - 1] != "]":
+        return None
+    if not line.startswith(prefix, TIMESTAMP_LEN + 1):
+        return None
+
+    # Parse JSON
+    json_str = line[TIMESTAMP_LEN + 1 + len(prefix) :].removeprefix(":")
+    try:
+        obj = json.loads(json_str)
+    except json.JSONDecodeError:
+        raise ValueError(f"Invalid JSON at line {line}")
+
+    # Parse timestamp
+    ts_str = line[1 : TIMESTAMP_LEN - 1]
+    ts = round((float(ts_str) - 10) * 1000)
+
+    # Add timestamp to object
+    obj["timestamp"] = ts
+    return obj
