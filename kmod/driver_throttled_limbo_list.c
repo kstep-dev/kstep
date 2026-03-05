@@ -33,47 +33,29 @@ static void run(void) {
   kstep_task_pin(helper, 2, 2);
   kstep_cgroup_add_task("A/B/C", helper->pid);
 
-  // A: small quota (5ms, 100ms period). C: large quota to avoid self-throttle.
+  // A: 5ms quota, 100ms period. C: 100ms quota, 100ms period.
   kstep_cgroup_write("A", "cpu.max", "5000 100000");
   kstep_cgroup_write("A/B/C", "cpu.max", "100000 100000");
 
   // Tick until tasks land on C's limbo list on CPU 1.
+  // Sleeps give CPU 1 real time to process task work (return-to-user).
   struct cfs_rq *cfs_rq_c1 = tasks[0]->sched_task_group->cfs_rq[1];
-  for (int i = 0; i < 50; i++) {
+  for (int i = 0; i < 200; i++) {
     kstep_tick();
-    kstep_sleep();
     if (count_limbo(cfs_rq_c1) >= 2)
       break;
   }
-  int nlimbo = count_limbo(cfs_rq_c1);
-  if (nlimbo < 2) {
-    kstep_fail("need >= 2 limbo tasks, got %d", nlimbo);
-    return;
-  }
+  if (count_limbo(cfs_rq_c1) < 2)
+    panic("need >= 2 limbo tasks, got %d", count_limbo(cfs_rq_c1));
 
-  // Re-set C's quota to 1ms with 100ms period. On buggy kernel this
-  // sets runtime_remaining = 0; the fix sets it to 1.
+  // Re-set C's quota to 1ms. On buggy kernel: runtime_remaining=0.
   kstep_cgroup_write("A/B/C", "cpu.max", "1000 100000");
 
-  // The helper task is on CPU 2's runqueue. Tick+sleep in a loop to
-  // (a) give CPU 2 time to schedule the helper via IPI-triggered
-  // reschedule and (b) force update_curr to drain C's pool.
-  struct cfs_bandwidth *cfs_b = &tasks[0]->sched_task_group->cfs_bandwidth;
-  for (int i = 0; i < 20 && cfs_b->runtime > 0; i++) {
-    for (int j = 0; j < 20; j++)
-      kstep_sleep();
-    kstep_tick();
-  }
-
-  // Wait for A's period timer to fire (~100ms real time) and
-  // async-unthrottle A on CPU 1 via CSD. Then tick to deliver the
-  // CSD IPI. On buggy kernel: tg_unthrottle_up(C) enqueues the first
-  // limbo task → runtime_remaining=0, pool=0 → throttle → WARN.
-  for (int i = 0; i < 300; i++)
-    kstep_sleep();
-  kstep_tick_repeat(3);
-  for (int i = 0; i < 10; i++)
-    kstep_sleep();
+  // Wake helper on CPU 2 to consume C's 1ms pool, then tick until
+  // A's period timer fires (every 100 ticks), triggering unthrottle.
+  // On buggy kernel: tg_unthrottle_up(C) → throttle → WARN.
+  kstep_task_wakeup(helper);
+  kstep_tick_repeat(120);
 }
 #else
 static void setup(void) { panic("unsupported kernel version"); }
