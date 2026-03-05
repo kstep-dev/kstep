@@ -17,12 +17,12 @@ static void rq_checkers_save(void) {
 
   for (int i = 0; checkers[i].name && i < MAX_CHECKERS; i++) {
     switch (checkers[i].type) {
-      case TEMPORAL_DELTA:
-        for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++)
-          prev_checker_values[i][cpu] = checkers[i].get_value(cpu_rq(cpu));
-        break;
-      default:
-        panic("Unsupported checker type %d", checkers[i].type);
+    case TEMPORAL_DELTA:
+      for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++)
+        prev_checker_values[i][cpu] = checkers[i].get_value(cpu_rq(cpu));
+      break;
+    default:
+      panic("Unsupported checker type %d", checkers[i].type);
     }
   }
 }
@@ -47,18 +47,24 @@ static void rq_checkers_check(void) {
 
   for (int i = 0; checkers[i].name && i < MAX_CHECKERS; i++) {
     switch (checkers[i].type) {
-      case TEMPORAL_DELTA:
-        check_temporal_delta(i, &checkers[i]);
-        break;
-      default:
-        panic("Unsupported checker type %d", checkers[i].type);
+    case TEMPORAL_DELTA:
+      check_temporal_delta(i, &checkers[i]);
+      break;
+    default:
+      panic("Unsupported checker type %d", checkers[i].type);
     }
   }
 }
 
 static u64 kstep_sched_clock = INIT_TIME_NS;
 static u64 kstep_sched_clock_read(void) { return kstep_sched_clock; }
-static void kstep_sched_clock_tick(void) { kstep_sched_clock += TICK_NSEC; }
+static void kstep_sched_clock_tick(void) {
+  // Advance the simulated clock by step_interval_us per tick. This models
+  // nohz_full behaviour where the tick is suppressed and update_curr() sees
+  // the full wall-clock delta when the tick eventually fires.
+  kstep_sched_clock +=
+      max_t(u64, TICK_NSEC, kstep_driver->step_interval_us * 1000ULL);
+}
 
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
 // On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
