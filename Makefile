@@ -14,11 +14,11 @@ user:
 
 .PHONY: kmod
 kmod:
-	$(MAKE) -C kmod LINUX_DIR=$(LINUX_DIR)
+	$(MAKE) -C kmod LINUX_NAME=$(LINUX_NAME)
 
 .PHONY: linux
 linux:
-	$(MAKE) -C linux LINUX_DIR=$(LINUX_DIR)
+	$(MAKE) -C linux LINUX_NAME=$(LINUX_NAME)
 
 .PHONY: clean
 clean:

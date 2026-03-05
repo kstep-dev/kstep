@@ -17,6 +17,7 @@ from scripts import (
     LATEST_OUT,
     LINUX_BUILD_DIR,
     LINUX_CURR_DIR,
+    LINUX_ROOT_DIR,
     LOGS_DIR,
     PROJ_DIR,
     QEMU_DIR,
@@ -38,6 +39,10 @@ class Driver:
     smp: str = "2"
     mem_mb: int = 512
 
+    @property
+    def num_cpus(self) -> int:
+        return int(self.smp.split(",")[0])
+
 
 def get_qemu_path() -> Path:
     name = f"qemu-system-{ARCH}"
@@ -55,7 +60,7 @@ def get_qemu_path() -> Path:
 
 def run_qemu(
     driver: Driver,
-    linux_dir: Path,
+    linux_name: str,
     log_file: Optional[Path] = None,
     debug: bool = False,
 ):
@@ -64,7 +69,6 @@ def run_qemu(
         system(f"sudo chmod 666 {kvm_path}")
 
     qemu_path = get_qemu_path()
-    linux_name = linux_dir.resolve().name
     kernel_img = LINUX_BUILD_DIR / linux_name
     rootfs_img = ROOTFS_DIR / f"{linux_name}.cpio"
 
@@ -77,14 +81,15 @@ def run_qemu(
     update_latest(LATEST_OUT, out_file)
     update_latest(LATEST_COV, cov_file)
 
+    isol_cpus = f"1-{driver.num_cpus - 1}" if driver.num_cpus > 2 else "1"
     boot_args = [
         "rw",
         "nokaslr",
         "sched_verbose",
-        "isolcpus=nohz,managed_irq,1,2",
+        f"isolcpus=nohz,managed_irq,{isol_cpus}",
         "irqaffinity=0",
-        "rcu_nocbs=1,2",
-        "nohz_full=1,2",
+        f"rcu_nocbs={isol_cpus}",
+        f"nohz_full={isol_cpus}",
         "init=/init",
         "panic=-1",  # Exit immediately on panic
         "quiet",  # Disable printk to be enabled later
@@ -154,6 +159,7 @@ def pipe_to_qemu(proc: subprocess.Popen, stdin_payload: str):
 
 
 def print_run_results(
+    linux_name: str,
     log_file=LATEST_LOG, 
     out_file=LATEST_OUT, 
     cov_file=LATEST_COV, 
@@ -171,7 +177,6 @@ def print_run_results(
 
     # check if cov is empty and call kcov_symbolize if it is not
     if cov_file.exists() and cov_file.stat().st_size != 0:
-        linux_name = LINUX_CURR_DIR.resolve().name
         cov_symbolize(cov_file=cov_file, linux_name=linux_name)
 
 
@@ -182,9 +187,10 @@ def is_port_free(port: int) -> bool:
         return s.connect_ex(("localhost", port)) != 0
 
 
-def run_gdb(linux_dir: Path):
+def run_gdb(linux_name: str):
     import signal
 
+    linux_dir = LINUX_ROOT_DIR / linux_name
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     args = [
         "-iex 'set pagination off'",
@@ -196,17 +202,25 @@ def run_gdb(linux_dir: Path):
     system(f"gdb {linux_dir}/vmlinux " + " ".join(args))
 
 
-def make_kstep(linux_dir: Path):
-    system(f"make -C {PROJ_DIR} kstep LINUX_DIR={linux_dir}")
+def make_kstep(linux_name: str):
+    system(f"make -C {PROJ_DIR} kstep LINUX_NAME={linux_name}")
 
 
-def make_linux(linux_dir: Path):
-    system(f"make -C {PROJ_DIR} linux LINUX_DIR={linux_dir}")
+def make_linux(linux_name: str):
+    system(f"make -C {PROJ_DIR} linux LINUX_NAME={linux_name}")
+
+
+def resolve_linux_name(linux_name: Optional[str] = None) -> str:
+    if linux_name is not None:
+        return linux_name
+    name = LINUX_CURR_DIR.resolve().name
+    logging.info(f"Using linux_name={name} (from linux/current)")
+    return name
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--linux_dir", type=Path, default=LINUX_CURR_DIR)
+    parser.add_argument("--linux_name", type=str, default=None)
     parser.add_argument("--log_file", type=Path, default=None)
     parser.add_argument("--debug", action="store_true")
     # See driver config
@@ -216,11 +230,13 @@ def main():
     parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 
+    linux_name = resolve_linux_name(args.linux_name)
+
     if args.debug and not is_port_free(1234):
         logging.info("Port 1234 is already in use, running GDB...")
-        run_gdb(linux_dir=args.linux_dir)
+        run_gdb(linux_name=linux_name)
     else:
-        make_kstep(linux_dir=args.linux_dir)
+        make_kstep(linux_name=linux_name)
         driver = Driver(
             **{
                 field.name: value
@@ -230,14 +246,14 @@ def main():
         )
         proc = run_qemu(
             driver=driver,
-            linux_dir=args.linux_dir,
+            linux_name=linux_name,
             debug=args.debug,
             log_file=args.log_file,
         )
 
         return_code = proc.wait()
         print(f"Qemu returned with code: {return_code}")
-        print_run_results()
+        print_run_results(linux_name=linux_name)
 
 
 if __name__ == "__main__":

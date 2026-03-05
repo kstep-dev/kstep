@@ -142,16 +142,16 @@ def plot_data(python_script: str, driver: str):
 
 
 def reproduce(linux: Linux, driver: Driver, skip_build: bool):
-    linux_dir = LINUX_ROOT_DIR / f"{driver.name}_{linux.name}"
-    checkout_linux(linux.version, linux_dir=linux_dir, patch=linux.patch, tarball=True)
+    linux_name = f"{driver.name}_{linux.name}"
+    checkout_linux(linux.version, linux_name=linux_name, patch=linux.patch, tarball=True)
     if not skip_build:
-        make_linux(linux_dir=linux_dir)
-    make_kstep(linux_dir=linux_dir)
-    log_file = RESULTS_DIR / f"{driver.name}_{linux.name}.log"
-    proc = run_qemu(linux_dir=linux_dir, driver=driver, log_file=log_file)
+        make_linux(linux_name=linux_name)
+    make_kstep(linux_name=linux_name)
+    log_file = RESULTS_DIR / f"{linux_name}.log"
+    proc = run_qemu(linux_name=linux_name, driver=driver, log_file=log_file)
     return_code = proc.wait()
     print(f"Reproduction returned with code: {return_code}")
-    print_run_results()
+    print_run_results(linux_name=linux_name)
 
 
 def main(bug: Bug, run: List[str], skip_build: bool):

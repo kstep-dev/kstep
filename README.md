@@ -70,11 +70,11 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 
 #### 🛠️ Build Linux and kSTEP
 ```sh
-make linux [LINUX_DIR=<path>]  # Build kernel
-make kstep [LINUX_DIR=<path>]  # Build kSTEP rootfs (default target)
+make linux [LINUX_NAME=<name>]  # Build kernel
+make kstep [LINUX_NAME=<name>]  # Build kSTEP rootfs (default target)
 ```
 
-- `[LINUX_DIR=<path>]`: Path to the Linux directory, default to `linux/current`.
+- `[LINUX_NAME=<name>]`: Name of the Linux directory under `linux/`, default to what `linux/current` points to.
 
 #### 🏃‍♂️ Run kSTEP
 
