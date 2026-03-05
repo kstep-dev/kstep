@@ -148,6 +148,13 @@ bugs = [
             Linux(name="fixed", version="650cad561cce04b62a8c8e0446b685ef171bc3bb"),
         ],
     ),
+    Bug(
+        driver=Driver(name="min_deadline", smp="2"),
+        linux=[
+            Linux(name="buggy", version="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c~1"),
+            Linux(name="fixed", version="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c"),
+        ],
+    ),
 ]
 
 
