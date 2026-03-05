@@ -132,7 +132,7 @@ static void kstep_cgroup_mkdir(const char *name) {
   kstep_mkdir(path);
 }
 
-static void kstep_cgroup_init(void) {
+void kstep_cgroup_init(void) {
   kstep_cgroup_write("", "cgroup.subtree_control", CGROUP_CONTROL);
 
   // Pre-enter rcu_sync on cgroup percpu rwsems so that subsequent
@@ -148,12 +148,6 @@ static void kstep_cgroup_init(void) {
 }
 
 void kstep_cgroup_create(const char *name) {
-  static bool initialized = false;
-  if (!initialized) {
-    kstep_cgroup_init();
-    initialized = true;
-  }
-
   kstep_cgroup_mkdir(name);
   kstep_cgroup_write(name, "cgroup.subtree_control", CGROUP_CONTROL);
 }

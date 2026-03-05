@@ -47,6 +47,9 @@ bool kstep_is_sys_kthread(struct task_struct *p);
 // task.c
 void kstep_task_init(void);
 
+// kernel.c
+void kstep_cgroup_init(void);
+
 // cov.c
 void kstep_cov_init(void);
 void kstep_cov_enable(void);

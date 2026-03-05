@@ -42,6 +42,7 @@ static int __init kstep_main(void) {
 
   // Run userspace programs when we know the system is ready
   kstep_task_init();
+  kstep_cgroup_init();
   kstep_driver->setup();
   kstep_topo_print();
 
