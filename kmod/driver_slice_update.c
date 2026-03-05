@@ -7,6 +7,8 @@
 #include "driver.h"
 #include "internal.h"
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+
 static struct task_struct *task;
 
 static void setup(void) {
@@ -43,6 +45,11 @@ static void run(void) {
     kstep_pass("slice updated: got=%llu expected=%u", slice, new_slice);
   }
 }
+
+#else
+static void setup(void) { panic("unsupported kernel version"); }
+static void run(void) {}
+#endif
 
 KSTEP_DRIVER_DEFINE{
     .name = "slice_update",
