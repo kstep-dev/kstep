@@ -134,6 +134,13 @@ bugs = [
             Linux(name="fixed", version="d4ac164bde7a12ec0a238a7ead5aa26819bbb1c1"),
         ],
     ),
+    Bug(
+        driver=Driver(name="slice_update", smp="2"),
+        linux=[
+            Linux(name="buggy", version="2f2fc17bab0011430ceb6f2dc1959e7d1f981444~1"),
+            Linux(name="fixed", version="2f2fc17bab0011430ceb6f2dc1959e7d1f981444"),
+        ],
+    ),
 ]
 
 
@@ -143,7 +150,9 @@ def plot_data(python_script: str, driver: str):
 
 def reproduce(linux: Linux, driver: Driver, skip_build: bool):
     linux_name = f"{driver.name}_{linux.name}"
-    checkout_linux(linux.version, linux_name=linux_name, patch=linux.patch, tarball=True)
+    checkout_linux(
+        linux.version, linux_name=linux_name, patch=linux.patch, tarball=True
+    )
     if not skip_build:
         make_linux(linux_name=linux_name)
     make_kstep(linux_name=linux_name)
