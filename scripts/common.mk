@@ -9,13 +9,13 @@ BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.jso
 # Absolute path to the project directory
 PROJ_DIR := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
 
-# Resolve LINUX_DIR
-LINUX_DIR ?= linux/current
-LINUX_DIR_ABS := $(if $(filter /%,$(LINUX_DIR)),$(LINUX_DIR),$(PROJ_DIR)/$(LINUX_DIR))
-LINUX_DIR_REAL := $(realpath $(LINUX_DIR_ABS))
-ifeq ($(LINUX_DIR_REAL),)
-    $(error $(LINUX_DIR_ABS) does not exist)
+# Resolve LINUX_NAME and LINUX_DIR
+LINUX_NAME ?= $(notdir $(realpath $(PROJ_DIR)/linux/current))
+ifeq ($(LINUX_NAME),)
+    $(error linux/current does not exist or is a broken symlink)
 endif
-override LINUX_DIR := $(LINUX_DIR_REAL)
+ifeq ($(origin LINUX_NAME),file)
+    $(info Using LINUX_NAME=$(LINUX_NAME) (from linux/current symlink))
+endif
 
-LINUX_NAME := $(notdir $(LINUX_DIR))
+LINUX_DIR := $(PROJ_DIR)/linux/$(LINUX_NAME)

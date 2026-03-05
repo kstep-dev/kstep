@@ -12,7 +12,8 @@ from run import (
     print_run_results,
     run_qemu,
 )
-from scripts import LINUX_ROOT_DIR, LINUX_BUILD_DIR, LOGS_DIR, generate_input, GLOBAL_SIGNAL_CORPUS, cov_parse
+from scripts import GLOBAL_SIGNAL_CORPUS, LOGS_DIR, cov_parse, generate_input
+
 
 def smp_to_cpus(smp: str) -> int:
     try:
@@ -44,9 +45,9 @@ def run_test(
     max_cgroups: int,
     seed: int,
 ):
-    linux_dir = LINUX_ROOT_DIR / f"{linux.name}"
-    checkout_linux(linux.version, linux_dir=linux_dir, tarball=True)
-    make_linux(linux_dir=linux_dir)
+    linux_name = linux.name
+    checkout_linux(linux.version, linux_name=linux_name, tarball=True)
+    make_linux(linux_name=linux_name)
 
     cpus = smp_to_cpus(smp)
     seq = generate_input(
@@ -62,14 +63,14 @@ def run_test(
         smp=smp
     )
 
-    make_kstep(linux_dir=linux_dir)
+    make_kstep(linux_name=linux_name)
 
-    log_file = LOGS_DIR / f"{linux.name}.log"
+    log_file = LOGS_DIR / f"{linux_name}.log"
     out_file = log_file.with_suffix(".out")
     cov_file = log_file.with_suffix(".cov")
 
     proc = run_qemu(
-        linux_dir=linux_dir,
+        linux_name=linux_name,
         driver=driver,
         log_file=log_file,
     )
@@ -114,6 +115,7 @@ def run_test(
         )
 
     print_run_results(
+        linux_name=linux_name,
         log_file=log_file,
         out_file=out_file,
         cov_file=cov_file,
