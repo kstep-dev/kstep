@@ -7,7 +7,7 @@
 #include "driver.h"
 #include "internal.h"
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(6, 18, 0)
 
 static struct task_struct *task_a;
 static struct task_struct *task_b;
