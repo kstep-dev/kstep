@@ -47,7 +47,7 @@ static void kstep_cov_record(u64 ip) {
 
   // filter the coverage on CPU 0
   if (cpu == 0 &&
-      (current != controller || !kstep_cov_mode_check(COV_ENABLED_WITH_CONTROLLER)))
+      (current->pid != 1 || !kstep_cov_mode_check(COV_ENABLED_WITH_CONTROLLER)))
     return;
   
   if (cov_counter[cpu] >= COV_BUFFER_SIZE)

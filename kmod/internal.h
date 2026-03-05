@@ -18,7 +18,6 @@
 
 // main.c
 extern struct kstep_driver *kstep_driver;
-extern struct task_struct *controller;
 
 // tick.c
 void kstep_sched_timer_init(void);
