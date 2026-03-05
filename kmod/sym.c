@@ -7,8 +7,6 @@
 
 KSYM_IMPORT_RAW(struct rq, runqueues);
 
-static void *(*kallsyms_lookup_name_fn)(const char *name);
-
 static void *get_kallsyms_lookup_name(void) {
   struct kprobe kp = {.symbol_name = "kallsyms_lookup_name"};
   int ret = register_kprobe(&kp);
@@ -16,6 +14,12 @@ static void *get_kallsyms_lookup_name(void) {
     panic("Failed to register kprobe: %d", ret);
   unregister_kprobe(&kp);
   return (void *)kp.addr;
+}
+
+static void *(*kallsyms_lookup_name_fn)(const char *name);
+
+void *kstep_ksym_lookup(const char *name) {
+  return kallsyms_lookup_name_fn(name);
 }
 
 static void init_ksym(const char *name, void **ptr) {
@@ -29,7 +33,7 @@ static void init_ksym(const char *name, void **ptr) {
   if (dot)
     *dot = '\0';
 
-  *ptr = kallsyms_lookup_name_fn(buf);
+  *ptr = kstep_ksym_lookup(buf);
   if (*ptr == NULL)
     panic("Symbol %s not found", buf);
 }
@@ -63,10 +67,4 @@ struct kstep_driver *kstep_sym_init(const char *driver_name) {
   if (driver == NULL)
     panic("Driver %s not found", driver_name);
   return driver;
-}
-
-// Lookup a kernel symbol by name and store the pointer in the provided address
-// Don't panic if the symbol is not found
-void kstep_ksym_lookup(const char *name, void **ptr) {
-  *ptr = kallsyms_lookup_name_fn(name);
 }
