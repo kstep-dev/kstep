@@ -202,6 +202,30 @@ static void kstep_sched_tick(void) {
   }
 }
 
+// CFS bandwidth timer control: walk all task groups, suppress their
+// real-time hrtimers, and fire the period callback at the right cadence.
+#ifdef CONFIG_CFS_BANDWIDTH
+static void kstep_cfs_bandwidth_tick(void) {
+  typedef enum hrtimer_restart (cfs_period_timer_fn_t)(struct hrtimer *);
+  KSYM_IMPORT_TYPED(cfs_period_timer_fn_t, sched_cfs_period_timer);
+  KSYM_IMPORT(task_groups);
+
+  struct task_group *tg;
+  list_for_each_entry_rcu(tg, KSYM_task_groups, list) {
+    struct cfs_bandwidth *cfs_b = &tg->cfs_bandwidth;
+    if (!cfs_b->period_active)
+      continue;
+    if (hrtimer_active(&cfs_b->period_timer))
+      hrtimer_cancel(&cfs_b->period_timer);
+    u64 period_ticks = div_u64(ktime_to_ns(cfs_b->period), TICK_NSEC);
+    if (period_ticks == 0 || kstep_jiffies % period_ticks == 0) {
+      hrtimer_set_expires(&cfs_b->period_timer, ns_to_ktime(0));
+      KSYM_sched_cfs_period_timer(&cfs_b->period_timer);
+    }
+  }
+}
+#endif
+
 void kstep_tick(void) {
   KSYM_IMPORT(sysrq_sched_debug_show);
   if (kstep_driver->print_sched_debug)
@@ -216,6 +240,9 @@ void kstep_tick(void) {
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
   kstep_sched_tick();
+#ifdef CONFIG_CFS_BANDWIDTH
+  kstep_cfs_bandwidth_tick();
+#endif
   rq_checkers_check();
 }
 
