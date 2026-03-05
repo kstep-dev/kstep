@@ -1,6 +1,8 @@
 import hashlib
 from dataclasses import dataclass
 from typing import Iterable, Iterator
+from pathlib import Path
+from scripts.parse_log import parse_line
 
 OpTuple = tuple[int, int, int, int]
 
@@ -35,4 +37,14 @@ class InputSeq:
 
     def digest(self) -> str:
         return hashlib.sha256(self.to_payload().encode("utf-8")).hexdigest()
+
+def input_seq_from_log(log_file: Path) -> InputSeq:
+    seq = InputSeq()
+    with open(log_file, "r", encoding="utf-8") as f:
+        for line in f:
+            parts = parse_line(line, "EXECOP")
+            if parts is None:
+                continue
+            seq.append((int(parts["op"]), int(parts["a"]), int(parts["b"]), int(parts["c"])))
+    return seq
 

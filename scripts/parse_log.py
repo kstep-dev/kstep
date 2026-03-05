@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 
 import pandas as pd
-from consts import LATEST_LOG
 
 TIMESTAMP_LEN = 14
 
@@ -50,6 +49,7 @@ def parse_log(path: Path, prefix: str) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
+    from consts import LATEST_LOG
     parser = argparse.ArgumentParser()
     parser.add_argument("path", type=Path, default=LATEST_LOG, nargs="?")
     parser.add_argument(

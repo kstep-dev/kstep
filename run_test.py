@@ -101,7 +101,7 @@ def run_test(
     new_signals = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
         seq=seq,
         signal_records=signal_records,
-        linux_version=linux.version,
+        linux_name=linux.name,
     )
 
     # Analyze the per-action signals for the test if there are new signals
@@ -112,19 +112,12 @@ def run_test(
             new_signals=new_signals,
             linux_name=linux.name,
         )
-
-    print_run_results(
-        log_file=log_file,
-        out_file=out_file,
-        cov_file=cov_file,
-    )
     
-    return new_signals
+    return
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--linux_name", type=str, default="test_default")
-    parser.add_argument("--linux_version", type=str, default="v6.14")
+    parser.add_argument("--linux_version", type=str, default="v6.18")
     parser.add_argument("--smp", type=str, default="10")
     parser.add_argument("--steps", type=int, default=80)
     parser.add_argument("--max_tasks", type=int, default=10)
@@ -133,7 +126,7 @@ def main():
     args = parser.parse_args()
 
     linux = Linux(
-        name=args.linux_name,
+        name=f"{args.linux_name}_test",
         version=args.linux_version,
     )
 

@@ -10,6 +10,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
+from scripts.input_seq import input_seq_from_log
+from scripts.cov import cov_parse
+from scripts.corpus import GLOBAL_SIGNAL_CORPUS
 
 from scripts import (
     LATEST_COV,
@@ -21,7 +24,6 @@ from scripts import (
     PROJ_DIR,
     QEMU_DIR,
     ROOTFS_DIR,
-    cov_symbolize,
     system,
     system_with_pipe,
     update_latest,
@@ -154,6 +156,7 @@ def pipe_to_qemu(proc: subprocess.Popen, stdin_payload: str):
 
 
 def print_run_results(
+    linux_dir: Path,
     log_file=LATEST_LOG, 
     out_file=LATEST_OUT, 
     cov_file=LATEST_COV, 
@@ -169,10 +172,39 @@ def print_run_results(
             pass
         print(line.strip())
 
-    # check if cov is empty and call kcov_symbolize if it is not
+    # check if cov is empty and call analyze_new_signals and analyze_per_action_signals if it is not
     if cov_file.exists() and cov_file.stat().st_size != 0:
-        linux_name = LINUX_CURR_DIR.resolve().name
-        cov_symbolize(cov_file=cov_file, linux_name=linux_name)
+        linux_name = linux_dir.resolve().name
+
+        # Parse the signal file and get the signal records and list
+        signal_records = cov_parse(cov_file)
+
+        # Symbolize the pcs
+        GLOBAL_SIGNAL_CORPUS.update_pc_symbolize(
+            signal_records=signal_records,
+            linux_name=linux_name,
+        )
+
+        # Parse the input sequence from the log file
+        seq = input_seq_from_log(log_file=log_file)
+
+        # Analyze the new signals for the test
+        new_signals = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
+            seq=seq,
+            signal_records=signal_records,
+            linux_name=linux_name,
+            output_path=LOGS_DIR / f"{cov_file}.new_edges.json",
+        )
+        
+        # Analyze the per-action signals for the test if there are new signals
+        if new_signals:
+            GLOBAL_SIGNAL_CORPUS.analyze_per_action_signals(
+                seq=seq,
+                signal_records=signal_records,
+                new_signals=new_signals,
+                linux_name=linux_name,
+                output_path=LOGS_DIR / f"{cov_file}.json",
+            )
 
 
 def is_port_free(port: int) -> bool:
@@ -237,7 +269,7 @@ def main():
 
         return_code = proc.wait()
         print(f"Qemu returned with code: {return_code}")
-        print_run_results()
+        print_run_results(linux_dir=args.linux_dir)
 
 
 if __name__ == "__main__":
