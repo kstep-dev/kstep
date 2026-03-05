@@ -121,7 +121,7 @@ bugs = [
         ],
     ),
     Bug(
-        driver=Driver(name="throttled_limbo_list", smp="2"),
+        driver=Driver(name="throttled_limbo_list", smp="3"),
         linux=[
             Linux(name="buggy", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad~1"),
             Linux(name="fixed", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad"),
