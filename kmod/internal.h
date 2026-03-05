@@ -67,8 +67,7 @@ struct kstep_driver *kstep_sym_init(const char *driver_name);
 #define KSYM_IMPORT(name) KSYM_IMPORT_TYPED(typeof(name), name)
 #define KSYM_IMPORT_TYPED(type, name) static KSYM_IMPORT_RAW(type, name) __used
 #define KSYM_IMPORT_RAW(type, name) type *KSYM_##name
-// An alternative to KSYM_IMPORT, but don't panic if the symbol is not found
-void kstep_ksym_lookup(const char *name, void **ptr);
+void *kstep_ksym_lookup(const char *name);
 
 
 extern KSYM_IMPORT_RAW(struct rq, runqueues);
