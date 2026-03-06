@@ -52,7 +52,7 @@ jobs:
           - v6.12     # 2024 LTS
           - v6.6      # 2023 LTS
           - v6.1      # 2022 LTS
-          - v5.15.197 # 2021 LTS
+          - v5.15     # 2021 LTS
 
     name: Linux ${{matrix.version}}
     runs-on: ubuntu-latest
