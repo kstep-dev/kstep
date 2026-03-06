@@ -192,7 +192,7 @@ static bool op_cgroup_create(int a, int b, int c) {
 
   // Move the task back to the root cgroup: only the leaf cgroup has tasks in cgroupv2
   for (int i = 0; i < MAX_TASKS; i++) {
-    if (kstep_tasks[i] && cgroup_tasks[i] == parent_id) {
+    if (parent_id != -1 && kstep_tasks[i] && cgroup_tasks[i] == parent_id) {
       kstep_cgroup_add_task("", kstep_tasks[i]->pid);
       cgroup_tasks[i] = -1;
     }

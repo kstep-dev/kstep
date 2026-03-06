@@ -15,17 +15,6 @@ enum kstep_cov_mode {
 
 static unsigned int cov_mode = COV_DISABLED;
 
-__always_inline bool kstep_cov_mode_check(enum kstep_cov_mode mode) {
-  unsigned int mode_current = READ_ONCE(cov_mode);
-  barrier();
-  return mode_current == mode;
-}
-
-__always_inline void kstep_cov_mode_set(enum kstep_cov_mode mode) {
-  barrier();
-  WRITE_ONCE(cov_mode, mode);
-  barrier();
-}
 
 // Record the coverage for each command and each pid
 struct cov_entry {
@@ -38,6 +27,39 @@ static struct cov_entry cov_buffer[NR_CPUS][COV_BUFFER_SIZE];
 static int cov_counter[NR_CPUS] = {0}; // no need to be atomic with serialized sched calls per CPU
 static struct file *cov_file = NULL;
 static u32 cov_cmd_id = 0;
+
+
+// Hash map to track the previous PC and signals for each PID under this command
+#define PID_MAP_SIZE 2048
+#define SIG_CHUNK_SIZE 64 // Each signal chunk has 64 signals
+
+struct slot_entry {
+  u32 pid;
+  u32 pc_count;
+  u64 pcs[SIG_CHUNK_SIZE];
+};
+static struct slot_entry slot_entries[PID_MAP_SIZE];
+
+static void kstep_cov_reset(void) {
+  for (int cpu = 0; cpu < num_possible_cpus(); cpu++)
+    cov_counter[cpu] = 0;
+  for (u32 slot = 0; slot < PID_MAP_SIZE; slot++) {
+    slot_entries[slot].pid = 0xffffffff;
+    slot_entries[slot].pc_count = 0;
+  }
+}
+
+__always_inline bool kstep_cov_mode_check(enum kstep_cov_mode mode) {
+  unsigned int mode_current = READ_ONCE(cov_mode);
+  barrier();
+  return mode_current == mode;
+}
+
+__always_inline void kstep_cov_mode_set(enum kstep_cov_mode mode) {
+  barrier();
+  WRITE_ONCE(cov_mode, mode);
+  barrier();
+}
 
 static void kstep_cov_record(u64 ip) {
   int cpu = smp_processor_id();
@@ -78,6 +100,8 @@ void kstep_cov_init(void) {
       // touch 1 read per element is sufficient to pre-fault the page
       READ_ONCE(cov_buffer[cpu][i].ip);
     }
+
+  kstep_cov_reset();
 }
 
 // Cov mode control functions
@@ -115,42 +139,15 @@ static u32 kstep_cov_cmd_id_get(void) {
   return current_cmd_id;
 }
 
-static void kstep_cov_reset(void) {
-  for (int cpu = 0; cpu < num_possible_cpus(); cpu++)
-    cov_counter[cpu] = 0;
-}
-
-#define PID_MAP_SIZE 2048
-#define SIG_CHUNK_SIZE 64 // Each signal chunk has 64 signals
-
-// Hash map to track the previous PC and signals for each PID under this command
-struct slot_entry {
-  u32 pid;
-  u64 prev_pc;
-  u32 pc_count;
-  u64 pcs[SIG_CHUNK_SIZE];
-  u64 sigs[SIG_CHUNK_SIZE];
-};
-static struct slot_entry slot_entries[PID_MAP_SIZE];
-
-// ref: https://github.com/google/syzkaller/blob/17d780d63fb22ce9f5928fb059d6dde009510d37/executor/executor.cc#L1600
-static __always_inline u32 kstep_cov_hash(u32 a) {
-  a = (a ^ 61) ^ (a >> 16);
-  a = a + (a << 3);
-  a = a ^ (a >> 4);
-  a = a * 0x27d4eb2d;
-  a = a ^ (a >> 15);
-  return a;
-}
 
 // Get an slot in the hash map for the given PID
 static __always_inline int get_slot_by_pid(u32 pid) {
   u32 idx = pid & (PID_MAP_SIZE - 1);
   for (u32 i = 0; i < PID_MAP_SIZE; i++) {
     u32 pos = (idx + i) & (PID_MAP_SIZE - 1);
-    if (slot_entries[pos].pc_count == 0) {
+    if (slot_entries[pos].pid == 0xffffffff) {
       slot_entries[pos].pid = pid;
-      slot_entries[pos].prev_pc = 0;
+      slot_entries[pos].pc_count = 0;
       return pos;
     }
     if (slot_entries[pos].pid == pid) {
@@ -160,7 +157,7 @@ static __always_inline int get_slot_by_pid(u32 pid) {
   panic("slot not found for pid %d", pid);
 }
 
-static __always_inline void kstep_cov_flush_sigs(u32 slot, u32 cmd_id) {
+static __always_inline void kstep_cov_flush_pcs(u32 slot, u32 cmd_id) {
   u32 count = slot_entries[slot].pc_count;
 
   if (count == 0)
@@ -170,14 +167,12 @@ static __always_inline void kstep_cov_flush_sigs(u32 slot, u32 cmd_id) {
     u32 cmd_id;
     u32 pid;
     u64 pc;
-    u64 sig;
   } records[SIG_CHUNK_SIZE];
 
   for (u32 i = 0; i < count; i++) {
     records[i].cmd_id = cmd_id;
     records[i].pid = slot_entries[slot].pid;
     records[i].pc = slot_entries[slot].pcs[i];
-    records[i].sig = slot_entries[slot].sigs[i];
   }
 
   kernel_write(cov_file, records, count * sizeof(records[0]), 0);
@@ -194,34 +189,24 @@ void kstep_cov_dump(void) {
     int count = cov_counter[cpu];
     for (int i = 0; i < count; i++) {
       struct cov_entry *e = &cov_buffer[cpu][i];
-      u64 prev, pc, sig;
-      u32 slot;
-      u32 pc_count;
+      u32 slot, pc_count;
 
       if (e->cmd_id != cmd_id)
         panic("cov_entry[%d].cmd_id != cmd_id", i);
 
       slot = get_slot_by_pid(e->pid);
 
-      // ref: https://github.com/google/syzkaller/blob/17d780d63fb22ce9f5928fb059d6dde009510d37/executor/executor.cc#L1226
-      prev = slot_entries[slot].prev_pc;
-      pc = e->ip;
-      sig = pc ^ (kstep_cov_hash((u32)(prev & 0xfff)) & 0xfff);
-      slot_entries[slot].prev_pc = pc;
-
       pc_count = slot_entries[slot].pc_count;
-      slot_entries[slot].sigs[pc_count] = sig;
-      slot_entries[slot].pcs[pc_count] = pc;
+      slot_entries[slot].pcs[pc_count] = e->ip;
       slot_entries[slot].pc_count++;
       if (slot_entries[slot].pc_count == SIG_CHUNK_SIZE)
-        kstep_cov_flush_sigs(slot, cmd_id);
+        kstep_cov_flush_pcs(slot, cmd_id);
     }
   }
 
   for (u32 slot = 0; slot < PID_MAP_SIZE; slot++) {
-    if (slot_entries[slot].pc_count == 0)
-      continue;
-    kstep_cov_flush_sigs(slot, cmd_id);
+    if (slot_entries[slot].pid != 0xffffffff)
+      kstep_cov_flush_pcs(slot, cmd_id);
   }
 
   kstep_cov_reset();
