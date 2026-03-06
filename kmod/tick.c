@@ -17,12 +17,12 @@ static void rq_checkers_save(void) {
 
   for (int i = 0; checkers[i].name && i < MAX_CHECKERS; i++) {
     switch (checkers[i].type) {
-      case TEMPORAL_DELTA:
-        for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++)
-          prev_checker_values[i][cpu] = checkers[i].get_value(cpu_rq(cpu));
-        break;
-      default:
-        panic("Unsupported checker type %d", checkers[i].type);
+    case TEMPORAL_DELTA:
+      for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++)
+        prev_checker_values[i][cpu] = checkers[i].get_value(cpu_rq(cpu));
+      break;
+    default:
+      panic("Unsupported checker type %d", checkers[i].type);
     }
   }
 }
@@ -47,18 +47,24 @@ static void rq_checkers_check(void) {
 
   for (int i = 0; checkers[i].name && i < MAX_CHECKERS; i++) {
     switch (checkers[i].type) {
-      case TEMPORAL_DELTA:
-        check_temporal_delta(i, &checkers[i]);
-        break;
-      default:
-        panic("Unsupported checker type %d", checkers[i].type);
+    case TEMPORAL_DELTA:
+      check_temporal_delta(i, &checkers[i]);
+      break;
+    default:
+      panic("Unsupported checker type %d", checkers[i].type);
     }
   }
 }
 
 static u64 kstep_sched_clock = INIT_TIME_NS;
 static u64 kstep_sched_clock_read(void) { return kstep_sched_clock; }
-static void kstep_sched_clock_tick(void) { kstep_sched_clock += TICK_NSEC; }
+static void kstep_sched_clock_tick(void) {
+  // Advance the simulated clock by step_interval_us per tick. This models
+  // nohz_full behaviour where the tick is suppressed and update_curr() sees
+  // the full wall-clock delta when the tick eventually fires.
+  kstep_sched_clock +=
+      max_t(u64, TICK_NSEC, kstep_driver->step_interval_us * 1000ULL);
+}
 
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
 // On x86_64 with paravirt enabled, `sched_clock` (see `arch/x86/kernel/tsc.c`)
@@ -196,6 +202,30 @@ static void kstep_sched_tick(void) {
   }
 }
 
+// CFS bandwidth timer control: walk all task groups, suppress their
+// real-time hrtimers, and fire the period callback at the right cadence.
+#ifdef CONFIG_CFS_BANDWIDTH
+static void kstep_cfs_bandwidth_tick(void) {
+  typedef enum hrtimer_restart (cfs_period_timer_fn_t)(struct hrtimer *);
+  KSYM_IMPORT_TYPED(cfs_period_timer_fn_t, sched_cfs_period_timer);
+  KSYM_IMPORT(task_groups);
+
+  struct task_group *tg;
+  list_for_each_entry_rcu(tg, KSYM_task_groups, list) {
+    struct cfs_bandwidth *cfs_b = &tg->cfs_bandwidth;
+    if (!cfs_b->period_active)
+      continue;
+    if (hrtimer_active(&cfs_b->period_timer))
+      hrtimer_cancel(&cfs_b->period_timer);
+    u64 period_ticks = div_u64(ktime_to_ns(cfs_b->period), TICK_NSEC);
+    if (period_ticks == 0 || kstep_jiffies % period_ticks == 0) {
+      hrtimer_set_expires(&cfs_b->period_timer, ns_to_ktime(0));
+      KSYM_sched_cfs_period_timer(&cfs_b->period_timer);
+    }
+  }
+}
+#endif
+
 void kstep_tick(void) {
   KSYM_IMPORT(sysrq_sched_debug_show);
   if (kstep_driver->print_sched_debug)
@@ -210,6 +240,9 @@ void kstep_tick(void) {
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
   kstep_sched_tick();
+#ifdef CONFIG_CFS_BANDWIDTH
+  kstep_cfs_bandwidth_tick();
+#endif
   rq_checkers_check();
 }
 

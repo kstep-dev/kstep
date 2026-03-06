@@ -235,8 +235,6 @@ static bool op_cgroup_set_weight(int a, int b, int c) {
   return true;
 }
 
-// TODO: kstep_cgroup_add_task stuck unless 
-// (1) it is called in setup or (2) cgroup_attach_lock is skipped
 static bool op_cgroup_add_task(int a, int b, int c) {
   char name[MAX_CGROUP_NAME_LEN];
   (void)c;

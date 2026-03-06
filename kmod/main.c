@@ -6,7 +6,6 @@
 #include "internal.h"
 
 struct kstep_driver *kstep_driver = NULL;
-struct task_struct *controller = NULL;
 
 static char driver_name[DRIVER_NAME_LEN] = "default";
 module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
@@ -28,9 +27,6 @@ void kstep_status_set_fail(void) { status = KSTEP_STATUS_FAIL; }
 static int __init kstep_main(void) {
   kstep_output_init();
 
-  controller = current;
-  TRACE_INFO("Controller %d started", controller->pid);
-
   TRACE_INFO("Linux version: %s", UTS_RELEASE);
   kstep_driver = kstep_sym_init(driver_name);
   kstep_driver_print(kstep_driver);
@@ -42,6 +38,7 @@ static int __init kstep_main(void) {
 
   // Run userspace programs when we know the system is ready
   kstep_task_init();
+  kstep_cgroup_init();
   kstep_driver->setup();
   kstep_topo_print();
 

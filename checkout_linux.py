@@ -67,10 +67,11 @@ def patch_linux(linux_dir: Path, patch: Path):
 
 def checkout_linux(
     version: str,
-    linux_dir: Path,
+    linux_name: str,
     patch: Path | None = None,
     tarball: bool = False,
 ):
+    linux_dir = LINUX_ROOT_DIR / linux_name
     if linux_dir.exists():
         logging.info(f"{fmt_path(linux_dir)} already exists")
     else:
@@ -92,7 +93,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("version", type=str, nargs="?", default="v6.14")
     parser.add_argument(
-        "name",
+        "linux_name",
         type=str,
         nargs="?",
         default=None,
@@ -104,7 +105,7 @@ if __name__ == "__main__":
 
     checkout_linux(
         version=args.version,
-        linux_dir=LINUX_ROOT_DIR / (args.name if args.name else args.version),
+        linux_name=args.linux_name if args.linux_name else args.version,
         tarball=args.tarball,
         patch=args.patch,
     )

@@ -121,7 +121,7 @@ bugs = [
         ],
     ),
     Bug(
-        driver=Driver(name="throttled_limbo_list", smp="2"),
+        driver=Driver(name="throttled_limbo_list", smp="3"),
         linux=[
             Linux(name="buggy", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad~1"),
             Linux(name="fixed", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad"),
@@ -134,6 +134,27 @@ bugs = [
             Linux(name="fixed", version="d4ac164bde7a12ec0a238a7ead5aa26819bbb1c1"),
         ],
     ),
+    Bug(
+        driver=Driver(name="slice_update", smp="2"),
+        linux=[
+            Linux(name="buggy", version="2f2fc17bab0011430ceb6f2dc1959e7d1f981444~1"),
+            Linux(name="fixed", version="2f2fc17bab0011430ceb6f2dc1959e7d1f981444"),
+        ],
+    ),
+    Bug(
+        driver=Driver(name="avg_vruntime_ceil", smp="2"),
+        linux=[
+            Linux(name="buggy", version="650cad561cce04b62a8c8e0446b685ef171bc3bb~1"),
+            Linux(name="fixed", version="650cad561cce04b62a8c8e0446b685ef171bc3bb"),
+        ],
+    ),
+    Bug(
+        driver=Driver(name="min_deadline", smp="2"),
+        linux=[
+            Linux(name="buggy", version="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c~1"),
+            Linux(name="fixed", version="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c"),
+        ],
+    ),
 ]
 
 
@@ -142,16 +163,18 @@ def plot_data(python_script: str, driver: str):
 
 
 def reproduce(linux: Linux, driver: Driver, skip_build: bool):
-    linux_dir = LINUX_ROOT_DIR / f"{driver.name}_{linux.name}"
-    checkout_linux(linux.version, linux_dir=linux_dir, patch=linux.patch, tarball=True)
+    linux_name = f"{driver.name}_{linux.name}"
+    checkout_linux(
+        linux.version, linux_name=linux_name, patch=linux.patch, tarball=True
+    )
     if not skip_build:
-        make_linux(linux_dir=linux_dir)
-    make_kstep(linux_dir=linux_dir)
-    log_file = RESULTS_DIR / f"{driver.name}_{linux.name}.log"
-    proc = run_qemu(linux_dir=linux_dir, driver=driver, log_file=log_file)
+        make_linux(linux_name=linux_name)
+    make_kstep(linux_name=linux_name)
+    log_file = RESULTS_DIR / f"{linux_name}.log"
+    proc = run_qemu(linux_name=linux_name, driver=driver, log_file=log_file)
     return_code = proc.wait()
     print(f"Reproduction returned with code: {return_code}")
-    print_run_results()
+    print_run_results(linux_name=linux_name)
 
 
 def main(bug: Bug, run: List[str], skip_build: bool):

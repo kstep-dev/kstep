@@ -18,7 +18,6 @@
 
 // main.c
 extern struct kstep_driver *kstep_driver;
-extern struct task_struct *controller;
 
 // tick.c
 void kstep_sched_timer_init(void);
@@ -47,6 +46,9 @@ bool kstep_is_sys_kthread(struct task_struct *p);
 // task.c
 void kstep_task_init(void);
 
+// kernel.c
+void kstep_cgroup_init(void);
+
 // cov.c
 void kstep_cov_init(void);
 void kstep_cov_enable(void);
@@ -67,8 +69,7 @@ struct kstep_driver *kstep_sym_init(const char *driver_name);
 #define KSYM_IMPORT(name) KSYM_IMPORT_TYPED(typeof(name), name)
 #define KSYM_IMPORT_TYPED(type, name) static KSYM_IMPORT_RAW(type, name) __used
 #define KSYM_IMPORT_RAW(type, name) type *KSYM_##name
-// An alternative to KSYM_IMPORT, but don't panic if the symbol is not found
-void kstep_ksym_lookup(const char *name, void **ptr);
+void *kstep_ksym_lookup(const char *name);
 
 
 extern KSYM_IMPORT_RAW(struct rq, runqueues);

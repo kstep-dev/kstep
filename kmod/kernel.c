@@ -3,12 +3,11 @@
 #include <linux/freezer.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
+#include <linux/percpu-rwsem.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/kprobes.h>
 
 #include "internal.h"
-#include "pt_regs.h"
 
 #define SYSCTL_ROOT "/proc/sys/"
 #define CGROUP_ROOT "/sys/fs/cgroup/"
@@ -16,41 +15,6 @@
 
 #define MAX_PATH_LENGTH 64
 #define MAX_DATA_LENGTH 64
-
-// The sync RCU requires CPU1-N to report their QC state during the tick,
-// but we have disabled the tick on CPU1-N in kstep_sched_timer_init.
-// causing the sync RCU (cgroup_attach_lock) to hang.
-
-// In kstep, we have ensured that only 1 op will change the cgroup tree at a time,
-// so it is safe to skip the RCU write lock here.
-
-// cgroup_threadgroup_rwsem and cpuset_rwsem are used to protect the cgroup tree
-KSYM_IMPORT(cgroup_threadgroup_rwsem);
-struct percpu_rw_semaphore ** cgroup_threadgroup_rwsem_ptr = &KSYM_cgroup_threadgroup_rwsem;
-
-// Override the function with return if the argument for rcu writing lock is cgroup-related
-static int skip_cgroup_rwsem(struct kprobe *kp, struct pt_regs *regs) {
-  void * cpuset_rwsem_ptr;
-  kstep_ksym_lookup("cpuset_rwsem", &cpuset_rwsem_ptr);
-
-  if (PT_REGS_PARM1(regs) != (unsigned long)*cgroup_threadgroup_rwsem_ptr &&
-      (!cpuset_rwsem_ptr || PT_REGS_PARM1(regs) != (unsigned long)cpuset_rwsem_ptr))
-    return 0;
-
-  override_function_with_ret(regs);
-  return 1;
-}
-
-
-static struct kprobe cgroup_attach_lock_kp = {
-  .symbol_name = "percpu_down_write",
-  .pre_handler = skip_cgroup_rwsem,
-};
-
-static struct kprobe cgroup_attach_unlock_kp = {
-  .symbol_name = "percpu_up_write",
-  .pre_handler = skip_cgroup_rwsem,
-};
 
 void kstep_write(const char *path, const char *buf, size_t size) {
   TRACE_INFO("Writing %s: %s", path, buf);
@@ -168,17 +132,22 @@ static void kstep_cgroup_mkdir(const char *name) {
   kstep_mkdir(path);
 }
 
+void kstep_cgroup_init(void) {
+  kstep_cgroup_write("", "cgroup.subtree_control", CGROUP_CONTROL);
+
+  // Pre-enter rcu_sync on cgroup percpu rwsems so that subsequent
+  // percpu_down_write calls skip synchronize_rcu(), which would hang
+  // because ticks are disabled on CPU1-N.
+  KSYM_IMPORT(rcu_sync_enter);
+  KSYM_IMPORT(cgroup_threadgroup_rwsem);
+  KSYM_rcu_sync_enter(&KSYM_cgroup_threadgroup_rwsem->rss);
+
+  struct percpu_rw_semaphore *cpuset_rwsem = kstep_ksym_lookup("cpuset_rwsem");
+  if (cpuset_rwsem)
+    KSYM_rcu_sync_enter(&cpuset_rwsem->rss);
+}
+
 void kstep_cgroup_create(const char *name) {
-  static bool root_initialized = false;
-  if (!root_initialized) {
-    kstep_cgroup_write("", "cgroup.subtree_control", CGROUP_CONTROL);
-
-    register_kprobe(&cgroup_attach_lock_kp);
-    register_kprobe(&cgroup_attach_unlock_kp);
-
-    root_initialized = true;
-  }
-
   kstep_cgroup_mkdir(name);
   kstep_cgroup_write(name, "cgroup.subtree_control", CGROUP_CONTROL);
 }

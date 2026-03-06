@@ -1,7 +1,7 @@
 #define _GNU_SOURCE
 
-#include <stdbool.h>      // bool
 #include <signal.h>       // signal
+#include <stdbool.h>      // bool
 #include <stdlib.h>       // atoi
 #include <sys/prctl.h>    // PR_SET_NAME
 #include <sys/resource.h> // setpriority
@@ -55,7 +55,8 @@ static void loop() {
 }
 
 int main(int argc, char **argv) {
-  struct sigaction sa = {.sa_sigaction = handler, .sa_flags = SA_SIGINFO};
+  struct sigaction sa = {.sa_sigaction = handler,
+                         .sa_flags = SA_SIGINFO | SA_NODEFER};
   sigaction(SIGUSR1, &sa, NULL);
   set_proc_affinity(1, sysconf(_SC_NPROCESSORS_ONLN) - 1);
   prctl(PR_SET_NAME, TASK_READY_COMM);
