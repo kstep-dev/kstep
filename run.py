@@ -179,7 +179,6 @@ def print_run_results(
 
     # check if cov is empty and call analyze_new_signals and analyze_per_action_signals if it is not
     if cov_file.exists() and cov_file.stat().st_size != 0:
-        linux_name = linux_dir.resolve().name
 
         # Parse the signal file and get the signal records and list
         signal_records = cov_parse(cov_file)
