@@ -10,7 +10,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 from consts import RESULTS_DIR
-from parse_log import parse_jsonl, parse_log
+from parse_log import parse_jsonl
 from plot_utils import save_fig
 
 
@@ -19,7 +19,7 @@ def parse_nr_running(path: Path) -> pd.DataFrame:
 
 
 def parse_lb_events(path: Path, cpus: list[int], driver: str) -> pd.DataFrame:
-    df = parse_log(path, prefix="load_balance")
+    df = parse_jsonl(path, "load_balance")
     df = df[df["timestamp"] != 0]
     df["dst_cpu"] -= min(cpus)
     if driver == "even_idle_cpu":
@@ -101,19 +101,15 @@ def plot_legend(fig, driver, cmap):
 
 
 def main(driver: str):
-    log_file_buggy = RESULTS_DIR / f"{driver}_buggy.log"
-    log_file_fixed = RESULTS_DIR / f"{driver}_fixed.log"
-
     out_file_buggy = RESULTS_DIR / f"{driver}_buggy.jsonl"
     out_file_fixed = RESULTS_DIR / f"{driver}_fixed.jsonl"
-
 
     nr_running_buggy = parse_nr_running(out_file_buggy)
     nr_running_fixed = parse_nr_running(out_file_fixed)
 
     cpus = [1, 2, 3, 4] if driver == "even_idle_cpu" else [4, 5, 6, 7]
-    lb_events_buggy = parse_lb_events(log_file_buggy, cpus=cpus, driver=driver)
-    lb_events_fixed = parse_lb_events(log_file_fixed, cpus=cpus, driver=driver)
+    lb_events_buggy = parse_lb_events(out_file_buggy, cpus=cpus, driver=driver)
+    lb_events_fixed = parse_lb_events(out_file_fixed, cpus=cpus, driver=driver)
 
     fig, (ax1, ax2) = plt.subplots(
         2, 1, figsize=(3.5, 2), sharex=False, gridspec_kw={"hspace": 0.3}

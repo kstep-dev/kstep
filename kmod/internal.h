@@ -24,6 +24,7 @@ void kstep_sched_timer_init(void);
 u64 kstep_jiffies_get(void);
 void kstep_jiffies_init(void);
 void kstep_sched_clock_init(void);
+void kstep_sched_tick_init(void);
 
 // output.c
 void kstep_output_init(void);

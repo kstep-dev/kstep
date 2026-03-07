@@ -93,8 +93,6 @@ def run_qemu(
         f"nohz_full={isol_cpus}",
         "init=/init",
         "panic=-1",  # Exit immediately on panic
-        "quiet",  # Disable printk to be enabled later
-        "printk.time=0",  # Disable printk time to be enabled later
         "console=ttyS0",
     ]
 
