@@ -1,6 +1,19 @@
-include scripts/common.mk
-
 .DEFAULT_GOAL := kstep
+
+# ========= common =========
+
+PROJ_DIR := $(CURDIR)
+MAKEFLAGS += $(if $(findstring -j,$(MAKEFLAGS)),,-j$(shell nproc))
+BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.json --,)
+
+LINUX_NAME ?= $(notdir $(realpath $(PROJ_DIR)/linux/current))
+ifeq ($(LINUX_NAME),)
+    $(error linux/current does not exist or is a broken symlink)
+endif
+$(info ======= LINUX_NAME: $(LINUX_NAME) =======)
+
+LINUX_DIR := $(PROJ_DIR)/linux/$(LINUX_NAME)
+BUILD_DIR := $(PROJ_DIR)/build/$(LINUX_NAME)
 
 # ========= user =========
 
@@ -20,9 +33,40 @@ $(USER_OUT_DIR):
 
 # ========= linux =========
 
+LINUX_CONFIG := $(LINUX_DIR)/.config
+KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
+
+ARCH := $(shell uname -m)
+ifeq ($(ARCH), x86_64)
+	LINUX_IMAGE := $(LINUX_DIR)/arch/x86/boot/bzImage
+else ifeq ($(ARCH), aarch64)
+	LINUX_IMAGE := $(LINUX_DIR)/arch/arm64/boot/Image
+else
+	$(error Unsupported architecture: $(ARCH))
+endif
+
 .PHONY: linux
-linux:
-	$(MAKE) -C linux LINUX_NAME=$(LINUX_NAME)
+linux: linux-config linux-patch
+	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(LINUX_NAME) WERROR=0 HOSTCFLAGS=-Wno-error
+	mkdir -p $(BUILD_DIR)
+	cp $(LINUX_IMAGE) $(BUILD_DIR)/image
+
+.PHONY: linux-config
+linux-config: $(LINUX_CONFIG)
+$(LINUX_CONFIG): $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
+	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
+	touch $(LINUX_CONFIG)
+
+.PHONY: linux-patch
+linux-patch: $(LINUX_DIR)/kernel/cov.c
+$(LINUX_DIR)/kernel/cov.c: $(PROJ_DIR)/linux/cov.c
+	ln -sf $< $@
+	echo 'obj-y += cov.o' >> $(LINUX_DIR)/kernel/Makefile
+	echo 'ccflags-y += -fsanitize-coverage=trace-pc' >> $(LINUX_DIR)/kernel/sched/Makefile
+
+.PHONY: linux-clean
+linux-clean:
+	cd $(LINUX_DIR) && $(MAKE) clean
 
 # ========= kmod =========
 
