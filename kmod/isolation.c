@@ -49,7 +49,7 @@ static const char *sys_kthread_names[] = {
     "ksoftirqd/",
 };
 
-bool kstep_is_sys_kthread(struct task_struct *p) {
+static bool kstep_is_sys_kthread(struct task_struct *p) {
   for (int i = 0; i < ARRAY_SIZE(sys_kthread_names); i++)
     if (strstarts(p->comm, sys_kthread_names[i]))
       return true;

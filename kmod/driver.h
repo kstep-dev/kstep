@@ -28,7 +28,6 @@ struct kstep_driver {
   u64 step_interval_us;                 // Real time sleep between steps in us
   u64 tick_interval_ns;                 // Virtual clock advance per tick in ns
   bool print_rq;                        // Print runqueue stats
-  bool print_tasks;                     // Print task stats
   bool print_load_balance;              // Print load balancing
   struct kstep_checker *checkers;       // Array of checkers
 };
@@ -38,7 +37,6 @@ static inline void kstep_driver_print(struct kstep_driver *driver) {
   TRACE_INFO("- %-20s: %s", "name", driver->name);
   TRACE_INFO("- %-20s: %llu", "step_interval_us", driver->step_interval_us);
   TRACE_INFO("- %-20s: %d", "print_rq", driver->print_rq);
-  TRACE_INFO("- %-20s: %d", "print_tasks", driver->print_tasks);
   TRACE_INFO("- %-20s: %d", "print_load_balance", driver->print_load_balance);
 }
 void kstep_status_set_pass(void); // use `kstep_pass(...)` instead

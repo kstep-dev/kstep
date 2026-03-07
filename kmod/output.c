@@ -144,26 +144,6 @@ void kstep_print_sched_debug(void) {
   KSYM_sysrq_sched_debug_show();
 }
 
-static void print_task(struct task_struct *p) {
-  pr_info("task: {");
-  pr_cont(K(pid) "%d, ", task_pid_nr(p));
-  pr_cont(K(on_cpu) "%5s, ", p->on_cpu ? "true" : "false");
-  pr_cont(K(cpu) "%d, ", task_cpu(p));
-  pr_cont(K(state) "\"%c\", ", task_state_to_char(p));
-  pr_cont(K(vruntime) "%12lld, ", p->se.vruntime);
-  pr_cont(K(sum_exec) "%12lld", p->se.sum_exec_runtime);
-  pr_cont("}\n");
-}
-
-void kstep_print_tasks(void) {
-  struct task_struct *p;
-  for_each_process(p) {
-    if (task_cpu(p) == 0 || kstep_is_sys_kthread(p))
-      continue;
-    print_task(p);
-  }
-}
-
 void kstep_output_curr_task(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct task_struct *curr = cpu_rq(cpu)->curr;

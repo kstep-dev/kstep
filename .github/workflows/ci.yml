@@ -104,6 +104,9 @@ jobs:
         timeout-minutes: 1
         run: ./run.py
 
+      - name: Print output
+        run: cat data/latest.out
+
       - name: Print coverage
         run: cat data/latest.cov.json
 

@@ -29,7 +29,6 @@ void kstep_sched_tick_init(void);
 // output.c
 void kstep_output_init(void);
 void kstep_print_rq(void);
-void kstep_print_tasks(void);
 void kstep_trace_load_balance(void);
 
 // reset.c
@@ -42,7 +41,6 @@ void kstep_patch_min_vruntime(void);
 void kstep_disable_workqueue(void);
 void kstep_move_kthreads(void);
 void kstep_prealloc_kworkers(void);
-bool kstep_is_sys_kthread(struct task_struct *p);
 
 // task.c
 void kstep_task_init(void);
