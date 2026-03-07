@@ -64,9 +64,6 @@ $(ROOTFS_IMG): $(KMOD_OUT_FILE) $(USER_OUT_FILES)
 
 # ========= linux =========
 
-LINUX_CONFIG := $(LINUX_DIR)/.config
-KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
-
 ARCH := $(shell uname -m)
 ifeq ($(ARCH), x86_64)
 	LINUX_IMAGE := $(LINUX_DIR)/arch/x86/boot/bzImage
@@ -83,11 +80,12 @@ linux: linux-config linux-patch
 	cp $(LINUX_IMAGE) $(BUILD_DIR)/image
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
 
+KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
+
 .PHONY: linux-config
-linux-config: $(LINUX_CONFIG)
-$(LINUX_CONFIG): $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
-	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
-	touch $(LINUX_CONFIG)
+linux-config: $(LINUX_DIR)/.config
+$(LINUX_DIR)/.config: $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
+	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $^ && touch $@
 
 .PHONY: linux-patch
 linux-patch: $(LINUX_DIR)/kernel/cov.c
