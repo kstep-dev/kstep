@@ -54,7 +54,12 @@ static void kstep_reset_runqueue(struct rq *rq) {
 #endif
 
 // https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+// https://github.com/torvalds/linux/commit/dcbc9d3f0e594223275a18f7016001889ad35eff (avg_vruntime -> sum_w_vruntime)
+// https://github.com/torvalds/linux/commit/4ff674fa986c27ec8a0542479258c92d361a2566 (avg_load -> sum_weight)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
+  rq->cfs.sum_w_vruntime = 0;
+  rq->cfs.sum_weight = 0;
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
   rq->cfs.avg_vruntime = 0;
   rq->cfs.avg_load = 0;
 #endif

@@ -2,6 +2,9 @@
 #include <linux/kprobes.h>
 #include <linux/sched/clock.h>
 #include <linux/sched_clock.h>
+#if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
+#include <asm/timer.h>
+#endif
 
 #include "internal.h"
 
