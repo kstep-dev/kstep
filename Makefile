@@ -52,12 +52,13 @@ ROOTFS_IMG := $(BUILD_DIR)/rootfs.cpio
 kstep: $(ROOTFS_IMG)
 
 $(ROOTFS_IMG): $(KMOD_OUT_FILE) $(USER_OUT_FILES)
-	cd $(BUILD_DIR)/kmod && echo kmod.ko | cpio -o --format=newc > $(ROOTFS_IMG)
+	cd $(KMOD_OUT_DIR) && echo kmod.ko | cpio -o --format=newc > $(ROOTFS_IMG)
 	cd $(USER_OUT_DIR) && ls | cpio -o --format=newc >> $(ROOTFS_IMG)
 
 # ========= clean =========
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(KMOD_OUT_DIR)
+	rm -rf $(USER_OUT_DIR)
 	rm -f $(KMOD_SRC_DIR)/compile_commands.json

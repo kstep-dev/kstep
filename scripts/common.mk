@@ -14,9 +14,7 @@ LINUX_NAME ?= $(notdir $(realpath $(PROJ_DIR)/linux/current))
 ifeq ($(LINUX_NAME),)
     $(error linux/current does not exist or is a broken symlink)
 endif
-ifeq ($(origin LINUX_NAME),file)
-    $(info Using LINUX_NAME=$(LINUX_NAME) (from linux/current symlink))
-endif
+$(info ======= LINUX_NAME: $(LINUX_NAME) =======)
 
 LINUX_DIR := $(PROJ_DIR)/linux/$(LINUX_NAME)
 BUILD_DIR := $(PROJ_DIR)/build/$(LINUX_NAME)
