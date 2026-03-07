@@ -5,9 +5,20 @@ import json
 from pathlib import Path
 
 import pandas as pd
-
-from utils import parse_line
 from consts import LATEST_LOG
+from utils import parse_line
+
+
+def parse_jsonl(path: Path, type: str) -> pd.DataFrame:
+    print(f'Parsing {path} with type "{type}"')
+    rows = []
+    with open(path) as f:
+        for line in f:
+            record = json.loads(line)
+            if record.get("type") == type:
+                del record["type"]
+                rows.append(record)
+    return pd.DataFrame(rows)
 
 
 def parse_log(path: Path, prefix: str) -> pd.DataFrame:

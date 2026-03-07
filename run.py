@@ -75,7 +75,7 @@ def run_qemu(
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_file or LOGS_DIR / f"log-{timestamp}.log"
-    out_file = log_file.with_suffix(".out")
+    out_file = log_file.with_suffix(".jsonl")
     cov_file = log_file.with_suffix(".cov")
     signal_file = log_file.with_suffix(".signal")
     update_latest(LATEST_LOG, log_file)

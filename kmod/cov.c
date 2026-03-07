@@ -84,10 +84,11 @@ static void kstep_cov_record(u64 ip) {
   cov_counter[cpu]++;
 }
 
-KSYM_IMPORT_TYPED(typeof(&kstep_cov_record), sanitizer_cov_trace_pc);
+static void* sanitizer_cov_trace_pc_ptr = NULL;
 
 void kstep_cov_init(void) {
-  if (KSYM_sanitizer_cov_trace_pc == NULL)
+  sanitizer_cov_trace_pc_ptr = kstep_ksym_lookup("sanitizer_cov_trace_pc");
+  if (sanitizer_cov_trace_pc_ptr == NULL)
     panic("sanitizer_cov_trace_pc not found");
 
   cov_file = filp_open("/dev/ttyS2", O_WRONLY | O_NOCTTY, 0);
@@ -106,12 +107,12 @@ void kstep_cov_init(void) {
 
 // Cov mode control functions
 void kstep_cov_enable(void) {
-  *KSYM_sanitizer_cov_trace_pc = kstep_cov_record;
+  *((void**)sanitizer_cov_trace_pc_ptr) = kstep_cov_record;
   kstep_cov_mode_set(COV_ENABLED);
 }
 
 void kstep_cov_disable(void) {
-  *KSYM_sanitizer_cov_trace_pc = NULL;
+  *((void**)sanitizer_cov_trace_pc_ptr) = NULL;
   kstep_cov_mode_set(COV_DISABLED);
 }
 

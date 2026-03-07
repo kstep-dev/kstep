@@ -23,10 +23,13 @@ static void run(void) {
 }
 
 static void on_tick(void) {
-  pr_info(
-      "nr_running: {\"cpu4\": %d, \"cpu5\": %d, \"cpu6\": %d, \"cpu7\": %d}\n",
-      cpu_rq(4)->nr_running, cpu_rq(5)->nr_running, cpu_rq(6)->nr_running,
-      cpu_rq(7)->nr_running);
+  struct kstep_json *json = kstep_json_begin();
+  kstep_json_field_str(json, "type", "nr_running");
+  kstep_json_field_u64(json, "cpu4", cpu_rq(4)->nr_running);
+  kstep_json_field_u64(json, "cpu5", cpu_rq(5)->nr_running);
+  kstep_json_field_u64(json, "cpu6", cpu_rq(6)->nr_running);
+  kstep_json_field_u64(json, "cpu7", cpu_rq(7)->nr_running);
+  kstep_json_end(json);
 }
 
 KSTEP_DRIVER_DEFINE{

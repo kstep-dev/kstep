@@ -66,7 +66,7 @@ def run_test(
     make_kstep(linux_name=linux_name)
 
     log_file = LOGS_DIR / f"{linux_name}.log"
-    out_file = log_file.with_suffix(".out")
+    out_file = log_file.with_suffix(".jsonl")
     cov_file = log_file.with_suffix(".cov")
 
     proc = run_qemu(
