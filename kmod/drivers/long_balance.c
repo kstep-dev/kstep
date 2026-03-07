@@ -16,12 +16,13 @@ static void on_sched_softirq_begin(void) {
 static void on_sched_softirq_end(void) {
   ktime_t starttime = this_cpu_read(sched_softirq_starttime);
   u64 lat_ns = ktime_to_ns(ktime_sub(ktime_get(), starttime));
-  struct kstep_json *json = kstep_json_begin();
-  kstep_json_field_str(json, "type", "sched_softirq");
-  kstep_json_field_u64(json, "cpu", smp_processor_id());
-  kstep_json_field_fmt(json, "lat_us", "%llu.%03llu", lat_ns / 1000,
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, "type", "sched_softirq");
+  kstep_json_field_u64(&json, "cpu", smp_processor_id());
+  kstep_json_field_fmt(&json, "lat_us", "%llu.%03llu", lat_ns / 1000,
                        lat_ns % 1000);
-  kstep_json_end(json);
+  kstep_json_end(&json);
   TRACE_INFO("sched_softirq on CPU %d, latency: %llu.%03llu ms",
              smp_processor_id(), lat_ns / 1000, lat_ns % 1000);
 }
