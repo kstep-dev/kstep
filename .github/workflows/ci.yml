@@ -64,7 +64,9 @@ jobs:
         id: linux-cache
         uses: actions/cache/restore@v4
         with:
-          path: linux
+          path: |
+            linux
+            build
           key: ${{matrix.version}}-${{hashFiles('linux/config.kstep**', 'linux/cov.c')}}
 
       - name: Linux - Download
@@ -73,17 +75,19 @@ jobs:
 
       - name: Linux - Install build dependencies
         if: steps.linux-cache.outputs.cache-hit != 'true'
-        run: sudo apt update && sudo apt install -y libelf-dev pahole
+        run: sudo apt update && sudo apt install -y libelf-dev
 
       - name: Linux - Build
         if: steps.linux-cache.outputs.cache-hit != 'true'
-        run: make linux; make -C linux clean
+        run: make linux; make linux-clean
 
       - name: Linux - Save cache
         if: steps.linux-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: linux
+          path: |
+            linux
+            build
           key: ${{matrix.version}}-${{hashFiles('linux/config.kstep**', 'linux/cov.c')}}
 
       - name: Build kSTEP

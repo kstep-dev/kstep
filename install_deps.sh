@@ -11,7 +11,6 @@ PACKAGES=(
     libncurses-dev
     libssl-dev
     libelf-dev
-    pahole         # BTF support
     cpio           # rootfs
     bear           # clangd completion
     qemu-kvm       # run virtual machine

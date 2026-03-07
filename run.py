@@ -10,25 +10,24 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
-from scripts.input_seq import input_seq_from_log
-from scripts.cov import cov_parse
-from scripts.corpus import GLOBAL_SIGNAL_CORPUS
 
 from scripts import (
+    BUILD_DIR,
     LATEST_COV,
     LATEST_LOG,
     LATEST_OUT,
-    LINUX_BUILD_DIR,
     LINUX_CURR_DIR,
     LINUX_ROOT_DIR,
     LOGS_DIR,
     PROJ_DIR,
     QEMU_DIR,
-    ROOTFS_DIR,
     system,
     system_with_pipe,
     update_latest,
 )
+from scripts.corpus import GLOBAL_SIGNAL_CORPUS
+from scripts.cov import cov_parse
+from scripts.input_seq import input_seq_from_log
 
 ARCH = os.uname().machine
 assert ARCH in ("x86_64", "aarch64"), f"Unsupported architecture: {ARCH}"
@@ -71,8 +70,8 @@ def run_qemu(
         system(f"sudo chmod 666 {kvm_path}")
 
     qemu_path = get_qemu_path()
-    kernel_img = LINUX_BUILD_DIR / linux_name
-    rootfs_img = ROOTFS_DIR / f"{linux_name}.cpio"
+    kernel_img = BUILD_DIR / linux_name / "image"
+    rootfs_img = BUILD_DIR / linux_name / "rootfs.cpio"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_file or LOGS_DIR / f"log-{timestamp}.log"
