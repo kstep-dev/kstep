@@ -2,7 +2,6 @@ include ../scripts/common.mk
 
 LINUX_CONFIG := $(LINUX_DIR)/.config
 KSTEP_CONFIG := $(realpath config.kstep)
-LINUX_BUILD_DIR := $(abspath build)
 
 ARCH := $(shell uname -m)
 ifeq ($(ARCH), x86_64)
@@ -16,9 +15,9 @@ endif
 .PHONY: kernel
 kernel: config patch
 	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(BEAR_CMD) $(MAKE) LOCALVERSION=-$(LINUX_NAME) WERROR=0 HOSTCFLAGS=-Wno-error
-	mkdir -p $(LINUX_BUILD_DIR)
-	cp $(LINUX_IMAGE) $(LINUX_BUILD_DIR)/$(LINUX_NAME)
-	cp $(LINUX_DIR)/vmlinux $(LINUX_BUILD_DIR)/$(LINUX_NAME).vmlinux
+	mkdir -p $(BUILD_DIR)
+	cp $(LINUX_IMAGE) $(BUILD_DIR)/image
+	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
 
 .PHONY: config
 config: $(LINUX_CONFIG)

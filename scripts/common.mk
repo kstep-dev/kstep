@@ -19,3 +19,4 @@ ifeq ($(origin LINUX_NAME),file)
 endif
 
 LINUX_DIR := $(PROJ_DIR)/linux/$(LINUX_NAME)
+BUILD_DIR := $(PROJ_DIR)/build/$(LINUX_NAME)

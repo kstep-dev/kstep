@@ -1,0 +1,3 @@
+obj-m := kmod.o
+kmod-y := $(patsubst %.c,%.o,$(filter-out %.mod.c,$(wildcard *.c) $(wildcard drivers/*.c)))
+ccflags-y := -I$(srctree) -I$(src) -std=gnu11 -Werror -Wno-declaration-after-statement

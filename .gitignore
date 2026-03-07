@@ -5,6 +5,7 @@
 # Build artifacts
 /kmod/build
 /user/build
+/build
 
 # Data files
 /data/download/*.tar.xz

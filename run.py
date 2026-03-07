@@ -18,13 +18,13 @@ from scripts import (
     LATEST_COV,
     LATEST_LOG,
     LATEST_OUT,
-    LINUX_BUILD_DIR,
     LINUX_CURR_DIR,
     LINUX_ROOT_DIR,
     LOGS_DIR,
     PROJ_DIR,
     QEMU_DIR,
-    ROOTFS_DIR,
+    BUILD_DIR,
+    cov_symbolize,
     system,
     system_with_pipe,
     update_latest,
@@ -71,8 +71,8 @@ def run_qemu(
         system(f"sudo chmod 666 {kvm_path}")
 
     qemu_path = get_qemu_path()
-    kernel_img = LINUX_BUILD_DIR / linux_name
-    rootfs_img = ROOTFS_DIR / f"{linux_name}.cpio"
+    kernel_img = BUILD_DIR / linux_name / "image"
+    rootfs_img = BUILD_DIR / linux_name / "rootfs.cpio"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_file or LOGS_DIR / f"log-{timestamp}.log"
