@@ -96,5 +96,4 @@ KSTEP_DRIVER_DEFINE{
     .run = run,
     .step_interval_us = 1000,
     .tick_interval_ns = 10000000000ULL * 1000ULL,
-    .print_rq = false,
 };

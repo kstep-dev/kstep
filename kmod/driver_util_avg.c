@@ -38,6 +38,15 @@ static s64 get_util_avg(struct rq *rq) {
   return rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
 }
 
+static void on_tick_begin(void) {
+  struct rq *rq = cpu_rq(1);
+  u64 avg_util = rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
+  struct kstep_json *json = kstep_json_begin();
+  kstep_json_field_str(json, "type", "avg_util");
+  kstep_json_field_u64(json, "val", avg_util);
+  kstep_json_end(json);
+}
+
 static struct kstep_checker checkers[] = {
   { .name = "util_avg_cliff", .type = TEMPORAL_DELTA, .get_value = get_util_avg, .max_delta = 100 },
   { NULL }  // Terminator
@@ -47,7 +56,7 @@ KSTEP_DRIVER_DEFINE{
     .name = "util_avg",
     .setup = setup,
     .run = run,
+    .on_tick_begin = on_tick_begin,
     .step_interval_us = 1000,
-    .print_rq = true,
     .checkers = checkers,
 };

@@ -8,13 +8,13 @@ import argparse
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from consts import RESULTS_DIR
-from parse_log import parse_log
+from parse_log import parse_jsonl
 from plot_utils import save_fig
 
 
-def plot_util(buggy_df, fixed_df, field: str, ylabel: str):
+def plot_util(buggy_df, fixed_df, ylabel: str):
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(1.8, 1.8), sharex=True, sharey=True)
-    ymax = max(max(buggy_df[field]), max(fixed_df[field]))
+    ymax = max(max(buggy_df["val"]), max(fixed_df["val"]))
 
     for ax, df, title, color in [
         (ax1, buggy_df, "Buggy", "#A72703"),
@@ -22,7 +22,7 @@ def plot_util(buggy_df, fixed_df, field: str, ylabel: str):
     ]:
         ax.plot(
             df["timestamp"],
-            df[field],
+            df["val"],
             linewidth=3,
             linestyle="-",
             color=color,
@@ -54,19 +54,19 @@ def plot_util(buggy_df, fixed_df, field: str, ylabel: str):
 
 def main(driver: str):
     if driver == "uclamp_inversion":
-        field = "effective_util"
+        type = "effective_util"
         ylabel = "Effective Utilization"
     elif driver == "h_nr_runnable":
-        field = "runnable_avg"
+        type = "runnable_avg"
         ylabel = "Runnable Avg"
     else:
-        field = "avg_util"
+        type = "avg_util"
         ylabel = "Average Utilization"
 
-    buggy_df = parse_log(RESULTS_DIR / f"{driver}_buggy.log", prefix="rq")
-    fixed_df = parse_log(RESULTS_DIR / f"{driver}_fixed.log", prefix="rq")
+    buggy_df = parse_jsonl(RESULTS_DIR / f"{driver}_buggy.jsonl", type)
+    fixed_df = parse_jsonl(RESULTS_DIR / f"{driver}_fixed.jsonl", type)
 
-    fig = plot_util(buggy_df, fixed_df, field, ylabel)
+    fig = plot_util(buggy_df, fixed_df, ylabel)
     save_fig(fig, driver)
 
 

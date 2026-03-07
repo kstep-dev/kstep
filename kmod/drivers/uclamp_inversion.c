@@ -67,7 +67,10 @@ static void on_tick_begin(void) {
   u64 effective_util = KSYM_effective_cpu_util(rq->cpu, rq->cfs.avg.util_avg,
                                                arch_scale_cpu_capacity(rq->cpu),
                                                FREQUENCY_UTIL, NULL);
-  pr_info("rq: {\"effective_util\": %llu}\n", effective_util);
+  struct kstep_json *json = kstep_json_begin();
+  kstep_json_field_str(json, "type", "effective_util");
+  kstep_json_field_u64(json, "val", effective_util);
+  kstep_json_end(json);
 #endif
 }
 

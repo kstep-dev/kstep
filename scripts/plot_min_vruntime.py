@@ -4,18 +4,11 @@ Plot min_vruntime and avg_vruntime for CPU 2 over time from log files
 """
 
 import argparse
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 from consts import RESULTS_DIR
-from parse_log import parse_log
+from parse_log import parse_jsonl
 from plot_utils import save_fig
-
-
-def parse_log_file(path: Path):
-    df = parse_log(path, prefix="rq")
-    df = df[df["cpu"] == 1]
-    return df
 
 
 def plot_min_vruntime(buggy_df, fixed_df):
@@ -24,7 +17,7 @@ def plot_min_vruntime(buggy_df, fixed_df):
     # Top subplot: min_vruntime using scatter
     ax1.scatter(
         buggy_df["timestamp"],
-        buggy_df["min_vruntime"],
+        buggy_df["val"],
         s=26,
         marker="o",
         facecolor="#A72703",
@@ -36,7 +29,7 @@ def plot_min_vruntime(buggy_df, fixed_df):
     )
     ax1.scatter(
         fixed_df["timestamp"],
-        fixed_df["min_vruntime"],
+        fixed_df["val"],
         s=60,
         marker="s",
         facecolor="none",
@@ -63,8 +56,8 @@ def plot_min_vruntime(buggy_df, fixed_df):
 
 
 def main(driver: str):
-    buggy_df = parse_log_file(RESULTS_DIR / f"{driver}_buggy.log")
-    fixed_df = parse_log_file(RESULTS_DIR / f"{driver}_fixed.log")
+    buggy_df = parse_jsonl(RESULTS_DIR / f"{driver}_buggy.jsonl", "min_vruntime")
+    fixed_df = parse_jsonl(RESULTS_DIR / f"{driver}_fixed.jsonl", "min_vruntime")
 
     fig = plot_min_vruntime(buggy_df, fixed_df)
     save_fig(fig, driver)

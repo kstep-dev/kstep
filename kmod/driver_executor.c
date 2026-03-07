@@ -112,5 +112,4 @@ KSTEP_DRIVER_DEFINE {
   .setup = setup,
   .run = run,
   .step_interval_us = 1000,
-  .print_rq = false,
 };
