@@ -9,25 +9,25 @@ enum kstep_checker_type {
   TEMPORAL_DELTA, // Checker for comparing rq fields before and after a tick
 };
 struct kstep_checker {
-  const char *name;                 // Name for logging
-  enum kstep_checker_type type;  // Type of checker
-  s64 (*get_value)(struct rq *rq);  // Extract value from rq
-  s64 max_delta;                    // Max allowed change per tick (absolute value)
+  const char *name;                // Name for logging
+  enum kstep_checker_type type;    // Type of checker
+  s64 (*get_value)(struct rq *rq); // Extract value from rq
+  s64 max_delta; // Max allowed change per tick (absolute value)
 };
 
 // main.c
 #define DRIVER_NAME_LEN 32
 struct kstep_driver {
   char name[DRIVER_NAME_LEN];
-  void (*setup)(void);      // Setup the driver (e.g., create tasks)
-  void (*run)(void);        // Run the driver
-  void (*on_tick)(void);    // Callback on each tick
-  u64 step_interval_us;     // Time between steps in us
-  bool print_rq;            // Print runqueue stats
-  bool print_tasks;         // Print task stats
-  bool print_load_balance;  // Print load balancing
-  bool print_sched_debug;   // Print sched debug
-  struct kstep_checker *checkers;  // Array of checkers
+  void (*setup)(void);            // Setup the driver (e.g., create tasks)
+  void (*run)(void);              // Run the driver
+  void (*on_tick)(void);          // Callback on each tick
+  u64 step_interval_us;           // Time between steps in us
+  bool print_rq;                  // Print runqueue stats
+  bool print_tasks;               // Print task stats
+  bool print_load_balance;        // Print load balancing
+  bool print_sched_debug;         // Print sched debug
+  struct kstep_checker *checkers; // Array of checkers
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 
@@ -44,20 +44,20 @@ void kstep_status_set_fail(void); // use `kstep_fail(...)` instead
 // output.c
 struct kstep_json;
 struct kstep_json *kstep_json_begin(void);
-void kstep_json_field(struct kstep_json *json, const char *key, const char *fmt,
-                      ...);
-void kstep_json_list_begin(struct kstep_json *json, const char *key);
-void kstep_json_list_append_str(struct kstep_json *json,
-                                   const char *str, size_t str_len);
-void kstep_json_list_end(struct kstep_json *json);
+void kstep_json_field_fmt(struct kstep_json *json, const char *key,
+                          const char *value, ...);
+void kstep_json_field_str(struct kstep_json *json, const char *key,
+                          const char *value);
+void kstep_json_field_u64(struct kstep_json *json, const char *key, u64 value);
+void kstep_json_field_s64(struct kstep_json *json, const char *key, s64 value);
 void kstep_json_end(struct kstep_json *json);
 #define kstep_status_impl_message(fmt, ...)                                    \
-  kstep_json_field(json, "message", "\"" fmt "\"", ##__VA_ARGS__)
+  kstep_json_field_fmt(json, "message", "\"" fmt "\"", ##__VA_ARGS__)
 #define kstep_status_impl(status, ...)                                         \
   do {                                                                         \
     kstep_status_set_##status();                                               \
     struct kstep_json *json = kstep_json_begin();                              \
-    kstep_json_field(json, "status", "\"" #status "\"");                       \
+    kstep_json_field_str(json, "status", #status);                             \
     __VA_OPT__(kstep_status_impl_message(__VA_ARGS__);)                        \
     kstep_json_end(json);                                                      \
   } while (0)

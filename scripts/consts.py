@@ -16,7 +16,7 @@ QEMU_DIR = DATA_DIR / "qemu"
 CORPUS_DIR = DATA_DIR / "corpus"
 
 LATEST_LOG = DATA_DIR / "latest.log"
-LATEST_OUT = DATA_DIR / "latest.out"
+LATEST_OUT = DATA_DIR / "latest.jsonl"
 LATEST_COV = DATA_DIR / "latest.cov"
 LATEST_COV_JSON = DATA_DIR / "latest.cov.json"
 

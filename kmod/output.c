@@ -28,7 +28,7 @@ struct kstep_json *kstep_json_begin(void) {
   if (!json)
     panic("Failed to allocate json");
   json->buf[json->len++] = '{';
-  kstep_json_field(json, "timestamp", "%lu", kstep_jiffies_get());
+  kstep_json_field_fmt(json, "timestamp", "%lu", kstep_jiffies_get());
   return json;
 }
 
@@ -40,7 +40,7 @@ static void kstep_json_append(struct kstep_json *json, const char *buf,
   json->len += len;
 }
 
-void kstep_json_field(struct kstep_json *json, const char *key, const char *fmt,
+void kstep_json_field_fmt(struct kstep_json *json, const char *key, const char *fmt,
                       ...) {
   kstep_json_append(json, "\"", 1);
   kstep_json_append(json, key, strlen(key));
@@ -60,33 +60,25 @@ void kstep_json_field(struct kstep_json *json, const char *key, const char *fmt,
   kstep_json_append(json, ",", 1);
 }
 
-void kstep_json_list_begin(struct kstep_json *json, const char *key) {
+void kstep_json_field_str(struct kstep_json *json, const char *key,
+                          const char *value) {
   kstep_json_append(json, "\"", 1);
   kstep_json_append(json, key, strlen(key));
-  kstep_json_append(json, "\":[", 3);
-}
-
-void kstep_json_list_append_str(struct kstep_json *json, const char *str,
-                               size_t str_len) {
-  kstep_json_append(json, "\"", 1);
-  kstep_json_append(json, str, str_len);
+  kstep_json_append(json, "\":\"", 3);
+  kstep_json_append(json, value, strlen(value));
   kstep_json_append(json, "\",", 2);
 }
 
-static void kstep_json_replace_comma(struct kstep_json *json, char end) {
-  if (json->len > 0 && json->buf[json->len - 1] == ',')
-    json->buf[json->len - 1] = end;
-  else
-    kstep_json_append(json, &end, 1);
+void kstep_json_field_u64(struct kstep_json *json, const char *key, u64 value) {
+  kstep_json_field_fmt(json, key, "%llu", value);
 }
 
-void kstep_json_list_end(struct kstep_json *json) {
-  kstep_json_replace_comma(json, ']');
-  kstep_json_append(json, ",", 1);
+void kstep_json_field_s64(struct kstep_json *json, const char *key, s64 value) {
+  kstep_json_field_fmt(json, key, "%lld", value);
 }
 
 void kstep_json_end(struct kstep_json *json) {
-  kstep_json_replace_comma(json, '}');
+  json->buf[json->len - 1] = '}';
   kstep_json_append(json, "\n", 1);
   ssize_t ret = kernel_write(output_file, json->buf, json->len, NULL);
   if (ret < 0)
