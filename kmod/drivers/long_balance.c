@@ -7,14 +7,14 @@
 
 #define NUM_TASKS 20000
 
-static DEFINE_PER_CPU(ktime_t, sched_balance_starttime) = 0;
+static DEFINE_PER_CPU(ktime_t, sched_softirq_starttime) = 0;
 
 static void on_sched_softirq_begin(void) {
-  this_cpu_write(sched_balance_starttime, ktime_get());
+  this_cpu_write(sched_softirq_starttime, ktime_get());
 }
 
 static void on_sched_softirq_end(void) {
-  ktime_t starttime = this_cpu_read(sched_balance_starttime);
+  ktime_t starttime = this_cpu_read(sched_softirq_starttime);
   u64 lat_ns = ktime_to_ns(ktime_sub(ktime_get(), starttime));
   struct kstep_json *json = kstep_json_begin();
   kstep_json_field_str(json, "type", "sched_softirq");
