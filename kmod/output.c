@@ -28,7 +28,7 @@ struct kstep_json *kstep_json_begin(void) {
   if (!json)
     panic("Failed to allocate json");
   json->buf[json->len++] = '{';
-  kstep_json_field_fmt(json, "timestamp", "%lu", kstep_jiffies_get());
+  kstep_json_field_u64(json, "timestamp", kstep_jiffies_get());
   return json;
 }
 
