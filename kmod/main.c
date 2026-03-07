@@ -10,20 +10,6 @@ struct kstep_driver *kstep_driver = NULL;
 static char driver_name[DRIVER_NAME_LEN] = "default";
 module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
 
-enum kstep_status {
-  KSTEP_STATUS_PENDING,
-  KSTEP_STATUS_PASS,
-  KSTEP_STATUS_FAIL,
-};
-static enum kstep_status status = KSTEP_STATUS_PENDING;
-
-void kstep_status_set_pass(void) {
-  if (status == KSTEP_STATUS_FAIL)
-    panic("pass after fail not allowed");
-  status = KSTEP_STATUS_PASS;
-}
-void kstep_status_set_fail(void) { status = KSTEP_STATUS_FAIL; }
-
 static int __init kstep_main(void) {
   kstep_output_init();
 
@@ -60,11 +46,6 @@ static int __init kstep_main(void) {
   kstep_driver->run();
 
   TRACE_INFO("Exiting driver %s on Linux %s", kstep_driver->name, UTS_RELEASE);
-
-  if (status == KSTEP_STATUS_PENDING || status == KSTEP_STATUS_PASS)
-    kstep_pass();
-  else if (status == KSTEP_STATUS_FAIL)
-    kstep_fail();
 
   kernel_restart(NULL);
 

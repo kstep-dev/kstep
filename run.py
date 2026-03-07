@@ -163,13 +163,6 @@ def print_run_results(
     print(f"Out: {out_file}")
     print(f"Cov: {cov_file}")
 
-    # Print the last line for status
-    with out_file.open() as f:
-        line = "Not found"
-        for line in f:
-            pass
-        print(line.strip())
-
     # check if cov is empty and call analyze_new_signals and analyze_per_action_signals if it is not
     if cov_file.exists() and cov_file.stat().st_size != 0:
 

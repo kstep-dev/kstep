@@ -35,10 +35,7 @@ static void on_tick_begin(void) {
 #else
   s64 min_vruntime = rq->cfs.min_vruntime - INIT_TIME_NS;
 #endif
-  struct kstep_json *json = kstep_json_begin();
-  kstep_json_field_str(json, "type", "min_vruntime");
-  kstep_json_field_s64(json, "val", min_vruntime);
-  kstep_json_end(json);
+  kstep_json_print_2kv("type", "min_vruntime", "val", "%lld", min_vruntime);
 }
 
 KSTEP_DRIVER_DEFINE{

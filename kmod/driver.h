@@ -31,31 +31,28 @@ struct kstep_driver {
   struct kstep_checker *checkers;       // Array of checkers
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
-void kstep_status_set_pass(void); // use `kstep_pass(...)` instead
-void kstep_status_set_fail(void); // use `kstep_fail(...)` instead
 
 // output.c
-struct kstep_json;
-struct kstep_json *kstep_json_begin(void);
+struct kstep_json {
+  size_t len;
+  char buf[512 - sizeof(size_t)];
+};
+void kstep_json_begin(struct kstep_json *json);
 void kstep_json_field_fmt(struct kstep_json *json, const char *key,
-                          const char *value, ...);
+                          const char *val_fmt, ...);
 void kstep_json_field_str(struct kstep_json *json, const char *key,
-                          const char *value);
-void kstep_json_field_u64(struct kstep_json *json, const char *key, u64 value);
-void kstep_json_field_s64(struct kstep_json *json, const char *key, s64 value);
+                          const char *val);
+void kstep_json_field_u64(struct kstep_json *json, const char *key, u64 val);
+void kstep_json_field_s64(struct kstep_json *json, const char *key, s64 val);
 void kstep_json_end(struct kstep_json *json);
-#define kstep_status_impl_message(fmt, ...)                                    \
-  kstep_json_field_fmt(json, "message", "\"" fmt "\"", ##__VA_ARGS__)
-#define kstep_status_impl(status, ...)                                         \
-  do {                                                                         \
-    kstep_status_set_##status();                                               \
-    struct kstep_json *json = kstep_json_begin();                              \
-    kstep_json_field_str(json, "status", #status);                             \
-    __VA_OPT__(kstep_status_impl_message(__VA_ARGS__);)                        \
-    kstep_json_end(json);                                                      \
-  } while (0)
-#define kstep_pass(...) kstep_status_impl(pass, ##__VA_ARGS__)
-#define kstep_fail(...) kstep_status_impl(fail, ##__VA_ARGS__)
+void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,
+                          const char *val2_fmt, ...);
+#define kstep_pass(msg_fmt, ...)                                               \
+  kstep_json_print_2kv("status", "pass", "message",                           \
+                        "\"" msg_fmt "\"", ##__VA_ARGS__)
+#define kstep_fail(msg_fmt, ...)                                               \
+  kstep_json_print_2kv("status", "fail", "message",                           \
+                        "\"" msg_fmt "\"", ##__VA_ARGS__)
 void kstep_print_sched_debug(void);
 void kstep_output_curr_task(void);
 

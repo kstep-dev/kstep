@@ -49,7 +49,7 @@ static void run(void) {
 
   TRACE_INFO("h_nr_runnable == %u", h_nr_runnable);
   if (h_nr_runnable == 1)
-    kstep_pass();
+    kstep_pass("h_nr_runnable == %u", h_nr_runnable);
   else
     kstep_fail("h_nr_runnable == %u", h_nr_runnable);
 
@@ -57,10 +57,8 @@ static void run(void) {
 }
 
 static void on_tick_begin(void) {
-  struct kstep_json *json = kstep_json_begin();
-  kstep_json_field_str(json, "type", "runnable_avg");
-  kstep_json_field_u64(json, "val", cpu_rq(1)->cfs.avg.runnable_avg);
-  kstep_json_end(json);
+  kstep_json_print_2kv("type", "runnable_avg", "val", "%llu",
+                       cpu_rq(1)->cfs.avg.runnable_avg);
 }
 
 #else

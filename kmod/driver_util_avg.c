@@ -41,10 +41,7 @@ static s64 get_util_avg(struct rq *rq) {
 static void on_tick_begin(void) {
   struct rq *rq = cpu_rq(1);
   u64 avg_util = rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
-  struct kstep_json *json = kstep_json_begin();
-  kstep_json_field_str(json, "type", "avg_util");
-  kstep_json_field_u64(json, "val", avg_util);
-  kstep_json_end(json);
+  kstep_json_print_2kv("type", "avg_util", "val", "%llu", avg_util);
 }
 
 static struct kstep_checker checkers[] = {

@@ -5,7 +5,6 @@
 
 #include "internal.h"
 
-#define OUTPUT_BUF_SIZE 65536
 
 static struct file *output_file;
 
@@ -15,72 +14,95 @@ void kstep_output_init(void) {
     panic("Failed to open /dev/ttyS1: %ld", PTR_ERR(output_file));
 }
 
-struct kstep_json {
-  char buf[OUTPUT_BUF_SIZE];
-  size_t len;
-};
-
-struct kstep_json *kstep_json_begin(void) {
-  struct kstep_json *json = kzalloc(sizeof(*json), GFP_KERNEL);
-  if (!json)
-    panic("Failed to allocate json");
-  json->buf[json->len++] = '{';
-  kstep_json_field_u64(json, "timestamp", kstep_jiffies_get());
-  return json;
+static void kstep_json_append_char(struct kstep_json *json, char c) {
+  if (json->len + 1 >= sizeof(json->buf))
+    panic("json buffer overflow");
+  json->buf[json->len++] = c;
 }
 
-static void kstep_json_append(struct kstep_json *json, const char *buf,
-                              size_t len) {
-  if (json->len + len >= OUTPUT_BUF_SIZE)
+static void kstep_json_append_buf(struct kstep_json *json, const char *buf,
+                                  size_t len) {
+  if (json->len + len >= sizeof(json->buf))
     panic("json buffer overflow");
   memcpy(json->buf + json->len, buf, len);
   json->len += len;
 }
 
-void kstep_json_field_fmt(struct kstep_json *json, const char *key,
-                          const char *value, ...) {
-  kstep_json_append(json, "\"", 1);
-  kstep_json_append(json, key, strlen(key));
-  kstep_json_append(json, "\":", 2);
+static void kstep_json_append_str(struct kstep_json *json, const char *str) {
+  kstep_json_append_char(json, '"');
+  kstep_json_append_buf(json, str, strlen(str));
+  kstep_json_append_char(json, '"');
+}
 
-  int rem = OUTPUT_BUF_SIZE - json->len;
-
-  va_list args;
-  va_start(args, value);
-  int len = vsnprintf(json->buf + json->len, rem, value, args);
-  va_end(args);
-
+static void kstep_json_append_fmt(struct kstep_json *json, const char *fmt,
+                                  va_list args) {
+  int rem = sizeof(json->buf) - json->len;
+  int len = vsnprintf(json->buf + json->len, rem, fmt, args);
   if (len < 0 || len >= rem)
     panic("json formatting failed");
   json->len += len;
+}
 
-  kstep_json_append(json, ",", 1);
+void kstep_json_field_fmt(struct kstep_json *json, const char *key,
+                          const char *val_fmt, ...) {
+  kstep_json_append_str(json, key);
+  kstep_json_append_char(json, ':');
+
+  va_list args;
+  va_start(args, val_fmt);
+  kstep_json_append_fmt(json, val_fmt, args);
+  va_end(args);
+
+  kstep_json_append_char(json, ',');
 }
 
 void kstep_json_field_str(struct kstep_json *json, const char *key,
-                          const char *value) {
-  kstep_json_append(json, "\"", 1);
-  kstep_json_append(json, key, strlen(key));
-  kstep_json_append(json, "\":\"", 3);
-  kstep_json_append(json, value, strlen(value));
-  kstep_json_append(json, "\",", 2);
+                          const char *val) {
+  kstep_json_append_str(json, key);
+  kstep_json_append_char(json, ':');
+  kstep_json_append_str(json, val);
+  kstep_json_append_char(json, ',');
 }
 
-void kstep_json_field_u64(struct kstep_json *json, const char *key, u64 value) {
-  kstep_json_field_fmt(json, key, "%llu", value);
+void kstep_json_field_u64(struct kstep_json *json, const char *key, u64 val) {
+  kstep_json_field_fmt(json, key, "%llu", val);
 }
 
-void kstep_json_field_s64(struct kstep_json *json, const char *key, s64 value) {
-  kstep_json_field_fmt(json, key, "%lld", value);
+void kstep_json_field_s64(struct kstep_json *json, const char *key, s64 val) {
+  kstep_json_field_fmt(json, key, "%lld", val);
+}
+
+void kstep_json_begin(struct kstep_json *json) {
+  json->len = 0;
+  kstep_json_append_char(json, '{');
+  kstep_json_field_u64(json, "timestamp", kstep_jiffies_get());
 }
 
 void kstep_json_end(struct kstep_json *json) {
-  json->buf[json->len - 1] = '}';
-  kstep_json_append(json, "\n", 1);
+  if (json->len > 0 && json->buf[json->len - 1] == ',')
+    json->len--;
+  kstep_json_append_char(json, '}');
+  kstep_json_append_char(json, '\n');
   ssize_t ret = kernel_write(output_file, json->buf, json->len, NULL);
   if (ret < 0)
     panic("write to output file failed: %ld", ret);
-  kfree(json);
+}
+
+void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,
+                          const char *val2_fmt, ...) {
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, key1, val1);
+  kstep_json_append_str(&json, key2);
+  kstep_json_append_char(&json, ':');
+
+  va_list args;
+  va_start(args, val2_fmt);
+  kstep_json_append_fmt(&json, val2_fmt, args);
+  va_end(args);
+
+  kstep_json_append_char(&json, ',');
+  kstep_json_end(&json);
 }
 
 void kstep_print_sched_debug(void) {
@@ -91,11 +113,12 @@ void kstep_print_sched_debug(void) {
 void kstep_output_curr_task(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct task_struct *curr = cpu_rq(cpu)->curr;
-    struct kstep_json *json = kstep_json_begin();
-    kstep_json_field_str(json, "type", "curr_task");
-    kstep_json_field_u64(json, "cpu", cpu);
-    kstep_json_field_u64(json, "pid", task_pid_nr(curr));
-    kstep_json_end(json);
+    struct kstep_json json;
+    kstep_json_begin(&json);
+    kstep_json_field_str(&json, "type", "curr_task");
+    kstep_json_field_u64(&json, "cpu", cpu);
+    kstep_json_field_u64(&json, "pid", task_pid_nr(curr));
+    kstep_json_end(&json);
   }
 }
 
@@ -117,13 +140,14 @@ static void load_balance_enter(unsigned long ip, unsigned long parent_ip,
   if (kstep_jiffies_get() == 0)
     return;
 
-  struct kstep_json *json = kstep_json_begin();
-  kstep_json_field_str(json, "type", "load_balance");
-  kstep_json_field_u64(json, "dst_cpu", env->dst_cpu);
-  kstep_json_field_fmt(json, "span", "\"%*pbl\"",
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, "type", "load_balance");
+  kstep_json_field_u64(&json, "dst_cpu", env->dst_cpu);
+  kstep_json_field_fmt(&json, "span", "\"%*pbl\"",
                        cpumask_pr_args(sched_domain_span(env->sd)));
-  kstep_json_field_str(json, "name", env->sd->name);
-  kstep_json_end(json);
+  kstep_json_field_str(&json, "name", env->sd->name);
+  kstep_json_end(&json);
 }
 
 struct ftrace_ops load_balance_enter_op = {
