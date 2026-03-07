@@ -149,7 +149,7 @@ NAME_MAPS = {
         2: "Task 2 (waker)",
         3: "Task 3 (wakee)",
     },
-    "freeze": {     
+    "freeze": {
         0: "Task 1 (fail to freeze)",
         1: "Task 2",
         2: "Task 3",
