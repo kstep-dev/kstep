@@ -126,10 +126,9 @@ COLOR_MAPS = {
         3: COLOR_BUGGY,
     },
     "freeze": {
-        0: COLOR_IDLE,
-        1: COLOR_BUGGY,
-        2: COLOR_YELLOW,
-        3: COLOR_LIGHT_BLUE,
+        0: COLOR_BUGGY,
+        1: COLOR_YELLOW,
+        2: COLOR_LIGHT_BLUE,
     },
     "vruntime_overflow": {
         0: COLOR_IDLE,
@@ -151,10 +150,9 @@ NAME_MAPS = {
         3: "Task 3 (wakee)",
     },
     "freeze": {     
-        0: "Idle",
-        1: "Task 1 (fail to freeze)",
-        2: "Task 2",
-        3: "Task 3",
+        0: "Task 1 (fail to freeze)",
+        1: "Task 2",
+        2: "Task 3",
     },
     "vruntime_overflow": {
         0: "Idle",

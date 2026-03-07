@@ -17,6 +17,6 @@ KSTEP_DRIVER_DEFINE{
     .name = "rt_runtime_toggle",
     .setup = setup,
     .run = run,
+    .on_tick_begin = kstep_output_curr_task,
     .step_interval_us = 1000,
-    .print_tasks = true,
 };

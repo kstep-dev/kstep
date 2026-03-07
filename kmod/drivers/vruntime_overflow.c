@@ -64,7 +64,6 @@ KSTEP_DRIVER_DEFINE{
     .name = "vruntime_overflow",
     .setup = setup,
     .run = run,
+    .on_tick_begin = kstep_output_curr_task,
     .step_interval_us = 10000,
-    .print_tasks = true,
-    .print_rq = true,
 };
