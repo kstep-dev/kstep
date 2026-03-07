@@ -22,6 +22,8 @@ struct kstep_driver {
   void (*setup)(void);            // Setup the driver (e.g., create tasks)
   void (*run)(void);              // Run the driver
   void (*on_tick)(void);          // Callback on each tick
+  void (*on_sched_softirq_begin)(void); // Callback before load balancing
+  void (*on_sched_softirq_end)(void);   // Callback after load balancing
   u64 step_interval_us;           // Time between steps in us
   bool print_rq;                  // Print runqueue stats
   bool print_tasks;               // Print task stats

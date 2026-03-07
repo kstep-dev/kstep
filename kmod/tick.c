@@ -192,7 +192,7 @@ void kstep_sleep(void) {
 }
 
 static void (*sched_tick_fn)(void);
-static void (*sched_balance_softirq_fn)(void);
+static void (*sched_softirq_fn)(void);
 
 void kstep_sched_tick_init(void) {
   sched_tick_fn =
@@ -200,9 +200,9 @@ void kstep_sched_tick_init(void) {
   if (!sched_tick_fn)
     panic("Failed to find sched_tick or scheduler_tick");
 
-  sched_balance_softirq_fn = kstep_ksym_lookup("sched_balance_softirq")
-                                 ?: kstep_ksym_lookup("run_rebalance_domains");
-  if (!sched_balance_softirq_fn)
+  sched_softirq_fn = kstep_ksym_lookup("sched_balance_softirq")
+                         ?: kstep_ksym_lookup("run_rebalance_domains");
+  if (!sched_softirq_fn)
     panic("Failed to find sched_balance_softirq or run_rebalance_domains");
 }
 
@@ -211,7 +211,11 @@ static void kstep_do_sched_tick(void *data) {
   // Drain SCHED_SOFTIRQ synchronously to avoid non-deterministic delivery
   if (local_softirq_pending() & (1 << SCHED_SOFTIRQ)) {
     set_softirq_pending(local_softirq_pending() & ~(1 << SCHED_SOFTIRQ));
-    sched_balance_softirq_fn();
+    if (kstep_driver->on_sched_softirq_begin)
+      kstep_driver->on_sched_softirq_begin();
+    sched_softirq_fn();
+    if (kstep_driver->on_sched_softirq_end)
+      kstep_driver->on_sched_softirq_end();
   }
 }
 
