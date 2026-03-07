@@ -18,7 +18,7 @@ class Bug:
 
 bugs = [
     Bug(
-        driver=Driver(name="sync_wakeup", smp="3"),
+        driver=Driver(name="sync_wakeup", num_cpus=3),
         linux=[
             Linux(name="buggy", version="v6.14"),
             Linux(
@@ -30,7 +30,7 @@ bugs = [
         plot_format="curr_task",
     ),
     Bug(
-        driver=Driver(name="freeze", smp="2"),
+        driver=Driver(name="freeze", num_cpus=2),
         linux=[
             Linux(name="buggy", version="cd9626e9ebc77edec33023fe95dab4b04ffc819d~1"),
             Linux(name="fixed", version="cd9626e9ebc77edec33023fe95dab4b04ffc819d"),
@@ -38,7 +38,7 @@ bugs = [
         plot_format="curr_task",
     ),
     Bug(
-        driver=Driver(name="vruntime_overflow", smp="2"),
+        driver=Driver(name="vruntime_overflow", num_cpus=2),
         linux=[
             Linux(name="buggy", version="bbce3de72be56e4b5f68924b7da9630cc89aa1a8~1"),
             Linux(name="fixed", version="bbce3de72be56e4b5f68924b7da9630cc89aa1a8"),
@@ -46,7 +46,7 @@ bugs = [
         plot_format="curr_task",
     ),
     Bug(
-        driver=Driver(name="long_balance", smp="3", mem_mb=4096),
+        driver=Driver(name="long_balance", num_cpus=3, mem_mb=4096),
         linux=[
             Linux(name="buggy", version="2feab2492deb2f14f9675dd6388e9e2bf669c27a~1"),
             Linux(name="fixed", version="2feab2492deb2f14f9675dd6388e9e2bf669c27a"),
@@ -54,7 +54,7 @@ bugs = [
         plot_format="rebalance",
     ),
     Bug(
-        driver=Driver(name="util_avg", smp="2"),
+        driver=Driver(name="util_avg", num_cpus=2),
         linux=[
             Linux(name="buggy", version="17e3e88ed0b6318fde0d1c14df1a804711cab1b5~1"),
             Linux(name="fixed", version="17e3e88ed0b6318fde0d1c14df1a804711cab1b5"),
@@ -62,7 +62,7 @@ bugs = [
         plot_format="val",
     ),
     Bug(
-        driver=Driver(name="lag_vruntime", smp="2"),
+        driver=Driver(name="lag_vruntime", num_cpus=2),
         linux=[
             Linux(name="buggy", version="5068d84054b766efe7c6202fc71b2350d1c326f1~1"),
             Linux(name="fixed", version="5068d84054b766efe7c6202fc71b2350d1c326f1"),
@@ -70,7 +70,7 @@ bugs = [
         plot_format="min_vruntime",
     ),
     Bug(
-        driver=Driver(name="even_idle_cpu", smp="5"),
+        driver=Driver(name="even_idle_cpu", num_cpus=5),
         linux=[
             Linux(name="buggy", version="v6.17"),
             Linux(
@@ -82,7 +82,7 @@ bugs = [
         plot_format="lb_nr_running",
     ),
     Bug(
-        driver=Driver(name="extra_balance", smp="8,sockets=2,cores=2,threads=2"),
+        driver=Driver(name="extra_balance", num_cpus=5),
         linux=[
             Linux(name="buggy", version="6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3~1"),
             Linux(name="fixed", version="6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3"),
@@ -90,7 +90,7 @@ bugs = [
         plot_format="lb_nr_running",
     ),
     Bug(
-        driver=Driver(name="rt_runtime_toggle", smp="2"),
+        driver=Driver(name="rt_runtime_toggle", num_cpus=2),
         linux=[
             Linux(name="buggy", version="9b58e976b3b391c0cf02e038d53dd0478ed3013c~1"),
             Linux(name="fixed", version="9b58e976b3b391c0cf02e038d53dd0478ed3013c"),
@@ -98,7 +98,7 @@ bugs = [
         plot_format="curr_task",
     ),
     Bug(
-        driver=Driver(name="uclamp_inversion", smp="2"),
+        driver=Driver(name="uclamp_inversion", num_cpus=2),
         linux=[
             Linux(name="buggy", version="0213b7083e81f4acd69db32cb72eb4e5f220329a~1"),
             Linux(name="fixed", version="0213b7083e81f4acd69db32cb72eb4e5f220329a"),
@@ -106,7 +106,7 @@ bugs = [
         plot_format="val",
     ),
     Bug(
-        driver=Driver(name="h_nr_runnable", smp="2"),
+        driver=Driver(name="h_nr_runnable", num_cpus=2),
         linux=[
             Linux(name="buggy", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734~1"),
             Linux(name="fixed", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734"),
@@ -114,42 +114,42 @@ bugs = [
         plot_format="val",
     ),
     Bug(
-        driver=Driver(name="vlag_overflow", smp="3"),
+        driver=Driver(name="vlag_overflow", num_cpus=3),
         linux=[
             Linux(name="buggy", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe~1"),
             Linux(name="fixed", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe"),
         ],
     ),
     Bug(
-        driver=Driver(name="throttled_limbo_list", smp="3"),
+        driver=Driver(name="throttled_limbo_list", num_cpus=3),
         linux=[
             Linux(name="buggy", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad~1"),
             Linux(name="fixed", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad"),
         ],
     ),
     Bug(
-        driver=Driver(name="over_schedule", smp="2"),
+        driver=Driver(name="over_schedule", num_cpus=2),
         linux=[
             Linux(name="buggy", version="d4ac164bde7a12ec0a238a7ead5aa26819bbb1c1~1"),
             Linux(name="fixed", version="d4ac164bde7a12ec0a238a7ead5aa26819bbb1c1"),
         ],
     ),
     Bug(
-        driver=Driver(name="slice_update", smp="2"),
+        driver=Driver(name="slice_update", num_cpus=2),
         linux=[
             Linux(name="buggy", version="2f2fc17bab0011430ceb6f2dc1959e7d1f981444~1"),
             Linux(name="fixed", version="2f2fc17bab0011430ceb6f2dc1959e7d1f981444"),
         ],
     ),
     Bug(
-        driver=Driver(name="avg_vruntime_ceil", smp="2"),
+        driver=Driver(name="avg_vruntime_ceil", num_cpus=2),
         linux=[
             Linux(name="buggy", version="650cad561cce04b62a8c8e0446b685ef171bc3bb~1"),
             Linux(name="fixed", version="650cad561cce04b62a8c8e0446b685ef171bc3bb"),
         ],
     ),
     Bug(
-        driver=Driver(name="min_deadline", smp="2"),
+        driver=Driver(name="min_deadline", num_cpus=2),
         linux=[
             Linux(name="buggy", version="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c~1"),
             Linux(name="fixed", version="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c"),

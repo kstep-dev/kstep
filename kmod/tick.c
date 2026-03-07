@@ -217,10 +217,9 @@ static void kstep_do_sched_tick(void *data) {
 }
 
 static void kstep_sched_tick(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
     smp_call_function_single(cpu, kstep_do_sched_tick, NULL, 1);
-    kstep_sleep();
-  }
+  kstep_sleep();
 }
 
 // CFS bandwidth timer control: walk all task groups, suppress their

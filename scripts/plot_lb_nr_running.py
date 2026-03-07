@@ -22,10 +22,7 @@ def parse_lb_events(path: Path, cpus: list[int], driver: str) -> pd.DataFrame:
     df = parse_jsonl(path, "load_balance")
     df = df[df["timestamp"] != 0]
     df["dst_cpu"] -= min(cpus)
-    if driver == "even_idle_cpu":
-        df = df[df["name"] == "MC"]
-    elif driver == "extra_balance":
-        df = df[df["span"] == "4-7"]
+    df = df[df["name"] == "MC"]
     return df
 
 
@@ -49,7 +46,7 @@ def plot_color_matrix_with_lb(
     matrix = np.empty((values.shape[0], values.shape[1], 4), dtype=float)
     for k, rgba in cmap.items():
         matrix[values == k] = rgba
-    ax.imshow(matrix, aspect="auto", origin="lower")
+    ax.imshow(matrix, aspect="auto", origin="lower", interpolation="nearest")
 
     ax.set_xlim(nr_running_df.index.min(), nr_running_df.index.max() + 1)
     ax.yaxis.set_major_locator(ticker.MaxNLocator(integer=True))
@@ -61,7 +58,7 @@ def plot_color_matrix_with_lb(
         ax.set_xticks([])
         ax.set_xlabel("")
     else:
-        ax.xaxis.set_major_locator(ticker.MaxNLocator(3))
+        ax.xaxis.set_major_locator(ticker.MaxNLocator(4, steps=[1, 5, 10]))
         # Shorter ticks, labels closer
         ax.tick_params(axis="x", length=2, pad=1, labelsize=13)
         ax.set_xlabel("Time (ms)", labelpad=0.5, fontsize=13)
@@ -107,7 +104,7 @@ def main(driver: str):
     nr_running_buggy = parse_nr_running(out_file_buggy)
     nr_running_fixed = parse_nr_running(out_file_fixed)
 
-    cpus = [1, 2, 3, 4] if driver == "even_idle_cpu" else [4, 5, 6, 7]
+    cpus = [1, 2, 3, 4]
     lb_events_buggy = parse_lb_events(out_file_buggy, cpus=cpus, driver=driver)
     lb_events_fixed = parse_lb_events(out_file_fixed, cpus=cpus, driver=driver)
 

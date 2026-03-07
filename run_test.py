@@ -15,12 +15,6 @@ from run import (
 from scripts import GLOBAL_SIGNAL_CORPUS, LOGS_DIR, cov_parse, generate_input
 
 
-def smp_to_cpus(smp: str) -> int:
-    try:
-        return int(smp.split(",")[0])
-    except (ValueError, AttributeError, IndexError):
-        return 2
-
 def assert_exec_matches_generated(log_file, seq):
     i = 0
     f = open(log_file, "r")
@@ -39,7 +33,7 @@ def assert_exec_matches_generated(log_file, seq):
     
 def run_test(
     linux: Linux,
-    smp: str,
+    num_cpus: int,
     steps: int,
     max_tasks: int,
     max_cgroups: int,
@@ -49,18 +43,17 @@ def run_test(
     checkout_linux(linux.version, linux_name=linux_name, tarball=True)
     make_linux(linux_name=linux_name)
 
-    cpus = smp_to_cpus(smp)
     seq = generate_input(
         steps=steps,
         max_tasks=max_tasks,
         max_cgroups=max_cgroups,
-        cpus=cpus,
+        cpus=num_cpus,
         seed=seed,
     )
 
     driver = Driver(
         name="executor",
-        smp=smp
+        num_cpus=num_cpus,
     )
 
     make_kstep(linux_name=linux_name)
@@ -119,7 +112,7 @@ def run_test(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--linux_version", type=str, default="v6.18")
-    parser.add_argument("--smp", type=str, default="10")
+    parser.add_argument("--num_cpus", type=int, default=10)
     parser.add_argument("--steps", type=int, default=80)
     parser.add_argument("--max_tasks", type=int, default=10)
     parser.add_argument("--max_cgroups", type=int, default=10)
@@ -133,7 +126,7 @@ def main():
 
     run_test(
         linux=linux,
-        smp=args.smp,
+        num_cpus=args.num_cpus,
         steps=args.steps,
         max_tasks=args.max_tasks,
         max_cgroups=args.max_cgroups,

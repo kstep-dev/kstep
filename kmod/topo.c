@@ -143,6 +143,15 @@ void kstep_topo_set_level(enum kstep_topo_type type, const char *cpulists[],
   for (int i = 0; i < size; i++)
     if (cpulist_parse(cpulists[i], &kstep_masks[type][i]) < 0)
       panic("Failed to parse cpulist %s for level %d", cpulists[i], type);
+
+  // Also update cpu_sibling_map so that cpu_smt_mask() / is_core_idle()
+  // reflect the new SMT topology.
+  if (type == KSTEP_TOPO_SMT) {
+    KSYM_IMPORT_TYPED(cpumask_var_t, cpu_sibling_map);
+    for (int i = 0; i < size; i++)
+      cpumask_copy(*per_cpu_ptr(KSYM_cpu_sibling_map, i),
+                   &kstep_masks[KSTEP_TOPO_SMT][i]);
+  }
 }
 
 void kstep_topo_apply(void) {
