@@ -20,11 +20,17 @@
 extern struct kstep_driver *kstep_driver;
 
 // tick.c
-void kstep_sched_timer_init(void);
-u64 kstep_jiffies_get(void);
-void kstep_jiffies_init(void);
+void kstep_tick_init(void);
+
+// tick_clock.c
 void kstep_sched_clock_init(void);
-void kstep_sched_tick_init(void);
+void kstep_sched_clock_tick(void);
+u64 kstep_sched_clock_get(void);
+
+// tick_jiffies.c
+void kstep_jiffies_init(void);
+void kstep_jiffies_tick(void);
+u64 kstep_jiffies_get(void);
 
 // output.c
 void kstep_output_init(void);
@@ -68,7 +74,6 @@ struct kstep_driver *kstep_sym_init(const char *driver_name);
 #define KSYM_IMPORT_TYPED(type, name) static KSYM_IMPORT_RAW(type, name) __used
 #define KSYM_IMPORT_RAW(type, name) type *KSYM_##name
 void *kstep_ksym_lookup(const char *name);
-
 
 extern KSYM_IMPORT_RAW(struct rq, runqueues);
 #undef cpu_rq
