@@ -5,7 +5,6 @@
 
 #include "internal.h"
 
-#define K(s) "\"" #s "\": "
 #define OUTPUT_BUF_SIZE 65536
 
 static struct file *output_file;
