@@ -139,6 +139,11 @@ void kstep_print_rq(void) {
     print_rq(cpu_rq(cpu));
 }
 
+void kstep_print_sched_debug(void) {
+  KSYM_IMPORT(sysrq_sched_debug_show);
+  KSYM_sysrq_sched_debug_show();
+}
+
 static void print_task(struct task_struct *p) {
   pr_info("task: {");
   pr_cont(K(pid) "%d, ", task_pid_nr(p));
@@ -156,6 +161,17 @@ void kstep_print_tasks(void) {
     if (task_cpu(p) == 0 || kstep_is_sys_kthread(p))
       continue;
     print_task(p);
+  }
+}
+
+void kstep_output_curr_task(void) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct task_struct *curr = cpu_rq(cpu)->curr;
+    struct kstep_json *json = kstep_json_begin();
+    kstep_json_field_str(json, "type", "curr_task");
+    kstep_json_field_u64(json, "cpu", cpu);
+    kstep_json_field_u64(json, "pid", task_pid_nr(curr));
+    kstep_json_end(json);
   }
 }
 

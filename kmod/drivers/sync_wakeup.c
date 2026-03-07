@@ -73,7 +73,6 @@ KSTEP_DRIVER_DEFINE{
     .name = "sync_wakeup",
     .setup = setup,
     .run = run,
-    .step_interval_us = 10000,
-    .print_tasks = true,
-    .print_rq = true,
+    .on_tick_begin = kstep_output_curr_task,
+    .step_interval_us = 1000,
 };

@@ -10,13 +10,13 @@ import numpy as np
 import pandas as pd
 from consts import RESULTS_DIR
 from matplotlib import colors
-from parse_log import parse_log
+from parse_log import parse_jsonl
 from plot_utils import save_fig
 
 
 def parse_curr_task(path: Path, type: str) -> pd.DataFrame:
-    df = parse_log(path, prefix="task")
-    df = df[df["on_cpu"] == True]
+    out_path = path.with_suffix(".jsonl")
+    df = parse_jsonl(out_path, type="curr_task")
     df["type"] = type
     return df
 
@@ -62,7 +62,7 @@ def plot_color_matrix(
     ax.set_title(title, fontsize=10, pad=3)
 
 
-def plot_cur_task(
+def plot_curr_task(
     log_file_buggy: Path,
     log_file_fixed: Path,
     title_buggy: str,
@@ -120,47 +120,51 @@ COLOR_BUGGY = "tab:red"
 
 COLOR_MAPS = {
     "sync_wakeup": {
-        -1: COLOR_IDLE,
-        0: COLOR_YELLOW,
-        1: COLOR_LIGHT_BLUE,
-        2: COLOR_BUGGY,
-    },
-    "freeze": {
-        -1: COLOR_IDLE,
-        0: COLOR_BUGGY,
+        0: COLOR_IDLE,
         1: COLOR_YELLOW,
         2: COLOR_LIGHT_BLUE,
+        3: COLOR_BUGGY,
+    },
+    "freeze": {
+        0: COLOR_IDLE,
+        1: COLOR_BUGGY,
+        2: COLOR_YELLOW,
+        3: COLOR_LIGHT_BLUE,
     },
     "vruntime_overflow": {
-        -1: COLOR_IDLE,
-        0: COLOR_YELLOW,
-        1: COLOR_BUGGY,
-        2: COLOR_LIGHT_BLUE,
+        0: COLOR_IDLE,
+        1: COLOR_YELLOW,
+        2: COLOR_BUGGY,
+        3: COLOR_LIGHT_BLUE,
     },
     "rt_runtime_toggle": {
-        0: COLOR_LIGHT_BLUE,
-        -1: COLOR_IDLE,
+        0: COLOR_IDLE,
+        1: COLOR_LIGHT_BLUE,
     },
 }
 
 NAME_MAPS = {
     "sync_wakeup": {
-        0: "Task 1",
-        1: "Task 2 (waker)",
-        2: "Task 3 (wakee)",
+        0: "Idle",
+        1: "Task 1",
+        2: "Task 2 (waker)",
+        3: "Task 3 (wakee)",
     },
-    "freeze": {
-        0: "Task 1 (fail to freeze)",
-        1: "Task 2",
-        2: "Task 3",
+    "freeze": {     
+        0: "Idle",
+        1: "Task 1 (fail to freeze)",
+        2: "Task 2",
+        3: "Task 3",
     },
     "vruntime_overflow": {
-        0: "Task 1",
-        1: "Task 2 (starved)",
-        2: "Task 3",
+        0: "Idle",
+        1: "Task 1",
+        2: "Task 2 (starved)",
+        3: "Task 3",
     },
     "rt_runtime_toggle": {
-        0: "Real-time Task",
+        0: "Idle",
+        1: "Real-time Task",
     },
 }
 
@@ -173,7 +177,7 @@ def main(driver: str):
         title_buggy = "Buggy"
         title_fixed = "Fixed"
 
-    fig = plot_cur_task(
+    fig = plot_curr_task(
         log_file_buggy=RESULTS_DIR / f"{driver}_buggy.log",
         log_file_fixed=RESULTS_DIR / f"{driver}_fixed.log",
         title_buggy=title_buggy,

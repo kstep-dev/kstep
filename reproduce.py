@@ -27,7 +27,7 @@ bugs = [
                 patch=LINUX_ROOT_DIR / "sync_wakeup.patch",
             ),
         ],
-        plot_format="cur_task",
+        plot_format="curr_task",
     ),
     Bug(
         driver=Driver(name="freeze", smp="2"),
@@ -35,7 +35,7 @@ bugs = [
             Linux(name="buggy", version="cd9626e9ebc77edec33023fe95dab4b04ffc819d~1"),
             Linux(name="fixed", version="cd9626e9ebc77edec33023fe95dab4b04ffc819d"),
         ],
-        plot_format="cur_task",
+        plot_format="curr_task",
     ),
     Bug(
         driver=Driver(name="vruntime_overflow", smp="2"),
@@ -43,7 +43,7 @@ bugs = [
             Linux(name="buggy", version="bbce3de72be56e4b5f68924b7da9630cc89aa1a8~1"),
             Linux(name="fixed", version="bbce3de72be56e4b5f68924b7da9630cc89aa1a8"),
         ],
-        plot_format="cur_task",
+        plot_format="curr_task",
     ),
     Bug(
         driver=Driver(name="long_balance", smp="3", mem_mb=4096),
@@ -95,7 +95,7 @@ bugs = [
             Linux(name="buggy", version="9b58e976b3b391c0cf02e038d53dd0478ed3013c~1"),
             Linux(name="fixed", version="9b58e976b3b391c0cf02e038d53dd0478ed3013c"),
         ],
-        plot_format="cur_task",
+        plot_format="curr_task",
     ),
     Bug(
         driver=Driver(name="uclamp_inversion", smp="2"),

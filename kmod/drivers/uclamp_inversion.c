@@ -58,7 +58,7 @@ static void run(void) {
   kstep_tick_repeat(101);
 }
 
-static void on_tick(void) {
+static void on_tick_begin(void) {
 // https://github.com/torvalds/linux/commit/9c0b4bb7f6303c9c4e2e34984c46f5a86478f84d
 // https://github.com/torvalds/linux/commit/bb4479994945e9170534389a7762eb56149320ac
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
@@ -75,6 +75,6 @@ KSTEP_DRIVER_DEFINE{
     .name = "uclamp_inversion",
     .setup = setup,
     .run = run,
-    .on_tick = on_tick,
+    .on_tick_begin = on_tick_begin,
     .step_interval_us = 1000,
 };

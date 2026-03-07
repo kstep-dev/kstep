@@ -31,7 +31,7 @@ static void run(void) {
   kstep_tick_repeat(250);
 }
 
-static void on_tick(void) {
+static void on_tick_begin(void) {
   struct kstep_json *json = kstep_json_begin();
   kstep_json_field_str(json, "type", "nr_running");
   kstep_json_field_u64(json, "cpu1", cpu_rq(1)->nr_running);
@@ -45,7 +45,7 @@ KSTEP_DRIVER_DEFINE{
     .name = "even_idle_cpu",
     .setup = setup,
     .run = run,
-    .on_tick = on_tick,
+    .on_tick_begin = on_tick_begin,
     .step_interval_us = 1000,
     .print_load_balance = true,
 };
