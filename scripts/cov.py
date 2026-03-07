@@ -53,17 +53,15 @@ def symbolize_pcs(pcs: list[int], linux_name: str) -> dict[int, tuple[str, str]]
         fn = lines[i].strip()
         loc = lines[i + 1].strip()
         if "?" in fn:
-            fn += f"{pc}"
+            fn += f"{pc:x}"
         if "?" in loc:
-            loc += f"{pc}"
+            loc += f"{pc:x}"
 
         # Keep only the path relative to the linux source directory.
         loc_path, sep, loc_suffix = loc.partition(":")
         linux_prefix = f"{LINUX_ROOT_DIR}/{linux_name}/"
         if linux_prefix in loc_path:
             loc_path = loc_path.rsplit(linux_prefix, 1)[1]
-        else:
-            raise RuntimeError(f"Linux prefix not found in loc: {loc}")
         loc = f"{loc_path}{sep}{loc_suffix}" if sep else loc_path
         
         out[pc] = (fn, loc)
