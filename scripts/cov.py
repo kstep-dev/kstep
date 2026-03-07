@@ -53,9 +53,9 @@ def symbolize_pcs(pcs: list[int], linux_name: str) -> dict[int, tuple[str, str]]
         fn = lines[i].strip()
         loc = lines[i + 1].strip()
         if "?" in fn:
-            fn += f":{pc}"
+            fn += f"{pc}"
         if "?" in loc:
-            loc += f":{pc}"
+            loc += f"{pc}"
 
         # Keep only the path relative to the linux source directory.
         loc_path, sep, loc_suffix = loc.partition(":")
