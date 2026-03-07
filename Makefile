@@ -3,7 +3,7 @@
 # ========= common =========
 
 PROJ_DIR := $(CURDIR)
-MAKEFLAGS += $(if $(findstring -j,$(MAKEFLAGS)),,-j$(shell nproc))
+MAKEFLAGS := $(MAKEFLAGS) $(if $(findstring -j,$(MAKEFLAGS)),,-j$(shell nproc))
 BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.json --,)
 
 LINUX_NAME ?= $(notdir $(realpath $(PROJ_DIR)/linux/current))
