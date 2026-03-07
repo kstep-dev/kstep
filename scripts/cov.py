@@ -3,7 +3,7 @@
 import subprocess
 from pathlib import Path
 from collections import defaultdict
-from .consts import LINUX_ROOT_DIR
+from .consts import BUILD_DIR, LINUX_ROOT_DIR
 
 COV_RECORD_SIZE = 16  # u32 pid + u32 cmd_id + u64 pc
 
@@ -26,7 +26,7 @@ def cov_parse(cov_file: Path) -> dict[int, dict[int, list[int]]]:
     return records
 
 def symbolize_pcs(pcs: list[int], linux_name: str) -> dict[int, tuple[str, str]]:
-    vmlinux_path = LINUX_ROOT_DIR / linux_name / "vmlinux"
+    vmlinux_path = BUILD_DIR / linux_name / "vmlinux"
     if not vmlinux_path.exists():
         raise RuntimeError(f"Missing vmlinux: {vmlinux_path}")
 

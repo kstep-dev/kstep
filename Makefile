@@ -31,43 +31,6 @@ $(USER_OUT_DIR)/%: $(USER_SRC_FILES) | $(USER_OUT_DIR)
 $(USER_OUT_DIR):
 	mkdir -p $@
 
-# ========= linux =========
-
-LINUX_CONFIG := $(LINUX_DIR)/.config
-KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
-
-ARCH := $(shell uname -m)
-ifeq ($(ARCH), x86_64)
-	LINUX_IMAGE := $(LINUX_DIR)/arch/x86/boot/bzImage
-else ifeq ($(ARCH), aarch64)
-	LINUX_IMAGE := $(LINUX_DIR)/arch/arm64/boot/Image
-else
-	$(error Unsupported architecture: $(ARCH))
-endif
-
-.PHONY: linux
-linux: linux-config linux-patch
-	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(LINUX_NAME) WERROR=0 HOSTCFLAGS=-Wno-error
-	mkdir -p $(BUILD_DIR)
-	cp $(LINUX_IMAGE) $(BUILD_DIR)/image
-
-.PHONY: linux-config
-linux-config: $(LINUX_CONFIG)
-$(LINUX_CONFIG): $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
-	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
-	touch $(LINUX_CONFIG)
-
-.PHONY: linux-patch
-linux-patch: $(LINUX_DIR)/kernel/cov.c
-$(LINUX_DIR)/kernel/cov.c: $(PROJ_DIR)/linux/cov.c
-	ln -sf $< $@
-	echo 'obj-y += cov.o' >> $(LINUX_DIR)/kernel/Makefile
-	echo 'ccflags-y += -fsanitize-coverage=trace-pc' >> $(LINUX_DIR)/kernel/sched/Makefile
-
-.PHONY: linux-clean
-linux-clean:
-	cd $(LINUX_DIR) && $(MAKE) clean
-
 # ========= kmod =========
 
 KMOD_SRC_DIR := $(PROJ_DIR)/kmod
@@ -98,6 +61,44 @@ kstep: $(ROOTFS_IMG)
 $(ROOTFS_IMG): $(KMOD_OUT_FILE) $(USER_OUT_FILES)
 	cd $(KMOD_OUT_DIR) && echo kmod.ko | cpio -o --format=newc > $(ROOTFS_IMG)
 	cd $(USER_OUT_DIR) && ls | cpio -o --format=newc >> $(ROOTFS_IMG)
+
+# ========= linux =========
+
+LINUX_CONFIG := $(LINUX_DIR)/.config
+KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
+
+ARCH := $(shell uname -m)
+ifeq ($(ARCH), x86_64)
+	LINUX_IMAGE := $(LINUX_DIR)/arch/x86/boot/bzImage
+else ifeq ($(ARCH), aarch64)
+	LINUX_IMAGE := $(LINUX_DIR)/arch/arm64/boot/Image
+else
+	$(error Unsupported architecture: $(ARCH))
+endif
+
+.PHONY: linux
+linux: linux-config linux-patch
+	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(LINUX_NAME) WERROR=0 HOSTCFLAGS=-Wno-error
+	mkdir -p $(BUILD_DIR)
+	cp $(LINUX_IMAGE) $(BUILD_DIR)/image
+	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
+
+.PHONY: linux-config
+linux-config: $(LINUX_CONFIG)
+$(LINUX_CONFIG): $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
+	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
+	touch $(LINUX_CONFIG)
+
+.PHONY: linux-patch
+linux-patch: $(LINUX_DIR)/kernel/cov.c
+$(LINUX_DIR)/kernel/cov.c: $(PROJ_DIR)/linux/cov.c
+	ln -sf $< $@
+	echo 'obj-y += cov.o' >> $(LINUX_DIR)/kernel/Makefile
+	echo 'ccflags-y += -fsanitize-coverage=trace-pc' >> $(LINUX_DIR)/kernel/sched/Makefile
+
+.PHONY: linux-clean
+linux-clean:
+	cd $(LINUX_DIR) && $(MAKE) clean
 
 # ========= clean =========
 
