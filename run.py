@@ -37,12 +37,8 @@ assert ARCH in ("x86_64", "aarch64"), f"Unsupported architecture: {ARCH}"
 class Driver:
     name: str = "default"
     params: Iterable[str] = ()
-    smp: str = "2"
+    num_cpus: int = 2
     mem_mb: int = 512
-
-    @property
-    def num_cpus(self) -> int:
-        return int(self.smp.split(",")[0])
 
 
 def get_qemu_path() -> Path:
@@ -114,7 +110,7 @@ def run_qemu(
 
     cmd = [
         str(qemu_path),
-        f"-smp {driver.smp}",
+        f"-smp {driver.num_cpus}",
         "-cpu max",
         f"-m {driver.mem_mb}M",
         f"-kernel {kernel_img}",
@@ -253,7 +249,7 @@ def main():
     parser.add_argument("--debug", action="store_true")
     # See driver config
     parser.add_argument("name", type=str, default=None, nargs="?")
-    parser.add_argument("--smp", type=str, default=None)
+    parser.add_argument("--num_cpus", type=int, default=None)
     parser.add_argument("--mem_mb", type=int, default=None)
     parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
