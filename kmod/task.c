@@ -88,8 +88,7 @@ void kstep_task_cfs(struct task_struct *p) {
 
 void kstep_task_pin(struct task_struct *p, int begin, int end) {
   kstep_task_signal(p, SIGCODE_PIN, begin, end, 0);
-  // Avoid high-volume logs in migration-heavy reproducers.
-  // TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
+  TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
 }
 
 void kstep_task_pause(struct task_struct *p) {

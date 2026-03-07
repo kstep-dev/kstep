@@ -18,7 +18,7 @@
 // The original reporters hit this on machines with idle scheduling policy
 // and nohz, where tasks ran uninterrupted for long stretches.
 //
-// We model this by setting step_interval_us = 10 billion (10000 seconds
+// We model this by setting tick_interval_ns = 10 trillion (10000 seconds
 // per tick). Each tick, the running group entity's vruntime jumps by
 // ~100 seconds while the 9 other entities stay frozen, creating a vlag
 // of ~90 seconds. A subsequent cgroup weight change triggers
@@ -94,6 +94,7 @@ KSTEP_DRIVER_DEFINE{
     .name = "vlag_overflow",
     .setup = setup,
     .run = run,
-    .step_interval_us = 10000000000ULL,
+    .step_interval_us = 1000,
+    .tick_interval_ns = 10000000000ULL * 1000ULL,
     .print_rq = false,
 };

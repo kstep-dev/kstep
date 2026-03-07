@@ -19,17 +19,17 @@ struct kstep_checker {
 #define DRIVER_NAME_LEN 32
 struct kstep_driver {
   char name[DRIVER_NAME_LEN];
-  void (*setup)(void);            // Setup the driver (e.g., create tasks)
-  void (*run)(void);              // Run the driver
-  void (*on_tick)(void);          // Callback on each tick
+  void (*setup)(void);                  // Setup the driver (e.g., create tasks)
+  void (*run)(void);                    // Run the driver
+  void (*on_tick_begin)(void);          // Callback before each tick
+  void (*on_tick_end)(void);            // Callback after each tick
   void (*on_sched_softirq_begin)(void); // Callback before load balancing
   void (*on_sched_softirq_end)(void);   // Callback after load balancing
-  u64 step_interval_us;           // Time between steps in us
-  bool print_rq;                  // Print runqueue stats
-  bool print_tasks;               // Print task stats
-  bool print_load_balance;        // Print load balancing
-  bool print_sched_debug;         // Print sched debug
-  struct kstep_checker *checkers; // Array of checkers
+  u64 step_interval_us;                 // Real time sleep between steps in us
+  u64 tick_interval_ns;                 // Virtual clock advance per tick in ns
+  bool print_rq;                        // Print runqueue stats
+  bool print_load_balance;              // Print load balancing
+  struct kstep_checker *checkers;       // Array of checkers
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 
@@ -37,7 +37,6 @@ static inline void kstep_driver_print(struct kstep_driver *driver) {
   TRACE_INFO("- %-20s: %s", "name", driver->name);
   TRACE_INFO("- %-20s: %llu", "step_interval_us", driver->step_interval_us);
   TRACE_INFO("- %-20s: %d", "print_rq", driver->print_rq);
-  TRACE_INFO("- %-20s: %d", "print_tasks", driver->print_tasks);
   TRACE_INFO("- %-20s: %d", "print_load_balance", driver->print_load_balance);
 }
 void kstep_status_set_pass(void); // use `kstep_pass(...)` instead
@@ -65,6 +64,8 @@ void kstep_json_end(struct kstep_json *json);
   } while (0)
 #define kstep_pass(...) kstep_status_impl(pass, ##__VA_ARGS__)
 #define kstep_fail(...) kstep_status_impl(fail, ##__VA_ARGS__)
+void kstep_print_sched_debug(void);
+void kstep_output_curr_task(void);
 
 // tick.c
 void kstep_tick(void);

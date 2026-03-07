@@ -53,7 +53,5 @@ KSTEP_DRIVER_DEFINE{
     .setup = setup,
     .run = run,
     .step_interval_us = 1000,
-    .print_tasks = true,
-    // .print_load_balance = true,
-    // .print_sched_debug = true,
+    .on_tick_begin = kstep_output_curr_task,
 };
