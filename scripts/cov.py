@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
 import subprocess
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
+
 from .consts import BUILD_DIR, LINUX_ROOT_DIR
 
 COV_RECORD_SIZE = 16  # u32 pid + u32 cmd_id + u64 pc
@@ -51,15 +52,16 @@ def symbolize_pcs(pcs: list[int], linux_name: str) -> dict[int, tuple[str, str]]
         pc = pcs[i // 2]
         fn = lines[i].strip()
         loc = lines[i + 1].strip()
-        assert "?" not in fn and "?" not in loc, f"fn contains ?: {fn}, loc contains ?: {loc}"
+        if "?" in fn:
+            fn += f"{pc:x}"
+        if "?" in loc:
+            loc += f"{pc:x}"
 
         # Keep only the path relative to the linux source directory.
         loc_path, sep, loc_suffix = loc.partition(":")
         linux_prefix = f"{LINUX_ROOT_DIR}/{linux_name}/"
         if linux_prefix in loc_path:
             loc_path = loc_path.rsplit(linux_prefix, 1)[1]
-        else:
-            raise RuntimeError(f"Linux prefix not found in loc: {loc}")
         loc = f"{loc_path}{sep}{loc_suffix}" if sep else loc_path
         
         out[pc] = (fn, loc)

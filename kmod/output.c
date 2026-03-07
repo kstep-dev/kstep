@@ -11,8 +11,6 @@
 static struct file *output_file;
 
 void kstep_output_init(void) {
-  kstep_sysctl_write("kernel.printk", "%d", 7);
-
   output_file = filp_open("/dev/ttyS1", O_WRONLY | O_NOCTTY, 0);
   if (IS_ERR(output_file))
     panic("Failed to open /dev/ttyS1: %ld", PTR_ERR(output_file));
@@ -40,8 +38,8 @@ static void kstep_json_append(struct kstep_json *json, const char *buf,
   json->len += len;
 }
 
-void kstep_json_field_fmt(struct kstep_json *json, const char *key, const char *fmt,
-                      ...) {
+void kstep_json_field_fmt(struct kstep_json *json, const char *key,
+                          const char *value, ...) {
   kstep_json_append(json, "\"", 1);
   kstep_json_append(json, key, strlen(key));
   kstep_json_append(json, "\":", 2);
@@ -49,8 +47,8 @@ void kstep_json_field_fmt(struct kstep_json *json, const char *key, const char *
   int rem = OUTPUT_BUF_SIZE - json->len;
 
   va_list args;
-  va_start(args, fmt);
-  int len = vsnprintf(json->buf + json->len, rem, fmt, args);
+  va_start(args, value);
+  int len = vsnprintf(json->buf + json->len, rem, value, args);
   va_end(args);
 
   if (len < 0 || len >= rem)
@@ -98,8 +96,10 @@ static void print_rq(struct rq *rq) {
 #endif
 
 // https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
-// https://github.com/torvalds/linux/commit/dcbc9d3f0e594223275a18f7016001889ad35eff (avg_vruntime -> sum_w_vruntime)
-// https://github.com/torvalds/linux/commit/4ff674fa986c27ec8a0542479258c92d361a2566 (avg_load -> sum_weight)
+// https://github.com/torvalds/linux/commit/dcbc9d3f0e594223275a18f7016001889ad35eff
+// (avg_vruntime -> sum_w_vruntime)
+// https://github.com/torvalds/linux/commit/4ff674fa986c27ec8a0542479258c92d361a2566
+// (avg_load -> sum_weight)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
   u64 avg_load = rq->cfs.sum_weight;
   KSYM_IMPORT(avg_vruntime);
@@ -174,10 +174,16 @@ static void load_balance_enter(unsigned long ip, unsigned long parent_ip,
   struct lb_env *env = (void *)regs_get_kernel_argument((void *)fregs, 0);
   if (env->dst_cpu == 0)
     return;
-  pr_info("load_balance: {" K(dst_cpu) "%d, " K(span) "\"%*pbl\", " K(
-              name) "\"%s\"}\n",
-          env->dst_cpu, cpumask_pr_args(sched_domain_span(env->sd)),
-          env->sd->name);
+  if (kstep_jiffies_get() == 0)
+    return;
+
+  struct kstep_json *json = kstep_json_begin();
+  kstep_json_field_str(json, "type", "load_balance");
+  kstep_json_field_u64(json, "dst_cpu", env->dst_cpu);
+  kstep_json_field_fmt(json, "span", "\"%*pbl\"",
+                       cpumask_pr_args(sched_domain_span(env->sd)));
+  kstep_json_field_str(json, "name", env->sd->name);
+  kstep_json_end(json);
 }
 
 struct ftrace_ops load_balance_enter_op = {

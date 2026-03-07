@@ -191,16 +191,33 @@ void kstep_sleep(void) {
   usleep_range(kstep_driver->step_interval_us, kstep_driver->step_interval_us);
 }
 
+static void (*sched_tick_fn)(void);
+static void (*sched_balance_softirq_fn)(void);
+
+void kstep_sched_tick_init(void) {
+  sched_tick_fn =
+      kstep_ksym_lookup("sched_tick") ?: kstep_ksym_lookup("scheduler_tick");
+  if (!sched_tick_fn)
+    panic("Failed to find sched_tick or scheduler_tick");
+
+  sched_balance_softirq_fn = kstep_ksym_lookup("sched_balance_softirq")
+                                 ?: kstep_ksym_lookup("run_rebalance_domains");
+  if (!sched_balance_softirq_fn)
+    panic("Failed to find sched_balance_softirq or run_rebalance_domains");
+}
+
+static void kstep_do_sched_tick(void *data) {
+  sched_tick_fn();
+  // Drain SCHED_SOFTIRQ synchronously to avoid non-deterministic delivery
+  if (local_softirq_pending() & (1 << SCHED_SOFTIRQ)) {
+    set_softirq_pending(local_softirq_pending() & ~(1 << SCHED_SOFTIRQ));
+    sched_balance_softirq_fn();
+  }
+}
+
 static void kstep_sched_tick(void) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
-  KSYM_IMPORT(sched_tick);
-  void *sched_tick = KSYM_sched_tick;
-#else
-  KSYM_IMPORT(scheduler_tick);
-  void *sched_tick = KSYM_scheduler_tick;
-#endif
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    smp_call_function_single(cpu, sched_tick, NULL, 1);
+    smp_call_function_single(cpu, kstep_do_sched_tick, NULL, 1);
     kstep_sleep();
   }
 }
@@ -209,7 +226,7 @@ static void kstep_sched_tick(void) {
 // real-time hrtimers, and fire the period callback at the right cadence.
 #ifdef CONFIG_CFS_BANDWIDTH
 static void kstep_cfs_bandwidth_tick(void) {
-  typedef enum hrtimer_restart (cfs_period_timer_fn_t)(struct hrtimer *);
+  typedef enum hrtimer_restart(cfs_period_timer_fn_t)(struct hrtimer *);
   KSYM_IMPORT_TYPED(cfs_period_timer_fn_t, sched_cfs_period_timer);
   KSYM_IMPORT(task_groups);
 

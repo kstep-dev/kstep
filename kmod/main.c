@@ -46,6 +46,7 @@ static int __init kstep_main(void) {
   kstep_sched_timer_init();
   kstep_jiffies_init();
   kstep_sched_clock_init();
+  kstep_sched_tick_init();
 
   // Reset the scheduler state to initial state
   kstep_reset_runqueues();
@@ -53,13 +54,10 @@ static int __init kstep_main(void) {
   kstep_reset_tasks();
   kstep_patch_min_vruntime();
 
+  TRACE_INFO("Running driver %s", kstep_driver->name);
+  
   if (kstep_driver->print_load_balance)
     kstep_trace_load_balance();
-
-  // Enable printk time
-  kstep_write("/sys/module/printk/parameters/time", "1", 1);
-
-  TRACE_INFO("Running driver %s", kstep_driver->name);
   kstep_driver->run();
 
   TRACE_INFO("Exiting driver %s on Linux %s", kstep_driver->name, UTS_RELEASE);
