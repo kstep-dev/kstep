@@ -10,11 +10,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
-from scripts.input_seq import input_seq_from_log
-from scripts.cov import cov_parse
-from scripts.corpus import GLOBAL_SIGNAL_CORPUS
 
 from scripts import (
+    BUILD_DIR,
     LATEST_COV,
     LATEST_LOG,
     LATEST_OUT,
@@ -23,12 +21,13 @@ from scripts import (
     LOGS_DIR,
     PROJ_DIR,
     QEMU_DIR,
-    BUILD_DIR,
-    cov_symbolize,
     system,
     system_with_pipe,
     update_latest,
 )
+from scripts.corpus import GLOBAL_SIGNAL_CORPUS
+from scripts.cov import cov_parse
+from scripts.input_seq import input_seq_from_log
 
 ARCH = os.uname().machine
 assert ARCH in ("x86_64", "aarch64"), f"Unsupported architecture: {ARCH}"
