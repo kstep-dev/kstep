@@ -1,6 +1,7 @@
 // https://github.com/torvalds/linux/commit/5068d84054b766efe7c6202fc71b2350d1c326f1
 
 #include "driver.h"
+#include "internal.h"
 
 static struct task_struct *target_task;
 static struct task_struct *other_task;
@@ -27,10 +28,23 @@ static void run(void) {
   kstep_tick_repeat(5);
 }
 
+static void on_tick_begin(void) {
+  struct rq *rq = cpu_rq(1);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+  s64 min_vruntime = rq->cfs.zero_vruntime - INIT_TIME_NS;
+#else
+  s64 min_vruntime = rq->cfs.min_vruntime - INIT_TIME_NS;
+#endif
+  struct kstep_json *json = kstep_json_begin();
+  kstep_json_field_str(json, "type", "min_vruntime");
+  kstep_json_field_s64(json, "val", min_vruntime);
+  kstep_json_end(json);
+}
+
 KSTEP_DRIVER_DEFINE{
     .name = "lag_vruntime",
     .setup = setup,
     .run = run,
+    .on_tick_begin = on_tick_begin,
     .step_interval_us = 10000,
-    .print_rq = true,
 };

@@ -16,8 +16,7 @@
 #include "driver.h"
 #include "internal.h"
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0) && \
-    LINUX_VERSION_CODE < KERNEL_VERSION(6, 8, 0)
+#if LINUX_VERSION_CODE == KERNEL_VERSION(6, 6, 0)
 
 #define NUM_ROOT_TASKS 2
 #define NUM_TASKS (NUM_ROOT_TASKS + 1)

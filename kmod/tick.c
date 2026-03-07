@@ -248,8 +248,6 @@ static void kstep_cfs_bandwidth_tick(void) {
 void kstep_tick(void) {
   if (kstep_driver->on_tick_begin)
     kstep_driver->on_tick_begin();
-  if (kstep_driver->print_rq)
-    kstep_print_rq();
   rq_checkers_save();
   kstep_sched_clock_tick();
   kstep_jiffies_tick();

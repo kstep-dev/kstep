@@ -27,9 +27,8 @@ void kstep_status_set_fail(void) { status = KSTEP_STATUS_FAIL; }
 static int __init kstep_main(void) {
   kstep_output_init();
 
-  TRACE_INFO("Linux version: %s", UTS_RELEASE);
+  TRACE_INFO("Starting %s on Linux %s", driver_name, UTS_RELEASE);
   kstep_driver = kstep_sym_init(driver_name);
-  kstep_driver_print(kstep_driver);
 
   // Isolate the CPUs to avoid interference
   kstep_prealloc_kworkers();

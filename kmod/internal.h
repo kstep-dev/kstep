@@ -28,7 +28,6 @@ void kstep_sched_tick_init(void);
 
 // output.c
 void kstep_output_init(void);
-void kstep_print_rq(void);
 void kstep_trace_load_balance(void);
 
 // reset.c

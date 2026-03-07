@@ -57,7 +57,10 @@ static void run(void) {
 }
 
 static void on_tick_begin(void) {
-  pr_info("rq: {\"runnable_avg\": %lu}\n", cpu_rq(1)->cfs.avg.runnable_avg);
+  struct kstep_json *json = kstep_json_begin();
+  kstep_json_field_str(json, "type", "runnable_avg");
+  kstep_json_field_u64(json, "val", cpu_rq(1)->cfs.avg.runnable_avg);
+  kstep_json_end(json);
 }
 
 #else

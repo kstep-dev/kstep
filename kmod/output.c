@@ -5,7 +5,6 @@
 
 #include "internal.h"
 
-#define K(s) "\"" #s "\": "
 #define OUTPUT_BUF_SIZE 65536
 
 static struct file *output_file;
@@ -82,61 +81,6 @@ void kstep_json_end(struct kstep_json *json) {
   if (ret < 0)
     panic("write to output file failed: %ld", ret);
   kfree(json);
-}
-
-static void print_rq(struct rq *rq) {
-// https://github.com/torvalds/linux/commit/c2a295bffeaf9461ecba76dc9e4780c898c94f03
-// https://github.com/torvalds/linux/commit/7b8a702d943827130cc00ae36075eff5500f86f1
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
-  int h_nr_runnable = rq->cfs.h_nr_runnable;
-  int h_nr_queued = rq->cfs.h_nr_queued;
-#else
-  int h_nr_runnable = 0;
-  int h_nr_queued = 0;
-#endif
-
-// https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
-// https://github.com/torvalds/linux/commit/dcbc9d3f0e594223275a18f7016001889ad35eff
-// (avg_vruntime -> sum_w_vruntime)
-// https://github.com/torvalds/linux/commit/4ff674fa986c27ec8a0542479258c92d361a2566
-// (avg_load -> sum_weight)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
-  u64 avg_load = rq->cfs.sum_weight;
-  KSYM_IMPORT(avg_vruntime);
-  u64 avg_vruntime = KSYM_avg_vruntime(&rq->cfs) - INIT_TIME_NS;
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-  u64 avg_load = rq->cfs.avg_load;
-  KSYM_IMPORT(avg_vruntime);
-  u64 avg_vruntime = KSYM_avg_vruntime(&rq->cfs) - INIT_TIME_NS;
-#else
-  u64 avg_load = 0;
-  u64 avg_vruntime = 0;
-#endif
-
-  u64 avg_util =
-      rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
-
-// https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
-  u64 min_vruntime = rq->cfs.zero_vruntime;
-#else
-  u64 min_vruntime = rq->cfs.min_vruntime;
-#endif
-
-  pr_info("rq: {");
-  pr_cont(K(cpu) "%d, ", rq->cpu);
-  pr_cont(K(running) "%2d, ", rq->nr_running - (h_nr_queued - h_nr_runnable));
-  pr_cont(K(queued) "%2d, ", rq->nr_running);
-  pr_cont(K(avg_load) "%4llu, ", avg_load);
-  pr_cont(K(avg_util) "%4llu, ", avg_util);
-  pr_cont(K(min_vruntime) "%12lld, ", min_vruntime - INIT_TIME_NS);
-  pr_cont(K(avg_vruntime) "%12lld", avg_vruntime);
-  pr_cont("}\n");
-}
-
-void kstep_print_rq(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
-    print_rq(cpu_rq(cpu));
 }
 
 void kstep_print_sched_debug(void) {

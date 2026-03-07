@@ -59,7 +59,7 @@ bugs = [
             Linux(name="buggy", version="17e3e88ed0b6318fde0d1c14df1a804711cab1b5~1"),
             Linux(name="fixed", version="17e3e88ed0b6318fde0d1c14df1a804711cab1b5"),
         ],
-        plot_format="util_avg",
+        plot_format="val",
     ),
     Bug(
         driver=Driver(name="lag_vruntime", smp="2"),
@@ -103,7 +103,7 @@ bugs = [
             Linux(name="buggy", version="0213b7083e81f4acd69db32cb72eb4e5f220329a~1"),
             Linux(name="fixed", version="0213b7083e81f4acd69db32cb72eb4e5f220329a"),
         ],
-        plot_format="util_avg",
+        plot_format="val",
     ),
     Bug(
         driver=Driver(name="h_nr_runnable", smp="2"),
@@ -111,7 +111,7 @@ bugs = [
             Linux(name="buggy", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734~1"),
             Linux(name="fixed", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734"),
         ],
-        plot_format="util_avg",
+        plot_format="val",
     ),
     Bug(
         driver=Driver(name="vlag_overflow", smp="3"),
