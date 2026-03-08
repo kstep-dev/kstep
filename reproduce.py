@@ -171,9 +171,7 @@ def reproduce(linux: Linux, driver: Driver, skip_build: bool):
         make_linux(linux_name=linux_name)
     make_kstep(linux_name=linux_name)
     log_file = RESULTS_DIR / f"{linux_name}.log"
-    proc = run_qemu(linux_name=linux_name, driver=driver, log_file=log_file)
-    return_code = proc.wait()
-    print(f"Reproduction returned with code: {return_code}")
+    run_qemu(linux_name=linux_name, driver=driver, log_file=log_file)
     print_run_results(linux_name=linux_name)
 
 

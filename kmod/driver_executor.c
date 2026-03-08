@@ -67,7 +67,7 @@ static bool process_console_chunk(const char *buf, ssize_t nread,
 }
 
 static void setup(void) {
-  console = filp_open("/dev/console", O_RDONLY, 0);
+  console = filp_open("/dev/ttyS1", O_RDONLY, 0);
   kstep_cov_init();
 }
 

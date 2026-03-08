@@ -5,7 +5,6 @@ import dataclasses
 import logging
 import os
 import shutil
-import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -15,14 +14,13 @@ from scripts import (
     BUILD_DIR,
     LATEST_COV,
     LATEST_LOG,
-    LATEST_OUT,
+    LATEST_OUTPUT,
     LINUX_CURR_DIR,
     LINUX_ROOT_DIR,
     LOGS_DIR,
     PROJ_DIR,
     QEMU_DIR,
     system,
-    system_with_pipe,
     update_latest,
 )
 from scripts.corpus import GLOBAL_SIGNAL_CORPUS
@@ -59,6 +57,7 @@ def run_qemu(
     driver: Driver,
     linux_name: str,
     log_file: Optional[Path] = None,
+    input_file: Optional[Path] = None,
     debug: bool = False,
 ):
     kvm_path = Path("/dev/kvm")
@@ -71,11 +70,10 @@ def run_qemu(
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_file or LOGS_DIR / f"log-{timestamp}.log"
-    out_file = log_file.with_suffix(".jsonl")
+    output_file = log_file.with_suffix(".jsonl")
     cov_file = log_file.with_suffix(".cov")
-    signal_file = log_file.with_suffix(".signal")
     update_latest(LATEST_LOG, log_file)
-    update_latest(LATEST_OUT, out_file)
+    update_latest(LATEST_OUTPUT, output_file)
     update_latest(LATEST_COV, cov_file)
 
     isol_cpus = f"1-{driver.num_cpus - 1}" if driver.num_cpus > 2 else "1"
@@ -124,15 +122,13 @@ def run_qemu(
         f"-chardev stdio,id=char0,mux=on,logfile={log_file},signal=off",
         "-mon chardev=char0",
         serial_device("char0"),
-        # out file
-        f"-chardev file,id=char1,path={out_file}",
+        # input and output files
+        f"-chardev file,id=char1,path={output_file}"
+        + (f",input-path={input_file}" if input_file else ""),
         serial_device("char1"),
         # cov file
         f"-chardev file,id=char2,path={cov_file}",
         serial_device("char2"),
-        # signal file
-        f"-chardev file,id=char3,path={signal_file}",
-        serial_device("char3"),
         # acceleration
         f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]
@@ -143,29 +139,21 @@ def run_qemu(
     if debug:
         cmd += ["-s", "-S"]
 
-    return system_with_pipe(" ".join(cmd))
-
-
-def pipe_to_qemu(proc: subprocess.Popen, stdin_payload: str):
-    if not proc.stdin:
-        raise RuntimeError("QEMU stdin pipe is not available")
-    proc.stdin.write(stdin_payload.encode())
-    proc.stdin.flush()
+    system(" ".join(cmd))
 
 
 def print_run_results(
     linux_name: str,
-    log_file=LATEST_LOG, 
-    out_file=LATEST_OUT, 
-    cov_file=LATEST_COV, 
+    log_file=LATEST_LOG,
+    output_file=LATEST_OUTPUT,
+    cov_file=LATEST_COV,
 ):
     print(f"Log: {log_file}")
-    print(f"Out: {out_file}")
+    print(f"Output: {output_file}")
     print(f"Cov: {cov_file}")
 
     # check if cov is empty and call analyze_new_signals and analyze_per_action_signals if it is not
     if cov_file.exists() and cov_file.stat().st_size != 0:
-
         # Parse the signal file and get the signal records and list
         signal_records = cov_parse(cov_file)
 
@@ -185,7 +173,7 @@ def print_run_results(
             linux_name=linux_name,
             output_path=LOGS_DIR / f"{cov_file}.new_edges.json",
         )
-        
+
         # Analyze the per-action signals for the test if there are new signals
         if new_signals:
             GLOBAL_SIGNAL_CORPUS.analyze_per_action_signals(
@@ -261,15 +249,12 @@ def main():
                 if (value := getattr(args, field.name)) is not None
             }
         )
-        proc = run_qemu(
+        run_qemu(
             driver=driver,
             linux_name=linux_name,
             debug=args.debug,
             log_file=args.log_file,
         )
-
-        return_code = proc.wait()
-        print(f"Qemu returned with code: {return_code}")
         print_run_results(linux_name=linux_name)
 
 

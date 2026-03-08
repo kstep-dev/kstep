@@ -1,4 +1,3 @@
-import fcntl
 import logging
 import subprocess
 from enum import StrEnum
@@ -21,22 +20,6 @@ class TermColor(StrEnum):
 def system(cmd: str):
     logging.info(f"Running: `{TermColor.BLUE}{cmd}{TermColor.RESET}`")
     subprocess.run(cmd, shell=True, check=True)
-
-def system_with_pipe(cmd: str):
-    logging.info(f"Running with Pipe: `{TermColor.BLUE}{cmd}{TermColor.RESET}`")
-    # Save stdout flags: QEMU sets O_NONBLOCK on stdout when stdin is a pipe
-    # (it skips its normal atexit cleanup because isatty(stdin) is false), so
-    # we must restore the flags after the process exits. 
-    # Otherwise, the "echo" command in linux-patch will throw an error.
-    saved_stdout_flags = fcntl.fcntl(1, fcntl.F_GETFL)
-    proc = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE)
-    _orig_wait = proc.wait
-    def _wait_and_restore(*args, **kwargs):
-        result = _orig_wait(*args, **kwargs)
-        fcntl.fcntl(1, fcntl.F_SETFL, saved_stdout_flags)
-        return result
-    proc.wait = _wait_and_restore
-    return proc
 
 def download(url: str, output_path: Path):
     if output_path.exists():
