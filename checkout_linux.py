@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from scripts import (
+    BUILD_CURR_DIR,
+    BUILD_DIR,
     DOWNLOAD_DIR,
     LINUX_CURR_DIR,
     LINUX_MASTER_DIR,
@@ -15,6 +17,7 @@ from scripts import (
     download,
     system,
 )
+
 
 @dataclass(frozen=True)
 class Linux:
@@ -44,10 +47,16 @@ def add_worktree(version: str, linux_dir: Path):
     system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {version}")
 
 
-def set_current_linux(linux_dir: Path):
+def set_current_linux(linux_name: str):
+    linux_dir = LINUX_ROOT_DIR / linux_name
     LINUX_CURR_DIR.unlink(missing_ok=True)
     LINUX_CURR_DIR.symlink_to(linux_dir)
     logging.info(f"{fmt_path(LINUX_CURR_DIR)} now points to {fmt_path(linux_dir)}")
+
+    build_dir = BUILD_DIR / linux_name
+    BUILD_CURR_DIR.unlink(missing_ok=True)
+    BUILD_CURR_DIR.symlink_to(build_dir)
+    logging.info(f"{fmt_path(BUILD_CURR_DIR)} now points to {fmt_path(build_dir)}")
 
 
 def get_download_url(version: str) -> str:
@@ -86,7 +95,7 @@ def checkout_linux(
 
         if patch:
             patch_linux(linux_dir, patch)
-    set_current_linux(linux_dir)
+    set_current_linux(linux_name)
 
 
 if __name__ == "__main__":
