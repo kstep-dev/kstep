@@ -29,6 +29,7 @@ class GenState:
     task_state: dict = field(default_factory=dict) # key: task id, value: state
     cgroups: dict = field(default_factory=dict) # key: cgroup id, value: Cgroup
     leaf_cgroups: list[int] = field(default_factory=list) # list of leaf cgroup ids
+    task2cgroups: dict = field(default_factory=dict) # key: task id, value: list of cgroup ids
 
     # ======
     # Task related functions
@@ -95,6 +96,12 @@ class GenState:
         begin, end = self.choose_cpuset_subset(parent_range[0], parent_range[1])
         return begin, end
 
+    def choose_cpuset_task(self, task_id: int):
+        if task_id not in self.task2cgroups:
+            return self.choose_cpuset()
+        cgroup_id = self.task2cgroups[task_id]
+        return self.choose_cpuset_subset(self.cgroups[cgroup_id].cpuset[0], self.cgroups[cgroup_id].cpuset[1])
+
     def choose_cpu(self) -> int:
         return self.rnd.randint(1, self.cpus - 1)
 
@@ -145,4 +152,10 @@ class GenState:
             cur = self.cgroups.get(cur.parent_id)
         parts.append(CGROUP_ROOT)
         return "/".join(reversed(parts))
+
+    def cgroup_add_task(self, cgroup_id: int, task_id: int):
+        self.task2cgroups[task_id] = cgroup_id
+
+    def cgroup_remove_task(self, task_id: int):
+        self.task2cgroups.pop(task_id)
 

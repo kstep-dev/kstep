@@ -75,12 +75,15 @@ def op_task_fork(m: GenState):
         return None
     m.add_task(new_tid)
     m.set_task_state(new_tid, TASK_RUNNABLE)
+    # child will be added to the same cgroup as the parent
+    if tid in m.task2cgroups:
+        m.cgroup_add_task(m.task2cgroups[tid], new_tid)
     return (OP_NAME_TO_TYPE["TASK_FORK"], tid, new_tid, 0)
 
 
 def op_task_pin(m: GenState):
     tid = m.choose_task_in_state(TASK_RUNNABLE)
-    rng = m.choose_cpuset()
+    rng = m.choose_cpuset_task(tid)
     if rng is None:
         return None
     begin, end = rng
@@ -149,6 +152,7 @@ def op_cgroup_set_weight(m: GenState):
 def op_cgroup_add_task(m: GenState):
     cgroup_id = m.choose_leaf_cgroup()
     tid = m.choose_task()
+    m.cgroup_add_task(cgroup_id, tid)
     return (OP_NAME_TO_TYPE["CGROUP_ADD_TASK"], cgroup_id, tid, 0)
 
 
@@ -192,7 +196,7 @@ OPS: List[Op] = [
     ),
     Op(
         name="TASK_FIFO",
-        weight=2,
+        weight=1,
         is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE),
         emit=op_task_fifo,
         requires=[RESOURCE_TASK],
@@ -216,7 +220,7 @@ OPS: List[Op] = [
     ),
     Op(
         name="TASK_WAKEUP",
-        weight=4,
+        weight=10,
         is_applicable=lambda m: m.has_tasks_in_state(TASK_SLEEPING),
         emit=op_task_wakeup,
         requires=[RESOURCE_TASK],
