@@ -3,53 +3,53 @@
 
 #include "internal.h"
 
-// General rq checker infrastructure
+// General rq invariant infrastructure
 #define MAX_CPUS 16
-#define MAX_CHECKERS 8
-static s64 prev_checker_values[MAX_CHECKERS][MAX_CPUS];
+#define MAX_INVARIANTS 8
+static s64 prev_invariant_values[MAX_INVARIANTS][MAX_CPUS];
 
-static void rq_checkers_save(void) {
-  struct kstep_checker *checkers = kstep_driver->checkers;
-  if (!checkers)
+static void rq_invariants_save(void) {
+  struct kstep_invariant **invariants = kstep_driver->invariants;
+  if (!invariants)
     return;
 
-  for (int i = 0; checkers[i].name && i < MAX_CHECKERS; i++) {
-    switch (checkers[i].type) {
+  for (int i = 0; invariants[i] && i < MAX_INVARIANTS; i++) {
+    switch (invariants[i]->type) {
     case TEMPORAL_DELTA:
       for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++)
-        prev_checker_values[i][cpu] = checkers[i].get_value(cpu_rq(cpu));
+        prev_invariant_values[i][cpu] = invariants[i]->get_value(cpu_rq(cpu));
       break;
     default:
-      panic("Unsupported checker type %d", checkers[i].type);
+      panic("Unsupported invariant type %d", invariants[i]->type);
     }
   }
 }
 
-static void check_temporal_delta(int i, struct kstep_checker *checker) {
+static void check_temporal_delta(int i, struct kstep_invariant *inv) {
   for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++) {
-    s64 delta = checker->get_value(cpu_rq(cpu)) - prev_checker_values[i][cpu];
+    s64 delta = inv->get_value(cpu_rq(cpu)) - prev_invariant_values[i][cpu];
 
-    if (abs(delta) > checker->max_delta) {
-      pr_warn("CHECKER %d: %s on CPU %d: delta %lld, max %lld\n", i,
-              checker->name, cpu, delta, checker->max_delta);
-      kstep_fail("CHECKER %d: %s on CPU %d: delta %lld, max %lld", i,
-                 checker->name, cpu, delta, checker->max_delta);
+    if (abs(delta) > inv->max_delta) {
+      pr_warn("INVARIANT %d: %s on CPU %d: delta %lld, max %lld\n", i,
+              inv->name, cpu, delta, inv->max_delta);
+      kstep_fail("INVARIANT %d: %s on CPU %d: delta %lld, max %lld", i,
+                 inv->name, cpu, delta, inv->max_delta);
     }
   }
 }
 
-static void rq_checkers_check(void) {
-  struct kstep_checker *checkers = kstep_driver->checkers;
-  if (!checkers)
+static void rq_invariants_check(void) {
+  struct kstep_invariant **invariants = kstep_driver->invariants;
+  if (!invariants)
     return;
 
-  for (int i = 0; checkers[i].name && i < MAX_CHECKERS; i++) {
-    switch (checkers[i].type) {
+  for (int i = 0; invariants[i] && i < MAX_INVARIANTS; i++) {
+    switch (invariants[i]->type) {
     case TEMPORAL_DELTA:
-      check_temporal_delta(i, &checkers[i]);
+      check_temporal_delta(i, invariants[i]);
       break;
     default:
-      panic("Unsupported checker type %d", checkers[i].type);
+      panic("Unsupported invariant type %d", invariants[i]->type);
     }
   }
 }
@@ -121,14 +121,14 @@ static void kstep_cfs_bandwidth_tick(void) {
 void kstep_tick(void) {
   if (kstep_driver->on_tick_begin)
     kstep_driver->on_tick_begin();
-  rq_checkers_save();
+  rq_invariants_save();
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
   for (int cpu = 1; cpu < num_online_cpus(); cpu++)
     smp_call_function_single(cpu, kstep_do_sched_tick, NULL, 1);
   kstep_sleep();
   kstep_cfs_bandwidth_tick();
-  rq_checkers_check();
+  rq_invariants_check();
   if (kstep_driver->on_tick_end)
     kstep_driver->on_tick_end();
 }
