@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
-import time
 
 from checkout_linux import Linux, checkout_linux
 from run import (
     Driver,
     make_kstep,
     make_linux,
-    pipe_to_qemu,
-    print_run_results,
     run_qemu,
 )
 from scripts import GLOBAL_SIGNAL_CORPUS, LOGS_DIR, cov_parse, generate_input
@@ -59,26 +56,19 @@ def run_test(
     make_kstep(linux_name=linux_name)
 
     log_file = LOGS_DIR / f"{linux_name}.log"
-    out_file = log_file.with_suffix(".jsonl")
     cov_file = log_file.with_suffix(".cov")
+    input_file = log_file.with_suffix(".input")
+    # Pad with newlines to absorb bytes consumed during UART autoconfig.
+    # The 8250 driver briefly enables IER while probing, causing QEMU to
+    # deliver a few bytes from the input file which are then discarded.
+    input_file.write_text("\n" * 16 + seq.to_payload() + "EXIT\n")
 
-    proc = run_qemu(
+    run_qemu(
         linux_name=linux_name,
         driver=driver,
         log_file=log_file,
+        input_file=input_file,
     )
-
-    time.sleep(1)
-
-    # Supported commands:
-    # INT,INT,INT,INT: run single operation
-    # EXIT: exit the qemu
-    payload_str = seq.to_payload()
-    pipe_to_qemu(proc=proc, stdin_payload=payload_str)
-    pipe_to_qemu(proc=proc, stdin_payload="EXIT\n")
-
-    return_code = proc.wait()
-    print(f"QEMU returned with code: {return_code}")
 
     assert_exec_matches_generated(log_file, seq)
 
@@ -120,7 +110,7 @@ def main():
     args = parser.parse_args()
 
     linux = Linux(
-        name=f"{args.linux_name}_test",
+        name=f"{args.linux_version}_test",
         version=args.linux_version,
     )
 

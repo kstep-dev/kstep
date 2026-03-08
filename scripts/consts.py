@@ -16,7 +16,7 @@ QEMU_DIR = DATA_DIR / "qemu"
 CORPUS_DIR = DATA_DIR / "corpus"
 
 LATEST_LOG = DATA_DIR / "latest.log"
-LATEST_OUT = DATA_DIR / "latest.jsonl"
+LATEST_OUTPUT = DATA_DIR / "latest.jsonl"
 LATEST_COV = DATA_DIR / "latest.cov"
 LATEST_COV_JSON = DATA_DIR / "latest.cov.json"
 
@@ -24,7 +24,7 @@ LATEST_COV_JSON = DATA_DIR / "latest.cov.json"
 def update_latest(latest_file: Path, new_file: Path):
     assert latest_file in (
         LATEST_LOG,
-        LATEST_OUT,
+        LATEST_OUTPUT,
         LATEST_COV,
         LATEST_COV_JSON,
     )
