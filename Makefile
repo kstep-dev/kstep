@@ -34,7 +34,7 @@ $(USER_OUT_DIR):
 # ========= kmod =========
 
 KMOD_SRC_DIR := $(PROJ_DIR)/kmod
-KMOD_SRC_FILES := $(wildcard $(KMOD_SRC_DIR)/*.c $(KMOD_SRC_DIR)/*.h $(KMOD_SRC_DIR)/drivers/*.c)
+KMOD_SRC_FILES := $(wildcard $(KMOD_SRC_DIR)/*.c $(KMOD_SRC_DIR)/*.h $(KMOD_SRC_DIR)/drivers/*.c $(KMOD_SRC_DIR)/invariant/*.c)
 KMOD_OUT_DIR := $(BUILD_DIR)/kmod
 KMOD_OUT_FILE := $(KMOD_OUT_DIR)/kmod.ko
 
@@ -45,6 +45,8 @@ $(KMOD_OUT_FILE): $(KMOD_SRC_FILES) | $(KMOD_OUT_DIR)
 	ln -sf $(KMOD_SRC_DIR)/*.c $(KMOD_SRC_DIR)/*.h $(KMOD_SRC_DIR)/Kbuild $(KMOD_OUT_DIR)
 	mkdir -p $(KMOD_OUT_DIR)/drivers
 	ln -sf $(KMOD_SRC_DIR)/drivers/*.c $(KMOD_OUT_DIR)/drivers
+	mkdir -p $(KMOD_OUT_DIR)/invariant
+	ln -sf $(KMOD_SRC_DIR)/invariant/*.c $(KMOD_OUT_DIR)/invariant
 	cd $(KMOD_OUT_DIR) && $(BEAR_CMD) $(MAKE) -C $(LINUX_DIR) M=$(KMOD_OUT_DIR) modules
 	ln -sf $(KMOD_OUT_DIR)/compile_commands.json $(KMOD_SRC_DIR)/compile_commands.json
 

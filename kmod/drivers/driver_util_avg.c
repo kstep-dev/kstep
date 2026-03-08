@@ -2,6 +2,7 @@
 
 #include "driver.h"
 #include "internal.h"
+#include "invariant.h"
 
 static struct task_struct *tasks[2];
 
@@ -33,21 +34,13 @@ static void run(void) {
   kstep_tick_repeat(600);
 }
 
-// Checker: detect cliff changes in util_avg
-static s64 get_util_avg(struct rq *rq) {
-  return rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
-}
-
 static void on_tick_begin(void) {
   struct rq *rq = cpu_rq(1);
   u64 avg_util = rq->avg_rt.util_avg + rq->cfs.avg.util_avg + rq->avg_dl.util_avg;
   kstep_json_print_2kv("type", "avg_util", "val", "%llu", avg_util);
 }
 
-static struct kstep_checker checkers[] = {
-  { .name = "util_avg_cliff", .type = TEMPORAL_DELTA, .get_value = get_util_avg, .max_delta = 100 },
-  { NULL }  // Terminator
-};
+static struct kstep_invariant *invariants[] = { &invariant_util_avg, NULL };
 
 KSTEP_DRIVER_DEFINE{
     .name = "util_avg",
@@ -55,5 +48,5 @@ KSTEP_DRIVER_DEFINE{
     .run = run,
     .on_tick_begin = on_tick_begin,
     .step_interval_us = 1000,
-    .checkers = checkers,
+    .invariants = invariants,
 };

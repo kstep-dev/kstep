@@ -2,18 +2,9 @@
 #define KSTEP_DRIVER_H
 
 #include <linux/sched.h>
+#include "invariant.h"
 
 #define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
-
-enum kstep_checker_type {
-  TEMPORAL_DELTA, // Checker for comparing rq fields before and after a tick
-};
-struct kstep_checker {
-  const char *name;                // Name for logging
-  enum kstep_checker_type type;    // Type of checker
-  s64 (*get_value)(struct rq *rq); // Extract value from rq
-  s64 max_delta; // Max allowed change per tick (absolute value)
-};
 
 // main.c
 #define DRIVER_NAME_LEN 32
@@ -28,7 +19,7 @@ struct kstep_driver {
   u64 step_interval_us;                 // Real time sleep between steps in us
   u64 tick_interval_ns;                 // Virtual clock advance per tick in ns
   bool print_load_balance;              // Print load balancing
-  struct kstep_checker *checkers;       // Array of checkers
+  struct kstep_invariant **invariants;  // NULL-terminated array of invariant pointers
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 
