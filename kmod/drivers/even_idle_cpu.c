@@ -47,6 +47,6 @@ KSTEP_DRIVER_DEFINE{
     .setup = setup,
     .run = run,
     .on_tick_begin = on_tick_begin,
+    .on_sched_balance_selected = kstep_output_balance,
     .step_interval_us = 1000,
-    .print_load_balance = true,
 };

@@ -34,7 +34,10 @@ u64 kstep_jiffies_get(void);
 
 // output.c
 void kstep_output_init(void);
-void kstep_trace_load_balance(void);
+
+// trace.c
+void kstep_trace_sched_balance_begin(void);
+void kstep_trace_sched_balance_selected(void);
 
 // reset.c
 void kstep_reset_runqueues(void);

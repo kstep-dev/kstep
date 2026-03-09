@@ -5,7 +5,6 @@
 
 #include "internal.h"
 
-
 static struct file *output_file;
 
 void kstep_output_init(void) {
@@ -122,55 +121,13 @@ void kstep_output_curr_task(void) {
   }
 }
 
-struct lb_env {
-  struct sched_domain *sd;
-  struct rq *src_rq;
-  int src_cpu;
-  int dst_cpu;
-  struct rq *dst_rq;
-  // other fields are not needed
-};
-
-static void load_balance_enter(unsigned long ip, unsigned long parent_ip,
-                               struct ftrace_ops *op,
-                               struct ftrace_regs *fregs) {
-  struct lb_env *env = (void *)regs_get_kernel_argument((void *)fregs, 0);
-  if (env->dst_cpu == 0)
-    return;
-  if (kstep_jiffies_get() == 0)
-    return;
-
+void kstep_output_balance(int cpu, struct sched_domain *sd) {
   struct kstep_json json;
   kstep_json_begin(&json);
   kstep_json_field_str(&json, "type", "load_balance");
-  kstep_json_field_u64(&json, "dst_cpu", env->dst_cpu);
+  kstep_json_field_u64(&json, "dst_cpu", cpu);
   kstep_json_field_fmt(&json, "span", "\"%*pbl\"",
-                       cpumask_pr_args(sched_domain_span(env->sd)));
-  kstep_json_field_str(&json, "name", env->sd->name);
+                       cpumask_pr_args(sched_domain_span(sd)));
+  kstep_json_field_str(&json, "name", sd->name);
   kstep_json_end(&json);
-}
-
-struct ftrace_ops load_balance_enter_op = {
-    .func = load_balance_enter,
-    .flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED | FTRACE_OPS_FL_RECURSION,
-};
-
-void kstep_trace_load_balance(void) {
-  // We use `sched_balance_find_src_group`/`find_busiest_group` as a proxy to
-  // trace `sched_balance_rq`/`load_balance` when `should_we_balance` is true.
-
-// https://github.com/torvalds/linux/commit/82cf921432fc184adbbb9c1bced182564876ec5e
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
-  char *name = "sched_balance_find_src_group";
-#else
-  char *name = "find_busiest_group";
-#endif
-
-  if (ftrace_set_filter(&load_balance_enter_op, name, strlen(name), 1))
-    panic("Failed to set filter for %s", name);
-
-  if (register_ftrace_function(&load_balance_enter_op))
-    panic("Failed to register ftrace function for %s", name);
-
-  TRACE_INFO("Traced %s for load balancing", name);
 }
