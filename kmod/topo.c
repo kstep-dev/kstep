@@ -133,15 +133,25 @@ void kstep_topo_init(void) {
   int nr_cpus = num_online_cpus();
   struct sched_domain_topology_level *tl;
   for_each_tl(tl) {
+    enum kstep_topo_type type = get_topo_type(tl->name);
     for (int cpu = 0; cpu < nr_cpus; cpu++) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
       const struct cpumask *old_mask = tl->mask(tl, cpu);
 #else
       const struct cpumask *old_mask = tl->mask(cpu);
 #endif
-      cpumask_copy(&kstep_masks[get_topo_type(tl->name)][cpu], old_mask);
+      cpumask_copy(&kstep_masks[type][cpu], old_mask);
     }
-    tl->mask = kstep_masks_fns[get_topo_type(tl->name)];
+    tl->mask = kstep_masks_fns[type];
+  }
+
+  // Isolate CPU 0: remove it from CPUs 1-N's masks at every level so
+  // their load balancers never read CPU 0's non-deterministic state.
+  for (int type = 0; type < KSTEP_TOPO_NR; type++) {
+    cpumask_clear(&kstep_masks[type][0]);
+    cpumask_set_cpu(0, &kstep_masks[type][0]);
+    for (int cpu = 1; cpu < nr_cpus; cpu++)
+      cpumask_clear_cpu(0, &kstep_masks[type][cpu]);
   }
 }
 
