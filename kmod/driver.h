@@ -53,6 +53,7 @@ void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,
                        ##__VA_ARGS__)
 void kstep_print_sched_debug(void);
 void kstep_output_curr_task(void);
+void kstep_output_nr_running(void);
 void kstep_output_balance(int cpu, struct sched_domain *sd);
 
 // tick.c

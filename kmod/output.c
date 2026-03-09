@@ -116,6 +116,18 @@ void kstep_output_curr_task(void) {
   }
 }
 
+void kstep_output_nr_running(void) {
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, "type", "nr_running");
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    char key[8];
+    snprintf(key, sizeof(key), "cpu%d", cpu);
+    kstep_json_field_u64(&json, key, cpu_rq(cpu)->nr_running);
+  }
+  kstep_json_end(&json);
+}
+
 void kstep_output_balance(int cpu, struct sched_domain *sd) {
   struct kstep_json json;
   kstep_json_begin(&json);
