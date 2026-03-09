@@ -9,7 +9,7 @@ static void setup(void) {
   // SMT pairs: [1,2] [3,4], MC: [1-4]
   kstep_topo_init();
   const char *smt[] = {"0", "1-2", "1-2", "3-4", "3-4"};
-  kstep_topo_set_level(KSTEP_TOPO_SMT, smt, 5);
+  kstep_topo_set_smt(smt, ARRAY_SIZE(smt));
   kstep_topo_apply();
 
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
