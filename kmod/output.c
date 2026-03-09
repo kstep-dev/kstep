@@ -1,8 +1,3 @@
-#include <linux/fs.h>
-#include <linux/ftrace.h>
-#include <linux/slab.h>
-#include <linux/tracepoint.h>
-
 #include "internal.h"
 
 static struct file *output_file;
