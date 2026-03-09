@@ -1,25 +1,30 @@
 #ifndef KSTEP_DRIVER_H
 #define KSTEP_DRIVER_H
 
-#include <linux/sched.h>
 #include "invariant.h"
+#include <linux/sched.h>
 
 #define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
+#define DRIVER_NAME_LEN 32    
 
-// main.c
-#define DRIVER_NAME_LEN 32
+struct sched_domain;
 struct kstep_driver {
   char name[DRIVER_NAME_LEN];
-  void (*setup)(void);                  // Setup the driver (e.g., create tasks)
-  void (*run)(void);                    // Run the driver
-  void (*on_tick_begin)(void);          // Callback before each tick
-  void (*on_tick_end)(void);            // Callback after each tick
-  void (*on_sched_softirq_begin)(void); // Callback before load balancing
-  void (*on_sched_softirq_end)(void);   // Callback after load balancing
-  u64 step_interval_us;                 // Real time sleep between steps in us
-  u64 tick_interval_ns;                 // Virtual clock advance per tick in ns
-  bool print_load_balance;              // Print load balancing
-  struct kstep_invariant **invariants;  // NULL-terminated array of invariant pointers
+  void (*setup)(void);
+  void (*run)(void);
+  // Callbacks before and after each tick
+  void (*on_tick_begin)(void);
+  void (*on_tick_end)(void);
+  // Callbacks before and after load balancing softirq
+  void (*on_sched_softirq_begin)(void);
+  void (*on_sched_softirq_end)(void);
+  // Callback at sched_balance_rq
+  void (*on_sched_balance_begin)(int cpu, struct sched_domain *sd);
+  // Callback after should_we_balance
+  void (*on_sched_balance_selected)(int cpu, struct sched_domain *sd);
+  u64 step_interval_us;                // Real time sleep between steps in us
+  u64 tick_interval_ns;                // Virtual clock advance per tick in ns
+  struct kstep_invariant **invariants; // NULL-terminated array of invariants
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 
@@ -39,13 +44,14 @@ void kstep_json_end(struct kstep_json *json);
 void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,
                           const char *val2_fmt, ...);
 #define kstep_pass(msg_fmt, ...)                                               \
-  kstep_json_print_2kv("status", "pass", "message",                           \
-                        "\"" msg_fmt "\"", ##__VA_ARGS__)
+  kstep_json_print_2kv("status", "pass", "message", "\"" msg_fmt "\"",         \
+                       ##__VA_ARGS__)
 #define kstep_fail(msg_fmt, ...)                                               \
-  kstep_json_print_2kv("status", "fail", "message",                           \
-                        "\"" msg_fmt "\"", ##__VA_ARGS__)
+  kstep_json_print_2kv("status", "fail", "message", "\"" msg_fmt "\"",         \
+                       ##__VA_ARGS__)
 void kstep_print_sched_debug(void);
 void kstep_output_curr_task(void);
+void kstep_output_balance(int cpu, struct sched_domain *sd);
 
 // tick.c
 void kstep_tick(void);

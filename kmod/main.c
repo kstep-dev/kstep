@@ -40,8 +40,10 @@ static int __init kstep_main(void) {
 
   TRACE_INFO("Running driver %s", kstep_driver->name);
   
-  if (kstep_driver->print_load_balance)
-    kstep_trace_load_balance();
+  if (kstep_driver->on_sched_balance_begin || kstep_driver->on_sched_balance_selected)
+    kstep_trace_sched_balance_begin();
+  if (kstep_driver->on_sched_balance_selected)
+    kstep_trace_sched_balance_selected();
   kstep_driver->run();
 
   TRACE_INFO("Exiting driver %s on Linux %s", kstep_driver->name, UTS_RELEASE);
