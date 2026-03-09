@@ -10,8 +10,8 @@ static void setup(void) {
   kstep_cpu_set_capacity(4, SCHED_CAPACITY_SCALE / 2);
 
   kstep_topo_init();
-  const char *cpulists[] = {"0", "1-2", "1-2", "3-4", "3-4"};
-  kstep_topo_set_level(KSTEP_TOPO_CLS, cpulists, ARRAY_SIZE(cpulists));
+  const char *cls[] = {"0", "1-2", "1-2", "3-4", "3-4"};
+  kstep_topo_set_cls(cls, ARRAY_SIZE(cls));
   kstep_topo_apply();
 
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)

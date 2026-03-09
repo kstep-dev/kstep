@@ -88,16 +88,11 @@ int kstep_eligible(struct sched_entity *se);
 
 // topo.c
 void kstep_topo_init(void);
-enum kstep_topo_type {
-  KSTEP_TOPO_SMT,
-  KSTEP_TOPO_CLS,
-  KSTEP_TOPO_MC,
-  KSTEP_TOPO_PKG,
-  KSTEP_TOPO_NODE,
-  KSTEP_TOPO_NR,
-};
-void kstep_topo_set_level(enum kstep_topo_type type, const char *cpulists[],
-                          int size);
+void kstep_topo_set_smt(const char *cpulists[], int size);
+void kstep_topo_set_cls(const char *cpulists[], int size);
+void kstep_topo_set_mc(const char *cpulists[], int size);
+void kstep_topo_set_pkg(const char *cpulists[], int size);
+void kstep_topo_set_node(const char *cpulists[], int size);
 void kstep_topo_apply(void);
 void kstep_topo_print(void);
 void kstep_cpu_set_freq(int cpu, int scale);

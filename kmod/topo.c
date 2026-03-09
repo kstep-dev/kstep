@@ -79,6 +79,15 @@ void kstep_topo_print(void) {
   print_sched_domains();
 }
 
+enum kstep_topo_type {
+  KSTEP_TOPO_SMT,
+  KSTEP_TOPO_CLS,
+  KSTEP_TOPO_MC,
+  KSTEP_TOPO_PKG,
+  KSTEP_TOPO_NODE,
+  KSTEP_TOPO_NR,
+};
+
 static struct cpumask kstep_masks[KSTEP_TOPO_NR][NR_CPUS];
 
 // https://github.com/torvalds/linux/commit/661f951e371cc134ea31c84238dbdc9a898b8403
@@ -136,22 +145,40 @@ void kstep_topo_init(void) {
   }
 }
 
-void kstep_topo_set_level(enum kstep_topo_type type, const char *cpulists[],
-                          int size) {
+static void kstep_topo_set_level(enum kstep_topo_type type,
+                                 const char *cpulists[], int size) {
   if (size != num_online_cpus())
     panic("size %d != num_online_cpus %d", size, num_online_cpus());
   for (int i = 0; i < size; i++)
     if (cpulist_parse(cpulists[i], &kstep_masks[type][i]) < 0)
       panic("Failed to parse cpulist %s for level %d", cpulists[i], type);
+}
+
+void kstep_topo_set_smt(const char *cpulists[], int size) {
+  kstep_topo_set_level(KSTEP_TOPO_SMT, cpulists, size);
 
   // Also update cpu_sibling_map so that cpu_smt_mask() / is_core_idle()
   // reflect the new SMT topology.
-  if (type == KSTEP_TOPO_SMT) {
-    KSYM_IMPORT_TYPED(cpumask_var_t, cpu_sibling_map);
-    for (int i = 0; i < size; i++)
-      cpumask_copy(*per_cpu_ptr(KSYM_cpu_sibling_map, i),
-                   &kstep_masks[KSTEP_TOPO_SMT][i]);
-  }
+  KSYM_IMPORT_TYPED(cpumask_var_t, cpu_sibling_map);
+  for (int i = 0; i < size; i++)
+    cpumask_copy(*per_cpu_ptr(KSYM_cpu_sibling_map, i),
+                 &kstep_masks[KSTEP_TOPO_SMT][i]);
+}
+
+void kstep_topo_set_cls(const char *cpulists[], int size) {
+  kstep_topo_set_level(KSTEP_TOPO_CLS, cpulists, size);
+}
+
+void kstep_topo_set_mc(const char *cpulists[], int size) {
+  kstep_topo_set_level(KSTEP_TOPO_MC, cpulists, size);
+}
+
+void kstep_topo_set_pkg(const char *cpulists[], int size) {
+  kstep_topo_set_level(KSTEP_TOPO_PKG, cpulists, size);
+}
+
+void kstep_topo_set_node(const char *cpulists[], int size) {
+  kstep_topo_set_level(KSTEP_TOPO_NODE, cpulists, size);
 }
 
 void kstep_topo_apply(void) {
