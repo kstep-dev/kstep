@@ -37,12 +37,20 @@ static void setup(void) {
 
   // Create a wakee, blocked on the wait queue until the waker wakes it up.
   wakee_task = kthread_create(wakee_main, NULL, "wakee");
+
+  // Force the wakee to run on cpu 2 at first, so that its wake_cpu is set to 2.
+  // This helps the bug to trigger: at the later sync_wakeup, 
+  // prev_cpu differs this_cpu in wake_up_sync.
   struct cpumask mask;
+  cpumask_clear(&mask);
+  cpumask_set_cpu(2, &mask);
+  set_cpus_allowed_ptr(wakee_task, &mask);
+  wake_up_process(wakee_task);
+
+  // Reset the wakee to be able to run on cpu 1, 2.
   cpumask_copy(&mask, cpu_active_mask);
   cpumask_clear_cpu(0, &mask);
   set_cpus_allowed_ptr(wakee_task, &mask);
-  wakee_task->wake_cpu = 2;
-  wake_up_process(wakee_task);
 }
 
 static void *is_ineligible(void) {
