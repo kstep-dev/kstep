@@ -22,6 +22,8 @@ struct kstep_driver {
   void (*on_sched_balance_begin)(int cpu, struct sched_domain *sd);
   // Callback after should_we_balance
   void (*on_sched_balance_selected)(int cpu, struct sched_domain *sd);
+  // Callback at init_tg_cfs_entry (new task group cfs_rq created)
+  void (*on_sched_group_alloc)(struct task_group *tg, int cpu);
   u64 step_interval_us;                // Real time sleep between steps in us
   u64 tick_interval_ns;                // Virtual clock advance per tick in ns
   struct kstep_invariant **invariants; // NULL-terminated array of invariants

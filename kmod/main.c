@@ -24,6 +24,7 @@ static int __init kstep_main(void) {
   // Run userspace programs when we know the system is ready
   kstep_task_init();
   kstep_cgroup_init();
+  kstep_trace_sched_group_alloc(); // also sets min_vruntime
   kstep_driver->setup();
   kstep_topo_print();
 
@@ -36,11 +37,11 @@ static int __init kstep_main(void) {
   kstep_reset_runqueues();
   kstep_reset_cpumask();
   kstep_reset_tasks();
-  kstep_patch_min_vruntime();
 
   TRACE_INFO("Running driver %s", kstep_driver->name);
-  
-  if (kstep_driver->on_sched_balance_begin || kstep_driver->on_sched_balance_selected)
+
+  if (kstep_driver->on_sched_balance_begin ||
+      kstep_driver->on_sched_balance_selected)
     kstep_trace_sched_balance_begin();
   if (kstep_driver->on_sched_balance_selected)
     kstep_trace_sched_balance_selected();
