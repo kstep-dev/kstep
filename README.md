@@ -40,7 +40,7 @@ git clone --recursive https://github.com/ShawnZhong/kSTEP
 
 ## 📊 Results
 
-| kSTEP&nbsp;Driver | Figure |
+| kSTEP&nbsp;Driver,&nbsp;Fix,&nbsp;and&nbsp;Output | Figure |
 |-----------------------| :--------: |
 | **[sync_wakeup.c](kmod/drivers/sync_wakeup.c)** <br> **Official Fix**: [linux@aa3ee4f](https://github.com/torvalds/linux/commit/aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042) <br> **Our Fix**: [sync_wakeup.patch](linux/sync_wakeup.patch)  <br> [buggy.jsonl](https://github.com/SchedStep/results/blob/main/sync_wakeup_buggy.jsonl), [fixed.jsonl](https://github.com/SchedStep/results/blob/main/sync_wakeup_fixed.jsonl) | ![](https://github.com/SchedStep/results/blob/main/sync_wakeup.png) |
 | **[vruntime_overflow.c](kmod/drivers/vruntime_overflow.c)** <br> **Fix**: [linux@bbce3de](https://github.com/torvalds/linux/commit/bbce3de72be56e4b5f68924b7da9630cc89aa1a8) <br> [buggy.jsonl](https://github.com/SchedStep/results/blob/main/vruntime_overflow_buggy.jsonl), [fixed.jsonl](https://github.com/SchedStep/results/blob/main/vruntime_overflow_fixed.jsonl) | ![](https://github.com/SchedStep/results/blob/main/vruntime_overflow.png) |
