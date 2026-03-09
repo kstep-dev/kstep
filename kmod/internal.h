@@ -38,12 +38,12 @@ void kstep_output_init(void);
 // trace.c
 void kstep_trace_sched_balance_begin(void);
 void kstep_trace_sched_balance_selected(void);
+void kstep_trace_sched_group_alloc(void);
 
 // reset.c
 void kstep_reset_runqueues(void);
 void kstep_reset_cpumask(void);
 void kstep_reset_tasks(void);
-void kstep_patch_min_vruntime(void);
 
 // isolation.c
 void kstep_disable_workqueue(void);

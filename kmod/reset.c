@@ -1,5 +1,3 @@
-#include <linux/ftrace.h>
-
 #include "internal.h"
 
 static void kstep_reset_task(struct task_struct *p) {
@@ -98,35 +96,4 @@ void kstep_reset_cpumask(void) {
   }
   TRACE_INFO("Reset cpumask");
 #endif
-}
-
-// Set min vruntime for newly created cfs_rq
-static void set_min_vruntime(unsigned long ip, unsigned long parent_ip,
-                             struct ftrace_ops *op, struct ftrace_regs *fregs) {
-  struct cfs_rq *cfs_rq = (void *)regs_get_kernel_argument((void *)fregs, 1);
-// https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
-  cfs_rq->zero_vruntime = INIT_TIME_NS;
-#else
-  cfs_rq->min_vruntime = INIT_TIME_NS;
-#endif
-  TRACE_INFO("Set min vruntime to %llu ns", INIT_TIME_NS);
-}
-
-static struct ftrace_ops set_min_vruntime_op = {
-    .func = set_min_vruntime,
-    .flags = FTRACE_OPS_FL_SAVE_REGS_IF_SUPPORTED | FTRACE_OPS_FL_RECURSION,
-};
-
-void kstep_patch_min_vruntime(void) {
-  // We trace `init_tg_cfs_entry` as it is called immediately after
-  // `init_cfs_rq` to initialize the cfs_rq for the new task group.
-  char *name = "init_tg_cfs_entry";
-  if (ftrace_set_filter(&set_min_vruntime_op, name, strlen(name), 1))
-    panic("Failed to set filter for %s", name);
-
-  if (register_ftrace_function(&set_min_vruntime_op))
-    panic("Failed to register ftrace function for %s", name);
-
-  TRACE_INFO("Patched %s to set min vruntime", name);
 }
