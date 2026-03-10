@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 67/400 reproduced**
+**Total: 68/400 reproduced**
 
 ---
 
@@ -100,7 +100,7 @@
 - [ ] `111688ca1c4a` Fix negative imbalance in imbalance calculation — [`111688ca_fix_negative_imbalance_in_imbalance.md`](bugs/111688ca_fix_negative_imbalance_in_imbalance.md)
 - [x] `15257cc2f905` sched/fair: Revert force wakeup preemption — [`15257cc2_revert_force_wakeup_preemption.md`](bugs/15257cc2_revert_force_wakeup_preemption.md) <!-- driver:revert_force_wakeup_preemption attempts:1 -->
 - [ ] `289de3598481` sched/fair: Fix statistics for find_idlest_group() — [`289de359_statistics_for_find_idlest_group.md`](bugs/289de359_statistics_for_find_idlest_group.md)
-- [ ] `2ae891b82695` sched: Reduce the default slice to avoid tasks getting an extra tick — [`2ae891b8_the_default_slice_to_avoid.md`](bugs/2ae891b8_the_default_slice_to_avoid.md)
+- [x] `2ae891b82695` sched: Reduce the default slice to avoid tasks getting an extra tick — [`2ae891b8_the_default_slice_to_avoid.md`](bugs/2ae891b8_the_default_slice_to_avoid.md) <!-- driver:extra_tick attempts:1 -->
 - [ ] `39a2a6eb5c9b` sched/fair: Fix shift-out-of-bounds in load_balance() — [`39a2a6eb_shift_out_of_bounds_in.md`](bugs/39a2a6eb_shift_out_of_bounds_in.md)
 - [ ] `3a0baa8e6c57` sched/fair: Fix entity's lag with run to parity — [`3a0baa8e_entity_s_lag_with_run.md`](bugs/3a0baa8e_entity_s_lag_with_run.md)
 - [ ] `5ab297bab984` sched/fair: Fix reordering of enqueue/dequeue_task_fair() — [`5ab297ba_reordering_enqueuedequeue_task_fair.md`](bugs/5ab297ba_reordering_enqueuedequeue_task_fair.md)

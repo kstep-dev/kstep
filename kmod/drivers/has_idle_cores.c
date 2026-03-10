@@ -2,15 +2,10 @@
 // (commit 02dbb7246c5b)
 //
 // Bug: set_idle_cores(this, false) should be set_idle_cores(target, false).
-// When this != target (cross-LLC wakeup), the wrong LLC's has_idle_cores
-// flag is cleared.
-//
 // Topology (7 CPUs): SMT {1-2},{3-4},{5-6}; MC {1-4},{5-6}
-// LLC A (sd_llc for CPU 1) = MC domain {1-4}
-// LLC B (sd_llc for CPU 5) = SMT domain {5-6} (MC degenerated)
-// Waker kthread on CPU 1 (LLC A) wakes blocked kthread (prev_cpu=5, LLC B)
-// All CPUs in LLC B busy -> select_idle_cpu finds no idle core
-// Bug: clears has_idle_cores for LLC A (this=1). Fix: clears LLC B (target=5)
+// LLC A = MC {1-4}, LLC B = SMT {5-6} (MC degenerated)
+// Waker on CPU 1 (LLC A) wakes blocked kthread (prev_cpu=5, LLC B)
+// Bug: clears LLC A's has_idle_cores. Fix: clears LLC B's.
 
 #include "driver.h"
 #include "internal.h"
@@ -39,18 +34,13 @@ const char *mc[] = {"0", "1-4", "1-4", "1-4", "1-4", "5-6", "5-6"};
 kstep_topo_set_mc(mc, ARRAY_SIZE(mc));
 
 kstep_topo_apply();
-
-// QEMU vCPUs have no real SMT; enable the static key manually
 static_branch_enable(KSYM_sched_smt_present);
-
-busy5 = kstep_kthread_create("busy5");
-kstep_kthread_bind(busy5, cpumask_of(5));
-kstep_kthread_start(busy5);
 
 busy6 = kstep_kthread_create("busy6");
 kstep_kthread_bind(busy6, cpumask_of(6));
 kstep_kthread_start(busy6);
 
+// Wakee starts on CPU 5 alone (will expand to {5,6} later)
 wakee = kstep_kthread_create("wakee");
 kstep_kthread_bind(wakee, cpumask_of(5));
 kstep_kthread_start(wakee);
@@ -64,45 +54,53 @@ static void run(void)
 {
 kstep_tick_repeat(5);
 
+// Block wakee -> wait_event -> sleep (prev_cpu = 5)
 kstep_kthread_block(wakee);
 kstep_tick_repeat(5);
 
-TRACE_INFO("sched_smt_active=%d", sched_smt_active());
+// Expand wakee's affinity to {5,6} (LLC B) so nr_cpus_allowed > 1
+// This ensures select_task_rq_fair is actually called during wakeup
+struct cpumask llcb_mask;
+cpumask_clear(&llcb_mask);
+cpumask_set_cpu(5, &llcb_mask);
+cpumask_set_cpu(6, &llcb_mask);
+kstep_kthread_bind(wakee, &llcb_mask);
+
+// Start busy5 on CPU 5 (idle loop picks it up)
+busy5 = kstep_kthread_create("busy5");
+kstep_kthread_bind(busy5, cpumask_of(5));
+kstep_kthread_start(busy5);
+kstep_tick_repeat(2);
+
+TRACE_INFO("rq5_nr=%d rq6_nr=%d wakee_cpus=%d",
+   cpu_rq(5)->nr_running, cpu_rq(6)->nr_running,
+   wakee->nr_cpus_allowed);
 
 struct sched_domain_shared *sds_b = rcu_dereference(
 *per_cpu_ptr(KSYM_sd_llc_shared, 5));
 struct sched_domain_shared *sds_a = rcu_dereference(
 *per_cpu_ptr(KSYM_sd_llc_shared, 1));
 
-if (!sds_b || !sds_a) {
-kstep_fail("sd_llc_shared NULL: a=%px b=%px", sds_a, sds_b);
+if (!sds_b || !sds_a || sds_b == sds_a) {
+kstep_fail("Bad topology: a=%px b=%px", sds_a, sds_b);
 return;
 }
-
-if (sds_b == sds_a) {
-kstep_fail("LLCs share same sds (topology wrong)");
-return;
-}
-
-TRACE_INFO("wakee task_cpu=%d, waker task_cpu=%d",
-   task_cpu(wakee), task_cpu(waker));
-TRACE_INFO("rq[5].nr_running=%d rq[6].nr_running=%d",
-   cpu_rq(5)->nr_running, cpu_rq(6)->nr_running);
 
 WRITE_ONCE(sds_b->has_idle_cores, 1);
 WRITE_ONCE(sds_a->has_idle_cores, 1);
 
-TRACE_INFO("Before wakeup: LLC_B=%d LLC_A=%d",
+TRACE_INFO("Before: LLC_B=%d LLC_A=%d smt=%d",
    READ_ONCE(sds_b->has_idle_cores),
-   READ_ONCE(sds_a->has_idle_cores));
+   READ_ONCE(sds_a->has_idle_cores),
+   sched_smt_active());
 
 kstep_kthread_syncwake(waker, wakee);
-kstep_tick_repeat(3);
+mdelay(500);
 
 int has_idle_b = READ_ONCE(sds_b->has_idle_cores);
 int has_idle_a = READ_ONCE(sds_a->has_idle_cores);
 
-TRACE_INFO("After wakeup: LLC_B=%d LLC_A=%d", has_idle_b, has_idle_a);
+TRACE_INFO("After: LLC_B=%d LLC_A=%d", has_idle_b, has_idle_a);
 
 if (has_idle_b == 1 && has_idle_a == 0) {
 kstep_fail("Wrong LLC cleared: LLC_B=%d LLC_A=%d",

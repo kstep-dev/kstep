@@ -762,6 +762,14 @@ bugs = [
             Linux(name="fixed", version="fe7a11c78d2a"),
         ],
     ),
+    Bug(
+        driver=Driver(name="extra_tick", num_cpus=9),
+        linux=[
+            Linux(name="buggy", version="2ae891b826958b60919ea21c727f77bcd6ffcc2c~1"),
+            Linux(name="fixed", version="2ae891b826958b60919ea21c727f77bcd6ffcc2c"),
+        ],
+        plot_format="curr_task",
+    ),
 ]
 
 

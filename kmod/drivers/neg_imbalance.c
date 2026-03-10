@@ -1,84 +1,85 @@
 // https://github.com/torvalds/linux/commit/111688ca1c4a
 //
 // Bug: In calculate_imbalance(), when local group is group_fully_busy and
-// the local group's avg_load exceeds busiest group's avg_load, the formula
-// (sds->avg_load - local->avg_load) * local->group_capacity wraps to a
-// huge unsigned value, causing incorrect migration decisions.
+// local->avg_load >= busiest->avg_load, the imbalance formula
+//   min((busiest->avg_load - sds->avg_load) * busiest->group_capacity,
+//       (sds->avg_load - local->avg_load) * local->group_capacity)
+// underflows (unsigned subtraction), producing a huge imbalance value.
+// This causes the scheduler to incorrectly pull tasks from a less-loaded
+// busiest group to the more-loaded local group.
 //
-// Fix: Add a check: if local->avg_load >= busiest->avg_load, set
-// imbalance = 0 and return early.
+// Fix: Before the formula, check if local->avg_load >= busiest->avg_load
+// and return imbalance=0 if so.
 //
-// Reproduce: Create two clusters with asymmetric task weight. Local cluster
-// (CPU 1) has 1 heavy task (nice -20, high weight → high avg_load) and is
-// group_fully_busy. Busiest cluster (CPUs 2-3) has 3 light tasks (nice 0)
-// and is group_overloaded. When the wrapped imbalance is computed, the
-// scheduler erroneously pulls tasks from busiest to the more-loaded local.
+// Reproduce: Use asymmetric CPU capacities to create the condition.
+// CPU 1 (low capacity=256) with 1 task → group_fully_busy, avg_load ~4096
+// CPU 2 (full capacity=1024) with 3 tasks → group_overloaded, avg_load ~3072
+// Since local->avg_load > busiest->avg_load, the bug triggers.
+// One migratable task on CPU 2 gets wrongly pulled to CPU 1 on buggy kernel.
 
 #include "driver.h"
 #include "internal.h"
-#include <linux/version.h>
 
 #if LINUX_VERSION_CODE == KERNEL_VERSION(5, 6, 0)
 
-static struct task_struct *heavy_task;
-static struct task_struct *light_tasks[3];
+static struct task_struct *task_local;
+static struct task_struct *tasks_busiest[2];
+static struct task_struct *task_migrator;
 
 static void setup(void) {
-  // Two clusters: CPU 1 (local), CPUs 2-3 (busiest)
+  // CPU 1: low capacity → high avg_load per task
+  // CPU 2: full capacity → lower avg_load per task
+  kstep_cpu_set_capacity(1, SCHED_CAPACITY_SCALE / 4);
+  kstep_cpu_set_capacity(2, SCHED_CAPACITY_SCALE);
+
+  // Separate clusters: {0}, {1}, {2}
   kstep_topo_init();
-  const char *cls[] = {"0", "1", "2-3", "2-3"};
+  const char *cls[] = {"0", "1", "2"};
   kstep_topo_set_cls(cls, ARRAY_SIZE(cls));
   kstep_topo_apply();
 
-  heavy_task = kstep_task_create();
-  for (int i = 0; i < 3; i++)
-    light_tasks[i] = kstep_task_create();
+  task_local = kstep_task_create();
+  for (int i = 0; i < 2; i++)
+    tasks_busiest[i] = kstep_task_create();
+  task_migrator = kstep_task_create();
 }
 
 static void run(void) {
-  // Prevent jiffies drift on 5.6: set last_jiffies_update far in the future
-  // so tick_do_update_jiffies64() always returns early.
-  KSYM_IMPORT_TYPED(ktime_t, last_jiffies_update);
-  *KSYM_last_jiffies_update = KTIME_MAX;
+  // CPU 1: 1 task → group_fully_busy
+  // avg_load = group_load * 1024 / 256 ≈ 4096
+  kstep_task_pin(task_local, 1, 1);
 
-  // Local cluster (CPU 1): 1 heavy task → group_fully_busy, high avg_load
-  kstep_task_pin(heavy_task, 1, 1);
-  kstep_task_set_prio(heavy_task, -20);
+  // CPU 2: 3 tasks → group_overloaded (nr_running=3 > group_weight=1)
+  // avg_load = 3 * group_load * 1024 / 1024 ≈ 3072
+  for (int i = 0; i < 2; i++)
+    kstep_task_pin(tasks_busiest[i], 2, 2);
+  kstep_task_pin(task_migrator, 2, 2);
 
-  // Busiest cluster (CPUs 2-3): 3 light tasks → group_overloaded
-  kstep_task_pin(light_tasks[0], 2, 2);
-  kstep_task_pin(light_tasks[1], 2, 2);
-  kstep_task_pin(light_tasks[2], 3, 3);
-
-  // Let loads settle so PELT catches up to the actual weights
-  kstep_tick_repeat(200);
-
-  TRACE_INFO("Before unpin: light task CPUs: %d %d %d",
-             task_cpu(light_tasks[0]), task_cpu(light_tasks[1]),
-             task_cpu(light_tasks[2]));
-
-  // Unpin light tasks to allow cross-cluster migration
-  for (int i = 0; i < 3; i++)
-    kstep_task_pin(light_tasks[i], 1, 3);
-
-  // Tick more to trigger load balancing from CPU 1's perspective
+  // Let PELT load averages build up
   kstep_tick_repeat(300);
 
-  int wrong_migrations = 0;
-  for (int i = 0; i < 3; i++) {
-    int cpu = task_cpu(light_tasks[i]);
-    TRACE_INFO("light_tasks[%d] on CPU %d", i, cpu);
-    if (cpu == 1)
-      wrong_migrations++;
-  }
+  TRACE_INFO("Before: CPU1 nr=%d, CPU2 nr=%d",
+             cpu_rq(1)->nr_running, cpu_rq(2)->nr_running);
 
-  if (wrong_migrations > 0) {
-    kstep_fail("negative imbalance: %d task(s) pulled from "
-               "less-loaded busiest to more-loaded local group",
-               wrong_migrations);
-  } else {
-    kstep_pass("no wrong migration: imbalance calculation correct");
-  }
+  // Allow task_migrator to run on both CPUs
+  kstep_task_pin(task_migrator, 1, 2);
+
+  // Trigger load balancing
+  kstep_tick_repeat(300);
+
+  int cpu1_nr = cpu_rq(1)->nr_running;
+  int cpu2_nr = cpu_rq(2)->nr_running;
+
+  TRACE_INFO("After: CPU1 nr=%d, CPU2 nr=%d, migrator_cpu=%d",
+             cpu1_nr, cpu2_nr, task_cpu(task_migrator));
+
+  if (cpu1_nr > 1)
+    kstep_fail("negative imbalance: task pulled to more-loaded local "
+               "(CPU1 nr=%d)",
+               cpu1_nr);
+  else
+    kstep_pass("no negative imbalance: CPU1 nr=%d, CPU2 nr=%d",
+               cpu1_nr, cpu2_nr);
 }
 
 #else
@@ -90,6 +91,7 @@ KSTEP_DRIVER_DEFINE{
     .name = "neg_imbalance",
     .setup = setup,
     .run = run,
+    .on_tick_begin = kstep_output_nr_running,
+    .on_sched_balance_selected = kstep_output_balance,
     .step_interval_us = 100,
-    .tick_interval_ns = 1000000,
 };
