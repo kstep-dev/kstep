@@ -1,56 +1,33 @@
 // https://github.com/torvalds/linux/commit/aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042
 
-#include <linux/kthread.h>
-#include <linux/wait.h>
-
 #include "driver.h"
 
 static struct task_struct *waker_task;
 static struct task_struct *wakee_task;
 static struct task_struct *other_task;
 
-static atomic_t wakeup_ready = ATOMIC_INIT(0);
-DECLARE_WAIT_QUEUE_HEAD(wq);
-
-static int wakee_main(void *data) {
-  // Sleep on a wait queue until the waker triggers a synchronous wakeup.
-  wait_event(wq, atomic_read(&wakeup_ready) != 0);
-  while (1)
-    __asm__("" : : : "memory");
-  return 0;
-}
-
-static int waker_main(void *data) {
-  while (atomic_read(&wakeup_ready) == 0)
-    yield();
-  __wake_up_sync(&wq, TASK_NORMAL);
-  return 0;
-}
-
 static void setup(void) {
   other_task = kstep_task_create();
 
-  // Create a waker on cpu 1
-  waker_task = kthread_create(waker_main, NULL, "waker");
-  kthread_bind(waker_task, 1);
-  wake_up_process(waker_task);
+  // Waker: waker pinned to CPU 1; will call __wake_up_sync when triggered.
+  waker_task = kstep_kthread_create("waker");
+  kstep_kthread_bind(waker_task, cpumask_of(1));
+  kstep_kthread_start(waker_task);
+  kstep_kthread_yield(waker_task);
 
-  // Create a wakee, blocked on the wait queue until the waker wakes it up.
-  wakee_task = kthread_create(wakee_main, NULL, "wakee");
+  // Wakee: sleeper, first restricted to CPU 2 so the scheduler sets
+  // wake_cpu=2 on the initial placement.  This makes prev_cpu differ from
+  // this_cpu inside __wake_up_sync, which is needed to trigger the bug.
+  wakee_task = kstep_kthread_create("wakee");
+  kstep_kthread_bind(wakee_task, cpumask_of(2));
+  kstep_kthread_start(wakee_task);
+  kstep_kthread_block(wakee_task);
 
-  // Force the wakee to run on cpu 2 at first, so that its wake_cpu is set to 2.
-  // This helps the bug to trigger: at the later sync_wakeup, 
-  // prev_cpu differs this_cpu in wake_up_sync.
+  // Expand allowed set to CPUs 1,2 after the initial placement on CPU 2.
   struct cpumask mask;
-  cpumask_clear(&mask);
-  cpumask_set_cpu(2, &mask);
-  set_cpus_allowed_ptr(wakee_task, &mask);
-  wake_up_process(wakee_task);
-
-  // Reset the wakee to be able to run on cpu 1, 2.
   cpumask_copy(&mask, cpu_active_mask);
   cpumask_clear_cpu(0, &mask);
-  set_cpus_allowed_ptr(wakee_task, &mask);
+  kstep_kthread_bind(wakee_task, &mask);
 }
 
 static void *is_ineligible(void) {
@@ -64,11 +41,11 @@ static void run(void) {
 
   kstep_tick_repeat(20);
 
-  // tick until there is a ineligible task
+  // Tick until there is an ineligible task on CPU 1.
   kstep_tick_until(is_ineligible);
 
-  // wake up the waker to call sync wakeup
-  atomic_set(&wakeup_ready, 1);
+  // Trigger waker (on CPU 1) to call __wake_up_sync targeting wakee.
+  kstep_kthread_syncwake(waker_task, wakee_task);
 
   // Pause the ineligible task
   kstep_task_pause(other_task);
