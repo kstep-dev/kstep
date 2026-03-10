@@ -228,6 +228,13 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="reject_affinity", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="234a503e670b~1"),
+            Linux(name="fixed", version="234a503e670b"),
+        ],
+    ),
 ]
 
 

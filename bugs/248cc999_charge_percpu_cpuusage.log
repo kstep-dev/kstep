@@ -1,0 +1,222 @@
+● Read AGENTS.md
+  └ 43 lines read
+
+● Read bugs/248cc999_charge_percpu_cpuusage.md
+  └ 36 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 248cc9993d1c 2>/dev/null | head -200
+  └ 91 lines...
+
+● List directory kmod/drivers
+  └ 24 files found
+
+● List directory kmod
+  └ 25 files found
+
+● Read driver header
+  $ cd /users/szhong/kSTEP && head -100 kmod/driver.h
+  └ 101 lines...
+
+● Read rest of driver header
+  $ cd /users/szhong/kSTEP && cat kmod/driver.h | tail -50
+  └ 51 lines...
+
+● Read example driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/extra_balance.c
+  └ 43 lines...
+
+● Read another example driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/long_balance.c
+  └ 59 lines...
+
+● Read kernel.c for cgroup functions
+  $ cd /users/szhong/kSTEP && cat kmod/kernel.c | head -100
+  └ 101 lines...
+
+● Read internal header
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+
+● Find cgroup functions in kernel.c
+  $ cd /users/szhong/kSTEP && grep -n "cgroup" kmod/kernel.c
+  └ 21 lines...
+
+● Get kernel version from Makefile
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:Makefile | head -10
+  └ 11 lines...
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 248cc9993d1c~1 -1
+  └ 2 lines...
+
+● Get kernel version tag
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline v5.17-rc1..248cc9993d1c
+  --ancestry-path | wc -l; git -C linux/current describe --tags 248cc9993d1c~1 2>/dev/null || git -C
+   linux/current log --format="%H %s" 248cc9993d1c~3..248cc9993d1c
+  └ 3 lines...
+
+● Check run.py setup
+  $ cd /users/szhong/kSTEP && head -80 run.py
+  └ 81 lines...
+
+● Check cpuacct in sched.h
+  $ cd /users/szhong/kSTEP && grep -n
+  "cpuacct_cgrp_id\|cpuacct\|CGROUP_CPUACCT\|CONFIG_CGROUP_CPUACCT"
+  linux/current/kernel/sched/sched.h 2>/dev/null | head -20
+  └ 1 line...
+
+● Find cpuacct_cgrp_id definition
+  $ cd /users/szhong/kSTEP && grep -rn "cpuacct_cgrp_id" linux/current/include/ 2>/dev/null | head
+  -10
+  └ 1 line...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -60
+  └ 61 lines...
+
+● Read full cpuacct.c
+  $ cd /users/szhong/kSTEP && cat linux/current/kernel/sched/cpuacct.c
+  └ 377 lines...
+
+● Find cpuacct cgroup subsys ID
+  $ cd /users/szhong/kSTEP && grep -rn "cpuacct_cgrp_id" linux/current/include/linux/ 2>/dev/null |
+  head -10; echo "---"; grep -rn "cpuacct" linux/current/include/linux/cgroup_subsys.h 2>/dev/null;
+  echo "---"; grep -rn "cpuacct" linux/current/include/linux/cgroup-defs.h 2>/dev/null | head -10
+  └ 4 lines...
+
+● Read another driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/util_avg.c
+  └ 53 lines...
+
+● Check run.py CLI args
+  $ cd /users/szhong/kSTEP && grep -n "num_cpus\|add_argument" run.py | head -30
+  └ 11 lines...
+
+● Check buggy cpuacct_charge code
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:kernel/sched/cpuacct.c | tail
+   -40
+  └ 41 lines...
+
+● Check buggy cpuacct struct
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:kernel/sched/cpuacct.c | head
+   -30
+  └ 31 lines...
+
+● Check update_curr calls cpuacct
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:kernel/sched/fair.c | grep -n
+   "cgroup_account_cputime\|update_curr" | head -20
+  └ 21 lines...
+
+● Check cgroup_account_cputime in update_curr
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:kernel/sched/fair.c | grep
+  -A5 -B5 "cgroup_account_cputime" | head -30
+  └ 11 lines...
+
+● Check task_hot and update_curr around line 7134
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:kernel/sched/fair.c | sed -n
+  '7100,7200p'
+  └ 102 lines...
+
+● Check load_balance calls update_curr
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:kernel/sched/fair.c | grep -n
+   "update_curr\|detach_task\|can_migrate_task\|load_balance" | grep -i
+  "update_curr\|^.*load_balance\|detach" | head -30
+  └ 31 lines...
+
+● Check detach_tasks and update_curr
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:kernel/sched/fair.c | sed -n
+  '7200,7300p'
+  └ 102 lines...
+
+● Check detach paths
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:kernel/sched/fair.c | grep -n
+   "detach_task\|update_curr" | grep -i "detach\|7420\|7217\|7268" | head -20
+  └ 21 lines...
+
+● Check update_curr around line 7420
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:kernel/sched/fair.c | sed -n
+  '7400,7440p'
+  └ 42 lines...
+
+● Check detach_task code
+  $ cd /users/szhong/kSTEP && git -C linux/current show 248cc9993d1c~1:kernel/sched/fair.c | sed -n
+  '7847,7910p'
+  └ 65 lines...
+
+Now I have a clear understanding of the bug. Let me write the driver.
+
+● Create kmod/drivers/charge_percpu_cpuusage.c (+95)
+
+Now let me checkout the buggy kernel and build:
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 248cc9993d1c~1 charge_percpu_cpuusage_buggy 2>&1 |
+   tail -5
+  └ 6 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=charge_percpu_cpuusage_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=charge_percpu_cpuusage_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Check cpuacct config
+  $ cd /users/szhong/kSTEP && grep "CPUACCT" linux/charge_percpu_cpuusage_buggy/.config 2>/dev/null;
+   echo "---"; grep "cpuacct" linux/charge_percpu_cpuusage_buggy/include/linux/cgroup_subsys.h
+  2>/dev/null
+  └ 4 lines...
+
+● Read full Makefile
+  $ cd /users/szhong/kSTEP && cat Makefile
+  └ 105 lines...
+
+● Check Makefile for config options
+  $ cd /users/szhong/kSTEP && grep -n "CPUACCT\|config_extra\|config_append\|\.config" Makefile |
+  head -20
+  └ 3 lines...
+
+● Check kstep config for cgroup options
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | grep -i "CPUACCT\|CGROUP"
+  └ 4 lines...
+
+I need to enable `CONFIG_CGROUP_CPUACCT`. Let me add it to the config:
+
+● Read linux/config.kstep
+  └ 95 lines read
+
+● Edit linux/config.kstep (+1)
+
+Now rebuild with the updated config:
+
+● Rebuild buggy kernel with cpuacct
+  $ cd /users/szhong/kSTEP && rm -f linux/charge_percpu_cpuusage_buggy/.config && make linux
+  LINUX_NAME=charge_percpu_cpuusage_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=charge_percpu_cpuusage_buggy 2>&1 | tail -15
+  └ 16 lines...
+
+Build succeeded. Let me run the driver:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py charge_percpu_cpuusage --linux_name
+  charge_percpu_cpuusage_buggy --num_cpus 3 2>&1 | tail -5
+  └ 6 lines...
+
+● Check buggy kernel log
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | head -50
+  └ 2 lines...
+
+● Check log file
+  $ cd /users/szhong/kSTEP && cat data/latest.log | head -80
+  └ 81 lines...
+
+● Check for driver output
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  "TRACE_INFO|kstep|status|cpuacct|Before|After|Balance|fail|pass" | head -20
+  └ 6 lines...
+

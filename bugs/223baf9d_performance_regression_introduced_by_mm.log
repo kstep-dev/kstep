@@ -1,0 +1,197 @@
+● Read AGENTS.md
+  └ 43 lines read
+
+● Read bugs/223baf9d_performance_regression_introduced_by_mm.md
+  └ 39 lines read
+
+● Read the commit patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 223baf9d17f2 2>/dev/null | head -300
+  └ 301 lines...
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Read more of the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 223baf9d17f2 2>/dev/null | tail -n +300
+   | head -500
+  └ 501 lines...
+
+● Read example driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/default.c
+  └ 58 lines...
+
+● Read core.c changes
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 223baf9d17f2 -- kernel/sched/core.c
+  2>/dev/null | head -500
+  └ 501 lines...
+
+● Read sched.h changes
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 223baf9d17f2 -- kernel/sched/sched.h
+  2>/dev/null | head -500
+  └ 351 lines...
+
+Let me look at more examples and understand the task creation API better.
+
+● Read reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py
+  └ 295 lines...
+
+● Read task.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/task.c
+  └ 113 lines...
+
+● Read sync_wakeup driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/sync_wakeup.c
+  └ 64 lines...
+
+● Read another driver for reference
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/h_nr_runnable.c
+  └ 77 lines...
+
+● Check kernel versions
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 223baf9d17f2 -1 && git -C
+  linux/current log --oneline 223baf9d17f2~1 -1
+  └ 3 lines...
+
+● Get version tag
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags 223baf9d17f2~1 2>/dev/null || git
+   -C linux/current log --format="%H %s" 223baf9d17f2~1 -1
+  └ 2 lines...
+
+● List user directory
+  $ cd /users/szhong/kSTEP && ls user/
+  └ 2 lines...
+
+● Read internal.h for rq access
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -80
+  └ 80 lines...
+
+● Read user task implementation
+  $ cd /users/szhong/kSTEP && cat user/task.c
+  └ 67 lines...
+
+● Read user.h
+  $ cd /users/szhong/kSTEP && cat user/user.h
+  └ 18 lines...
+
+● Read mm_cid migration functions
+  $ cd /users/szhong/kSTEP && git -C linux/current show 223baf9d17f2 -- kernel/sched/core.c
+  2>/dev/null | grep -A 150
+  "sched_mm_cid_migrate_from\|sched_mm_cid_migrate_to\|task_tick_mm_cid\|init_sched_mm_cid" | head
+  -250
+  └ 251 lines...
+
+● Find key functions in the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show 223baf9d17f2 -- kernel/sched/core.c
+  2>/dev/null | grep -n "^+" | grep -i
+  "task_tick_mm_cid\|sched_mm_cid_remote_clear\|sched_mm_cid_migrate_to\b" | head -20
+  └ 15 lines...
+
+● Read migrate_to function
+  $ cd /users/szhong/kSTEP && git -C linux/current show 223baf9d17f2 -- kernel/sched/core.c
+  2>/dev/null | grep -A 80 "^+void sched_mm_cid_migrate_to" | head -80
+  └ 81 lines...
+
+Let me check the kernel config and look at how mm_cidmask is accessed.
+
+● Check build directory
+  $ cd /users/szhong/kSTEP && ls build/ 2>/dev/null | head -10
+  └ 11 lines...
+
+● Check mm_cidmask availability
+  $ cd /users/szhong/kSTEP && grep -r "CONFIG_SCHED_MM_CID\|mm_cidmask"
+  linux/current/include/linux/mm_types.h 2>/dev/null | head -20
+  └ 1 line...
+
+● Check SCHED_MM_CID Kconfig
+  $ cd /users/szhong/kSTEP && grep "SCHED_MM_CID" linux/current/kernel/sched/Makefile 2>/dev/null &&
+   grep "SCHED_MM_CID" linux/current/init/Kconfig linux/current/kernel/Kconfig* 2>/dev/null | head
+  -10
+  └ 1 line...
+
+● Find SCHED_MM_CID config
+  $ cd /users/szhong/kSTEP && grep -r "SCHED_MM_CID" linux/current/init/ linux/current/kernel/sched/
+   2>/dev/null | grep -i "kconfig\|config\|select\|depends" | head -10
+  └ 1 line...
+
+● Find SCHED_MM_CID kconfig
+  $ cd /users/szhong/kSTEP && grep -rn "SCHED_MM_CID" linux/current/init/Kconfig 2>/dev/null; grep
+  -rn "SCHED_MM_CID" linux/current/kernel/sched/Kconfig 2>/dev/null; find linux/current -name
+  "Kconfig*" -exec grep -l "SCHED_MM_CID" {} \; 2>/dev/null
+  └ 1 line...
+
+● Find SCHED_MM_CID config definition
+  $ cd /users/szhong/kSTEP && grep -rn "SCHED_MM_CID" linux/current/ --include="Kconfig*"
+  2>/dev/null; grep -rn "config SCHED_MM_CID" linux/current/ 2>/dev/null | head -5
+  └ 1 line...
+
+● Find SCHED_MM_CID references
+  $ cd /users/szhong/kSTEP && grep -rn "SCHED_MM_CID" linux/current/include/ 2>/dev/null | head -20
+  └ 1 line...
+
+● Check current linux checkout
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -1 && git -C linux/current describe
+   --tags 2>/dev/null
+  └ 3 lines...
+
+Now let me checkout the buggy kernel and start development.
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 223baf9d17f2~1 mm_cid_perf_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+Now let me check the kernel version and CONFIG_SCHED_MM_CID:
+
+● Check SCHED_MM_CID and version
+  $ cd /users/szhong/kSTEP && grep "SCHED_MM_CID" linux/current/include/linux/mm_types.h | head -5
+  && grep "VERSION" linux/current/Makefile | head -5
+  └ 10 lines...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && head -5 linux/current/Makefile
+  └ 6 lines...
+
+● Find SCHED_MM_CID Kconfig
+  $ cd /users/szhong/kSTEP && find linux/current -name "Kconfig*" -exec grep -l "SCHED_MM_CID" {} \;
+   2>/dev/null
+  └ 1 line...
+
+● Find config definition
+  $ cd /users/szhong/kSTEP && grep -rn "SCHED_MM_CID" linux/current/init/ linux/current/kernel/
+  --include="Kconfig*" 2>/dev/null; grep -rn "def_bool.*SCHED_MM_CID\|bool.*SCHED_MM_CID\|config
+  SCHED_MM_CID" linux/current/ --include="Kconfig*" 2>/dev/null | head -5
+  └ 3 lines...
+
+● Read SCHED_MM_CID config
+  $ cd /users/szhong/kSTEP && sed -n '1040,1060p' linux/current/init/Kconfig
+  └ 22 lines...
+
+● Find kernel config
+  $ cd /users/szhong/kSTEP && ls scripts/ | head -20 && cat scripts/kernel_config.py 2>/dev/null |
+  head -40 || ls scripts/*.config 2>/dev/null || find . -name ".config" -path "*/build/*"
+  2>/dev/null | head -5
+  └ 20 lines...
+
+● Check Makefile for kernel config
+  $ cd /users/szhong/kSTEP && grep -r "RSEQ\|SCHED_MM_CID" Makefile kmod/Makefile 2>/dev/null | head
+   -10; cat Makefile | grep -A5 "defconfig\|menuconfig\|config" | head -30
+  └ 18 lines...
+
+● Check kernel config for RSEQ/SMP
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | grep -i "RSEQ\|MM_CID\|SMP" | head -10
+  └ 3 lines...
+
+● Check RSEQ config
+  $ cd /users/szhong/kSTEP && grep "RSEQ" linux/config.kstep*
+  └ 1 line...
+
+● Fetch LKML discussion
+  $ curl -sL 'https://lore.kernel.org/lkml/20230327080502.GA570847@ziqianlu-desk2/t.mbox.gz' |
+  gunzip 2>/dev/null | head -200
+  └ 201 lines...
+
+Now I have a clear understanding. The bug is massive spinlock contention on `mm->cid_lock` during context switches. Let me create the driver to demonstrate this through observable cidmask weight differences.
