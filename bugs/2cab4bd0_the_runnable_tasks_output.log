@@ -1,0 +1,61 @@
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read bugs/2cab4bd0_the_runnable_tasks_output.md
+  └ 25 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 2cab4bd024d2 2>/dev/null | head -200
+  └ 164 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -40
+  └ 41 lines...
+
+● Check driver structure
+  $ cd /users/szhong/kSTEP && head -5 kmod/drivers/*.c | head -60
+  └ 61 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Check reproduce.py end
+  $ cd /users/szhong/kSTEP && cat reproduce.py | tail -80
+  └ 81 lines...
+
+● Check a simple driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/freeze.c
+  └ 39 lines...
+
+Let me look at how the output functions work and check a simple existing driver:
+
+● Check even_idle_cpu driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/even_idle_cpu.c
+  └ 43 lines...
+
+● Check output.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/output.c | head -80
+  └ 81 lines...
+
+● Find sched_debug usage
+  $ cd /users/szhong/kSTEP && grep -n "kstep_print_sched_debug" kmod/*.c kmod/drivers/*.c
+  └ 2 lines...
+
+● Read kstep_print_sched_debug
+  $ cd /users/szhong/kSTEP && sed -n '90,140p' kmod/output.c
+  └ 51 lines...
+
+● Check run.py for Driver format
+  $ cd /users/szhong/kSTEP && cat run.py | head -80
+  └ 81 lines...
+
+● Read full h_nr_runnable driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/h_nr_runnable.c
+  └ 77 lines...
+
+● Check h_nr_runnable driver detection
+  $ cd /users/szhong/kSTEP && grep -n "kstep_json\|kstep_pass\|kstep_fail"
+  kmod/drivers/h_nr_runnable.c
+  └ 4 lines...
+

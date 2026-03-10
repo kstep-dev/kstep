@@ -1,0 +1,56 @@
+● Read bugs/28156108_the_check_of_nr_running.md
+  └ 38 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 28156108fecb 2>/dev/null | head -200
+  └ 103 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -40
+  └ 41 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● See more reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -120
+  └ 121 lines...
+
+● Check sync_wakeup driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/sync_wakeup.c
+  └ 64 lines...
+
+● Check a similar driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/rq_qos_wakeup.c
+  └ 90 lines...
+
+● Check internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -80
+  └ 80 lines...
+
+● Check task.c implementation
+  $ cd /users/szhong/kSTEP && ls kmod/*.c | head -20 && cat kmod/task.c
+  └ 129 lines...
+
+● Check kthread.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Check tick.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/tick.c
+  └ 165 lines...
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -1 28156108fecb~1 2>/dev/null | cat
+  └ 2 lines...
+
+● Get kernel version tag
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 28156108fecb~1 --not v5.19-rc1
+  --not v5.18 2>/dev/null | head -5; git -C linux/current describe --tags --abbrev=0 28156108fecb~1
+  2>/dev/null
+  └ 7 lines...
+

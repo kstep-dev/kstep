@@ -1,0 +1,68 @@
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read bugs/399ced95_rcu_tasks_fix_stale_task.md
+  └ 36 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 399ced9594df 2>/dev/null | head -300
+  └ 223 lines...
+
+Let me explore existing drivers and understand the framework better before deciding on approach.
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && head -60 reproduce.py
+  └ 61 lines...
+
+● Look at example drivers
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/*.c | head -200
+  └ 201 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+Let me look at the kernel version and understand more about the internal headers available.
+
+● Check internal header
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -80
+  └ 80 lines...
+
+● Check kernel version at buggy commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -1 399ced9594df~1 2>/dev/null
+  └ 2 lines...
+
+● Get version tag
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags 399ced9594df~1 2>/dev/null || git
+   -C linux/current log --oneline -5 399ced9594df 2>/dev/null
+  └ 2 lines...
+
+● Check QEMU arch
+  $ cd /users/szhong/kSTEP && grep -n "qemu" run.py | head -10
+  └ 7 lines...
+
+● Check build architecture
+  $ cd /users/szhong/kSTEP && grep -n "arch\|x86\|aarch64\|arm" Makefile | head -10
+  └ 6 lines...
+
+● Check default architecture
+  $ cd /users/szhong/kSTEP && grep "ARCH" scripts/__init__.py 2>/dev/null || grep "ARCH" run.py |
+  head -5
+  └ 6 lines...
+
+● Check current arch
+  $ uname -m
+  └ 2 lines...
+
+This bug is a **memory ordering race** (store-buffering litmus test) that only manifests on weakly-ordered architectures (ARM/POWER). On x86 TSO, after `smp_mb()` flushes the store buffer, the pre-GP write is globally visible, so the new task will always see it — the bad outcome is architecturally forbidden. Cannot reproduce on x86/QEMU.
+
+Let me skip this and update TODO.md.
+
+● Find bug in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n "399ced9594df" TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
