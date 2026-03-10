@@ -1,0 +1,28 @@
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index d575b4914925..b764bfbb3281 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -157,6 +157,7 @@ __read_mostly int scheduler_running;
+ 
+ DEFINE_STATIC_KEY_FALSE(__sched_core_enabled);
+ 
++EXPORT_SYMBOL_GPL(__sched_core_enabled);
+ /* kernel prio, less is more */
+ static inline int __task_prio(struct task_struct *p)
+ {
+@@ -568,6 +569,7 @@ void raw_spin_rq_lock_nested(struct rq *rq, int subclass)
+ 		raw_spin_unlock(lock);
+ 	}
+ }
++EXPORT_SYMBOL_GPL(raw_spin_rq_lock_nested);
+ 
+ bool raw_spin_rq_trylock(struct rq *rq)
+ {
+@@ -597,6 +599,7 @@ void raw_spin_rq_unlock(struct rq *rq)
+ {
+ 	raw_spin_unlock(rq_lockp(rq));
+ }
++EXPORT_SYMBOL_GPL(raw_spin_rq_unlock);
+ 
+ #ifdef CONFIG_SMP
+ /*

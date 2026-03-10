@@ -306,6 +306,23 @@ bugs = [
         ],
     ),
     Bug(
+        driver=Driver(name="forceidle_balancing", num_cpus=2),
+        linux=[
+            Linux(
+                name="buggy",
+                version="5b6547ed97f4~1",
+                config=LINUX_ROOT_DIR / "forceidle_balancing.config",
+                patch=LINUX_ROOT_DIR / "forceidle_balancing.patch",
+            ),
+            Linux(
+                name="fixed",
+                version="5b6547ed97f4",
+                config=LINUX_ROOT_DIR / "forceidle_balancing.config",
+                patch=LINUX_ROOT_DIR / "forceidle_balancing.patch",
+            ),
+        ],
+    ),
+    Bug(
         driver=Driver(name="wakeup_next_class", num_cpus=3),
         linux=[
             Linux(name="buggy", version="5324953c06bd~1"),

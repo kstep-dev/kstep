@@ -29,7 +29,7 @@ void kstep_sched_clock_init(void) {
   if (set_fn) {
     set_fn(kstep_sched_clock_get);
   } else {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 12, 0)
     // Fallback for kernels < 5.12: directly patch pv_ops.time.sched_clock
     KSYM_IMPORT(pv_ops);
     KSYM_pv_ops->time.sched_clock =
