@@ -2,17 +2,17 @@
 //
 // Bug: __setscheduler_uclamp() calls static_branch_enable(&sched_uclamp_used)
 // while holding task_rq_lock (pi_lock + rq->lock). static_branch_enable()
-// internally calls cpus_read_lock(), a sleeping function, from atomic context.
+// calls cpus_read_lock(), a sleeping function, from atomic context.
 // This triggers "BUG: sleeping function called from invalid context".
 //
 // Fix: Move static_branch_enable() from __setscheduler_uclamp() to
 // uclamp_validate(), which runs before any scheduler locks are acquired.
 //
-// Reproduce: Use a kprobe on static_key_enable to capture preempt_count
-// when it is called during sched_setattr_nocheck(). On the buggy kernel,
-// static_key_enable is called from __setscheduler_uclamp under rq lock
-// so preempt_count is elevated. On the fixed kernel, it is called from
-// uclamp_validate before locks are acquired.
+// Reproduce: Use a kprobe on cpus_read_lock to capture preempt_count when
+// it is called during sched_setattr_nocheck(). On the buggy kernel,
+// cpus_read_lock is called via static_key_enable from __setscheduler_uclamp
+// (under rq lock) so preempt_count is elevated. On the fixed kernel, it
+// is called from uclamp_validate before locks, so preempt_count is low.
 
 #include "driver.h"
 #include "internal.h"
@@ -25,23 +25,22 @@
 
 static struct task_struct *task;
 
-// Kprobe state: capture preempt_count when static_key_enable is called
-static int captured_preempt_count = -1;
+// Kprobe state: capture max preempt_count during the test window
+static int max_preempt_count = -1;
 static bool probe_armed = false;
 
-static int sbe_pre_handler(struct kprobe *p, struct pt_regs *regs) {
+static int cpus_read_lock_handler(struct kprobe *p, struct pt_regs *regs) {
   if (probe_armed) {
-    // preempt_count() here includes +1 from kprobe itself disabling preemption.
-    // Under task_rq_lock (buggy path), raw_spin_lock adds more.
-    captured_preempt_count = preempt_count();
-    probe_armed = false;
+    int pc = preempt_count();
+    if (pc > max_preempt_count)
+      max_preempt_count = pc;
   }
   return 0;
 }
 
-static struct kprobe sbe_kp = {
-    .symbol_name = "static_key_enable",
-    .pre_handler = sbe_pre_handler,
+static struct kprobe crl_kp = {
+    .symbol_name = "cpus_read_lock",
+    .pre_handler = cpus_read_lock_handler,
 };
 
 static void setup(void) {
@@ -53,9 +52,9 @@ static void run(void) {
   kstep_task_wakeup(task);
   kstep_tick_repeat(3);
 
-  int kp_ret = register_kprobe(&sbe_kp);
+  int kp_ret = register_kprobe(&crl_kp);
   if (kp_ret < 0) {
-    kstep_fail("register_kprobe on static_key_enable failed: %d", kp_ret);
+    kstep_fail("register_kprobe on cpus_read_lock failed: %d", kp_ret);
     return;
   }
 
@@ -63,10 +62,28 @@ static void run(void) {
   setattr_fn_t setattr_fn =
       (setattr_fn_t)kstep_ksym_lookup("sched_setattr_nocheck");
   if (!setattr_fn) {
-    unregister_kprobe(&sbe_kp);
+    unregister_kprobe(&crl_kp);
     kstep_fail("could not resolve sched_setattr_nocheck");
     return;
   }
+
+  // Pre-enable sched_uclamp_used from a safe (non-atomic) context.
+  // This prevents the actual deadlock: when __setscheduler_uclamp calls
+  // static_key_enable under rq lock, the key is already enabled so
+  // static_key_enable_cpuslocked returns early (no jump_label_update,
+  // no text_mutex). But cpus_read_lock is still called, so our kprobe
+  // will still capture the preempt_count to detect the bug.
+  typedef void (*ske_fn_t)(struct static_key *);
+  ske_fn_t ske_fn = (ske_fn_t)kstep_ksym_lookup("static_key_enable");
+  struct static_key *uclamp_key =
+      (struct static_key *)kstep_ksym_lookup("sched_uclamp_used");
+  if (!ske_fn || !uclamp_key) {
+    unregister_kprobe(&crl_kp);
+    kstep_fail("could not resolve static_key_enable or sched_uclamp_used");
+    return;
+  }
+  ske_fn(uclamp_key);
+  TRACE_INFO("Pre-enabled sched_uclamp_used to prevent actual deadlock");
 
   struct sched_attr attr = {
       .size = sizeof(attr),
@@ -77,17 +94,18 @@ static void run(void) {
   };
 
   // Arm the probe and call sched_setattr_nocheck.
-  // On buggy kernel: static_key_enable is called from __setscheduler_uclamp
-  //   (under task_rq_lock -> preempt_count elevated by spinlocks)
-  // On fixed kernel: static_key_enable is called from uclamp_validate
-  //   (before any scheduler locks -> preempt_count is low)
-  captured_preempt_count = -1;
+  // On buggy kernel: cpus_read_lock is called from static_key_enable
+  //   inside __setscheduler_uclamp (under task_rq_lock -> preempt elevated)
+  // On fixed kernel: cpus_read_lock is called from static_key_enable
+  //   inside uclamp_validate (before any locks -> preempt is low)
+  max_preempt_count = -1;
   probe_armed = true;
 
   TRACE_INFO("Calling sched_setattr_nocheck with SCHED_FLAG_UTIL_CLAMP_MIN");
   int ret = setattr_fn(task, &attr);
+  probe_armed = false;
 
-  unregister_kprobe(&sbe_kp);
+  unregister_kprobe(&crl_kp);
 
   if (ret) {
     kstep_fail("sched_setattr_nocheck failed: %d", ret);
@@ -96,56 +114,25 @@ static void run(void) {
 
   unsigned int uclamp_min = task->uclamp_req[UCLAMP_MIN].value;
   TRACE_INFO("uclamp_req[MIN].value=%u (expected 512)", uclamp_min);
-  TRACE_INFO("captured preempt_count in static_key_enable: %d",
-             captured_preempt_count);
+  TRACE_INFO("max preempt_count in cpus_read_lock during setattr: %d",
+             max_preempt_count);
 
-  if (captured_preempt_count < 0) {
-    // Probe never fired - static_key_enable might have been skipped
-    // (e.g., already enabled via different path). Try scanning code instead.
-    TRACE_INFO("kprobe did not fire, falling back to code scan");
-
-    void *uclamp_fn = kstep_ksym_lookup("__setscheduler_uclamp");
-    void *sbe_fn = kstep_ksym_lookup("static_key_enable");
-
-    if (!uclamp_fn || !sbe_fn) {
-      kstep_fail("could not resolve __setscheduler_uclamp or static_key_enable");
-      return;
-    }
-
-    unsigned char *fn_start = (unsigned char *)uclamp_fn;
-    bool found = false;
-    for (int i = 0; i < 512 - 4; i++) {
-      if (fn_start[i] == 0xE8) {
-        int32_t offset;
-        memcpy(&offset, &fn_start[i + 1], 4);
-        void *target = (void *)(fn_start + i + 5 + offset);
-        if (target == sbe_fn) {
-          found = true;
-          break;
-        }
-      }
-    }
-
-    if (found) {
-      kstep_fail("static_key_enable called inside __setscheduler_uclamp "
-                 "(under rq lock) - sleeping in atomic context");
-    } else {
-      kstep_pass("static_key_enable not in __setscheduler_uclamp");
-    }
+  if (max_preempt_count < 0) {
+    kstep_fail("kprobe on cpus_read_lock never fired during setattr");
     return;
   }
 
   // Kprobe handler adds +1 to preempt_count. Under task_rq_lock, pi_lock
   // and rq->lock each add +1, plus IRQ disable. So buggy path has
-  // preempt_count >= 3 in the handler; fixed path has preempt_count == 1.
-  if (captured_preempt_count > 1) {
-    kstep_fail("static_key_enable called with preempt_count=%d "
+  // preempt_count >= 3 in the handler; fixed path has preempt_count <= 1.
+  if (max_preempt_count > 1) {
+    kstep_fail("cpus_read_lock called with preempt_count=%d "
                "(under scheduler locks - sleeping in atomic context)",
-               captured_preempt_count);
+               max_preempt_count);
   } else {
-    kstep_pass("static_key_enable called with preempt_count=%d "
+    kstep_pass("cpus_read_lock called with preempt_count=%d "
                "(no scheduler locks held)",
-               captured_preempt_count);
+               max_preempt_count);
   }
 }
 
