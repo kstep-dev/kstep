@@ -343,6 +343,13 @@ bugs = [
             Linux(name="fixed", version="5aec788aeb8e"),
         ],
     ),
+    Bug(
+        driver=Driver(name="yield_to_race", num_cpus=4),
+        linux=[
+            Linux(name="buggy", version="5d808c78d972~1"),
+            Linux(name="fixed", version="5d808c78d972"),
+        ],
+    ),
 ]
 
 

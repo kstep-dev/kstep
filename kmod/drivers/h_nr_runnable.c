@@ -6,7 +6,7 @@
 #include "internal.h" // rq
 
 // https://github.com/torvalds/linux/commit/76f2f783294d7d55c2564e2dfb0a7279ba0bc264
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
 
 static struct task_struct *target_task;
 static struct task_struct *other_task;
