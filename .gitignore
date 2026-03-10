@@ -5,6 +5,8 @@
 # Build artifacts
 /kmod/build
 /user/build
+/kmod/**/*.o
+/kmod/**/*.cmd
 /build
 
 # Data files
