@@ -97,7 +97,7 @@
 ## CFS (Completely Fair Scheduler) (32)
 
 - [ ] `02dbb7246c5b` Fix clearing of has_idle_cores flag in select_idle_cpu() — [`02dbb724_fix_clearing_of_has_idle.md`](bugs/02dbb724_fix_clearing_of_has_idle.md)
-- [ ] `111688ca1c4a` Fix negative imbalance in imbalance calculation — [`111688ca_fix_negative_imbalance_in_imbalance.md`](bugs/111688ca_fix_negative_imbalance_in_imbalance.md)
+- [-] `111688ca1c4a` Fix negative imbalance in imbalance calculation — [`111688ca_fix_negative_imbalance_in_imbalance.md`](bugs/111688ca_fix_negative_imbalance_in_imbalance.md) <!-- skipped:kernel-5.6.0-compat-issues-acpi-pci-objtool-jiffies-ftrace attempts:1 -->
 - [x] `15257cc2f905` sched/fair: Revert force wakeup preemption — [`15257cc2_revert_force_wakeup_preemption.md`](bugs/15257cc2_revert_force_wakeup_preemption.md) <!-- driver:revert_force_wakeup_preemption attempts:1 -->
 - [ ] `289de3598481` sched/fair: Fix statistics for find_idlest_group() — [`289de359_statistics_for_find_idlest_group.md`](bugs/289de359_statistics_for_find_idlest_group.md)
 - [x] `2ae891b82695` sched: Reduce the default slice to avoid tasks getting an extra tick — [`2ae891b8_the_default_slice_to_avoid.md`](bugs/2ae891b8_the_default_slice_to_avoid.md) <!-- driver:extra_tick attempts:1 -->
