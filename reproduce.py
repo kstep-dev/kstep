@@ -305,6 +305,13 @@ bugs = [
             Linux(name="fixed", version="565790d28b1e"),
         ],
     ),
+    Bug(
+        driver=Driver(name="wakeup_next_class", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="5324953c06bd~1"),
+            Linux(name="fixed", version="5324953c06bd"),
+        ],
+    ),
 ]
 
 

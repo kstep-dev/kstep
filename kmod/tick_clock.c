@@ -29,10 +29,14 @@ void kstep_sched_clock_init(void) {
   if (set_fn) {
     set_fn(kstep_sched_clock_get);
   } else {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
     // Fallback for kernels < 5.12: directly patch pv_ops.time.sched_clock
     KSYM_IMPORT(pv_ops);
     KSYM_pv_ops->time.sched_clock =
         (unsigned long long (*)(void))kstep_sched_clock_get;
+#else
+    panic("paravirt_set_sched_clock not found and pv_ops fallback not available");
+#endif
   }
   TRACE_INFO("Mocked sched clock");
 }
