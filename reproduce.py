@@ -215,6 +215,19 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="migration_cpu_stop_warn", num_cpus=3),
+        linux=[
+            Linux(
+                name="buggy",
+                version="1293771e4353c148d5f6908fb32d1c1cfd653e47~1",
+            ),
+            Linux(
+                name="fixed",
+                version="1293771e4353c148d5f6908fb32d1c1cfd653e47",
+            ),
+        ],
+    ),
 ]
 
 

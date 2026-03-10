@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 7/400 reproduced**
+**Total: 8/400 reproduced**
 
 ---
 
@@ -11,7 +11,7 @@
 - [x] `04193d590b39` sched: Fix balance_push() vs __sched_setscheduler() — [`04193d59_fix_balance_push_vs_sched.md`](bugs/04193d59_fix_balance_push_vs_sched.md) <!-- driver:balance_push_splice attempts:1 -->
 - [x] `0ec8d5aed4d1` sched/core: Add WARN_ON_ONCE() to check overflow for migrate_disable() — [`0ec8d5ae_add_warn_on_once_to.md`](bugs/0ec8d5ae_add_warn_on_once_to.md) <!-- driver:migrate_overflow attempts:1 -->
 - [x] `11c7aa0ddea8` rq-qos: fix missed wake-ups in rq_qos_throttle try two — [`11c7aa0d_fix_missed_wake_ups_in.md`](bugs/11c7aa0d_fix_missed_wake_ups_in.md) <!-- driver:rq_qos_wakeup attempts:1 -->
-- [ ] `1293771e4353` sched: Fix migration_cpu_stop() WARN — [`1293771e_fix_migration_cpu_stop_warn.md`](bugs/1293771e_fix_migration_cpu_stop_warn.md)
+- [x] `1293771e4353` sched: Fix migration_cpu_stop() WARN — [`1293771e_fix_migration_cpu_stop_warn.md`](bugs/1293771e_fix_migration_cpu_stop_warn.md) <!-- driver:migration_cpu_stop_warn attempts:1 -->
 - [x] `156ec6f42b8d` sched/features: Fix hrtick reprogramming — [`156ec6f4_fix_hrtick_reprogramming.md`](bugs/156ec6f4_fix_hrtick_reprogramming.md) <!-- driver:hrtick_reprogram attempts:1 -->
 - [-] `15faafc6b449` sched,init: Fix DEBUG_PREEMPT vs early boot — [`15faafc6_init_fix_debug_preempt_vs.md`](bugs/15faafc6_init_fix_debug_preempt_vs.md) <!-- skipped:boot-time-only-init-task-flag-management-identical-post-boot-state attempts:1 -->
 - [x] `1862d8e264de` sched: Fix faulty assertion in sched_change_end() — [`1862d8e2_fix_faulty_assertion_in_sched.md`](bugs/1862d8e2_fix_faulty_assertion_in_sched.md) <!-- driver:sched_change_assert attempts:1 -->
