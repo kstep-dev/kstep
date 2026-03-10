@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 60/400 reproduced**
+**Total: 61/400 reproduced**
 
 ---
 
@@ -87,7 +87,7 @@
 - [-] `e65855a52b47` Fix a deadlock when enabling uclamp static key — [`e65855a5_fix_deadlock_enabling_uclamp_static.md`](bugs/e65855a5_fix_deadlock_enabling_uclamp_static.md) <!-- skipped:requires CONFIG_JUMP_LABEL=y which causes objtool build failures on 5.8-rc6; without it static_key_enable is inlined and no deadlock occurs attempts:2 -->
 - [-] `e932c4ab38f0` sched/core: Prevent wakeup of ksoftirqd during idle load balance — [`e932c4ab_prevent_wakeup_ksoftirqd_during_idle.md`](bugs/e932c4ab_prevent_wakeup_ksoftirqd_during_idle.md) <!-- skipped:requires CONFIG_NO_HZ_COMMON which conflicts with kSTEP tick infrastructure attempts:1 -->
 - [x] `eaf5a92ebde5` sched/core: Fix reset-on-fork from RT with uclamp — [`eaf5a92e_fix_resetonfork_rt_uclamp.md`](bugs/eaf5a92e_fix_resetonfork_rt_uclamp.md) <!-- driver:resetonfork_rt_uclamp attempts:1 -->
-- [ ] `ec618b84f6e1` sched: Fix rq->nr_iowait ordering — [`ec618b84_fix_rqnr_iowait_ordering.md`](bugs/ec618b84_fix_rqnr_iowait_ordering.md)
+- [x] `ec618b84f6e1` sched: Fix rq->nr_iowait ordering — [`ec618b84_fix_rqnr_iowait_ordering.md`](bugs/ec618b84_fix_rqnr_iowait_ordering.md) <!-- driver:nr_iowait_ordering attempts:1 -->
 - [x] `ef73d6a4ef0b` sched/wait: Fix a kthread_park race with wait_woken() — [`ef73d6a4_fix_kthread_park_race_wait_woken.md`](bugs/ef73d6a4_fix_kthread_park_race_wait_woken.md) <!-- driver:kthread_park_wait_woken attempts:1 -->
 - [ ] `f1dfdab694eb` sched/vtime: Prevent unstable evaluation of WARN(vtime->state) — [`f1dfdab6_prevent_unstable_evaluation_warnvtimestate.md`](bugs/f1dfdab6_prevent_unstable_evaluation_warnvtimestate.md)
 - [-] `f912d051619d` sched: remove redundant on_rq status change — [`f912d051_remove_redundant_on_rq_status_change.md`](bugs/f912d051_remove_redundant_on_rq_status_change.md) <!-- skipped:pure-code-cleanup-no-behavioral-difference-redundant-assignments-set-identical-values attempts:1 -->

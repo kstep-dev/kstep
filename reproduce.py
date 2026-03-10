@@ -677,6 +677,13 @@ bugs = [
             Linux(name="fixed", version="ef73d6a4ef0b"),
         ],
     ),
+    Bug(
+        driver=Driver(name="nr_iowait_ordering", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="ec618b84f6e1~1"),
+            Linux(name="fixed", version="ec618b84f6e1"),
+        ],
+    ),
 ]
 
 
