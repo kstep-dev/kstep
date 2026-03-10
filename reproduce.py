@@ -452,6 +452,13 @@ bugs = [
             Linux(name="fixed", version="7fb3ff22ad87"),
         ],
     ),
+    Bug(
+        driver=Driver(name="migration_cpu_stop_requeue", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="8a6edb5257e2~1"),
+            Linux(name="fixed", version="8a6edb5257e2"),
+        ],
+    ),
 ]
 
 

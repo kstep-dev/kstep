@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 33/400 reproduced**
+**Total: 34/400 reproduced**
 
 ---
 
@@ -51,7 +51,7 @@
 - [x] `8061b9f5e111` sched/debug: Change need_resched warnings to pr_err — [`8061b9f5_change_needresched_warnings_to_prerr.md`](bugs/8061b9f5_change_needresched_warnings_to_prerr.md) <!-- driver:resched_warn attempts:1 -->
 - [x] `82c387ef7568` sched/core: Prevent rescheduling when interrupts are disabled — [`82c387ef_prevent_rescheduling_when_interrupts_are.md`](bugs/82c387ef_prevent_rescheduling_when_interrupts_are.md) <!-- driver:cond_resched_irq attempts:1 -->
 - [x] `87ca4f9efbd7` Fix use-after-free bug in dup_user_cpus_ptr() — [`87ca4f9e_fix_useafterfree_bug_dup_user.md`](bugs/87ca4f9e_fix_useafterfree_bug_dup_user.md) <!-- driver:dup_user_cpus_uaf attempts:1 -->
-- [ ] `8a6edb5257e2` sched: Fix migration_cpu_stop() requeueing — [`8a6edb52_fix_migration_cpu_stop_requeueing.md`](bugs/8a6edb52_fix_migration_cpu_stop_requeueing.md)
+- [x] `8a6edb5257e2` sched: Fix migration_cpu_stop() requeueing — [`8a6edb52_fix_migration_cpu_stop_requeueing.md`](bugs/8a6edb52_fix_migration_cpu_stop_requeueing.md) <!-- driver:migration_cpu_stop_requeue attempts:1 -->
 - [-] `8ba09b1dc131` sched: print stack trace with KERN_INFO — [`8ba09b1d_print_stack_trace_with_kern.md`](bugs/8ba09b1d_print_stack_trace_with_kern.md) <!-- skipped:cosmetic log-level change (show_stack→show_stack_loglvl); no scheduler behavior impact; not reproducible via kSTEP attempts:1 -->
 - [ ] `8d4d9c7b4333` sched/debug: Fix memory corruption caused by multiple small reads of flags — [`8d4d9c7b_fix_memory_corruption_caused_multiple.md`](bugs/8d4d9c7b_fix_memory_corruption_caused_multiple.md)
 - [-] `8d737320166b` sched: Fix build for modules using set_tsk_need_resched() — [`8d737320_fix_build_for_modules_using.md`](bugs/8d737320_fix_build_for_modules_using.md) <!-- skipped:build-time-only-bug-missing-EXPORT_SYMBOL_GPL-not-runtime-reproducible attempts:1 -->

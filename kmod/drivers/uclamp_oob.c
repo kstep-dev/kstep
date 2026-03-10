@@ -30,7 +30,12 @@ static void run(void) {
       .sched_nice = task_nice(task),
   };
 
-  int ret = sched_setattr_nocheck(task, &attr);
+  typedef int (*setattr_fn_t)(struct task_struct *, const struct sched_attr *);
+  setattr_fn_t setattr_fn =
+      (setattr_fn_t)kstep_ksym_lookup("sched_setattr_nocheck");
+  if (!setattr_fn)
+    panic("could not resolve sched_setattr_nocheck");
+  int ret = setattr_fn(task, &attr);
   if (ret)
     panic("sched_setattr_nocheck failed: %d", ret);
 
