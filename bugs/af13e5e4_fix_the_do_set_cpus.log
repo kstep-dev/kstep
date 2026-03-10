@@ -1,0 +1,111 @@
+● Read bugs/af13e5e4_fix_the_do_set_cpus.md
+  └ 37 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 af13e5e437dc 2>/dev/null | head -300
+  └ 116 lines...
+
+● Full patch context
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 af13e5e437dc | head -400
+  └ 116 lines...
+
+● Check commits around fix
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline af13e5e437dc~3..af13e5e437dc
+  └ 4 lines...
+
+● Read select_fallback_rq
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:kernel/sched/core.c | sed -n
+  '/^static int select_fallback_rq/,/^}/p' | head -80
+  └ 65 lines...
+
+● Find relevant functions in buggy kernel
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:kernel/sched/core.c | grep -n
+   "select_fallback_rq\|set_cpus_allowed_force\|__balance_push_cpu_stop\|do_set_cpus_allowed" | head
+   -30
+  └ 16 lines...
+
+● Read set_cpus_allowed_force
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:kernel/sched/core.c | sed -n
+  '/^static void set_cpus_allowed_force/,/^}/p' | head -40
+  └ 1 line...
+
+● Read set_cpus_allowed_force
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:kernel/sched/core.c | sed -n
+  '2679,2710p'
+  └ 33 lines...
+
+● Read do_set_cpus_allowed context
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:kernel/sched/core.c | sed -n
+  '2667,2700p'
+  └ 35 lines...
+
+● Find __task_rq_lock
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:kernel/sched/core.c | grep -n
+   "__task_rq_lock" | head -10
+  └ 9 lines...
+
+● Find lock guard definition
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:kernel/sched/sched.h | grep
+  -n "__task_rq_lock\|DEFINE_LOCK_GUARD" | head -20
+  └ 11 lines...
+
+● Read __task_rq_lock implementation
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:kernel/sched/sched.h | sed -n
+   '1821,1860p'
+  └ 41 lines...
+
+● Check reproduce.py structure
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -60
+  └ 61 lines...
+
+● Understand run.py
+  $ cd /users/szhong/kSTEP && cat run.py | head -60
+  └ 61 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -30
+  └ 31 lines...
+
+● Read similar existing driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/balance_push_splice.c
+  └ 75 lines...
+
+● Read hotplug-related driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migrate_swap_hotplug.c
+  └ 108 lines...
+
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+
+● Find KSYM_IMPORT mechanism
+  $ cd /users/szhong/kSTEP && grep -rn "KSYM_IMPORT\|ksym_import\|kallsyms" kmod/ --include="*.h"
+  --include="*.c" | grep -v drivers/ | head -20
+  └ 21 lines...
+
+● Fetch bug report from lore
+  $ curl -sL 'https://lore.kernel.org/oe-lkp/202510271206.24495a68-lkp@intel.com/t.mbox.gz'
+  2>/dev/null | gunzip 2>/dev/null | head -200
+  └ 199 lines...
+
+● Fetch fix discussion
+  $ curl -sL 'https://patch.msgid.link/20251027110133.GI3245006@noisy.programming.kicks-ass.net'
+  2>/dev/null | head -200
+  └ 8 lines...
+
+● Read migrate_disable_lock driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migrate_disable_lock.c
+  └ 69 lines...
+
+● Find deadlock-related drivers
+  $ cd /users/szhong/kSTEP && grep -l "deadlock\|lockdep\|recursive.*lock\|rq->lock\|rq->__lock"
+  kmod/drivers/*.c | head -10
+  └ 7 lines...
+
+● Read set_cpus_allowed_lock driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/set_cpus_allowed_lock.c
+  └ 98 lines...
+

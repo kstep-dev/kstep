@@ -533,6 +533,13 @@ bugs = [
             Linux(name="fixed", version="abfc01077df66593f128d966fdad1d042facc9ac"),
         ],
     ),
+    Bug(
+        driver=Driver(name="affine_move_self", num_cpus=4),
+        linux=[
+            Linux(name="buggy", version="9e81889c7648~1"),
+            Linux(name="fixed", version="9e81889c7648"),
+        ],
+    ),
 ]
 
 

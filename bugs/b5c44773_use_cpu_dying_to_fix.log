@@ -1,0 +1,118 @@
+● Read bugs/b5c44773_use_cpu_dying_to_fix.md
+  └ 37 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Check patch stats
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 b5c4477366fb --stat | head -20
+  └ 21 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && head -80 reproduce.py
+  └ 81 lines...
+
+● List existing drivers
+  $ ls /users/szhong/kSTEP/kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Read the full patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 b5c4477366fb 2>&1 | head -200
+  └ 201 lines...
+
+● Check existing balance_push driver
+  $ ls /users/szhong/kSTEP/kmod/drivers/balance_push*.c 2>/dev/null && cat
+  /users/szhong/kSTEP/kmod/drivers/balance_push_splice.c | head -80
+  └ 76 lines...
+
+● Read rest of patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 b5c4477366fb 2>&1 | tail -120
+  └ 121 lines...
+
+● Read internal header
+  $ cat /users/szhong/kSTEP/kmod/internal.h
+  └ 90 lines...
+
+● Find balance_push_set in buggy
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/core.c | grep -n
+   "balance_push_set" | head -10
+  └ 8 lines...
+
+● Read balance_push_set function
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/core.c | sed -n
+  '7690,7730p'
+  └ 41 lines...
+
+● Get kernel version from Makefile
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:Makefile | head -5
+  └ 6 lines...
+
+● Get kernel version info
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline b5c4477366fb -1 && git -C
+  linux/current describe --tags b5c4477366fb~1 2>/dev/null || git -C linux/current log --oneline
+  --format="%H %s" b5c4477366fb~1 -1
+  └ 3 lines...
+
+● Find is_cpu_allowed location
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/core.c | grep -n
+   "is_cpu_allowed" | head -5
+  └ 6 lines...
+
+● Read is_cpu_allowed in buggy
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/core.c | sed -n
+  '1795,1820p'
+  └ 26 lines...
+
+● Check fixed balance_push_set
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb:kernel/sched/core.c | grep -A
+  20 "static void balance_push_set"
+  └ 22 lines...
+
+● Find balance_push_callback definition
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/core.c | grep -n
+   "balance_push_callback" | head -10
+  └ 5 lines...
+
+● Read balance_push_callback def
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/core.c | sed -n
+  '7630,7650p'
+  └ 22 lines...
+
+● Read callback_head definition
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/core.c | sed -n
+  '4005,4015p'
+  └ 11 lines...
+
+● Check sched.h for balance_push
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/sched.h | grep
+  -n "balance_push" | head -10
+  └ 5 lines...
+
+● Check rq lock type
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/sched.h | grep
+  -B2 -A2 "raw_spinlock" | head -10
+  └ 11 lines...
+
+● Check rq lock field name
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/sched.h | grep
+  -n "raw_spinlock_t" | head -5
+  └ 6 lines...
+
+● Check rq struct definition
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/sched.h | sed -n
+   '910,920p'
+  └ 12 lines...
+
+● Check rq struct lock field
+  $ cd /users/szhong/kSTEP && git -C linux/current show b5c4477366fb~1:kernel/sched/sched.h | sed -n
+   '900,910p'
+  └ 12 lines...
+
+● Find drivers using kthread_create
+  $ cd /users/szhong/kSTEP && grep -l "kstep_kthread_create" kmod/drivers/*.c | head -5
+  └ 6 lines...
+
+● Read example kthread driver
+  $ cat /users/szhong/kSTEP/kmod/drivers/affine_move_self.c
+  └ 155 lines...
+

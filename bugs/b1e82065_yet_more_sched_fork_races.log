@@ -1,0 +1,67 @@
+● Read bugs/b1e82065_yet_more_sched_fork_races.md
+  └ 25 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 b1e8206582f9 2>/dev/null | head -300
+  └ 301 lines...
+
+● List existing drivers
+  $ ls /users/szhong/kSTEP/kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Read rest of patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 b1e8206582f9 2>/dev/null | tail -300
+  └ 301 lines...
+
+● Find fork-related drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | grep -i fork
+  └ 1 line...
+
+● Read task.c
+  $ cd /users/szhong/kSTEP && cat kmod/task.c 2>/dev/null | head -100
+  └ 101 lines...
+
+● Find reweight-related drivers
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/reweight_entity.c 2>/dev/null || echo "not found"; ls
+   kmod/drivers/ | grep -i reweight
+  └ 2 lines...
+
+● Read end of task.c
+  $ cd /users/szhong/kSTEP && cat kmod/task.c | tail -50
+  └ 50 lines...
+
+● Read user-space task code
+  $ cd /users/szhong/kSTEP && cat user/task.c 2>/dev/null
+  └ 67 lines...
+
+● Find task manipulation functions
+  $ cd /users/szhong/kSTEP && grep -n "kstep_task_set_prio\|kstep_task_usleep\|kstep_task_wakeup"
+  kmod/task.c
+  └ 4 lines...
+
+Let me fetch the LKML discussion for more context and check existing drivers for patterns.
+
+● Find similar drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/*.c | head -40 && echo "---" && cat
+  kmod/drivers/set_user_nice_dl.c 2>/dev/null || cat kmod/drivers/reweight_entity_bug.c 2>/dev/null
+  || echo "no direct match"
+  └ 43 lines...
+
+● Fetch LKML discussion
+  $ curl -sL
+  "https://lore.kernel.org/lkml/YgoeCbwj5mbCR0qA@hirez.programming.kicks-ass.net/t.mbox.gz"
+  2>/dev/null | gunzip 2>/dev/null | head -300
+  └ 301 lines...
+
+● Read a race condition driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/pf_kthread_race.c
+  └ 76 lines...
+
+● Read another driver for patterns
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/set_user_nice_dl.c 2>/dev/null; cat
+  kmod/drivers/rqcf_act_skip_leak.c 2>/dev/null | head -80
+  └ 80 lines...
+
