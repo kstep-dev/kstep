@@ -487,6 +487,16 @@ bugs = [
             Linux(name="fixed", version="8feb053d5319"),
         ],
     ),
+    Bug(
+        driver=Driver(
+            name="sched_debug_flags_corrupt",
+            kernel_params=("slub_debug=FZ",),
+        ),
+        linux=[
+            Linux(name="buggy", version="8d4d9c7b4333~1"),
+            Linux(name="fixed", version="8d4d9c7b4333"),
+        ],
+    ),
 ]
 
 
