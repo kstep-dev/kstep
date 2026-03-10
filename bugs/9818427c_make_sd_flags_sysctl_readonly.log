@@ -398,3 +398,184 @@ The crash is because `acpi=off` disables SMP. Let me try a different approach - 
   head -3
   └ 4 lines...
 
+● Try acpi=noirq
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy
+  --num_cpus 4 --kernel_params 'acpi=noirq' 2>&1 | tail -20
+  └ 21 lines...
+
+● Check CPU status
+  $ cd /users/szhong/kSTEP && grep -E 'CPU|smpboot|Brought' data/latest.log | head -10
+  └ 11 lines...
+
+● Check ACPI/APIC boot messages
+  $ cd /users/szhong/kSTEP && grep -E 'ACPI|APIC|MADT|weird|SMP|LAPIC' data/latest.log | head -15
+  └ 16 lines...
+
+● Get detailed boot log
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy
+  --num_cpus 4 2>&1 > /tmp/sd_boot.log 2>&1; grep -E
+  'ACPI|APIC|error|Error|fail|Fail|smpboot|SLUB|Acpi' /tmp/sd_boot.log | head -30
+  └ 31 lines...
+
+● Check crash details
+  $ grep -E 'acpi_init|Acpi-Namespace|BUG|error|kmem_cache|get_map|SLUB|terminate' /tmp/sd_boot.log
+  | head -20
+  └ 15 lines...
+
+● Get context before ACPI crash
+  $ grep -B3 'acpi_terminate\|acpi_init.*0x23c' /tmp/sd_boot.log | head -20
+  └ 12 lines...
+
+● Try disabling SLUB debug
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy
+  --num_cpus 4 --kernel_params 'slub_debug=-' 2>&1 | tail -30
+  └ 31 lines...
+
+● Find __kmem_cache_shutdown
+  $ cd /users/szhong/kSTEP && grep -n '__kmem_cache_shutdown'
+  linux/sd_flags_readonly_buggy/mm/slub.c | head -5
+  └ 4 lines...
+
+● Read __kmem_cache_shutdown
+  $ cd /users/szhong/kSTEP && sed -n '3792,3820p' linux/sd_flags_readonly_buggy/mm/slub.c
+  └ 29 lines...
+
+● Find kmem_cache_destroy
+  $ cd /users/szhong/kSTEP && grep -n 'kmem_cache_destroy'
+  linux/sd_flags_readonly_buggy/mm/slab_common.c | head -5
+  └ 4 lines...
+
+● Read kmem_cache_destroy
+  $ cd /users/szhong/kSTEP && sed -n '940,975p' linux/sd_flags_readonly_buggy/mm/slab_common.c
+  └ 37 lines...
+
+● Read free_partial and related
+  $ cd /users/szhong/kSTEP && sed -n '3730,3795p' linux/sd_flags_readonly_buggy/mm/slub.c
+  └ 67 lines...
+
+Let me patch the SLUB code to avoid the crash:
+
+● Patch SLUB to skip crash
+  $ cd /users/szhong/kSTEP/linux/sd_flags_readonly_buggy && sed -i 's/static void
+  list_slab_objects(struct kmem_cache \*s, struct page \*page,/static void list_slab_objects(struct
+  kmem_cache *s, struct page *page,\n\t\t\tconst char *text) { pr_err("%s: %s\\n", s->name, text); }
+   \nstatic void __attribute__((unused)) list_slab_objects_orig(struct kmem_cache *s, struct page
+  *page,/' mm/slub.c
+  └ 1 line...
+
+● Verify patch
+  $ cd /users/szhong/kSTEP/linux/sd_flags_readonly_buggy && grep -n 'list_slab_objects' mm/slub.c |
+  head -10
+  └ 4 lines...
+
+● Verify patch context
+  $ cd /users/szhong/kSTEP/linux/sd_flags_readonly_buggy && sed -n '3724,3732p' mm/slub.c
+  └ 10 lines...
+
+Good. Now rebuild:
+
+● Rebuild kernel with SLUB fix
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -5
+  └ 3 lines...
+
+● Force rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sd_flags_readonly_buggy FORCE=1 2>&1 | tail -5
+  └ 3 lines...
+
+● Force rebuild kstep
+  $ cd /users/szhong/kSTEP && touch kmod/drivers/sd_flags_readonly.c && make kstep
+  LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy
+  --num_cpus 4 2>&1 | tail -30
+  └ 31 lines...
+
+Excellent! The kernel boots and the driver works! Let me check the output:
+
+● Check test output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug triggers on buggy kernel. Now let me verify the fix. First checkout and build the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 9818427c6270 sd_flags_readonly_fixed 2>&1 | tail
+  -5
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 6 lines...
+
+Now apply the same SLUB patch and objtool fix to the fixed kernel, then build:
+
+● Apply objtool fix and check SLUB
+  $ cd /users/szhong/kSTEP/linux/sd_flags_readonly_fixed && sed -i '340s/return -1;/return 0;/'
+  tools/objtool/elf.c && grep -n 'list_slab_objects' mm/slub.c | head -3
+  └ 3 lines...
+
+● Apply SLUB fix to fixed kernel
+  $ cd /users/szhong/kSTEP/linux/sd_flags_readonly_fixed && sed -i '3726s/static void
+  list_slab_objects/static void list_slab_objects(struct kmem_cache *s, struct page *page, const
+  char *text) { pr_err("%s: %s\\n", s->name, text); } \nstatic void __attribute__((unused))
+  list_slab_objects_orig/' mm/slub.c && grep -n 'list_slab_objects' mm/slub.c | head -5
+  └ 4 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sd_flags_readonly_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sd_flags_readonly_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_fixed
+  --num_cpus 4 2>&1 | tail -20
+  └ 21 lines...
+
+● Check fixed kernel output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug confirmed:
+- **Buggy kernel**: `fail` — flags writable via sysctl (0x122f → 0x122d)
+- **Fixed kernel**: `pass` — flags sysctl is read-only (EACCES, err=-13)
+
+Now let me update TODO.md, reproduce.py, and commit:
+
+● Find TODO entry
+  $ cd /users/szhong/kSTEP && grep -n '9818427c6270' TODO.md
+  └ 2 lines...
+
+● Find total counter
+  $ cd /users/szhong/kSTEP && grep -n 'Total:' TODO.md | head -3
+  └ 2 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && tail -20 reproduce.py
+  └ 21 lines...
+
+● Check Bug class
+  $ cd /users/szhong/kSTEP && grep -B2 -A10 'class Bug' reproduce.py | head -30
+  └ 13 lines...
+
+● See existing bug entries
+  $ cd /users/szhong/kSTEP && grep -A15 'Bug(' reproduce.py | head -50
+  └ 51 lines...
+
+Now let me make all the updates:
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+Now add to reproduce.py. Let me find the right place:
