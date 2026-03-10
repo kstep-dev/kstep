@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 53/400 reproduced**
+**Total: 54/400 reproduced**
 
 ---
 
@@ -78,7 +78,7 @@
 - [x] `ca4984a7dd86` sched: Fix UCLAMP_FLAG_IDLE setting — [`ca4984a7_uclamp_flag_idle_setting.md`](bugs/ca4984a7_uclamp_flag_idle_setting.md) <!-- driver:uclamp_flag_idle attempts:1 -->
 - [x] `ce3614daabea` sched: Fix unreliable rseq cpu_id for new tasks — [`ce3614da_fix_rseq_cpu_id_tasks.md`](bugs/ce3614da_fix_rseq_cpu_id_tasks.md) <!-- driver:rseq_cpu_id_fork attempts:1 -->
 - [ ] `d136122f5845` sched: Fix race against ptrace_freeze_trace() — [`d136122f_fix_race_ptrace_freeze.md`](bugs/d136122f_fix_race_ptrace_freeze.md)
-- [ ] `d707faa64d03` sched/core: Add missing completion for affine_move_task() waiters — [`d707faa6_affine_move_task_completion.md`](bugs/d707faa6_affine_move_task_completion.md)
+- [x] `d707faa64d03` sched/core: Add missing completion for affine_move_task() waiters — [`d707faa6_affine_move_task_completion.md`](bugs/d707faa6_affine_move_task_completion.md) <!-- driver:affine_move_completion attempts:1 -->
 - [ ] `dbfb089d360b` sched: Fix loadavg accounting race — [`dbfb089d_fix_loadavg_accounting_race.md`](bugs/dbfb089d_fix_loadavg_accounting_race.md)
 - [ ] `dcd6dffb0a75` sched/core: Fix size of rq::uclamp initialization — [`dcd6dffb_fix_rq_uclamp_init_size.md`](bugs/dcd6dffb_fix_rq_uclamp_init_size.md)
 - [ ] `df14b7f9efcd` sched/core: Fix a missed update of user_cpus_ptr — [`df14b7f9_core_missed_user_cpus_ptr.md`](bugs/df14b7f9_core_missed_user_cpus_ptr.md)

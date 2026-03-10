@@ -603,6 +603,13 @@ bugs = [
             Linux(name="fixed", version="ce3614daabea"),
         ],
     ),
+    Bug(
+        driver=Driver(name="affine_move_completion", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="d707faa64d03~1"),
+            Linux(name="fixed", version="d707faa64d03"),
+        ],
+    ),
 ]
 
 
