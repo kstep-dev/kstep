@@ -1,0 +1,13 @@
+diff --git a/tools/objtool/elf.c b/tools/objtool/elf.c
+index 4e1d7460574b..01e673dd3bfc 100644
+--- a/tools/objtool/elf.c
++++ b/tools/objtool/elf.c
+@@ -355,7 +355,7 @@ static int read_symbols(struct elf *elf)
+ 	symtab = find_section_by_name(elf, ".symtab");
+ 	if (!symtab) {
+ 		WARN("missing symbol table");
+-		return -1;
++		return 0;
+ 	}
+ 
+ 	symtab_shndx = find_section_by_name(elf, ".symtab_shndx");

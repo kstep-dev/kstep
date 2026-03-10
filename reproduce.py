@@ -493,8 +493,16 @@ bugs = [
             kernel_params=("slub_debug=FZ",),
         ),
         linux=[
-            Linux(name="buggy", version="8d4d9c7b4333~1"),
-            Linux(name="fixed", version="8d4d9c7b4333"),
+            Linux(
+                name="buggy",
+                version="8d4d9c7b4333~1",
+                patch=LINUX_ROOT_DIR / "objtool_symtab.patch",
+            ),
+            Linux(
+                name="fixed",
+                version="8d4d9c7b4333",
+                patch=LINUX_ROOT_DIR / "objtool_symtab.patch",
+            ),
         ],
     ),
 ]
