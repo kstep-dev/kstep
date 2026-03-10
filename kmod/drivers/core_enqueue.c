@@ -50,12 +50,14 @@ static void run(void) {
   TRACE_INFO("task_b: pid=%d on_rq=%d cpu=%d", task_b->pid, task_b->on_rq,
              task_cpu(task_b));
 
-  // Enable core scheduling state on rqs
+  // Enable core scheduling static branch (for sched_core_enqueued checks)
+  // but do NOT enable rq->core_enabled. This prevents the scheduler on CPUs
+  // 1/2 from entering core-aware scheduling paths on resched, avoiding crashes
+  // from inconsistent core tree state (which IS the bug we're testing).
+  // The cookie update logic in sched_core_update_cookie (inlined in
+  // __sched_core_set) works regardless of core_enabled.
   KSYM_IMPORT(__sched_core_enabled);
   static_branch_enable(KSYM___sched_core_enabled);
-  rq0->core_enabled = true;
-  rq1->core_enabled = true;
-  rq2->core_enabled = true;
 
   // Pre-set sched_core_count to prevent sched_core_put from triggering
   // __sched_core_disable when we clean up
@@ -123,6 +125,13 @@ cleanup:
   rq2->core_enabled = false;
   atomic_set(KSYM_sched_core_count, 0);
   static_branch_disable(KSYM___sched_core_enabled);
+
+  // Clear any pending resched to avoid scheduler running with stale state
+  if (test_tsk_need_resched(rq1->curr))
+    clear_tsk_need_resched(rq1->curr);
+  if (test_tsk_need_resched(rq2->curr))
+    clear_tsk_need_resched(rq2->curr);
+
   kstep_tick_repeat(3);
 
   if (!a_enqueued || !b_enqueued) {

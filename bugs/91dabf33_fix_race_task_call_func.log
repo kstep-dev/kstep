@@ -387,3 +387,55 @@ Now let me add the driver to reproduce.py:
 
 ● Edit reproduce.py (+7)
 
+Now let me commit and push:
+
+● Check git status
+  $ cd /users/szhong/kSTEP && git add -A && git status --short
+  └ 7 lines...
+
+● Check staged files
+  $ cd /users/szhong/kSTEP && git --no-pager diff --cached --name-only
+  └ 6 lines...
+
+● Check unstaged and untracked
+  $ cd /users/szhong/kSTEP && git --no-pager diff --name-only && echo "---UNTRACKED---" && git
+  ls-files --others --exclude-standard | head -20
+  └ 8 lines...
+
+● Check specific file diffs
+  $ cd /users/szhong/kSTEP && git --no-pager diff TODO.md | head -20 && echo "---" && git --no-pager
+   diff reproduce.py | head -20 && echo "---" && git --no-pager diff --cached
+  kmod/drivers/task_call_func_race.c | head -5
+  └ 3 lines...
+
+● Check specific file status
+  $ cd /users/szhong/kSTEP && git --no-pager status TODO.md reproduce.py
+  kmod/drivers/task_call_func_race.c
+  └ 5 lines...
+
+● Check git log and TODO state
+  $ cd /users/szhong/kSTEP && git --no-pager log --oneline -5 && echo "---" && grep "91dabf33ae5d"
+  TODO.md
+  └ 8 lines...
+
+● Verify files are in place
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/task_call_func_race.c | head -5 && echo "---" && grep
+   "task_call_func_race" reproduce.py
+  └ 8 lines...
+
+● Full git status
+  $ cd /users/szhong/kSTEP && git --no-pager status
+  └ 24 lines...
+
+My changes are already committed and pushed via the ralph-loop auto-save. Let me verify everything is in order:
+
+● Verify all changes committed
+  $ cd /users/szhong/kSTEP && git --no-pager log --oneline -1 && echo "---" && git --no-pager show
+  --stat HEAD | grep -E "task_call_func|TODO|reproduce" && echo "---" && echo "Driver exists:" &&
+  test -f kmod/drivers/task_call_func_race.c && echo "YES" && echo "TODO updated:" && grep
+  "91dabf33ae5d" TODO.md | head -1 && echo "reproduce.py updated:" && grep "task_call_func_race"
+  reproduce.py | head -1
+  └ 14 lines...
+
+All changes are committed and pushed. Let me do a proper commit now:
+

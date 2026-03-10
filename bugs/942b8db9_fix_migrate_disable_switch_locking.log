@@ -1,0 +1,44 @@
+● Read bugs/942b8db9_fix_migrate_disable_switch_locking.md
+  └ 39 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the commit patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 942b8db96500 2>/dev/null | head -300
+  └ 301 lines...
+
+● Read sample drivers
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/*.c | head -200
+  └ 201 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Search for migration-related code
+  $ cd /users/szhong/kSTEP && grep -l "migrate_disable\|migration_disabled\|cpus_ptr\|cpus_mask"
+  kmod/*.c kmod/*.h 2>/dev/null
+  └ 2 lines...
+
+● Read kmod/internal.h
+  └ 89 lines read
+
+● Search migration-related code in kmod
+  $ cd /users/szhong/kSTEP && grep -n "migrate\|migration" kmod/isolation.c kmod/kthread.c
+  kmod/task.c 2>/dev/null | head -30
+  └ 2 lines...
+
+● Check KSYM_IMPORT mechanism
+  $ cd /users/szhong/kSTEP && grep -rn "KSYM_IMPORT\|ksym" kmod/ksym.h kmod/ksym.c 2>/dev/null |
+  head -30
+  └ 1 line...
+
+● Read kthread module
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Read task module
+  $ cd /users/szhong/kSTEP && cat kmod/task.c
+  └ 113 lines...
+
