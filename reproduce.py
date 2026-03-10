@@ -155,6 +155,13 @@ bugs = [
             Linux(name="fixed", version="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c"),
         ],
     ),
+    Bug(
+        driver=Driver(name="zero_vruntime", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="b3d99f43c72b56cf7a104a364e7fb34b0702828b~1"),
+            Linux(name="fixed", version="b3d99f43c72b56cf7a104a364e7fb34b0702828b"),
+        ],
+    ),
 ]
 
 
