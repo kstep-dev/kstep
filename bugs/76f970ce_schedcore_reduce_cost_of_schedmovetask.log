@@ -250,7 +250,59 @@ Let me verify determinism by running both again:
   "RESCHED"
   └ 2 lines...
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           The util values are still identical. The issue is tasks need to be in a non-root cgroup for the group hierarchy propagation to create an observable difference. Let me put tasks in a cgroup.
+● Verify fixed determinism
+  $ cd /users/szhong/kSTEP && ./run.py sched_move --linux_name sched_move_fixed 2>&1 | grep
+  "RESCHED"
+  └ 2 lines...
+
+Deterministic and consistent. Now let me update TODO.md, add to reproduce.py, commit and push.
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Find TODO entry
+  $ cd /users/szhong/kSTEP && grep -n "76f970ce51c8" TODO.md
+  └ 2 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && tail -20 reproduce.py
+  └ 21 lines...
+
+● Check if already in reproduce.py
+  $ cd /users/szhong/kSTEP && grep -n "sched_move" reproduce.py
+  └ 2 lines...
+
+● Check sched_move entry in reproduce.py
+  $ cd /users/szhong/kSTEP && grep -A 8 'driver=Driver(name="sched_move"' reproduce.py
+  └ 8 lines...
+
+The bug is already marked as done and in reproduce.py! But the reproduce.py entry uses `num_cpus=4` while the rewritten driver works with 2 CPUs. Let me update reproduce.py to match and commit.
+
+● Check num_cpus defaults
+  $ cd /users/szhong/kSTEP && grep -B2 "num_cpus" reproduce.py | head -20
+  └ 21 lines...
+
+● Edit reproduce.py (+1 -1)
+
+Now let me check the git status and commit:
+
+● Check changes
+  $ cd /users/szhong/kSTEP && git --no-pager diff --stat
+  └ 5 lines...
+
+● Check driver changes
+  $ cd /users/szhong/kSTEP && git --no-pager diff kmod/drivers/sched_move.c
+  └ 1 line...
+
+● Commit and push
+  $ cd /users/szhong/kSTEP && git add reproduce.py && git commit -m "reproduce: sched_move fix
+  num_cpus (76f970ce51c8)
+
+  Driver now uses default 2 CPUs instead of 4....
+  └ 16 lines...
+
+Done                                                                                                                                                                                                                                                                                                                         The util values are still identical. The issue is tasks need to be in a non-root cgroup for the group hierarchy propagation to create an observable difference. Let me put tasks in a cgroup.
 
 ● Read kmod/drivers/sched_move.c
   └ 133 lines read
@@ -479,4 +531,38 @@ Now add to reproduce.py:
 ● Edit reproduce.py (+7)
 
 Now commit and push:
+
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git add -A && git --no-pager diff --cached --stat
+  └ 12 lines...
+
+● Check config changes
+  $ cd /users/szhong/kSTEP && git --no-pager diff --cached -- linux/config.kstep
+  └ 1 line...
+
+● Check unstaged config changes
+  $ cd /users/szhong/kSTEP && git --no-pager diff -- linux/config.kstep
+  └ 1 line...
+
+● Check config.kstep
+  $ cd /users/szhong/kSTEP && tail -3 linux/config.kstep
+  └ 4 lines...
+
+● Stage config and check all changes
+  $ cd /users/szhong/kSTEP && git add linux/config.kstep && git --no-pager diff --cached --stat
+  └ 12 lines...
+
+● Verify config change staged
+  $ cd /users/szhong/kSTEP && git --no-pager diff --cached -- linux/config.kstep
+  └ 1 line...
+
+● Check config.kstep status
+  $ cd /users/szhong/kSTEP && git --no-pager status -- linux/config.kstep
+  └ 5 lines...
+
+● Check committed config
+  $ cd /users/szhong/kSTEP && git --no-pager show HEAD:linux/config.kstep | tail -3
+  └ 4 lines...
+
+Good — the autogroup config was already committed (likely by the initial `git add -A`). Let me now commit:
 

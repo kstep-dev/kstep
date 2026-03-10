@@ -322,3 +322,18 @@ The bug triggers on the buggy kernel - `resched_seen=0` after 30 ticks with `cor
   $ cd /users/szhong/kSTEP && make linux LINUX_NAME=forceidle_starvation_fixed 2>&1 | tail -5
   └ 6 lines...
 
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=forceidle_starvation_fixed 2>&1 | tail -10
+  └ 11 lines...
+
+● Run on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py forceidle_starvation --linux_name forceidle_starvation_fixed
+  --num_cpus 3 2>&1 | tail -5
+  └ 6 lines...
+
+● Check fixed kernel results
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl && echo "---" && cat data/latest.log | grep -E
+  "tick |Initial|resched|core_force|Core sched|After 30" | head -20
+  └ 23 lines...
+
+I see - the detection needs to happen after the tick, not before. On the fixed kernel, `prev_sum_exec_runtime` changes (showing reschedules happened), but `need_resched` is cleared before the next tick's `on_tick_begin`. Let me use `on_tick_end` instead:
