@@ -87,6 +87,14 @@ void kstep_cgroup_add_task(const char *name, int pid);
 void kstep_freeze_task(struct task_struct *p);
 int kstep_eligible(struct sched_entity *se);
 
+// kthread.c
+struct task_struct *kstep_kthread_create(const char *name);
+void kstep_kthread_bind(struct task_struct *p, const struct cpumask *mask);
+void kstep_kthread_start(struct task_struct *p);
+void kstep_kthread_syncwake(struct task_struct *waker, struct task_struct *wakee);
+void kstep_kthread_block(struct task_struct *p);
+void kstep_kthread_yield(struct task_struct *p);
+
 // topo.c
 void kstep_topo_init(void);
 void kstep_topo_set_smt(const char *cpulists[], int size);
