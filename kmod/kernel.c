@@ -92,12 +92,12 @@ void kstep_mkdir(const char *dir) {
   struct dentry *result = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755, NULL);
   int err = IS_ERR(result) ? PTR_ERR(result) : 0;
 // https://github.com/torvalds/linux/commit/c54b386969a58151765a9ffaaa0438e7b580283f
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
-  struct dentry *result = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
-  int err = IS_ERR(result) ? PTR_ERR(result) : 0;
-// https://github.com/torvalds/linux/commit/abf08576afe31506b812c8c1be9714f78613f300
+// vfs_mkdir returns struct dentry * since 6.15, but dev kernels reporting 6.14
+// may already have this change. Use (unsigned long) cast to handle both int and
+// struct dentry * return types without triggering -Werror=int-conversion.
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
-  int err = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
+  unsigned long __mret = (unsigned long)vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
+  int err = IS_ERR_VALUE(__mret) ? (int)__mret : 0;
 // https://github.com/torvalds/linux/commit/6521f8917082928a4cb637eb64b77b5f2f5b30fc
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
   int err = vfs_mkdir(&init_user_ns, inode, dentry, 0755);
@@ -207,7 +207,9 @@ void kstep_cgroup_add_task(const char *name, int pid) {
 
 void kstep_freeze_task(struct task_struct *p) {
 // https://github.com/torvalds/linux/commit/f5d39b020809146cc28e6e73369bf8065e0310aa
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
+#ifdef CONFIG_FREEZER_ACTIVE
+  static_branch_inc(&freezer_active);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
   static_branch_inc(&freezer_active);
 #else
   atomic_inc(&system_freezing_cnt);
@@ -222,7 +224,9 @@ void kstep_freeze_task(struct task_struct *p) {
   KSYM_freeze_task(p);
 
   *KSYM_pm_freezing = false;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
+#ifdef CONFIG_FREEZER_ACTIVE
+  static_branch_dec(&freezer_active);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
   static_branch_dec(&freezer_active);
 #else
   atomic_dec(&system_freezing_cnt);

@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 34/400 reproduced**
+**Total: 35/400 reproduced**
 
 ---
 
@@ -57,7 +57,7 @@
 - [-] `8d737320166b` sched: Fix build for modules using set_tsk_need_resched() — [`8d737320_fix_build_for_modules_using.md`](bugs/8d737320_fix_build_for_modules_using.md) <!-- skipped:build-time-only-bug-missing-EXPORT_SYMBOL_GPL-not-runtime-reproducible attempts:1 -->
 - [ ] `8feb053d5319` sched: Fix trace_sched_switch(.prev_state) — [`8feb053d_fix_trace_sched_switch_prev.md`](bugs/8feb053d_fix_trace_sched_switch_prev.md)
 - [ ] `91caa5ae2424` Fix the bug that task won't enqueue into core tree when update cookie — [`91caa5ae_fix_bug_that_task_wont.md`](bugs/91caa5ae_fix_bug_that_task_wont.md)
-- [ ] `91dabf33ae5d` sched: Fix race in task_call_func() — [`91dabf33_fix_race_task_call_func.md`](bugs/91dabf33_fix_race_task_call_func.md)
+- [x] `91dabf33ae5d` sched: Fix race in task_call_func() — [`91dabf33_fix_race_task_call_func.md`](bugs/91dabf33_fix_race_task_call_func.md) <!-- driver:task_call_func_race attempts:1 -->
 - [ ] `942b8db96500` sched: Fix migrate_disable_switch() locking — [`942b8db9_fix_migrate_disable_switch_locking.md`](bugs/942b8db9_fix_migrate_disable_switch_locking.md)
 - [ ] `96500560f0c7` Avoid double calling update_rq_clock() in __balance_push_cpu_stop() — [`96500560_avoid_double_calling_update_rq.md`](bugs/96500560_avoid_double_calling_update_rq.md)
 - [ ] `9818427c6270` sched/debug: Make sd->flags sysctl read-only — [`9818427c_make_sd_flags_sysctl_readonly.md`](bugs/9818427c_make_sd_flags_sysctl_readonly.md)

@@ -10,6 +10,7 @@
 #include <linux/kthread.h>
 #include <linux/version.h>
 #include <linux/wait.h>
+#include <linux/freezer.h>
 
 #if LINUX_VERSION_CODE == KERNEL_VERSION(5, 19, 0)
 

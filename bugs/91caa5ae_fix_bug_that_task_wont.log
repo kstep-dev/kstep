@@ -1,0 +1,379 @@
+● Read bugs/91caa5ae_fix_bug_that_task_wont.md
+  └ 40 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 91caa5ae2424 2>/dev/null | head -300
+  └ 130 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Find core sched drivers
+  $ cd /users/szhong/kSTEP && grep -l "core_cookie\|core_sched\|sched_core" kmod/drivers/*.c
+  2>/dev/null
+  └ 3 lines...
+
+● Find SMT/core sched references
+  $ cd /users/szhong/kSTEP && grep -l "topo_set_smt\|core_cookie\|force_idle\|forceidle"
+  kmod/drivers/*.c kmod/*.c kmod/*.h 2>/dev/null
+  └ 6 lines...
+
+● Read kmod/drivers/forceidle_balancing.c
+  └ 115 lines read
+
+● Read kmod/drivers/forceidle_starvation.c
+  └ 131 lines read
+
+● List directory kmod/drivers
+  └ 51 files found
+
+● Find core sched helpers in kmod
+  $ cd /users/szhong/kSTEP && grep -r "sched_core_enqueued\|core_cookie\|core_tree" kmod/
+  --include="*.h" --include="*.c" 2>/dev/null | grep -v drivers/ | head -20
+  └ 1 line...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 91caa5ae2424 -1 2>/dev/null && git
+  -C linux/current describe --tags 91caa5ae2424~1 2>/dev/null | head -5
+  └ 3 lines...
+
+● View internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/internal.h
+  └ 2 lines...
+
+● Find KSYM_IMPORT definitions
+  $ cd /users/szhong/kSTEP && grep -r "KSYM_IMPORT\|ksym" kmod/ --include="*.h" --include="*.c"
+  2>/dev/null | grep -v drivers/ | head -20
+  └ 21 lines...
+
+● Find internal/ksym files
+  $ cd /users/szhong/kSTEP && find kmod -name "internal*" -o -name "ksym*" 2>/dev/null
+  └ 2 lines...
+
+● Find KSYM definitions
+  $ cd /users/szhong/kSTEP && grep -r "KSYM_IMPORT\|kstep_ksym" kmod/ksym.h kmod/ksym.c 2>/dev/null
+  | head -20
+  └ 1 line...
+
+● Read kmod/internal.h
+  └ 89 lines read
+
+● Get kernel version tag
+  $ cd /users/szhong/kSTEP && python3 -c "
+  import subprocess
+  r = subprocess.run(['git', '-C', 'linux/current', 'describe', '--tags', '--abbrev=0',
+  '91caa5ae2424~1'], capture_output=True, text=True)
+  print('Tag:', r.stdout.strip())...
+  └ 9 lines...
+
+● Get kernel Makefile version
+  $ cd /users/szhong/kSTEP && git -C linux/current show 91caa5ae2424~1:Makefile | head -5
+  └ 6 lines...
+
+● View buggy core_sched.c
+  $ cd /users/szhong/kSTEP && git -C linux/current show 91caa5ae2424~1:kernel/sched/core_sched.c |
+  head -80
+  └ 80 lines...
+
+● Find core sched definitions
+  $ cd /users/szhong/kSTEP && git -C linux/current show 91caa5ae2424~1:kernel/sched/sched.h | grep
+  -n "sched_core_enqueued\|sched_core_enqueue\|sched_core_dequeue\|core_cookie\|task_on_rq_queued\|c
+  ore_tree\|core_node" | head -30
+  └ 14 lines...
+
+● View sched_core_enqueued
+  $ cd /users/szhong/kSTEP && git -C linux/current show 91caa5ae2424~1:kernel/sched/sched.h | sed -n
+   '1288,1300p'
+  └ 14 lines...
+
+● View task_on_rq_queued
+  $ cd /users/szhong/kSTEP && git -C linux/current show 91caa5ae2424~1:kernel/sched/sched.h | sed -n
+   '2060,2070p'
+  └ 12 lines...
+
+Now I have a solid understanding of the bug. Let me checkout the buggy kernel and write the driver.
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 91caa5ae2424~1 core_enqueue_buggy 2>&1 | tail -5
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+Let me write the driver while the checkout runs.
+
+● Create kmod/drivers/core_enqueue.c (+177)
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 6 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=core_enqueue_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=core_enqueue_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Find freezer_active usage
+  $ cd /users/szhong/kSTEP && grep -n "freezer_active" kmod/kernel.c
+  └ 3 lines...
+
+● Read kmod/kernel.c lines 200-235
+  └ 36 lines read
+
+● Check if freezer_active commit exists
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline f5d39b020809 -1 2>/dev/null && git
+  -C linux/current merge-base --is-ancestor f5d39b020809 91caa5ae2424~1 2>/dev/null; echo "exit: $?"
+  └ 3 lines...
+
+● Check freezer_active in kernel
+  $ cd /users/szhong/kSTEP && grep -r "freezer_active" linux/core_enqueue_buggy/include/ 2>/dev/null
+   | head -5
+  └ 1 line...
+
+● Check freezer symbols
+  $ cd /users/szhong/kSTEP && grep -r "freezer_active\|system_freezing_cnt"
+  linux/core_enqueue_buggy/kernel/freezer.c 2>/dev/null | head -10
+  └ 4 lines...
+
+● Check freezer_active version
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags --abbrev=0 f5d39b020809
+  2>/dev/null
+  └ 2 lines...
+
+● Search for freezer_active
+  $ cd /users/szhong/kSTEP && grep -r "freezer_active" linux/core_enqueue_buggy/include/
+  linux/core_enqueue_buggy/kernel/ 2>/dev/null | head -10
+  └ 1 line...
+
+The symbol doesn't exist in this kernel. I need to fix the version guard to build. Let me use a `#ifdef` check instead:
+
+● Edit kmod/kernel.c (+6 -2)
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=core_enqueue_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Read kmod/drivers/task_state_cmp.c lines 1-40
+  └ 40 lines read
+
+● Check freezable_schedule in kernel
+  $ cd /users/szhong/kSTEP && grep -r "freezable_schedule"
+  linux/core_enqueue_buggy/include/linux/wait.h 2>/dev/null | head -5
+  └ 4 lines...
+
+● Check freezable_schedule definition
+  $ cd /users/szhong/kSTEP && grep -rn "freezable_schedule"
+  linux/core_enqueue_buggy/include/linux/freezer.h 2>/dev/null | head -10
+  └ 11 lines...
+
+● Check kmod Makefile
+  $ cd /users/szhong/kSTEP && cat kmod/Makefile 2>/dev/null | head -30
+  └ 1 line...
+
+● Find build files
+  $ cd /users/szhong/kSTEP && find kmod -name "Makefile" -o -name "Kbuild" | head -5 && cat
+  kmod/Kbuild 2>/dev/null
+  └ 5 lines...
+
+● Edit kmod/drivers/task_state_cmp.c (+1)
+
+● Build kstep module again
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=core_enqueue_buggy 2>&1 | tail -20
+  └ 17 lines...
+
+● Check rq lock usage
+  $ cd /users/szhong/kSTEP && grep -n "raw_spin_rq_lock\|raw_spin_rq_unlock"
+  kmod/drivers/forceidle_balancing.c kmod/drivers/forceidle_starvation.c
+  └ 4 lines...
+
+● Check rq lock macros
+  $ cd /users/szhong/kSTEP && grep -n "raw_spin_rq_lock_irqsave\|raw_spin_rq_unlock_irqrestore"
+  linux/core_enqueue_buggy/kernel/sched/sched.h | head -10
+  └ 7 lines...
+
+● View rq lock implementation
+  $ cd /users/szhong/kSTEP && sed -n '1360,1400p' linux/core_enqueue_buggy/kernel/sched/sched.h
+  └ 42 lines...
+
+● Check raw_spin_rq_lock definition
+  $ cd /users/szhong/kSTEP && grep -n "raw_spin_rq_lock\b\|raw_spin_rq_unlock\b"
+  linux/core_enqueue_buggy/kernel/sched/sched.h | head -10
+  └ 11 lines...
+
+● View raw_spin_rq_lock
+  $ cd /users/szhong/kSTEP && sed -n '1340,1360p' linux/core_enqueue_buggy/kernel/sched/sched.h
+  └ 22 lines...
+
+I need to avoid calling non-exported symbols directly. Let me rewrite the driver to use ksym lookups.
+
+● Read kmod/drivers/core_enqueue.c
+  └ 176 lines read
+
+● Edit kmod/drivers/core_enqueue.c (+34 -44)
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=core_enqueue_buggy 2>&1 | tail -15
+  └ 16 lines...
+
+Build succeeded. Let me run the driver on the buggy kernel:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py core_enqueue --linux_name core_enqueue_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Check logs
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log
+  └ 2 lines...
+
+● Check output files
+  $ cd /users/szhong/kSTEP && cat data/latest.log 2>/dev/null | head -50 && echo "---" && cat
+  data/latest.jsonl 2>/dev/null | head -20
+  └ 52 lines...
+
+● Check relevant log lines
+  $ cd /users/szhong/kSTEP && grep -E
+  "TRACE_INFO|kstep|core_enqueue|BUG|panic|sched_core|fail|pass|status" data/latest.log | head -30
+  └ 14 lines...
+
+● Check QEMU CPU config
+  $ cd /users/szhong/kSTEP && grep -n "num_online_cpus\|cpu\|qemu\|smp" run.py | head -20
+  └ 16 lines...
+
+● Check run.py driver config
+  $ cd /users/szhong/kSTEP && sed -n '25,60p' run.py
+  └ 37 lines...
+
+● Run with 3 CPUs
+  $ cd /users/szhong/kSTEP && ./run.py core_enqueue --linux_name core_enqueue_buggy --num_cpus 3
+  2>&1 | tail -20
+  └ 21 lines...
+
+● Check function declarations
+  $ cd /users/szhong/kSTEP && grep -n "^static\|^int\|^unsigned long\|^void"
+  linux/core_enqueue_buggy/kernel/sched/core_sched.c | head -20
+  └ 12 lines...
+
+● Find core_enabled in core_sched
+  $ cd /users/szhong/kSTEP && grep -n "core_enabled\s*="
+  linux/core_enqueue_buggy/kernel/sched/core_sched.c 2>/dev/null | head -20
+  └ 1 line...
+
+● Find where core_enabled is set
+  $ cd /users/szhong/kSTEP && grep -n "core_enabled\s*="
+  linux/core_enqueue_buggy/kernel/sched/core.c | head -20
+  └ 4 lines...
+
+● View core_enabled setup code
+  $ cd /users/szhong/kSTEP && sed -n '340,375p' linux/core_enqueue_buggy/kernel/sched/core.c
+  └ 35 lines...
+
+● View sched_core_put context
+  $ cd /users/szhong/kSTEP && sed -n '310,345p' linux/core_enqueue_buggy/kernel/sched/core.c
+  └ 37 lines...
+
+● Find sched_core_get/put
+  $ cd /users/szhong/kSTEP && grep -n "sched_core_get\|sched_core_put\b"
+  linux/core_enqueue_buggy/kernel/sched/core.c | head -10
+  └ 5 lines...
+
+● View sched_core_get
+  $ cd /users/szhong/kSTEP && sed -n '399,430p' linux/core_enqueue_buggy/kernel/sched/core.c
+  └ 33 lines...
+
+● Edit kmod/drivers/core_enqueue.c (+50 -63)
+
+● Build kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=core_enqueue_buggy 2>&1 | tail -15
+  └ 16 lines...
+
+Build succeeded. Let me run it:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py core_enqueue --linux_name core_enqueue_buggy --num_cpus 3
+  2>&1 | tail -30
+  └ 31 lines...
+
+● Check kernel symbols
+  $ cd /users/szhong/kSTEP && nm build/core_enqueue_buggy/vmlinux 2>/dev/null | grep
+  "sched_core_update_cookie\|sched_core_share_pid\|sched_core_enqueue\b\|sched_core_dequeue\b" |
+  head -10
+  └ 4 lines...
+
+The static branch enable isn't working. Let me check the kernel binary for `sched_core_update_cookie` and find an alternative approach:
+
+● List all sched_core symbols
+  $ cd /users/szhong/kSTEP && nm build/core_enqueue_buggy/vmlinux 2>/dev/null | grep "sched_core" |
+  sort
+  └ 25 lines...
+
+`__sched_core_set` is in kallsyms and inlines `sched_core_update_cookie`. Let me use it directly:
+
+● Edit kmod/drivers/core_enqueue.c (+35 -49)
+
+● Build kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=core_enqueue_buggy 2>&1 | tail -15
+  └ 16 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py core_enqueue --linux_name core_enqueue_buggy --num_cpus 3
+  2>&1 | tail -30
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● stop_bash
+  └ 1 line...
+
+● Check log for hang
+  $ cd /users/szhong/kSTEP && cat data/latest.log 2>/dev/null | grep -E
+  "TRACE|kstep|panic|BUG|hang|lock|dead|core_set|cookie|enqueue|fail|pass|WARN|stuck" | head -30
+  └ 17 lines...
+
+● Run with timeout
+  $ cd /users/szhong/kSTEP && timeout 60 ./run.py core_enqueue --linux_name core_enqueue_buggy
+  --num_cpus 3 2>&1 | tail -40
+  └ 2 lines...
+
+● stop_bash
+  └ 1 line...
+
+The QEMU hung. Let me check what happened and debug:
+
+● Check log files
+  $ cd /users/szhong/kSTEP && ls -la data/latest.log 2>/dev/null && ls -lt data/logs/ 2>/dev/null |
+  head -5
+  └ 7 lines...
+
+● Check latest log
+  $ cd /users/szhong/kSTEP && grep "core_enqueue\|TRACE\|panic\|BUG\|WARN\|Running
+  driver\|__sched_core_set\|cookie\|enqueue" data/logs/log-20260310_092948.log | head -20
+  └ 18 lines...
+
+The bug is confirmed - `enqueued=0` after cookie assignment! But cleanup crashes. Let me fix the cleanup:
+
+● Edit kmod/drivers/core_enqueue.c (+13 -5)
+
+Also need to add the typedef for core_dequeue_fn_t usage later in the function. Let me check the current state:
+
+● Read kmod/drivers/core_enqueue.c
+  └ 147 lines read
+

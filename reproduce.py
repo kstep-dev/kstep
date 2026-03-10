@@ -459,6 +459,13 @@ bugs = [
             Linux(name="fixed", version="8a6edb5257e2"),
         ],
     ),
+    Bug(
+        driver=Driver(name="task_call_func_race", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="91dabf33ae5d~1"),
+            Linux(name="fixed", version="91dabf33ae5d"),
+        ],
+    ),
 ]
 
 
