@@ -276,6 +276,21 @@ bugs = [
             Linux(name="fixed", version="3a7956e25e1d"),
         ],
     ),
+    Bug(
+        driver=Driver(name="preempt_str", num_cpus=2),
+        linux=[
+            Linux(
+                name="buggy",
+                version="3ebb1b652239~1",
+                config=LINUX_ROOT_DIR / "preempt_str.config",
+            ),
+            Linux(
+                name="fixed",
+                version="3ebb1b652239",
+                config=LINUX_ROOT_DIR / "preempt_str.config",
+            ),
+        ],
+    ),
 ]
 
 
@@ -289,6 +304,15 @@ def reproduce(linux: Linux, driver: Driver, skip_build: bool):
         linux.version, linux_name=linux_name, patch=linux.patch, tarball=True
     )
     if not skip_build:
+        if linux.config:
+            # Generate default config, merge extra fragment, then build
+            system(f"make -C {PROJ_DIR} linux-config LINUX_NAME={linux_name}")
+            linux_dir = LINUX_ROOT_DIR / linux_name
+            system(
+                f"cd {linux_dir} && "
+                f"./scripts/kconfig/merge_config.sh -m .config {linux.config} && "
+                f"make olddefconfig"
+            )
         make_linux(linux_name=linux_name)
     make_kstep(linux_name=linux_name)
     log_file = RESULTS_DIR / f"{linux_name}.log"

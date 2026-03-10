@@ -27,6 +27,8 @@ class Linux:
     version: str
     # The patch to apply to the kernel
     patch: Path | None = None
+    # Extra config fragment to merge (applied after default kSTEP config)
+    config: Path | None = None
 
 
 def fmt_path(path: Path) -> str:

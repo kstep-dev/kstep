@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 14/400 reproduced**
+**Total: 15/400 reproduced**
 
 ---
 
@@ -23,7 +23,7 @@
 - [x] `2cab4bd024d2` sched/debug: Fix the runnable tasks output — [`2cab4bd0_the_runnable_tasks_output.md`](bugs/2cab4bd0_the_runnable_tasks_output.md) <!-- driver:sched_debug_output attempts:1 -->
 - [-] `399ced9594df` rcu/tasks: Fix stale task snapshot for Tasks Trace — [`399ced95_rcu_tasks_fix_stale_task.md`](bugs/399ced95_rcu_tasks_fix_stale_task.md) <!-- skipped:memory-ordering-bug-only-on-weakly-ordered-archs-not-x86-TSO attempts:1 -->
 - [x] `3a7956e25e1d` kthread: Fix PF_KTHREAD vs to_kthread() race — [`3a7956e2_kthread_fix_pf_kthread_vs.md`](bugs/3a7956e2_kthread_fix_pf_kthread_vs.md) <!-- driver:pf_kthread_race attempts:1 -->
-- [ ] `3ebb1b652239` Fix preemption string of preempt_dynamic_none — [`3ebb1b65_fix_preemption_string_of_preempt.md`](bugs/3ebb1b65_fix_preemption_string_of_preempt.md)
+- [x] `3ebb1b652239` Fix preemption string of preempt_dynamic_none <!-- driver:preempt_str attempts:1 --> — [`3ebb1b65_fix_preemption_string_of_preempt.md`](bugs/3ebb1b65_fix_preemption_string_of_preempt.md)
 - [ ] `42dc938a590c` sched/core: Mitigate race cpus_share_cache()/update_top_cache_domain() — [`42dc938a_mitigate_race_cpus_share_cache.md`](bugs/42dc938a_mitigate_race_cpus_share_cache.md)
 - [-] `494dcdf46e5c` sched: Fix build warning without CONFIG_SYSCTL — [`494dcdf4_fix_build_warning_without_config.md`](bugs/494dcdf4_fix_build_warning_without_config.md) <!-- skipped:build-time-compiler-warning-not-runtime-bug attempts:1 -->
 - [ ] `505da6689305` sched/clock: Avoid false sharing for sched_clock_irqtime — [`505da668_sched_clock_avoid_false_sharing.md`](bugs/505da668_sched_clock_avoid_false_sharing.md)

@@ -29,7 +29,7 @@ void kstep_sched_clock_init(void) {
   if (set_fn)
     set_fn(kstep_sched_clock_get);
   else
-    pv_ops.time.sched_clock = kstep_sched_clock_get;
+    panic("paravirt_set_sched_clock not found");
   TRACE_INFO("Mocked sched clock");
 }
 
