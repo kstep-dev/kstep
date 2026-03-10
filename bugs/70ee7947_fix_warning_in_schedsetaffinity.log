@@ -206,3 +206,29 @@ Bug triggers on buggy kernel (`fail`), no warning on fixed kernel (`pass`). Now 
 
 Now commit and push:
 
+● Git commit
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: setaffinity_warn
+  (70ee7947a290)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>&1 | tail -5
+  └ 4 lines...
+
+● Git push
+  $ cd /users/szhong/kSTEP && git push 2>&1 | tail -5
+  └ 3 lines...
+
+Successfully reproduced bug `70ee7947a290`:
+
+- **Bug**: `WARN_ON_ONCE` fires in `__sched_setaffinity` when a cpuset update races with `sched_setaffinity`, causing an empty mask intersection
+- **Driver**: `setaffinity_warn` — two raw kthreads race: one toggles cpuset CPUs between "1-2" and "1", while the other repeatedly calls `sched_setaffinity(target, {CPU 2})`
+- **Buggy kernel**: WARN fires → `kstep_fail` ✓
+- **Fixed kernel**: No warning → `kstep_pass` ✓
+- **Committed and pushed**
+
+
+Total usage est:        6 Premium requests
+API time spent:         12m 6s
+Total session time:     17m 5s
+Total code changes:     +147 -2
+Breakdown by AI model:
+ claude-opus-4.6-1m      2.3m in, 40.4k out, 2.3m cached (Est. 6 Premium requests)

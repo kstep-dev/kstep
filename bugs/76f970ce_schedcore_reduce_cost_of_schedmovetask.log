@@ -161,3 +161,146 @@
    && echo "---" && head -6 linux/sched_move_buggy/Makefile
   └ 12 lines...
 
+Now I understand the bug. The key issue is the early bail in `sched_move_task()` preventing `detach_task_cfs_rq()` during task exit, causing stale utilization. I need CONFIG_SCHED_AUTOGROUP for the exit path. Let me implement the driver.
+
+● Check autogroup in configs
+  $ cd /users/szhong/kSTEP && grep -c "CONFIG_SCHED_AUTOGROUP" linux/config.kstep; echo "---"; grep
+  "AUTOGROUP" linux/sched_move_buggy/.config 2>/dev/null || echo "not found"
+  └ 4 lines...
+
+● Check autogroup source exists
+  $ cd /users/szhong/kSTEP && grep -n "sched_autogroup_exit_task"
+  linux/sched_move_buggy/kernel/sched/autogroup.c 2>/dev/null | head -5
+  └ 4 lines...
+
+● Enable autogroup in config
+  $ cd /users/szhong/kSTEP && echo "CONFIG_SCHED_AUTOGROUP=y" >> linux/config.kstep
+  └ 1 line...
+
+Now let me create the driver. I need to understand the fork/exit mechanics better first.
+
+● Check if child iteration is used
+  $ cd /users/szhong/kSTEP && grep -n "list_for_each_entry\|children\|sibling" kmod/drivers/*.c
+  2>/dev/null | head -10
+  └ 2 lines...
+
+● Check if send_sig is used
+  $ cd /users/szhong/kSTEP && grep -n "send_sig\|SIGKILL" kmod/drivers/*.c kmod/*.c 2>/dev/null |
+  head -10
+  └ 3 lines...
+
+● Read exit_mm driver for reference
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/exit_mm_membarrier.c
+  └ 106 lines...
+
+● Check run.py CLI options
+  $ cd /users/szhong/kSTEP && python3 ./run.py --help 2>&1 | head -20
+  └ 17 lines...
+
+Good, `--num_cpus` is available. Now let me create the driver:
+
+● Create kmod/drivers/sched_move.c (+119)
+
+Now let me build the buggy kernel with autogroup enabled:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sched_move_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Verify autogroup enabled
+  $ cd /users/szhong/kSTEP && grep "CONFIG_SCHED_AUTOGROUP" linux/sched_move_buggy/.config
+  └ 2 lines...
+
+Good, autogroup is enabled. Now build kstep:
+
+● Build kstep for buggy kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_move_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Now let me run the driver on the buggy kernel:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py sched_move --linux_name sched_move_buggy --num_cpus 4 2>&1 |
+  tail -5
+  └ 6 lines...
+
+● Check buggy kernel logs
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | grep -E
+  "round|Final|pass|fail|panic|BUG|killed|util_avg" | tail -30
+  └ 2 lines...
+
+● Check buggy kernel logs
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  "round|Final|pass|fail|panic|BUG|killed|util_avg" | tail -30
+  └ 26 lines...
+
+● Check pass/fail result
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "pass|fail"
+  └ 3 lines...
+
+● Check JSONL output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl | grep -E "pass|fail" | tail -5
+  └ 2 lines...
+
+The buggy kernel shows `fail` with stale util_avg=332. Now let me build and test the fixed kernel to confirm the bug is gone:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 76f970ce51c8 sched_move_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sched_move_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_move_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run driver on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py sched_move --linux_name sched_move_fixed --num_cpus 4 2>&1 |
+  tail -5
+  └ 6 lines...
+
+● Check fixed kernel results
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "round|Final|killed|util_avg" | tail -25
+   && echo "---" && cat data/latest.jsonl | grep -E "pass|fail"
+  └ 24 lines...
+
+The util values are nearly identical on both kernels (~332 vs ~328). The autogroup sysctl defaults to 1, so during exit with PF_EXITING, groups differ and the early bail doesn't trigger. I need to set `sysctl_sched_autogroup_enabled=0` to trigger the bug.
+
+● Edit kmod/drivers/sched_move.c (+22 -7)
+
+● Rebuild kstep for buggy kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_move_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Check build errors
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_move_buggy 2>&1 | grep "error:" | head -10
+  └ 2 lines...
+
+● Edit kmod/drivers/sched_move.c (+1 -1)
+
+● Rebuild kstep for buggy
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_move_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py sched_move --linux_name sched_move_buggy --num_cpus 4 2>&1 |
+  tail -3
+  └ 4 lines...
+
+● Check buggy results with sysctl=0
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "round|Final|baseline|util_avg" | tail
+  -25 && echo "---" && cat data/latest.jsonl | grep -E "pass|fail"
+  └ 25 lines...
+
+● Rebuild and run on fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_move_fixed 2>&1 | tail -3 && ./run.py
+  sched_move --linux_name sched_move_fixed --num_cpus 4 2>&1 | tail -3
+  └ 7 lines...
+
+● Check fixed kernel results
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "round|Final|baseline|util_avg" | tail
+  -25 && echo "---" && cat data/latest.jsonl | grep -E "pass|fail"
+  └ 25 lines...
+
