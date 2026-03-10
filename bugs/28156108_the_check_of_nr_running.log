@@ -394,3 +394,32 @@ Now update TODO.md:
 
 Now revert the stub in main.c (it was needed for the build but should be a proper fix or left if other drivers need it). Actually, the stub is needed for other drivers on this kernel version, so it's a legitimate fix. Let me keep it and commit:
 
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git add -A && git --no-pager diff --cached --stat
+  └ 9 lines...
+
+● Commit changes
+  $ cd /users/szhong/kSTEP && git commit -m "reproduce: nr_running_wakelist (28156108fecb)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+  └ 4 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1 | tail -5
+  └ 3 lines...
+
+Successfully reproduced bug `28156108fecb`. Summary:
+
+**Bug**: `ttwu_queue_cond()` checks `nr_running <= 1` instead of `!nr_running` when WF_ON_CPU is set, causing unnecessary wakelist queueing when there's another runnable task.
+
+**Driver** (`nr_running_wakelist.c`): Sets up CPU 1 with one runnable task (nr_running=1) and a blocked kthread. Simulates the descheduling window by setting `on_cpu=1`, then calls `wake_up_process`. By reading `nr_running` immediately after:
+- **Buggy**: nr_running stays 1 (wakelist path taken, activation deferred) → `fail`
+- **Fixed**: nr_running increases to 2 (direct activation) → `pass`
+
+
+Total usage est:        6 Premium requests
+API time spent:         18m 51s
+Total session time:     28m 20s
+Total code changes:     +199 -78
+Breakdown by AI model:
+ claude-opus-4.6-1m      7.5m in, 64.0k out, 7.3m cached (Est. 6 Premium requests)
