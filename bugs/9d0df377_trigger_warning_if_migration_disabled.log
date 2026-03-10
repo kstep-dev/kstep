@@ -1,0 +1,75 @@
+● Read bugs/9d0df377_trigger_warning_if_migration_disabled.md
+  └ 40 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 9d0df3779745 2>/dev/null | head -200
+  └ 89 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● See example driver patterns
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/*.c | head -100
+  └ 101 lines...
+
+● Check kernel version near commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 9d0df3779745~1 | head -3
+  └ 4 lines...
+
+● Read simple driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/default.c
+  └ 58 lines...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags --abbrev=0 9d0df3779745~1
+  2>/dev/null || git -C linux/current log --oneline -1 9d0df3779745~1
+  └ 2 lines...
+
+● Determine kernel version range
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline --ancestry-path v5.15..9d0df3779745
+   | wc -l && git -C linux/current log --oneline --ancestry-path v5.16..9d0df3779745 2>/dev/null |
+  wc -l
+  └ 3 lines...
+
+● Check KSYM_IMPORT usage
+  $ cd /users/szhong/kSTEP && grep -r "KSYM_IMPORT\|KSYM_" kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Check internal.h header
+  $ cd /users/szhong/kSTEP && head -50 kmod/internal.h
+  └ 51 lines...
+
+● Find KSYM_IMPORT definition
+  $ cd /users/szhong/kSTEP && grep -r "KSYM_IMPORT" kmod/*.h kmod/*.c 2>/dev/null | head -20
+  └ 21 lines...
+
+● Check driver execution model
+  $ cd /users/szhong/kSTEP && grep -n "run\|DRIVER" kmod/main.c 2>/dev/null | head -20
+  └ 6 lines...
+
+● Check nr_pinned type in rq
+  $ cd /users/szhong/kSTEP && grep -n "nr_pinned" linux/current/kernel/sched/sched.h 2>/dev/null |
+  head -10
+  └ 2 lines...
+
+● Check migration APIs in sched.h
+  $ cd /users/szhong/kSTEP && grep -n "migrate_enable\|migrate_disable"
+  linux/current/include/linux/sched.h 2>/dev/null | head -10
+  └ 1 line...
+
+Now I have enough info. Let me write the driver. The bug is simple: calling `migrate_enable()` without matching `migrate_disable()` causes `rq->nr_pinned` underflow. The fix adds a WARN_ON_ONCE check.
+
+● Find migrate_enable declaration
+  $ cd /users/szhong/kSTEP && grep -rn "migrate_enable\|migrate_disable"
+  linux/current/include/linux/preempt.h 2>/dev/null | head -10
+  └ 11 lines...
+
+● Find migrate function declarations
+  $ cd /users/szhong/kSTEP && grep -rn "void migrate_enable\|void migrate_disable"
+  linux/current/include/ 2>/dev/null | head -10
+  └ 5 lines...
+

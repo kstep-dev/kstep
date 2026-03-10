@@ -61,7 +61,7 @@
 - [x] `942b8db96500` sched: Fix migrate_disable_switch() locking — [`942b8db9_fix_migrate_disable_switch_locking.md`](bugs/942b8db9_fix_migrate_disable_switch_locking.md) <!-- driver:migrate_disable_lock attempts:1 -->
 - [ ] `96500560f0c7` Avoid double calling update_rq_clock() in __balance_push_cpu_stop() — [`96500560_avoid_double_calling_update_rq.md`](bugs/96500560_avoid_double_calling_update_rq.md)
 - [ ] `9818427c6270` sched/debug: Make sd->flags sysctl read-only — [`9818427c_make_sd_flags_sysctl_readonly.md`](bugs/9818427c_make_sd_flags_sysctl_readonly.md)
-- [ ] `9864f5b5943a` cpuidle: Move trace_cpu_idle() into generic code — [`9864f5b5_move_trace_cpu_idle_into.md`](bugs/9864f5b5_move_trace_cpu_idle_into.md)
+- [-] `9864f5b5943a` cpuidle: Move trace_cpu_idle() into generic code — [`9864f5b5_move_trace_cpu_idle_into.md`](bugs/9864f5b5_move_trace_cpu_idle_into.md) <!-- skipped:tracing-correctness-issue-not-observable-via-kSTEP attempts:1 -->
 - [ ] `9d0df3779745` Trigger warning if ->migration_disabled counter underflows — [`9d0df377_trigger_warning_if_migration_disabled.md`](bugs/9d0df377_trigger_warning_if_migration_disabled.md)
 - [ ] `9e81889c7648` sched: Fix affine_move_task() self-concurrency — [`9e81889c_fix_affine_move_task_self.md`](bugs/9e81889c_fix_affine_move_task_self.md)
 - [ ] `9ed20bafc858` preempt/dynamic: Fix setup_preempt_mode() return value — [`9ed20baf_fix_setup_preempt_mode_return.md`](bugs/9ed20baf_fix_setup_preempt_mode_return.md)

@@ -1,0 +1,44 @@
+● Read bugs/9864f5b5_move_trace_cpu_idle_into.md
+  └ 40 lines read
+
+● Check patch stats
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 9864f5b5943a --stat 2>/dev/null | head
+  -20
+  └ 21 lines...
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● View idle.c patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 9864f5b5943a -- kernel/sched/idle.c
+  2>/dev/null
+  └ 81 lines...
+
+● stop_bash
+  └ 1 line...
+
+Let me look at the full patch and understand the architecture-specific changes to see if there's an observable effect.
+
+● View arch changes
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 9864f5b5943a -- arch/ | head -100
+  └ 101 lines...
+
+● View idle.c patch fully
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 9864f5b5943a -- kernel/sched/idle.c |
+  cat
+  └ 95 lines...
+
+This bug is a tracing infrastructure correctness issue — `trace_cpu_idle()` was being called with RCU disabled in arch-specific idle implementations. The fix moves the trace calls to the generic code outside the RCU-disabled region. This doesn't affect scheduler behavior or task placement — it's purely about trace event safety. It cannot be observed through kSTEP's interfaces.
+
+Let me skip this and update TODO.md.
+
+● Find bug in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n '9864f5b5943a' TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+
