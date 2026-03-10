@@ -21,3 +21,19 @@ The bug requires userspace file I/O (open/write/poll on /proc/pressure files) wi
 
 ● Edit TODO.md (+1 -1)
 
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: a06247c6804f - PSI UAF requires
+  userspace file ops outside kSTEP scope
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" && git push
+  └ 16 lines...
+
+**Skipped** `a06247c6804f` — this PSI use-after-free bug requires concurrent userspace file operations (open/write/poll) on `/proc/pressure/*` files, which is outside kSTEP's kernel-level scheduler simulation scope. Committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         31s
+Total session time:     39s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      155.2k in, 1.4k out, 136.5k cached (Est. 6 Premium requests)

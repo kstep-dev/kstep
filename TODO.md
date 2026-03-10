@@ -64,7 +64,7 @@
 - [-] `9864f5b5943a` cpuidle: Move trace_cpu_idle() into generic code — [`9864f5b5_move_trace_cpu_idle_into.md`](bugs/9864f5b5_move_trace_cpu_idle_into.md) <!-- skipped:tracing-correctness-issue-not-observable-via-kSTEP attempts:1 -->
 - [x] `9d0df3779745` Trigger warning if ->migration_disabled counter underflows — [`9d0df377_trigger_warning_if_migration_disabled.md`](bugs/9d0df377_trigger_warning_if_migration_disabled.md) <!-- driver:migration_underflow attempts:1 -->
 - [ ] `9e81889c7648` sched: Fix affine_move_task() self-concurrency — [`9e81889c_fix_affine_move_task_self.md`](bugs/9e81889c_fix_affine_move_task_self.md)
-- [ ] `9ed20bafc858` preempt/dynamic: Fix setup_preempt_mode() return value — [`9ed20baf_fix_setup_preempt_mode_return.md`](bugs/9ed20baf_fix_setup_preempt_mode_return.md)
+- [-] `9ed20bafc858` preempt/dynamic: Fix setup_preempt_mode() return value — [`9ed20baf_fix_setup_preempt_mode_return.md`](bugs/9ed20baf_fix_setup_preempt_mode_return.md) <!-- skipped:boot-time-only __setup() return value bug, no runtime scheduling impact attempts:1 -->
 - [-] `a06247c6804f` psi: Fix uaf issue when psi trigger is destroyed while being polled — [`a06247c6_fix_uaf_issue_when_psi.md`](bugs/a06247c6_fix_uaf_issue_when_psi.md) <!-- skipped:requires-userspace-file-ops-on-proc-pressure-outside-kstep-scope attempts:1 -->
 - [ ] `abfc01077df6` sched: Fix do_set_cpus_allowed() locking — [`abfc0107_fix_do_set_cpus_allowed.md`](bugs/abfc0107_fix_do_set_cpus_allowed.md)
 - [ ] `af13e5e437dc` sched: Fix the do_set_cpus_allowed() locking fix — [`af13e5e4_fix_the_do_set_cpus.md`](bugs/af13e5e4_fix_the_do_set_cpus.md)

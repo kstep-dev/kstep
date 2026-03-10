@@ -603,3 +603,12 @@ Now commit and push:
   $ cd /users/szhong/kSTEP && git --no-pager diff --cached --stat | head -20
   └ 8 lines...
 
+● Check all changes
+  $ cd /users/szhong/kSTEP && git --no-pager diff --name-only | head -10 && echo "---" && git
+  --no-pager diff --cached --name-only | head -10
+  └ 2 lines...
+
+● Full git status
+  $ cd /users/szhong/kSTEP && git --no-pager status
+  └ 15 lines...
+

@@ -8,3 +8,4 @@
   $ cd /users/szhong/kSTEP && git -C linux/current show -U32 abfc01077df6 2>/dev/null | head -300
   └ 301 lines...
 
+Let me explore the kSTEP framework and existing drivers to understand patterns.

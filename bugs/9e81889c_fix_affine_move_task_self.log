@@ -32,3 +32,32 @@
   $ cd /users/szhong/kSTEP && cat kmod/drivers/dup_user_cpus_uaf.c 2>/dev/null
   └ 111 lines...
 
+● Find related drivers
+  $ cd /users/szhong/kSTEP && grep -l
+  "sched_setaffinity\|migration_pending\|affine_move\|set_cpus_allowed" kmod/drivers/*.c 2>/dev/null
+  └ 8 lines...
+
+● Check kernel version near the fix
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 9e81889c7648~3..9e81889c7648
+  2>/dev/null
+  └ 4 lines...
+
+● Check internal.h for symbols
+  $ cd /users/szhong/kSTEP && grep -n "kstep_ksym_lookup\|kstep_cov" kmod/internal.h 2>/dev/null |
+  head -20
+  └ 11 lines...
+
+● Read similar driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migration_cpu_stop_requeue.c 2>/dev/null
+  └ 136 lines...
+
+● Read setaffinity driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/setaffinity_warn.c 2>/dev/null
+  └ 138 lines...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -1 9e81889c7648~1 && git -C
+  linux/current describe --tags 9e81889c7648~1 2>/dev/null || git -C linux/current log --oneline
+  9e81889c7648~1 -1
+  └ 3 lines...
+
