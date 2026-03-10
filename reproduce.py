@@ -655,6 +655,21 @@ bugs = [
             Linux(name="fixed", version="eaf5a92ebde5bca3bb2565616115bd6d579486cd"),
         ],
     ),
+    Bug(
+        driver=Driver(name="hrtick_context", num_cpus=2),
+        linux=[
+            Linux(
+                name="buggy",
+                version="e38e5299747b~1",
+                config=LINUX_ROOT_DIR / "hrtick_context.config",
+            ),
+            Linux(
+                name="fixed",
+                version="e38e5299747b",
+                config=LINUX_ROOT_DIR / "hrtick_context.config",
+            ),
+        ],
+    ),
 ]
 
 

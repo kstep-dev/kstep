@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 58/400 reproduced**
+**Total: 59/400 reproduced**
 
 ---
 
@@ -83,7 +83,7 @@
 - [-] `dcd6dffb0a75` sched/core: Fix size of rq::uclamp initialization — [`dcd6dffb_fix_rq_uclamp_init_size.md`](bugs/dcd6dffb_fix_rq_uclamp_init_size.md) <!-- skipped:boot-time-init-bug-percpu-BSS-zeroed-in-QEMU-no-observable-effect attempts:1 -->
 - [x] `df14b7f9efcd` sched/core: Fix a missed update of user_cpus_ptr — [`df14b7f9_core_missed_user_cpus_ptr.md`](bugs/df14b7f9_core_missed_user_cpus_ptr.md) <!-- driver:missed_user_cpus_ptr attempts:1 -->
 - [x] `e0b257c3b71b` sched: Prevent raising SCHED_SOFTIRQ when CPU is !active — [`e0b257c3_prevent_softirq_inactive_cpu.md`](bugs/e0b257c3_prevent_softirq_inactive_cpu.md) <!-- driver:softirq_inactive_cpu attempts:1 -->
-- [ ] `e38e5299747b` sched/hrtick: Fix hrtick() vs. scheduling context — [`e38e5299_hrtick_schedule_context.md`](bugs/e38e5299_hrtick_schedule_context.md)
+- [x] `e38e5299747b` sched/hrtick: Fix hrtick() vs. scheduling context — [`e38e5299_hrtick_schedule_context.md`](bugs/e38e5299_hrtick_schedule_context.md) <!-- driver:hrtick_context attempts:1 -->
 - [ ] `e65855a52b47` Fix a deadlock when enabling uclamp static key — [`e65855a5_fix_deadlock_enabling_uclamp_static.md`](bugs/e65855a5_fix_deadlock_enabling_uclamp_static.md)
 - [ ] `e932c4ab38f0` sched/core: Prevent wakeup of ksoftirqd during idle load balance — [`e932c4ab_prevent_wakeup_ksoftirqd_during_idle.md`](bugs/e932c4ab_prevent_wakeup_ksoftirqd_during_idle.md)
 - [x] `eaf5a92ebde5` sched/core: Fix reset-on-fork from RT with uclamp — [`eaf5a92e_fix_resetonfork_rt_uclamp.md`](bugs/eaf5a92e_fix_resetonfork_rt_uclamp.md) <!-- driver:resetonfork_rt_uclamp attempts:1 -->
