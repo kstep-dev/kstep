@@ -275,3 +275,42 @@ Now add to reproduce.py. Let me find the right place:
 
 Now commit and push:
 
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git add -A && git diff --cached --stat
+  └ 10 lines...
+
+There are unrelated files staged. Let me only commit my changes:
+
+● Unstage unrelated files
+  $ cd /users/szhong/kSTEP && git reset HEAD -- bugs/5ebde09d_rqcf_act_skip_leak.log
+  bugs/6080fb21_updating_ppos_server_write_ops.log kmod/drivers/rqcf_act_skip_leak.c && git diff
+  --cached --stat
+  └ 11 lines...
+
+● Commit changes
+  $ cd /users/szhong/kSTEP && git commit -m "reproduce: yield_to_race (5d808c78d972)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+  └ 4 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced bug `5d808c78d972`. Here's a summary:
+
+**Bug**: `yield_to()` uses `scoped_guard(irqsave)` which only disables IRQs but doesn't hold the target's `pi_lock`. This allows `try_to_wake_up()` to concurrently migrate the target task, causing `yield_to_task_fair()`/`set_next_buddy()` to operate on a stale runqueue.
+
+**Detection**: The driver creates a target kthread (sleeping on CPU1), a yielder (calling `yield_to` on CPU2), and a checker (testing `pi_lock` contention on CPU3).
+
+**Results**:
+- **Buggy kernel**: 0/10,194,338 trylock attempts contended → pi_lock never held → race possible ✗
+- **Fixed kernel**: 5,965,748/6,754,351 (88%) contended → pi_lock held → race prevented ✓
+
+
+Total usage est:        6 Premium requests
+API time spent:         14m 35s
+Total session time:     22m 9s
+Total code changes:     +151 -3
+Breakdown by AI model:
+ claude-opus-4.6-1m      3.5m in, 50.1k out, 3.4m cached (Est. 6 Premium requests)

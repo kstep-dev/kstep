@@ -188,3 +188,310 @@ Now let me look at the buggy `__schedule()` and related code:
   $ cd /users/szhong/kSTEP && cat kmod/drivers/throttled_limbo_list.c
   └ 71 lines...
 
+● Check SCHED_WARN_ON definition
+  $ cd /users/szhong/kSTEP && grep -n "SCHED_WARN_ON" linux/current/kernel/sched/sched.h | head -10
+  └ 1 line...
+
+● Find SCHED_WARN_ON definition
+  $ cd /users/szhong/kSTEP && grep -n "define SCHED_WARN_ON" linux/current/kernel/sched/sched.h
+  └ 1 line...
+
+● Find SCHED_WARN_ON macro definition
+  $ cd /users/szhong/kSTEP && grep -rn "SCHED_WARN_ON" linux/current/include/ 2>/dev/null | head -5;
+   grep -rn "define SCHED_WARN_ON" linux/current/ 2>/dev/null | head -5
+  └ 1 line...
+
+● Find SCHED_WARN_ON usage
+  $ cd /users/szhong/kSTEP && grep -rn "SCHED_WARN_ON" linux/current/kernel/sched/sched.h | head -5
+  └ 1 line...
+
+● Find SCHED_WARN definition
+  $ cd /users/szhong/kSTEP && grep -rn "SCHED_WARN" linux/current/kernel/sched/debug.c 2>/dev/null |
+   head -5; grep -rn "define SCHED_WARN" linux/current/kernel/sched/ 2>/dev/null | head -5
+  └ 1 line...
+
+● Find SCHED_WARN across includes
+  $ cd /users/szhong/kSTEP && grep -rn "SCHED_WARN" linux/current/include/linux/sched.h 2>/dev/null
+  | head -5; grep -rn "SCHED_WARN" linux/current/include/linux/ 2>/dev/null | head -5
+  └ 1 line...
+
+● Find SCHED_WARN_ON definition globally
+  $ cd /users/szhong/kSTEP && grep -rn "SCHED_WARN" linux/current/kernel/ 2>/dev/null | grep
+  "define" | head -10
+  └ 1 line...
+
+● Find SCHED_WARN_ON definition globally
+  $ cd /users/szhong/kSTEP && grep -rn "define.*SCHED_WARN" linux/current/ 2>/dev/null | head -5
+  └ 1 line...
+
+● Git grep for SCHED_WARN_ON
+  $ cd /users/szhong/kSTEP && git -C linux/current grep "define SCHED_WARN" 2>/dev/null | head -5
+  └ 1 line...
+
+● Find all SCHED_WARN uses
+  $ cd /users/szhong/kSTEP && grep -rn "SCHED_WARN" linux/current/kernel/sched/*.h 2>/dev/null |
+  head -15
+  └ 1 line...
+
+● Check sched.h header for SCHED_WARN
+  $ cd /users/szhong/kSTEP && head -100 linux/current/kernel/sched/sched.h | grep -n "SCHED_WARN"
+  └ 1 line...
+
+● Check SCHED_WARN in buggy kernel
+  $ cd /users/szhong/kSTEP && grep -n "SCHED_WARN"
+  linux/rqcf_act_skip_leak_buggy/kernel/sched/sched.h
+  └ 8 lines...
+
+● Check SCHED_WARN_ON conditionals
+  $ cd /users/szhong/kSTEP && sed -n '84,90p' linux/rqcf_act_skip_leak_buggy/kernel/sched/sched.h
+  └ 6 lines...
+
+● Check if SCHED_DEBUG is enabled
+  $ cd /users/szhong/kSTEP && grep "CONFIG_SCHED_DEBUG" build/rqcf_act_skip_leak_buggy/.config
+  2>/dev/null; grep "CONFIG_SCHED_DEBUG" linux/current/.config 2>/dev/null; grep
+  "CONFIG_SCHED_DEBUG" scripts/kstep_config 2>/dev/null
+  └ 1 line...
+
+● Find config files
+  $ cd /users/szhong/kSTEP && find scripts/ -name "*config*" -o -name "*.config" 2>/dev/null | head
+  -10; ls scripts/
+  └ 5 lines...
+
+● Check Makefile for config
+  $ cd /users/szhong/kSTEP && cat Makefile | head -60
+  └ 61 lines...
+
+● Check linux target for config
+  $ cd /users/szhong/kSTEP && cat Makefile | grep -A 20 "linux:"
+  └ 22 lines...
+
+● Check if SCHED_DEBUG is in config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | grep -i "sched_debug"
+  └ 2 lines...
+
+Good, `CONFIG_SCHED_DEBUG=y` is enabled, so `SCHED_WARN_ON` expands to `WARN_ONCE`. Now let me create the driver. My approach:
+
+1. Set up CFS bandwidth throttling on a cgroup with tasks on CPU1
+2. Run ticks to get CFS rqs throttled and on the cfsb_csd_list
+3. Set RQCF_ACT_SKIP on CPU1's rq (simulating the __schedule() leak)
+4. Call `__cfsb_csd_unthrottle()` directly (via KSYM) to trigger the warning
+5. Check dmesg for the WARN_ONCE output
+
+● Find cfsb_csd_list in rq struct
+  $ cd /users/szhong/kSTEP && grep -n "cfsb_csd_list" linux/current/kernel/sched/sched.h | head -5
+  └ 2 lines...
+
+● Find CSD list fields
+  $ cd /users/szhong/kSTEP && grep -n "cfsb_csd\|throttled_csd_list"
+  linux/current/kernel/sched/sched.h | head -10
+  └ 4 lines...
+
+● Confirm __cfsb_csd_unthrottle in buggy kernel
+  $ cd /users/szhong/kSTEP && sed -n '5771,5812p' linux/rqcf_act_skip_leak_buggy/kernel/sched/fair.c
+  └ 43 lines...
+
+● Find newidle_balance and related functions
+  $ cd /users/szhong/kSTEP && grep -n "newidle_balance\|sched_balance_rq\|run_rebalance"
+  linux/current/kernel/sched/fair.c | head -20
+  └ 11 lines...
+
+● Read newidle_balance function
+  $ cd /users/szhong/kSTEP && sed -n '12860,12945p' linux/current/kernel/sched/fair.c
+  └ 87 lines...
+
+● Read tick.c for tick implementation
+  $ cd /users/szhong/kSTEP && cat kmod/tick.c
+  └ 165 lines...
+
+● Read trace.c for callback hookpoints
+  $ cd /users/szhong/kSTEP && cat kmod/trace.c
+  └ 107 lines...
+
+● Read task.c for pause implementation
+  $ cd /users/szhong/kSTEP && cat kmod/task.c
+  └ 113 lines...
+
+● Check user task signal handling
+  $ cd /users/szhong/kSTEP && cat user/task.c | head -80
+  └ 67 lines...
+
+● Read kthread.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Read reset.c for runqueue initialization
+  $ cd /users/szhong/kSTEP && cat kmod/reset.c | head -60
+  └ 61 lines...
+
+● Check run.py for default CPU config
+  $ cd /users/szhong/kSTEP && cat run.py | head -80
+  └ 81 lines...
+
+● Check num_cpus default
+  $ cd /users/szhong/kSTEP && cat run.py | grep -A 5 "num_cpus"
+  └ 28 lines...
+
+● Get exact kernel version numbers
+  $ cd /users/szhong/kSTEP && head -5 linux/rqcf_act_skip_leak_buggy/Makefile
+  └ 6 lines...
+
+Good, `KERNEL_VERSION(6, 6, 0)` is correct. Now let me create the driver:
+
+● Create kmod/drivers/rqcf_act_skip_leak.c (+92)
+
+Now let's build and test on the buggy kernel:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=rqcf_act_skip_leak_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=rqcf_act_skip_leak_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Good, build succeeded. Now let's run:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py rqcf_act_skip_leak --linux_name rqcf_act_skip_leak_buggy
+  --num_cpus 3 2>&1 | tail -5
+  └ 6 lines...
+
+● Check log for bug detection
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | grep -E
+  "RQCF|ACT_SKIP|pass|fail|TRACE|newidle|balance|BUG|WARN|clock_update" | head -30
+  └ 2 lines...
+
+● Check latest log for results
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  "RQCF|ACT_SKIP|pass|fail|newidle|balance|BUG|WARN|clock_update" | head -30
+  └ 5 lines...
+
+● Check for kstep output
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "kstep|status|rqcf|leak" | head -20
+  └ 9 lines...
+
+● Check full log tail
+  $ cd /users/szhong/kSTEP && cat data/latest.log | tail -40
+  └ 41 lines...
+
+● Check JSON output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+● Find rd overload mechanism in buggy kernel
+  $ cd /users/szhong/kSTEP && grep -n "get_rd_overloaded\|rd->overload\|set_rd_overloaded"
+  linux/rqcf_act_skip_leak_buggy/kernel/sched/*.c linux/rqcf_act_skip_leak_buggy/kernel/sched/*.h
+  2>/dev/null | head -20
+  └ 5 lines...
+
+● Check when rd->overload is set
+  $ cd /users/szhong/kSTEP && sed -n '2475,2490p'
+  linux/rqcf_act_skip_leak_buggy/kernel/sched/sched.h
+  └ 17 lines...
+
+● Find newidle_balance function name
+  $ cd /users/szhong/kSTEP && grep -n "sched_balance_newidle\|newidle_balance"
+  linux/rqcf_act_skip_leak_buggy/kernel/sched/fair.c | head -5
+  └ 6 lines...
+
+● Read newidle_balance implementation
+  $ cd /users/szhong/kSTEP && sed -n '12140,12220p'
+  linux/rqcf_act_skip_leak_buggy/kernel/sched/fair.c
+  └ 81 lines...
+
+Let me add more debugging to understand why the detection didn't work:
+
+● Edit kmod/drivers/rqcf_act_skip_leak.c (+13 -6)
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=rqcf_act_skip_leak_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run with debug logging
+  $ cd /users/szhong/kSTEP && ./run.py rqcf_act_skip_leak --linux_name rqcf_act_skip_leak_buggy
+  --num_cpus 3 2>&1 | tail -3
+  └ 4 lines...
+
+● Check debug output
+  $ cd /users/szhong/kSTEP && grep -E "TRACE_INFO|Before block|After sleep|After ticks|Set
+  REQ|flags=|balance|RQCF|ACT_SKIP" data/latest.log
+  └ 9 lines...
+
+● Check sub_nr_running for overload clearing
+  $ cd /users/szhong/kSTEP && grep -A 15 "static inline void sub_nr_running"
+  linux/rqcf_act_skip_leak_buggy/kernel/sched/sched.h
+  └ 16 lines...
+
+● Find all rd->overload in fair.c
+  $ cd /users/szhong/kSTEP && grep -n "rd->overload"
+  linux/rqcf_act_skip_leak_buggy/kernel/sched/fair.c
+  └ 3 lines...
+
+● Check overload update context
+  $ cd /users/szhong/kSTEP && sed -n '10440,10460p'
+  linux/rqcf_act_skip_leak_buggy/kernel/sched/fair.c
+  └ 21 lines...
+
+● Check jiffies tick implementation
+  $ cd /users/szhong/kSTEP && cat kmod/tick_jiffies.c
+  └ 46 lines...
+
+Let me force the overload flag and retry:
+
+● Edit kmod/drivers/rqcf_act_skip_leak.c (+6)
+
+● Rebuild and run with overload forced
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=rqcf_act_skip_leak_buggy 2>&1 | tail -3 &&
+  ./run.py rqcf_act_skip_leak --linux_name rqcf_act_skip_leak_buggy --num_cpus 3 2>&1 | tail -3
+  └ 7 lines...
+
+● Check debug output
+  $ cd /users/szhong/kSTEP && grep -E "Before|After|Set REQ|balance|ACT_SKIP|flags=" data/latest.log
+  └ 10 lines...
+
+The bug is detected on the buggy kernel! `RQCF_ACT_SKIP leak on CPU 1: flags=0x2` - ACT_SKIP (0x02) was visible during newidle_balance.
+
+Now let's verify the fix. Let me checkout the fixed kernel and test:
+
+● Check JSON result
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 5ebde09d9170 rqcf_act_skip_leak_fixed 2>&1 | tail
+  -5
+  └ 6 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=rqcf_act_skip_leak_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=rqcf_act_skip_leak_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py rqcf_act_skip_leak --linux_name rqcf_act_skip_leak_fixed
+  --num_cpus 3 2>&1 | tail -3
+  └ 4 lines...
+
+● Check fixed kernel results
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl && echo "---" && grep -E "Before|After|Set
+  REQ|ACT_SKIP|flags=" data/latest.log
+  └ 10 lines...
+
+The bug is reproduced correctly:
+- **Buggy kernel**: `RQCF_ACT_SKIP leak` detected (flags=0x2, ACT_SKIP set during newidle_balance) → **FAIL**
+- **Fixed kernel**: `No RQCF_ACT_SKIP leak` (flags=0x4, RQCF_UPDATED correctly set, no ACT_SKIP) → **PASS**
+
+Now let me clean up the driver (remove debug logging) and add it to reproduce.py:
+
+● Read kmod/drivers/rqcf_act_skip_leak.c
+  └ 104 lines read
+
+Now let me clean up the debug logging and finalize:
+
+● Edit kmod/drivers/rqcf_act_skip_leak.c (+8 -19)
+
+Let me verify the driver still works after cleanup:
+

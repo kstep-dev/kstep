@@ -101,3 +101,20 @@ I'll skip this bug.
 
 ● Edit TODO.md (+1 -1)
 
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 6080fb211672 ppos bug requires
+  userspace file writes
+
+  The bug is in sched_fair_server_write() file position tracking on
+  debugfs write errors. Cannot reproduce via kSTEP because:...
+  └ 18 lines...
+
+**Skipped** `6080fb211672`. The bug is a VFS-level file position (`ppos`) tracking issue in `sched_fair_server_write()` — not a scheduler state bug. It requires userspace debugfs writes (due to `copy_from_user`) and file position inspection after failed writes, neither of which kSTEP supports. TODO.md updated and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         4m 6s
+Total session time:     4m 38s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      570.7k in, 13.2k out, 526.4k cached (Est. 6 Premium requests)
