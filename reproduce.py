@@ -350,6 +350,13 @@ bugs = [
             Linux(name="fixed", version="5d808c78d972"),
         ],
     ),
+    Bug(
+        driver=Driver(name="rqcf_act_skip_leak", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="5ebde09d9170~1"),
+            Linux(name="fixed", version="5ebde09d9170"),
+        ],
+    ),
 ]
 
 

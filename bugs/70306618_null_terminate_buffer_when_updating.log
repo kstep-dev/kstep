@@ -1,0 +1,41 @@
+● Read bugs/70306618_null_terminate_buffer_when_updating.md
+  └ 42 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the commit patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 703066188f63 2>/dev/null | head -200
+  └ 119 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -30
+  └ 31 lines...
+
+● Check kstep_write implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kernel.c | head -80
+  └ 81 lines...
+
+● Find relevant driver examples
+  $ cd /users/szhong/kSTEP && grep -l "kstep_write\|debugfs\|tunable_scaling" kmod/drivers/*.c
+  2>/dev/null | head -5
+  └ 1 line...
+
+● Check existing debugfs driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/sched_debug_output.c
+  └ 102 lines...
+
+● Check commit details
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 703066188f63 -1 --format="%H %s"
+  └ 2 lines...
+
+● Check parent commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --format="%H %s" 703066188f63~1 -1
+  └ 2 lines...
+
+● Find kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags --contains 703066188f63
+  2>/dev/null || git -C linux/current log --oneline 703066188f63..HEAD --ancestry-path --merges |
+  tail -5
+  └ 2 lines...
+

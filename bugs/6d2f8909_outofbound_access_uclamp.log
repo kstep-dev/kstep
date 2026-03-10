@@ -1,0 +1,98 @@
+● Read bugs/6d2f8909_outofbound_access_uclamp.md
+  └ 25 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 6d2f8909a5fa 2>/dev/null | head -300
+  └ 98 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -60
+  └ 61 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Check for existing uclamp drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | grep -i uclamp
+  └ 2 lines...
+
+● Read default driver for reference
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/default.c
+  └ 58 lines...
+
+● Search for uclamp usage in drivers
+  $ cd /users/szhong/kSTEP && grep -r "uclamp" kmod/drivers/ 2>/dev/null | head -20
+  └ 17 lines...
+
+● Read kmod/drivers/uclamp_inversion.c
+  └ 93 lines read
+
+● Check internal.h include
+  $ cd /users/szhong/kSTEP && grep -r "internal.h" kmod/drivers/uclamp_inversion.c
+  └ 2 lines...
+
+● Check cgroup_write implementation
+  $ cd /users/szhong/kSTEP && grep -r "kstep_cgroup_write\|uclamp" kmod/kernel.c 2>/dev/null | head
+  -20
+  └ 7 lines...
+
+● Check uclamp_se struct
+  $ cd /users/szhong/kSTEP && git -C linux/current show 6d2f8909a5fa~1:kernel/sched/sched.h
+  2>/dev/null | grep -A 10 "struct uclamp_se {"
+  └ 1 line...
+
+● Check commit details
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 6d2f8909a5fa~1..6d2f8909a5fa
+  2>/dev/null | head -5
+  └ 2 lines...
+
+● Check UCLAMP_BUCKETS definition
+  $ cd /users/szhong/kSTEP && git -C linux/current show 6d2f8909a5fa~1:kernel/sched/sched.h
+  2>/dev/null | grep -B5 -A20 "UCLAMP_BUCKETS\|uclamp_bucket" | head -50
+  └ 51 lines...
+
+● Check uclamp_se in task struct
+  $ cd /users/szhong/kSTEP && git -C linux/current show 6d2f8909a5fa~1:include/linux/sched.h
+  2>/dev/null | grep -B3 -A10 "struct uclamp_se" | head -20
+  └ 21 lines...
+
+● Check UCLAMP_BUCKETS value
+  $ cd /users/szhong/kSTEP && git -C linux/current show 6d2f8909a5fa~1:include/linux/sched.h
+  2>/dev/null | grep -B2 -A8 "UCLAMP_BUCKETS"
+  └ 24 lines...
+
+Now let me check the kernel version and internal.h:
+
+● Check internal.h
+  $ cd /users/szhong/kSTEP && head -60 kmod/internal.h
+  └ 61 lines...
+
+● Get date for version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline --format="%H %ad" --date=short
+  6d2f8909a5fa~1 -1
+  └ 2 lines...
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 6d2f8909a5fa -1 --format="%H %s" &&
+   git -C linux/current describe --tags 6d2f8909a5fa~1 2>/dev/null || echo "no tag"
+  └ 3 lines...
+
+● Check kernel version from Makefile
+  $ cd /users/szhong/kSTEP && git -C linux/current show 6d2f8909a5fa~1:Makefile 2>/dev/null | head
+  -5
+  └ 6 lines...
+
+● Check how sched_setattr is imported
+  $ cd /users/szhong/kSTEP && grep -n "KSYM_IMPORT\|sched_setattr_nocheck"
+  kmod/drivers/uclamp_inversion.c
+  └ 4 lines...
+
+● Check KSYM macros
+  $ cd /users/szhong/kSTEP && grep -n "KSYM_IMPORT\|KSYM_" kmod/internal.h kmod/driver.h 2>/dev/null
+   | head -20
+  └ 11 lines...
+

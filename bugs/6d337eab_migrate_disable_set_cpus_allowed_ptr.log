@@ -1,0 +1,49 @@
+● Read bugs/6d337eab_migrate_disable_set_cpus_allowed_ptr.md
+  └ 41 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 6d337eab041d 2>&1 | head -300
+  └ 301 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Check existing driver examples
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/*.c | head -200
+  └ 201 lines...
+
+● Read rest of the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 6d337eab041d 2>&1 | tail -400
+  └ 401 lines...
+
+● Find migration-related drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | grep -i migrat
+  └ 4 lines...
+
+● Read kthread implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Read migration driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migration_cpu_stop_warn.c
+  └ 107 lines...
+
+● Read internal header
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -80
+  └ 80 lines...
+
+● Check sched.h changes for PREEMPT_RT
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 6d337eab041d -- include/linux/sched.h |
+   head -40
+  └ 41 lines...
+
+● Check kernel config for PREEMPT_RT
+  $ cd /users/szhong/kSTEP && cat scripts/linux_config 2>/dev/null | grep -i preempt || echo "No
+  scripts/linux_config"; find . -name "*.config" -o -name "defconfig" -o -name "kconfig" 2>/dev/null
+   | head -10
+  └ 12 lines...
+

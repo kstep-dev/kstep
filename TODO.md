@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 22/400 reproduced**
+**Total: 23/400 reproduced**
 
 ---
 
@@ -35,7 +35,7 @@
 - [x] `5b6547ed97f4` sched/core: Fix forceidle balancing — [`5b6547ed_forceidle_balancing.md`](bugs/5b6547ed_forceidle_balancing.md) <!-- driver:forceidle_balancing attempts:1 -->
 - [x] `5bc78502322a` sched: fix exit_mm vs membarrier (v4) — [`5bc78502_exit_mm_membarrier_v4.md`](bugs/5bc78502_exit_mm_membarrier_v4.md) <!-- driver:exit_mm_membarrier attempts:1 -->
 - [x] `5d808c78d972` Fix race between yield_to() and try_to_wake_up() — [`5d808c78_race_between_yield_to_try_to_wake_up.md`](bugs/5d808c78_race_between_yield_to_try_to_wake_up.md) <!-- driver:yield_to_race attempts:1 -->
-- [ ] `5ebde09d9170` sched/core: Fix RQCF_ACT_SKIP leak — [`5ebde09d_rqcf_act_skip_leak.md`](bugs/5ebde09d_rqcf_act_skip_leak.md)
+- [x] `5ebde09d9170` sched/core: Fix RQCF_ACT_SKIP leak — [`5ebde09d_rqcf_act_skip_leak.md`](bugs/5ebde09d_rqcf_act_skip_leak.md) <!-- driver:rqcf_act_skip_leak attempts:1 -->
 - [-] `6080fb211672` sched/debug: Fix updating of ppos on server write ops — [`6080fb21_updating_ppos_server_write_ops.md`](bugs/6080fb21_updating_ppos_server_write_ops.md) <!-- skipped:vfs-level-ppos-bug-requires-userspace-file-writes-not-reproducible-via-kstep attempts:1 -->
 - [-] `6c125b85f3c8` sched: Export hidden tracepoints to modules — [`6c125b85_export_hidden_tracepoints_modules.md`](bugs/6c125b85_export_hidden_tracepoints_modules.md) <!-- skipped:compile-time-symbol-export-issue-not-runtime-scheduler-bug attempts:1 -->
 - [ ] `6d2f8909a5fa` sched: Fix out-of-bound access in uclamp — [`6d2f8909_outofbound_access_uclamp.md`](bugs/6d2f8909_outofbound_access_uclamp.md)
