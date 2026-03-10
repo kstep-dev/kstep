@@ -1,0 +1,40 @@
+# Fix negative imbalance in imbalance calculation
+
+- **Commit:** 111688ca1c4a43a7e482f5401f82c46326b8ed49
+- **Affected file(s):** kernel/sched/fair.c
+- **Subsystem:** CFS (Completely Fair Scheduler)
+
+## Bug Description
+
+During load balancing calculations, a negative imbalance value was observed when the local scheduler group type is `group_fully_busy` and the average load of the local group is greater than the selected busiest group. This negative imbalance leads to incorrect load balancing decisions, as the imbalance value is intended to represent how many tasks should be migrated from the busiest group to the local group.
+
+## Root Cause
+
+In the `calculate_imbalance()` function, when the local group is fully busy (group_type < group_overloaded), the code calculates average loads and then immediately applies a formula to compute the imbalance without first checking if the local group is actually more loaded than the busiest group. When `local->avg_load >= busiest->avg_load`, the formula `(sds->avg_load - local->avg_load) * local->group_capacity` produces a negative value, resulting in a negative imbalance that doesn't make logical sense.
+
+## Fix Summary
+
+The fix adds a check immediately after calculating the average loads of both groups: if the local group's average load is greater than or equal to the busiest group's average load, the imbalance is set to zero and the function returns early. This prevents the negative imbalance from being calculated and ensures that no load balancing migration occurs when the local group is already at least as loaded as the "busiest" group.
+
+## Triggering Conditions
+
+The bug requires these precise conditions:
+- Load balancing is triggered in `calculate_imbalance()` within `kernel/sched/fair.c`
+- Local sched group type must be `group_fully_busy` (i.e., `local->group_type < group_overloaded`)
+- The local group's average load must exceed the busiest group's average load (`local->avg_load >= busiest->avg_load`)
+- This creates a scenario where the "local" group is actually more loaded than the supposedly "busiest" group
+- The imbalance calculation formula `(sds->avg_load - local->avg_load) * local->group_capacity` produces a negative value
+- This negative imbalance leads to incorrect load balancing decisions and potential scheduler instability
+
+## Reproduce Strategy (kSTEP)
+
+Requires at least 3 CPUs (CPU 0 reserved for driver). Setup asymmetric load topology:
+1. Use `kstep_topo_init()`, `kstep_topo_set_cls()` to create CPU clusters (e.g., CPUs 1-2 vs 3-4)
+2. In `setup()`: create multiple tasks with `kstep_task_create()` and pin them using `kstep_task_pin()`
+3. In `run()`: create imbalanced load where local group becomes "fully busy" but more loaded than busiest
+   - Pin 2+ tasks to one cluster (making it "fully busy")  
+   - Pin 1 task to another cluster (making it "less busy" but selected as busiest)
+   - Use `kstep_tick_repeat()` to let loads settle and trigger load balancing
+4. Use `on_sched_balance_selected()` callback to capture load balancing decisions
+5. Monitor via `kstep_output_balance()` and custom logging to detect negative imbalance calculation
+6. Success: observe scheduler attempting migration from less-loaded "busiest" to more-loaded local group
