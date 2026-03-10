@@ -155,6 +155,13 @@ bugs = [
             Linux(name="fixed", version="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c"),
         ],
     ),
+    Bug(
+        driver=Driver(name="balance_push_splice", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="04193d590b390ec7a0592630f46d559ec6564ba1~1"),
+            Linux(name="fixed", version="04193d590b390ec7a0592630f46d559ec6564ba1"),
+        ],
+    ),
 ]
 
 

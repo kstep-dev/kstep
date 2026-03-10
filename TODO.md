@@ -1,15 +1,15 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 0/400 reproduced**
+**Total: 3/400 reproduced**
 
 ---
 
 ## core (87)
 
 - [ ] `009836b4fa52` sched/core: Fix migrate_swap() vs. hotplug — [`009836b4_fix_migrate_swap_vs_hotplug.md`](bugs/009836b4_fix_migrate_swap_vs_hotplug.md)
-- [ ] `0213b7083e81` sched/uclamp: Fix uclamp_tg_restrict() — [`0213b708_fix_uclamp_tg_restrict.md`](bugs/0213b708_fix_uclamp_tg_restrict.md)
-- [ ] `04193d590b39` sched: Fix balance_push() vs __sched_setscheduler() — [`04193d59_fix_balance_push_vs_sched.md`](bugs/04193d59_fix_balance_push_vs_sched.md)
-- [ ] `0ec8d5aed4d1` sched/core: Add WARN_ON_ONCE() to check overflow for migrate_disable() — [`0ec8d5ae_add_warn_on_once_to.md`](bugs/0ec8d5ae_add_warn_on_once_to.md)
+- [x] `0213b7083e81` sched/uclamp: Fix uclamp_tg_restrict() — [`0213b708_fix_uclamp_tg_restrict.md`](bugs/0213b708_fix_uclamp_tg_restrict.md) <!-- driver:uclamp_inversion attempts:1 -->
+- [x] `04193d590b39` sched: Fix balance_push() vs __sched_setscheduler() — [`04193d59_fix_balance_push_vs_sched.md`](bugs/04193d59_fix_balance_push_vs_sched.md) <!-- driver:balance_push_splice attempts:1 -->
+- [x] `0ec8d5aed4d1` sched/core: Add WARN_ON_ONCE() to check overflow for migrate_disable() — [`0ec8d5ae_add_warn_on_once_to.md`](bugs/0ec8d5ae_add_warn_on_once_to.md) <!-- driver:migrate_overflow attempts:1 -->
 - [ ] `11c7aa0ddea8` rq-qos: fix missed wake-ups in rq_qos_throttle try two — [`11c7aa0d_fix_missed_wake_ups_in.md`](bugs/11c7aa0d_fix_missed_wake_ups_in.md)
 - [ ] `1293771e4353` sched: Fix migration_cpu_stop() WARN — [`1293771e_fix_migration_cpu_stop_warn.md`](bugs/1293771e_fix_migration_cpu_stop_warn.md)
 - [ ] `156ec6f42b8d` sched/features: Fix hrtick reprogramming — [`156ec6f4_fix_hrtick_reprogramming.md`](bugs/156ec6f4_fix_hrtick_reprogramming.md)
@@ -129,37 +129,6 @@
 - [ ] `f60a631ab9ed` Fix tg->load when offlining a CPU — [`f60a631a_fix_tgload_offlining_cpu.md`](bugs/f60a631a_fix_tgload_offlining_cpu.md)
 - [ ] `fe61468b2cbc` sched/fair: Fix enqueue_task_fair warning — [`fe61468b_fix_enqueue_task_fair_warning.md`](bugs/fe61468b_fix_enqueue_task_fair_warning.md)
 
-## EXT (sched_ext) (28)
-
-- [ ] `0922f54fdd15` sched_ext: Make watchdog handle ops.dispatch() looping stall — [`0922f54f_make_watchdog_handle_ops_dispatch.md`](bugs/0922f54f_make_watchdog_handle_ops_dispatch.md)
-- [ ] `0e7ffff1b811` scx: Fix raciness in scx_ops_bypass() — [`0e7ffff1_fix_raciness_in_scx_ops.md`](bugs/0e7ffff1_fix_raciness_in_scx_ops.md)
-- [ ] `12b5cd99a05f` sched/ext: Avoid null ptr traversal when ->put_prev_task() is called with NULL next — [`12b5cd99_avoid_null_ptr_traversal_when.md`](bugs/12b5cd99_avoid_null_ptr_traversal_when.md)
-- [ ] `1dd6c84f1c54` sched_ext: Fix incorrect sched_class settings for per-cpu migration tasks — [`1dd6c84f_fix_incorrect_sched_class_settings.md`](bugs/1dd6c84f_fix_incorrect_sched_class_settings.md)
-- [ ] `294f5ff47405` sched_ext: Merge branch 'for-6.15-fixes' into for-6.16 — [`294f5ff4_branch_for_6_15_fixes.md`](bugs/294f5ff4_branch_for_6_15_fixes.md)
-- [ ] `2dbbdeda77a6` sched_ext: Fix scx_bpf_dsq_insert() backward binary compatibility — [`2dbbdeda_scx_bpf_dsq_insert_backward.md`](bugs/2dbbdeda_scx_bpf_dsq_insert_backward.md)
-- [ ] `32966821574c` sched_ext: Fix migration disabled handling in targeted dispatches — [`32966821_migration_disabled_handling_in_targeted.md`](bugs/32966821_migration_disabled_handling_in_targeted.md)
-- [ ] `47d9f8212826` sched_ext: Fix NULL dereference in scx_bpf_cpu_rq() warning — [`47d9f821_fix_null_dereference_in_scx.md`](bugs/47d9f821_fix_null_dereference_in_scx.md)
-- [ ] `517a44d18537` sched_ext: Fix the memleak for sch->helper objects — [`517a44d1_fix_the_memleak_for_sch.md`](bugs/517a44d1_fix_the_memleak_for_sch.md)
-- [ ] `568894edbe48` sched_ext: Add scx_cgroup_enabled to gate cgroup operations and fix scx_tg_online() — [`568894ed_add_scx_cgroup_enabled_to.md`](bugs/568894ed_add_scx_cgroup_enabled_to.md)
-- [ ] `62d3726d4cd6` sched_ext: Fix build when !CONFIG_STACKTRACE — [`62d3726d_build_when_config_stacktrace.md`](bugs/62d3726d_build_when_config_stacktrace.md)
-- [ ] `62dcbab8b0ef` sched_ext: Avoid live-locking bypass mode switching — [`62dcbab8_avoid_livelocking_bypass_mode_switching.md`](bugs/62dcbab8_avoid_livelocking_bypass_mode_switching.md)
-- [ ] `6d594af5bff2` sched_ext: Fix incorrect use of bitwise AND — [`6d594af5_incorrect_use_of_bitwise_and.md`](bugs/6d594af5_incorrect_use_of_bitwise_and.md)
-- [ ] `72763ea3d45c` sched_ext: Fix unsafe list iteration in process_ddsp_deferred_locals() — [`72763ea3_unsafe_list_iteration_in_processddspdeferredlocals.md`](bugs/72763ea3_unsafe_list_iteration_in_processddspdeferredlocals.md)
-- [ ] `749989b2d90d` sched_ext: Fix SCX_EFLAG_INITIALIZED being a no-op flag — [`749989b2_scxeflaginitialized_being_a_no_op.md`](bugs/749989b2_scxeflaginitialized_being_a_no_op.md)
-- [ ] `750a40d816de` sched_ext: Synchronize bypass state changes with rq lock — [`750a40d8_synchronize_bypass_state_changes_with.md`](bugs/750a40d8_synchronize_bypass_state_changes_with.md)
-- [ ] `8fef0a3b17bb` sched_ext: Fix pick_task_scx() picking non-queued tasks when it's called without balance() — [`8fef0a3b_fix_pick_task_scx_picking.md`](bugs/8fef0a3b_fix_pick_task_scx_picking.md)
-- [ ] `9f769637a93f` sched_ext: Fix bypass depth leak on scx_enable() failure — [`9f769637_fix_bypass_depth_leak_on.md`](bugs/9f769637_fix_bypass_depth_leak_on.md)
-- [ ] `a257e9742103` sched_ext: Fix possible deadlock in the deferred_irq_workfn() — [`a257e974_fix_possible_deadlock_in_the.md`](bugs/a257e974_fix_possible_deadlock_in_the.md)
-- [ ] `a2f4b16e736d` sched_ext: Build fix on !CONFIG_STACKTRACE[_SUPPORT] — [`a2f4b16e_build_fix_on_config_stacktrace.md`](bugs/a2f4b16e_build_fix_on_config_stacktrace.md)
-- [ ] `a379fa1e2cae` sched_ext: Fix SCX_KICK_WAIT to work reliably — [`a379fa1e_fix_scx_kick_wait_to.md`](bugs/a379fa1e_fix_scx_kick_wait_to.md)
-- [ ] `bf934bed5e2f` sched_ext: Add missing cfi stub for ops.tick — [`bf934bed_add_missing_cfi_stub_for.md`](bugs/bf934bed_add_missing_cfi_stub_for.md)
-- [ ] `d6f3e7d564b2` sched_ext: Fix incorrect autogroup migration detection — [`d6f3e7d5_sched_ext_autogroup_migration.md`](bugs/d6f3e7d5_sched_ext_autogroup_migration.md)
-- [ ] `ddf7233fcab6` sched/ext: Fix invalid task state transitions on class switch — [`ddf7233f_sched_ext_task_state_transition.md`](bugs/ddf7233f_sched_ext_task_state_transition.md)
-- [ ] `e38be1c7647c` sched_ext: Fix rq lock state in hotplug ops — [`e38be1c7_sched_ext_rq_lock_hotplug.md`](bugs/e38be1c7_sched_ext_rq_lock_hotplug.md)
-- [ ] `ebfd5226ec36` sched_ext: Merge branch 'for-6.17-fixes' into for-6.18 — [`ebfd5226_merge_branch_for617fixes_into_for618.md`](bugs/ebfd5226_merge_branch_for617fixes_into_for618.md)
-- [ ] `f3f08c3acfb8` sched_ext: Fix incorrect assumption about migration disabled tasks in task_can_run_on_remote_rq() — [`f3f08c3a_fix_incorrect_assumption_about_migration.md`](bugs/f3f08c3a_fix_incorrect_assumption_about_migration.md)
-- [ ] `f7d1b585e153` sched_ext: Add a missing newline at the end of an error message — [`f7d1b585_add_missing_newline_end_error.md`](bugs/f7d1b585_add_missing_newline_end_error.md)
-
 ## Deadline (24)
 
 - [ ] `115135422562` sched/deadline: Fix 'stuck' dl_server — [`11513542_fix_stuck_dl_server.md`](bugs/11513542_fix_stuck_dl_server.md)
@@ -210,29 +179,6 @@
 - [ ] `c0490bc9bb62` sched/fair: Fix cfs_rq_is_decayed() on !SMP — [`c0490bc9_cfs_rq_is_decayed_on.md`](bugs/c0490bc9_cfs_rq_is_decayed_on.md)
 - [ ] `d4ac164bde7a` sched/eevdf: Fix wakeup-preempt by checking cfs_rq->nr_running — [`d4ac164b_eevdf_wakeup_preempt_nr_running.md`](bugs/d4ac164b_eevdf_wakeup_preempt_nr_running.md)
 - [ ] `e21cf43406a1` sched/cfs: change initial value of runnable_avg — [`e21cf434_cfs_runnable_avg_initial.md`](bugs/e21cf434_cfs_runnable_avg_initial.md)
-
-## EXT (20)
-
-- [ ] `05e63305c85c` sched_ext: Fix scx_kick_pseqs corruption on concurrent scheduler loads — [`05e63305_fix_scx_kick_pseqs_corruption.md`](bugs/05e63305_fix_scx_kick_pseqs_corruption.md)
-- [ ] `0aab26309ee9` sched_ext: Fix processs_ddsp_deferred_locals() by unifying DTL_INVALID handling — [`0aab2630_fix_processs_ddsp_deferred_locals.md`](bugs/0aab2630_fix_processs_ddsp_deferred_locals.md)
-- [ ] `2a064262eb37` sched_ext: Fix out-of-bounds access in scx_idle_init_masks() — [`2a064262_out_of_bounds_access_in.md`](bugs/2a064262_out_of_bounds_access_in.md)
-- [ ] `33d031ec1210` sched_ext: define missing cfi stubs for sched_ext — [`33d031ec_missing_cfi_stubs_for_sched.md`](bugs/33d031ec_missing_cfi_stubs_for_sched.md)
-- [ ] `42268ad0eb41` sched_ext: Build fix for !CONFIG_SMP — [`42268ad0_build_fix_for_config_smp.md`](bugs/42268ad0_build_fix_for_config_smp.md)
-- [ ] `5f02151c411d` sched_ext: Fix unsafe locking in the scx_dump_state() — [`5f02151c_unsafe_locking_scx_dump_state.md`](bugs/5f02151c_unsafe_locking_scx_dump_state.md)
-- [ ] `71d7847cad44` sched_ext: Fix scx_bpf_dsq_peek() with FIFO DSQs — [`71d7847c_scxbpfdsqpeek_with_fifo_dsqs.md`](bugs/71d7847c_scxbpfdsqpeek_with_fifo_dsqs.md)
-- [ ] `7900aa699c34` sched_ext: Fix cgroup exit ordering by moving sched_ext_free() to finish_task_switch() — [`7900aa69_cgroup_exit_ordering_by_moving.md`](bugs/7900aa69_cgroup_exit_ordering_by_moving.md)
-- [ ] `7b6216baae75` sched_ext: Fix scx_enable() crash on helper kthread creation failure — [`7b6216ba_scxenable_crash_on_helper_kthread.md`](bugs/7b6216ba_scxenable_crash_on_helper_kthread.md)
-- [ ] `8bb30798fd6e` sched_ext: Fixes incorrect type in bpf_scx_init() — [`8bb30798_fixes_incorrect_type_bpf_scx.md`](bugs/8bb30798_fixes_incorrect_type_bpf_scx.md)
-- [ ] `a11d6784d731` sched_ext: Fix missing rq lock in scx_bpf_cpuperf_set() — [`a11d6784_fix_missing_rq_lock_in.md`](bugs/a11d6784_fix_missing_rq_lock_in.md)
-- [ ] `a77d10d032f5` sched_ext: Avoid NULL scx_root deref through SCX_HAS_OP() — [`a77d10d0_avoid_null_scx_root_deref.md`](bugs/a77d10d0_avoid_null_scx_root_deref.md)
-- [ ] `b0101ccb5b46` sched_ext: fix uninitialized ret on alloc_percpu() failure — [`b0101ccb_fix_uninitialized_ret_on_alloc.md`](bugs/b0101ccb_fix_uninitialized_ret_on_alloc.md)
-- [ ] `b06ccbabe250` sched_ext: Fix starvation of scx_enable() under fair-class saturation — [`b06ccbab_fix_starvation_of_scx_enable.md`](bugs/b06ccbab_fix_starvation_of_scx_enable.md)
-- [ ] `c8fafb34854a` sched_ext: Avoid NULL scx_root deref in __scx_exit() — [`c8fafb34_avoid_null_scx_root_deref.md`](bugs/c8fafb34_avoid_null_scx_root_deref.md)
-- [ ] `df10932ad740` Revert "sched_ext: Use rhashtable_lookup() instead of rhashtable_lookup_fast()" — [`df10932a_revert_rhashtable_lookup_fast.md`](bugs/df10932a_revert_rhashtable_lookup_fast.md)
-- [ ] `e14fd98c6d66` sched/ext: Prevent update_locked_rq() calls with NULL rq — [`e14fd98c_sched_ext_null_rq_update.md`](bugs/e14fd98c_sched_ext_null_rq_update.md)
-- [ ] `f4fa7c25f632` sched_ext: Fix use of uninitialized variable in scx_bpf_cpuperf_set() — [`f4fa7c25_fix_use_uninitialized_variable_scx_bpf_cpuperf_set.md`](bugs/f4fa7c25_fix_use_uninitialized_variable_scx_bpf_cpuperf_set.md)
-- [ ] `f5e1e5ec204d` sched_ext: Fix missing post-enqueue handling in move_local_task_to_local_dsq() — [`f5e1e5ec_fix_missing_postenqueue_handling_move_local_task_to_local_dsq.md`](bugs/f5e1e5ec_fix_missing_postenqueue_handling_move_local_task_to_local_dsq.md)
-- [ ] `fde7d64766c1` sched_ext: idle: Fix scx_bpf_pick_any_cpu_node() behavior — [`fde7d647_idle_fix_scx_bpf_pick_any_cpu_node_behavior.md`](bugs/fde7d647_idle_fix_scx_bpf_pick_any_cpu_node_behavior.md)
 
 ## PSI (Pressure Stall Information) (14)
 
@@ -290,12 +236,6 @@
 - [ ] `2a4b03ffc69f` sched/fair: Prevent unlimited runtime on throttled group — [`2a4b03ff_unlimited_runtime_on_throttled_group.md`](bugs/2a4b03ff_unlimited_runtime_on_throttled_group.md)
 - [ ] `8b4e74ccb582` sched/fair: Fix detection of per-CPU kthreads waking a task — [`8b4e74cc_fix_detection_percpu_kthreads_waking.md`](bugs/8b4e74cc_fix_detection_percpu_kthreads_waking.md)
 - [ ] `c1f43c342e1f` sched/fair: Fix sched_can_stop_tick() for fair tasks — [`c1f43c34_sched_can_stop_tick_for.md`](bugs/c1f43c34_sched_can_stop_tick_for.md)
-
-## debug (3)
-
-- [ ] `459b09b5a325` sched/debug: Don't update sched_domain debug directories before sched_debug_init() — [`459b09b5_dont_update_sched_domain_debug.md`](bugs/459b09b5_dont_update_sched_domain_debug.md)
-- [ ] `ad32bb41fca6` sched/debug: Fix requested task uclamp values shown in procfs — [`ad32bb41_fix_requested_task_uclamp_values.md`](bugs/ad32bb41_fix_requested_task_uclamp_values.md)
-- [ ] `c2e406596571` sched/debug: fix dentry leak in update_sched_domain_debugfs — [`c2e40659_dentry_leak_in_update_sched.md`](bugs/c2e40659_dentry_leak_in_update_sched.md)
 
 ## RT (Real-Time scheduler) (3)
 
@@ -372,10 +312,6 @@
 
 - [ ] `0664e2c311b9` sched/deadline: Fix warning in migrate_enable for boosted tasks — [`0664e2c3_fix_warning_in_migrate_enable.md`](bugs/0664e2c3_fix_warning_in_migrate_enable.md)
 
-## EXT (extensible scheduler class) (1)
-
-- [ ] `0b47b6c3543e` Revert "sched_ext: Skip per-CPU tasks in scx_bpf_reenqueue_local()" — [`0b47b6c3_revert_sched_ext_skip_per.md`](bugs/0b47b6c3_revert_sched_ext_skip_per.md)
-
 ## core (MM CID) (1)
 
 - [ ] `0d032a43ebeb` sched/mmcid: Prevent pointless work in mm_update_cpus_allowed() — [`0d032a43_prevent_pointless_work_in_mm.md`](bugs/0d032a43_prevent_pointless_work_in_mm.md)
@@ -387,14 +323,6 @@
 ## fair (CFS) (1)
 
 - [ ] `13765de8148f` sched/fair: Fix fault in reweight_entity — [`13765de8_fix_fault_in_reweight_entity.md`](bugs/13765de8_fix_fault_in_reweight_entity.md)
-
-## sched_ext (EXT scheduler) (1)
-
-- [ ] `1626e5ef0b00` sched_ext: Fix lock imbalance in dispatch_to_local_dsq() — [`1626e5ef_fix_lock_imbalance_in_dispatch.md`](bugs/1626e5ef_fix_lock_imbalance_in_dispatch.md)
-
-## EXT (sched_ext - extensible scheduler) (1)
-
-- [ ] `18b2093f4598` sched_ext: Fix invalid irq restore in scx_ops_bypass() — [`18b2093f_fix_invalid_irq_restore_in.md`](bugs/18b2093f_fix_invalid_irq_restore_in.md)
 
 ## core scheduler (nohz idle load balancing) (1)
 
