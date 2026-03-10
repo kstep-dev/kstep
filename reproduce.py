@@ -466,6 +466,13 @@ bugs = [
             Linux(name="fixed", version="91dabf33ae5d"),
         ],
     ),
+    Bug(
+        driver=Driver(name="core_enqueue", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="91caa5ae2424~1"),
+            Linux(name="fixed", version="91caa5ae2424"),
+        ],
+    ),
 ]
 
 
