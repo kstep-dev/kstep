@@ -61,3 +61,228 @@
   9e81889c7648~1 -1
   └ 3 lines...
 
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 9e81889c7648~1 affine_move_buggy 2>&1 | tail -5
+  └ 1 line...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 6 lines...
+
+
+
+Now let me read the full `affine_move_task` function from the buggy kernel and check the kernel version:
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && head -5 linux/current/Makefile
+  └ 6 lines...
+
+● Find affine_move_task in source
+  $ cd /users/szhong/kSTEP && grep -n "affine_move_task" linux/current/kernel/sched/core.c | head
+  -10
+  └ 4 lines...
+
+● Read linux/current/kernel/sched/core.c lines 2182-2310
+  └ 129 lines read
+
+● Read migrate_disable driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migrate_disable_lock.c 2>/dev/null
+  └ 69 lines...
+
+● Check for debug list config
+  $ cd /users/szhong/kSTEP && grep "DEBUG_LIST\|LIST_DEBUG" scripts/kernel.config 2>/dev/null ||
+  grep -r "DEBUG_LIST" build/affine_move_buggy/.config 2>/dev/null || find . -name "kernel.config"
+  -o -name ".config" 2>/dev/null | head -5
+  └ 6 lines...
+
+● Check kernel config
+  $ cd /users/szhong/kSTEP && cat scripts/kernel.config | head -50
+  └ 2 lines...
+
+● Read migration_cpu_stop_warn driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migration_cpu_stop_warn.c 2>/dev/null
+  └ 107 lines...
+
+● Find config files
+  $ cd /users/szhong/kSTEP && find . -name "kstep.config" -o -name "defconfig" 2>/dev/null | grep -v
+   linux | head -5 && ls scripts/
+  └ 1 line...
+
+● Read shell output: Waiting up to 10 seconds for command output
+  └ 1 line...
+
+● Stop shell
+  └ 1 line...
+
+● Check build system
+  $ cd /users/szhong/kSTEP && ls scripts/ && cat Makefile | head -60
+  └ 65 lines...
+
+● Check stop_machine list usage
+  $ cd /users/szhong/kSTEP && grep -n "DEBUG_LIST\|CONFIG_DEBUG" linux/current/kernel/sched/Makefile
+   2>/dev/null; grep -c "cpu_stop_queue_work" linux/current/kernel/stop_machine.c 2>/dev/null; grep
+  -n "list_add_tail\|__list_add" linux/current/kernel/stop_machine.c 2>/dev/null
+  └ 3 lines...
+
+● Read linux/current/kernel/stop_machine.c lines 70-100
+  └ 31 lines read
+
+● Check QEMU CPU config
+  $ cd /users/szhong/kSTEP && grep -n "cpus\|SMP\|NR_CPUS" run.py | head -20
+  └ 8 lines...
+
+● Read reject_affinity driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/reject_affinity.c 2>/dev/null
+  └ 98 lines...
+
+● Check num_cpus usage
+  $ cd /users/szhong/kSTEP && grep -l "num_cpus" kmod/drivers/*.c 2>/dev/null | head -5; grep -n
+  "num_cpus" run.py | head -20
+  └ 5 lines...
+
+● Check driver num_cpus usage
+  $ cd /users/szhong/kSTEP && grep -rn "num_cpus" kmod/drivers/*.c 2>/dev/null | head -10
+  └ 1 line...
+
+● Check how num_cpus is set
+  $ cd /users/szhong/kSTEP && grep -rn "num_cpus" kmod/ 2>/dev/null | head -10
+  └ 3 lines...
+
+● Check DriverConfig
+  $ cd /users/szhong/kSTEP && grep -A2 "class.*DriverConfig\|num_cpus.*:" run.py | head -20
+  └ 3 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -80
+  └ 81 lines...
+
+● Check run.py for timeout/panic handling
+  $ cd /users/szhong/kSTEP && grep -n "timeout\|panic\|taint\|latest.log" run.py | head -20
+  └ 3 lines...
+
+● Read run.py QEMU config
+  $ cd /users/szhong/kSTEP && sed -n '80,150p' run.py
+  └ 72 lines...
+
+● Check timeout config
+  $ cd /users/szhong/kSTEP && grep -n "timeout\|TIMEOUT" run.py | head -10
+  └ 1 line...
+
+● Check how QEMU is run
+  $ cd /users/szhong/kSTEP && grep -n "timeout\|Popen\|process\|subprocess" run.py | head -20
+  └ 1 line...
+
+● Check system/timeout
+  $ cd /users/szhong/kSTEP && grep -n "def system\|timeout" scripts/__init__.py 2>/dev/null | head
+  -10 && grep -n "timeout" scripts/utils.py 2>/dev/null | head -10
+  └ 1 line...
+
+● Read scripts init
+  $ cd /users/szhong/kSTEP && cat scripts/__init__.py
+  └ 14 lines...
+
+● Check system function
+  $ cd /users/szhong/kSTEP && grep -n "def system\|timeout" scripts/utils.py 2>/dev/null | head -10
+  └ 2 lines...
+
+● Read utils.py
+  $ cd /users/szhong/kSTEP && cat scripts/utils.py
+  └ 64 lines...
+
+Let me look at the `yield_to_race` driver for concurrency patterns and check the Makefile for kernel config:
+
+● Read yield_to_race driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/yield_to_race.c 2>/dev/null | head -100
+  └ 101 lines...
+
+● Check list debug support
+  $ cd /users/szhong/kSTEP && grep -rn "CONFIG_DEBUG_LIST\|BUG_ON\|WARN_ON.*list\|list_debug"
+  linux/current/lib/list_debug.c 2>/dev/null | head -10
+  └ 1 line...
+
+● Read rest of yield_to_race
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/yield_to_race.c 2>/dev/null | tail -50
+  └ 51 lines...
+
+● Check PREEMPT config
+  $ cd /users/szhong/kSTEP && grep "PREEMPT" build/affine_move_buggy/.config 2>/dev/null || (make
+  linux LINUX_NAME=affine_move_buggy 2>&1 | tail -3; grep "PREEMPT" build/affine_move_buggy/.config
+  2>/dev/null)
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 4 lines...
+
+● Check preempt config from source
+  $ cd /users/szhong/kSTEP && grep "PREEMPT" linux/affine_move_buggy/.config 2>/dev/null | head -10
+  └ 6 lines...
+
+● Check debug config
+  $ cd /users/szhong/kSTEP && grep "DEBUG_LIST\|DEBUG_SG\|LOCKDEP\|DEBUG_SPINLOCK"
+  linux/affine_move_buggy/.config 2>/dev/null | head -10
+  └ 5 lines...
+
+● Find stopper thread function
+  $ cd /users/szhong/kSTEP && grep -n "stopper_thread\|smpboot_thread"
+  linux/current/kernel/stop_machine.c | head -10
+  └ 4 lines...
+
+● Read linux/current/kernel/stop_machine.c lines 487-530
+  └ 44 lines read
+
+● Read linux/current/kernel/stop_machine.c lines 25-70
+  └ 46 lines read
+
+Now I have a solid understanding. Let me write the driver. The key insight: with `PREEMPT_NONE`, a spinning kthread on CPU 1 prevents the stopper from running, creating a deterministic window for the double-enqueue race.
+
+● Create kmod/drivers/affine_move_self.c (+155)
+
+Now let me build and test on the buggy kernel:
+
+● Build buggy linux
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=affine_move_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep buggy
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=affine_move_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Build succeeded. Now let's run it:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py affine_move_self --linux_name affine_move_buggy --num_cpus 4
+  2>&1 | tail -20
+  └ 21 lines...
+
+● Check full log
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log 2>/dev/null || cat data/latest.log
+  2>/dev/null | head -80
+  └ 81 lines...
+
+● Check driver output
+  $ cd /users/szhong/kSTEP && grep -E "kstep|TRACE|fail|pass|stopper|WARN|refcount|migration"
+  data/logs/latest.log 2>/dev/null || grep -E
+  "kstep|TRACE|fail|pass|stopper|WARN|refcount|migration" data/latest.log 2>/dev/null
+  └ 10 lines...
+
+● Check output JSONL
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl 2>/dev/null
+  └ 2 lines...
+
+The bug is triggered on the buggy kernel. The refcount underflow `WARN` from the stopper corruption was detected. Now let me check the count=2 situation more carefully and test on the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 9e81889c7648 affine_move_fixed 2>&1 | tail -3
+  └ 1 line...
+

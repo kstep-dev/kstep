@@ -24,3 +24,20 @@ Let me skip this and update TODO.md.
 
 ● Edit TODO.md (+1 -1)
 
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 9ed20bafc858 - boot-time-only
+  __setup() return value bug
+
+  The bug is in setup_preempt_mode() returning inverted success/failure
+  codes for __setup() callbacks. This only affects boot parameter handling,...
+  └ 15 lines...
+
+**Skipped** `9ed20bafc858` — this is a boot-time-only bug where `setup_preempt_mode()` returns inverted `__setup()` callback return values (0 on success, 1 on failure). The actual preemption mode is still applied correctly via `sched_dynamic_update()` before the return, so there's no observable runtime scheduling difference. Cannot be reproduced with kSTEP drivers. Committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         48s
+Total session time:     57s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      162.7k in, 2.0k out, 142.4k cached (Est. 6 Premium requests)
