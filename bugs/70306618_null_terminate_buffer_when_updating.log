@@ -407,3 +407,39 @@ Now commit and push:
   $ cd /users/szhong/kSTEP && git diff HEAD -- bugs/6d2f8909_outofbound_access_uclamp.log | head -5
   └ 6 lines...
 
+● Stage only relevant files
+  $ cd /users/szhong/kSTEP && git reset HEAD bugs/6d2f8909_outofbound_access_uclamp.log && git
+  checkout -- bugs/6d2f8909_outofbound_access_uclamp.log 2>/dev/null; git add TODO.md
+  kmod/drivers/null_term_scaling.c kmod/reset.c reproduce.py
+  bugs/70306618_null_terminate_buffer_when_updating.log
+  └ 4 lines...
+
+● Commit changes
+  $ cd /users/szhong/kSTEP && git commit -m "reproduce: null_term_scaling (703066188f63)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+  └ 3 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1 | tail -5
+  └ 3 lines...
+
+Successfully reproduced and pushed. Here's a summary:
+
+**Bug**: `703066188f63` — `sched_scaling_write()` missing null termination and range validation for `/sys/kernel/debug/sched/tunable_scaling`
+
+**Approach**: Wrote to the debugfs file via `file->f_op->write()` using user-space memory mapped with `vm_mmap()`. Tested writing out-of-range value "3" (≥ `SCHED_TUNABLESCALING_END`).
+
+**Results**:
+- **Buggy kernel**: write "3" returned 2 (accepted — no range check) → `fail`  
+- **Fixed kernel**: write "3" returned -22 (`-EINVAL` — properly rejected) → `pass`
+
+**Also fixed**: Version guard in `kmod/reset.c` for `last_decay_max_lb_cost` field rename (should be `>= 5.16`, not `>= 5.15`).
+
+
+Total usage est:        6 Premium requests
+API time spent:         14m 30s
+Total session time:     20m 48s
+Total code changes:     +165 -63
+Breakdown by AI model:
+ claude-opus-4.6-1m      6.2m in, 48.7k out, 6.1m cached (Est. 6 Premium requests)
