@@ -699,6 +699,23 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="cpus_mask_check"),
+        linux=[
+            Linux(
+                name="buggy",
+                version="fd844ba9ae59~1",
+                patch=LINUX_ROOT_DIR / "objtool_symtab.patch",
+                config=LINUX_ROOT_DIR / "config.cpus_mask_check",
+            ),
+            Linux(
+                name="fixed",
+                version="fd844ba9ae59",
+                patch=LINUX_ROOT_DIR / "objtool_symtab.patch",
+                config=LINUX_ROOT_DIR / "config.cpus_mask_check",
+            ),
+        ],
+    ),
 ]
 
 

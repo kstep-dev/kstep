@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 62/400 reproduced**
+**Total: 64/400 reproduced**
 
 ---
 
@@ -89,9 +89,9 @@
 - [x] `eaf5a92ebde5` sched/core: Fix reset-on-fork from RT with uclamp — [`eaf5a92e_fix_resetonfork_rt_uclamp.md`](bugs/eaf5a92e_fix_resetonfork_rt_uclamp.md) <!-- driver:resetonfork_rt_uclamp attempts:1 -->
 - [x] `ec618b84f6e1` sched: Fix rq->nr_iowait ordering — [`ec618b84_fix_rqnr_iowait_ordering.md`](bugs/ec618b84_fix_rqnr_iowait_ordering.md) <!-- driver:nr_iowait_ordering attempts:1 -->
 - [x] `ef73d6a4ef0b` sched/wait: Fix a kthread_park race with wait_woken() — [`ef73d6a4_fix_kthread_park_race_wait_woken.md`](bugs/ef73d6a4_fix_kthread_park_race_wait_woken.md) <!-- driver:kthread_park_wait_woken attempts:1 -->
-- [ ] `f1dfdab694eb` sched/vtime: Prevent unstable evaluation of WARN(vtime->state) — [`f1dfdab6_prevent_unstable_evaluation_warnvtimestate.md`](bugs/f1dfdab6_prevent_unstable_evaluation_warnvtimestate.md)
+- [x] `f1dfdab694eb` sched/vtime: Prevent unstable evaluation of WARN(vtime->state) — [`f1dfdab6_prevent_unstable_evaluation_warnvtimestate.md`](bugs/f1dfdab6_prevent_unstable_evaluation_warnvtimestate.md) <!-- driver:vtime_warn attempts:1 -->
 - [-] `f912d051619d` sched: remove redundant on_rq status change — [`f912d051_remove_redundant_on_rq_status_change.md`](bugs/f912d051_remove_redundant_on_rq_status_change.md) <!-- skipped:pure-code-cleanup-no-behavioral-difference-redundant-assignments-set-identical-values attempts:1 -->
-- [ ] `fd844ba9ae59` Check cpus_mask, not cpus_ptr in __set_cpus_allowed_ptr(), to fix mask corruption — [`fd844ba9_check_cpus_mask_not_cpus_ptr___set_cpus_allowed_ptr.md`](bugs/fd844ba9_check_cpus_mask_not_cpus_ptr___set_cpus_allowed_ptr.md)
+- [x] `fd844ba9ae59` Check cpus_mask, not cpus_ptr in __set_cpus_allowed_ptr(), to fix mask corruption — [`fd844ba9_check_cpus_mask_not_cpus_ptr___set_cpus_allowed_ptr.md`](bugs/fd844ba9_check_cpus_mask_not_cpus_ptr___set_cpus_allowed_ptr.md) <!-- driver:cpus_mask_check attempts:1 -->
 - [ ] `fe7a11c78d2a` Fix unbalance set_rq_online/offline() in sched_cpu_deactivate() — [`fe7a11c7_fix_unbalance_set_rq_onlineoffline_sched_cpu_deactivate.md`](bugs/fe7a11c7_fix_unbalance_set_rq_onlineoffline_sched_cpu_deactivate.md)
 
 ## CFS (Completely Fair Scheduler) (32)
