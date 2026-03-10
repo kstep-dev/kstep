@@ -9,10 +9,10 @@
 // Fix: Use __raise_softirq_irqoff() which just marks softirq pending
 // without waking ksoftirqd, since softirqs are processed on return.
 //
-// Strategy: Check binary code of nohz_csd_func to determine whether it
-// calls raise_softirq_irqoff (buggy) or __raise_softirq_irqoff (fixed).
-// On x86, a CALL instruction is E8 xx xx xx xx where the target address
-// is computed relative to the instruction following the CALL.
+// Strategy: Scan the binary code of nohz_csd_func to verify which softirq
+// raise function it calls. On buggy kernel, it calls raise_softirq_irqoff
+// (which wakes ksoftirqd). On fixed kernel, it calls __raise_softirq_irqoff
+// (which only sets the pending bit). Requires CONFIG_NO_HZ_COMMON=y.
 
 #include "driver.h"
 #include "internal.h"
@@ -58,8 +58,8 @@ static void run(void) {
   TRACE_INFO("raise_softirq_irqoff at %px", raise_fn);
   TRACE_INFO("__raise_softirq_irqoff at %px", raise_fn_no_wake);
 
-  bool calls_raise = scan_for_call(nohz_csd, 128, raise_fn);
-  bool calls_raise_nowake = scan_for_call(nohz_csd, 128, raise_fn_no_wake);
+  bool calls_raise = scan_for_call(nohz_csd, 256, raise_fn);
+  bool calls_raise_nowake = scan_for_call(nohz_csd, 256, raise_fn_no_wake);
 
   TRACE_INFO("nohz_csd_func calls raise_softirq_irqoff: %s",
              calls_raise ? "YES" : "NO");

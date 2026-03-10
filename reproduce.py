@@ -684,6 +684,21 @@ bugs = [
             Linux(name="fixed", version="ec618b84f6e1"),
         ],
     ),
+    Bug(
+        driver=Driver(name="ksoftirqd_wakeup", num_cpus=2),
+        linux=[
+            Linux(
+                name="buggy",
+                version="e932c4ab38f0~1",
+                config=LINUX_ROOT_DIR / "nohz.config",
+            ),
+            Linux(
+                name="fixed",
+                version="e932c4ab38f0",
+                config=LINUX_ROOT_DIR / "nohz.config",
+            ),
+        ],
+    ),
 ]
 
 

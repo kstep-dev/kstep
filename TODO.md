@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 61/400 reproduced**
+**Total: 62/400 reproduced**
 
 ---
 
@@ -85,7 +85,7 @@
 - [x] `e0b257c3b71b` sched: Prevent raising SCHED_SOFTIRQ when CPU is !active — [`e0b257c3_prevent_softirq_inactive_cpu.md`](bugs/e0b257c3_prevent_softirq_inactive_cpu.md) <!-- driver:softirq_inactive_cpu attempts:1 -->
 - [x] `e38e5299747b` sched/hrtick: Fix hrtick() vs. scheduling context — [`e38e5299_hrtick_schedule_context.md`](bugs/e38e5299_hrtick_schedule_context.md) <!-- driver:hrtick_context attempts:1 -->
 - [-] `e65855a52b47` Fix a deadlock when enabling uclamp static key — [`e65855a5_fix_deadlock_enabling_uclamp_static.md`](bugs/e65855a5_fix_deadlock_enabling_uclamp_static.md) <!-- skipped:requires CONFIG_JUMP_LABEL=y which causes objtool build failures on 5.8-rc6; without it static_key_enable is inlined and no deadlock occurs attempts:2 -->
-- [-] `e932c4ab38f0` sched/core: Prevent wakeup of ksoftirqd during idle load balance — [`e932c4ab_prevent_wakeup_ksoftirqd_during_idle.md`](bugs/e932c4ab_prevent_wakeup_ksoftirqd_during_idle.md) <!-- skipped:requires CONFIG_NO_HZ_COMMON which conflicts with kSTEP tick infrastructure attempts:1 -->
+- [x] `e932c4ab38f0` sched/core: Prevent wakeup of ksoftirqd during idle load balance — [`e932c4ab_prevent_wakeup_ksoftirqd_during_idle.md`](bugs/e932c4ab_prevent_wakeup_ksoftirqd_during_idle.md) <!-- driver:ksoftirqd_wakeup attempts:2 -->
 - [x] `eaf5a92ebde5` sched/core: Fix reset-on-fork from RT with uclamp — [`eaf5a92e_fix_resetonfork_rt_uclamp.md`](bugs/eaf5a92e_fix_resetonfork_rt_uclamp.md) <!-- driver:resetonfork_rt_uclamp attempts:1 -->
 - [x] `ec618b84f6e1` sched: Fix rq->nr_iowait ordering — [`ec618b84_fix_rqnr_iowait_ordering.md`](bugs/ec618b84_fix_rqnr_iowait_ordering.md) <!-- driver:nr_iowait_ordering attempts:1 -->
 - [x] `ef73d6a4ef0b` sched/wait: Fix a kthread_park race with wait_woken() — [`ef73d6a4_fix_kthread_park_race_wait_woken.md`](bugs/ef73d6a4_fix_kthread_park_race_wait_woken.md) <!-- driver:kthread_park_wait_woken attempts:1 -->
