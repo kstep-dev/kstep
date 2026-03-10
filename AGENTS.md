@@ -12,7 +12,8 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 
 #### Development Stage
 
-- Create a driver in `kmod/driver_[driver_name].c` that triggers the bug.
+- Create a driver in `kmod/drivers/[driver_name].c` that triggers the bug.
+- Make sure you guard the driver with `#if LINUX_VERSION_CODE == KERNEL_VERSION(xxx)` to the version of the kernel.
 - Initially, you may directly manipulate internal scheduler state to trigger the bug.
 - Add detailed logging in your driver for all relevant fields to aid debugging. If necessary, add kernel-side logging with `printk()`.
 - Build and execute the driver on the buggy kernel with:

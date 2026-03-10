@@ -156,10 +156,24 @@ bugs = [
         ],
     ),
     Bug(
+        driver=Driver(name="rq_qos_wakeup"),
+        linux=[
+            Linux(name="buggy", version="11c7aa0ddea8611007768d3e6b58d45dc60a19e1~1"),
+            Linux(name="fixed", version="11c7aa0ddea8611007768d3e6b58d45dc60a19e1"),
+        ],
+    ),
+    Bug(
         driver=Driver(name="balance_push_splice", num_cpus=2),
         linux=[
             Linux(name="buggy", version="04193d590b390ec7a0592630f46d559ec6564ba1~1"),
             Linux(name="fixed", version="04193d590b390ec7a0592630f46d559ec6564ba1"),
+        ],
+    ),
+    Bug(
+        driver=Driver(name="migrate_swap_hotplug", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="009836b4fa52f92cba33618e773b1094affa8cd2~1"),
+            Linux(name="fixed", version="009836b4fa52f92cba33618e773b1094affa8cd2"),
         ],
     ),
     Bug(
