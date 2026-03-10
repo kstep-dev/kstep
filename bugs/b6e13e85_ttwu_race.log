@@ -80,3 +80,206 @@ Let me look at existing driver examples and understand the kernel version.
 ● Read shell output: Waiting up to 120 seconds for command output
   └ 1 line...
 
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 6 lines...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && head -5 linux/ttwu_race_buggy/Makefile
+  └ 6 lines...
+
+● Check group sched config
+  $ cd /users/szhong/kSTEP && grep -n "CONFIG_FAIR_GROUP_SCHED" build/ttwu_race_buggy/.config
+  2>/dev/null || grep -rn "CONFIG_FAIR_GROUP_SCHED" linux/ttwu_race_buggy/kernel/sched/Makefile
+  2>/dev/null
+  └ 1 line...
+
+● Find kstep config
+  $ cd /users/szhong/kSTEP && grep "CONFIG_FAIR_GROUP_SCHED\|CONFIG_CGROUP_SCHED" build/kstep_config
+   2>/dev/null || find . -name "kstep_config" -o -name ".config" 2>/dev/null | head -5
+  └ 1 line...
+
+● Stop shell
+  └ 1 line...
+
+● Find kernel config
+  $ cd /users/szhong/kSTEP && ls scripts/kstep_config* 2>/dev/null; grep "FAIR_GROUP" scripts/*.py
+  scripts/*.sh 2>/dev/null | head -5; grep "FAIR_GROUP" Makefile 2>/dev/null
+  └ 1 line...
+
+● Check scripts dir
+  $ cd /users/szhong/kSTEP && grep "FAIR_GROUP\|CGROUP_SCHED" scripts/config 2>/dev/null; ls
+  scripts/
+  └ 5 lines...
+
+● Check Makefile for config
+  $ cd /users/szhong/kSTEP && grep -n "FAIR_GROUP\|config_text\|\.config" Makefile | head -20
+  └ 3 lines...
+
+● Find config path
+  $ cd /users/szhong/kSTEP && cat Makefile | grep -A2 "KSTEP_CONFIG" | head -10
+  └ 7 lines...
+
+● Check kstep config for group sched
+  $ cd /users/szhong/kSTEP && grep "FAIR_GROUP\|CGROUP_SCHED" linux/config.kstep
+  linux/config.kstep.* 2>/dev/null
+  └ 3 lines...
+
+Good, `CONFIG_FAIR_GROUP_SCHED=y` is enabled. The NULL deref in `is_same_group()` will trigger. Now let me write the driver.
+
+● Verify sched_ttwu_pending in buggy kernel
+  $ cd /users/szhong/kSTEP && sed -n '2275,2300p' linux/ttwu_race_buggy/kernel/sched/core.c
+  └ 27 lines...
+
+● Find ttwu functions
+  $ cd /users/szhong/kSTEP && grep -n "sched_ttwu_pending\|ttwu_do_activate\|WF_ON_RQ\|WF_ON_CPU"
+  linux/ttwu_race_buggy/kernel/sched/core.c | head -20
+  └ 9 lines...
+
+Good. Now I can see that the buggy `sched_ttwu_pending` has no defensive checks. Let me write the driver:
+
+● Create kmod/drivers/ttwu_race.c (+138)
+
+Now let me build and test on the buggy kernel:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Check build errors
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | grep -i "error" | head
+  -20
+  └ 6 lines...
+
+● Check specific build error
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | grep -B3 "thunk_64.o" |
+  head -10
+  └ 8 lines...
+
+● Check objtool config
+  $ cd /users/szhong/kSTEP && grep -r "objtool\|CONFIG_STACK_VALIDATION" linux/config.kstep*
+  2>/dev/null
+  └ 1 line...
+
+● Check build dir and source file
+  $ cd /users/szhong/kSTEP && ls build/ttwu_race_buggy/ 2>/dev/null | head -5; ls
+  linux/ttwu_race_buggy/arch/x86/entry/thunk_64.S 2>/dev/null
+  └ 2 lines...
+
+● Check objtool/stack config
+  $ cd /users/szhong/kSTEP && grep "STACK_VALIDATION\|OBJTOOL\|UNWINDER" linux/config.kstep
+  linux/config.kstep.* 2>/dev/null
+  └ 1 line...
+
+● Read kstep config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | head -40
+  └ 41 lines...
+
+● Check unwinder config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | grep -i
+  "stack_valid\|objtool\|orc\|unwinder\|frame_pointer"
+  └ 1 line...
+
+● Check arch config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep.x86_64 2>/dev/null
+  └ 6 lines...
+
+● Check generated config
+  $ cd /users/szhong/kSTEP && grep "STACK_VALIDATION\|OBJTOOL" linux/ttwu_race_buggy/.config
+  2>/dev/null
+  └ 3 lines...
+
+● Check build target
+  $ cd /users/szhong/kSTEP && cat Makefile | grep -A10 "linux:" | head -15
+  └ 12 lines...
+
+● Read checkout script
+  $ cd /users/szhong/kSTEP && cat checkout_linux.py
+  └ 123 lines...
+
+● Check patch mechanism
+  $ cd /users/szhong/kSTEP && ls linux/patches* 2>/dev/null; ls -d linux/patch* 2>/dev/null; cat
+  Makefile | grep -A5 "linux-patch"
+  └ 14 lines...
+
+● Disable stack validation
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && scripts/config --disable STACK_VALIDATION &&
+  make olddefconfig 2>&1 | tail -3
+  └ 4 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Verify config change
+  $ cd /users/szhong/kSTEP && grep "STACK_VALIDATION" linux/ttwu_race_buggy/.config
+  └ 3 lines...
+
+● List existing kernel builds
+  $ cd /users/szhong/kSTEP && ls linux/ | head -20 && ls build/ | head -20
+  └ 41 lines...
+
+● Check versions of similar drivers
+  $ cd /users/szhong/kSTEP && for d in linux/cpus_share_cache_buggy linux/nr_running_wakelist_buggy;
+   do echo "==$d=="; head -5 "$d/Makefile" 2>/dev/null; done
+  └ 13 lines...
+
+● Check stack config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | grep -i stack
+  └ 1 line...
+
+● Check objtool
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && cat tools/objtool/Makefile | head -20
+  2>/dev/null; which objtool 2>/dev/null; ls tools/objtool/objtool 2>/dev/null
+  └ 22 lines...
+
+● Rebuild objtool
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && rm -f tools/objtool/objtool && make
+  tools/objtool/objtool 2>&1 | tail -5
+  └ 3 lines...
+
+● Rebuild objtool directly
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && rm tools/objtool/objtool && make -C
+  tools/objtool 2>&1 | tail -10
+  └ 2 lines...
+
+● Find objtool binary
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && find . -name objtool -type f 2>/dev/null
+  └ 1 line...
+
+● Find objtool
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && find . -name objtool 2>/dev/null; ls
+  tools/objtool/ | head -10
+  └ 12 lines...
+
+● Check objtool type
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && file tools/objtool/objtool 2>/dev/null; ls -la
+  tools/objtool/objtool 2>/dev/null
+  └ 2 lines...
+
+● List objtool dir
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && ls -la tools/objtool/
+  └ 78 lines...
+
+● Find objtool issue
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && grep -n "missing symbol table\|symtab"
+  tools/objtool/elf.c | head -10
+  └ 11 lines...
+
+● Find section lookup
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && grep -n "find_section_by_name"
+  tools/objtool/elf.c | head -10
+  └ 8 lines...
+
+● Read elf section parsing
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && sed -n '90,160p' tools/objtool/elf.c
+  └ 71 lines...
+
+● Read elf_read sections parsing
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && sed -n '200,310p' tools/objtool/elf.c
+  └ 112 lines...
+
+● Check entry Makefile
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && grep "thunk_64\|OBJECT_FILES_NON_STANDARD"
+  arch/x86/entry/Makefile
+  └ 1 line...
+

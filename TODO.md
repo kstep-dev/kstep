@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 46/400 reproduced**
+**Total: 47/400 reproduced**
 
 ---
 
@@ -67,7 +67,7 @@
 - [-] `9ed20bafc858` preempt/dynamic: Fix setup_preempt_mode() return value — [`9ed20baf_fix_setup_preempt_mode_return.md`](bugs/9ed20baf_fix_setup_preempt_mode_return.md) <!-- skipped:boot-time-only __setup() return value bug, no runtime scheduling impact attempts:1 -->
 - [-] `a06247c6804f` psi: Fix uaf issue when psi trigger is destroyed while being polled — [`a06247c6_fix_uaf_issue_when_psi.md`](bugs/a06247c6_fix_uaf_issue_when_psi.md) <!-- skipped:requires-userspace-file-ops-on-proc-pressure-outside-kstep-scope attempts:1 -->
 - [x] `abfc01077df6` sched: Fix do_set_cpus_allowed() locking — [`abfc0107_fix_do_set_cpus_allowed.md`](bugs/abfc0107_fix_do_set_cpus_allowed.md) <!-- driver:set_cpus_allowed_lock attempts:1 -->
-- [ ] `af13e5e437dc` sched: Fix the do_set_cpus_allowed() locking fix — [`af13e5e4_fix_the_do_set_cpus.md`](bugs/af13e5e4_fix_the_do_set_cpus.md)
+- [x] `af13e5e437dc` sched: Fix the do_set_cpus_allowed() locking fix — [`af13e5e4_fix_the_do_set_cpus.md`](bugs/af13e5e4_fix_the_do_set_cpus.md) <!-- driver:do_set_cpus_fix attempts:1 -->
 - [x] `b1e8206582f9` sched: Fix yet more sched_fork() races — [`b1e82065_yet_more_sched_fork_races.md`](bugs/b1e82065_yet_more_sched_fork_races.md) <!-- driver:sched_fork_race attempts:1 -->
 - [x] `b5c4477366fb` sched: Use cpu_dying() to fix balance_push vs hotplug-rollback — [`b5c44773_use_cpu_dying_to_fix.md`](bugs/b5c44773_use_cpu_dying_to_fix.md) <!-- driver:balance_push_hotplug attempts:1 -->
 - [ ] `b6e13e85829f` sched/core: Fix ttwu() race — [`b6e13e85_ttwu_race.md`](bugs/b6e13e85_ttwu_race.md)
