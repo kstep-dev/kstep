@@ -670,6 +670,13 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="kthread_park_wait_woken", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="ef73d6a4ef0b~1"),
+            Linux(name="fixed", version="ef73d6a4ef0b"),
+        ],
+    ),
 ]
 
 

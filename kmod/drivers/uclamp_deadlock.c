@@ -45,45 +45,56 @@ static struct kprobe crl_kp = {
 
 static void setup(void) {
   task = kstep_task_create();
-  kstep_task_pin(task, 1, 1);
 }
 
 static void run(void) {
   kstep_task_wakeup(task);
   kstep_tick_repeat(3);
-
-  int kp_ret = register_kprobe(&crl_kp);
-  if (kp_ret < 0) {
-    kstep_fail("register_kprobe on cpus_read_lock failed: %d", kp_ret);
-    return;
-  }
+  kstep_task_pause(task);
+  kstep_tick_repeat(1);
 
   typedef int (*setattr_fn_t)(struct task_struct *, const struct sched_attr *);
   setattr_fn_t setattr_fn =
       (setattr_fn_t)kstep_ksym_lookup("sched_setattr_nocheck");
   if (!setattr_fn) {
-    unregister_kprobe(&crl_kp);
     kstep_fail("could not resolve sched_setattr_nocheck");
     return;
   }
 
-  // Pre-enable sched_uclamp_used from a safe (non-atomic) context.
-  // This prevents the actual deadlock: when __setscheduler_uclamp calls
-  // static_key_enable under rq lock, the key is already enabled so
-  // static_key_enable_cpuslocked returns early (no jump_label_update,
-  // no text_mutex). But cpus_read_lock is still called, so our kprobe
-  // will still capture the preempt_count to detect the bug.
+  // First test: try a simple policy change (no uclamp) to verify
+  // sched_setattr_nocheck works at all in kSTEP v5.8
+  struct sched_attr attr_test = {
+      .size = sizeof(attr_test),
+      .sched_policy = SCHED_NORMAL,
+      .sched_nice = 0,
+  };
+  TRACE_INFO("Testing sched_setattr_nocheck with SCHED_NORMAL (no uclamp)");
+  int ret = setattr_fn(task, &attr_test);
+  TRACE_INFO("sched_setattr_nocheck(NORMAL) returned %d", ret);
+
+  if (ret) {
+    kstep_fail("sched_setattr_nocheck(NORMAL) failed: %d", ret);
+    return;
+  }
+
+  // Now test with uclamp. Pre-enable sched_uclamp_used first.
   typedef void (*ske_fn_t)(struct static_key *);
   ske_fn_t ske_fn = (ske_fn_t)kstep_ksym_lookup("static_key_enable");
   struct static_key *uclamp_key =
       (struct static_key *)kstep_ksym_lookup("sched_uclamp_used");
   if (!ske_fn || !uclamp_key) {
-    unregister_kprobe(&crl_kp);
     kstep_fail("could not resolve static_key_enable or sched_uclamp_used");
     return;
   }
   ske_fn(uclamp_key);
-  TRACE_INFO("Pre-enabled sched_uclamp_used to prevent actual deadlock");
+  TRACE_INFO("Pre-enabled sched_uclamp_used");
+
+  // Register kprobe on cpus_read_lock
+  int kp_ret = register_kprobe(&crl_kp);
+  if (kp_ret < 0) {
+    kstep_fail("register_kprobe on cpus_read_lock failed: %d", kp_ret);
+    return;
+  }
 
   struct sched_attr attr = {
       .size = sizeof(attr),
@@ -93,16 +104,11 @@ static void run(void) {
       .sched_nice = task_nice(task),
   };
 
-  // Arm the probe and call sched_setattr_nocheck.
-  // On buggy kernel: cpus_read_lock is called from static_key_enable
-  //   inside __setscheduler_uclamp (under task_rq_lock -> preempt elevated)
-  // On fixed kernel: cpus_read_lock is called from static_key_enable
-  //   inside uclamp_validate (before any locks -> preempt is low)
   max_preempt_count = -1;
   probe_armed = true;
 
   TRACE_INFO("Calling sched_setattr_nocheck with SCHED_FLAG_UTIL_CLAMP_MIN");
-  int ret = setattr_fn(task, &attr);
+  ret = setattr_fn(task, &attr);
   probe_armed = false;
 
   unregister_kprobe(&crl_kp);
