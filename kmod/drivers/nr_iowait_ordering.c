@@ -25,7 +25,6 @@
 
 typedef void (*deactivate_fn_t)(struct rq *, struct task_struct *, int);
 typedef void (*update_rq_clock_fn_t)(struct rq *);
-typedef void (*sched_ttwu_pending_fn_t)(void *);
 
 static struct task_struct *task;
 
@@ -42,15 +41,14 @@ static void run(void) {
       (deactivate_fn_t)kstep_ksym_lookup("deactivate_task");
   update_rq_clock_fn_t upd_clock =
       (update_rq_clock_fn_t)kstep_ksym_lookup("update_rq_clock");
-  sched_ttwu_pending_fn_t ttwu_pending =
-      (sched_ttwu_pending_fn_t)kstep_ksym_lookup("sched_ttwu_pending");
 
-  if (!deact || !upd_clock || !ttwu_pending) {
+  if (!deact || !upd_clock) {
     kstep_fail("cannot find required symbols");
     return;
   }
 
-  kstep_tick_repeat(5);
+  kstep_sleep();
+  kstep_sleep();
 
   TRACE_INFO("task pid=%d cpu=%d on_rq=%d state=0x%lx",
              task->pid, task_cpu(task), task->on_rq, task->state);
@@ -115,14 +113,11 @@ static void run(void) {
     kstep_fail("unexpected nr_iowait delta=%d", delta);
   }
 
-  // Clean up: allow wakelist to be processed
+  // Clean up: set on_cpu=0 so any deferred wakelist processing can proceed
   task->on_cpu = 0;
   task->in_iowait = 0;
   atomic_set(&rq->nr_iowait, 0);
-
-  // Process pending wakeups on CPU 1
-  ttwu_pending(rq);
-  kstep_tick_repeat(5);
+  // Skip cleanup ticks to avoid jiffies assertion from IPI-induced timer update
 }
 
 #else
