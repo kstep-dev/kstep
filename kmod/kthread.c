@@ -91,6 +91,12 @@ static void do_syncwakeup(struct kstep_kthread *kt, void *arg) {
   atomic_set(&kt->action_updated, 1);
 }
 
+static void do_wake_continue(struct kstep_kthread *kt, void *arg) {
+  __wake_up_sync(arg, TASK_NORMAL);
+  kt->action = do_spin;
+  atomic_set(&kt->action_updated, 1);
+}
+
 /* ---- public API ---- */
 
 struct task_struct *kstep_kthread_create(const char *name) {
@@ -151,6 +157,25 @@ void kstep_kthread_syncwake(struct task_struct *waker, struct task_struct *wakee
 
   // Set the action to do_syncwakeup
   waker_kt->action = do_syncwakeup;
+  waker_kt->action_arg = &wakee_kt->wq;
+  atomic_set(&waker_kt->action_updated, 1);
+}
+
+/*
+ * Like kstep_kthread_syncwake but the waker continues spinning
+ * instead of exiting after the wakeup.
+ */
+void kstep_kthread_wake_continue(struct task_struct *waker, struct task_struct *wakee) {
+  struct kstep_kthread *waker_kt = kt_find(waker);
+  struct kstep_kthread *wakee_kt = kt_find(wakee);
+
+  if ((waker_kt->action != do_spin && waker_kt->action != do_yield) ||
+      wakee_kt->action != do_block_on_wq)
+    panic("kstep: waker or wakee is not in the correct state");
+
+  atomic_set(&wakee_kt->wq_ready, 1);
+
+  waker_kt->action = do_wake_continue;
   waker_kt->action_arg = &wakee_kt->wq;
   atomic_set(&waker_kt->action_updated, 1);
 }

@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 65/400 reproduced**
+**Total: 66/400 reproduced**
 
 ---
 
@@ -98,7 +98,7 @@
 
 - [ ] `02dbb7246c5b` Fix clearing of has_idle_cores flag in select_idle_cpu() — [`02dbb724_fix_clearing_of_has_idle.md`](bugs/02dbb724_fix_clearing_of_has_idle.md)
 - [ ] `111688ca1c4a` Fix negative imbalance in imbalance calculation — [`111688ca_fix_negative_imbalance_in_imbalance.md`](bugs/111688ca_fix_negative_imbalance_in_imbalance.md)
-- [ ] `15257cc2f905` sched/fair: Revert force wakeup preemption — [`15257cc2_revert_force_wakeup_preemption.md`](bugs/15257cc2_revert_force_wakeup_preemption.md)
+- [x] `15257cc2f905` sched/fair: Revert force wakeup preemption — [`15257cc2_revert_force_wakeup_preemption.md`](bugs/15257cc2_revert_force_wakeup_preemption.md) <!-- driver:revert_force_wakeup_preemption attempts:1 -->
 - [ ] `289de3598481` sched/fair: Fix statistics for find_idlest_group() — [`289de359_statistics_for_find_idlest_group.md`](bugs/289de359_statistics_for_find_idlest_group.md)
 - [ ] `2ae891b82695` sched: Reduce the default slice to avoid tasks getting an extra tick — [`2ae891b8_the_default_slice_to_avoid.md`](bugs/2ae891b8_the_default_slice_to_avoid.md)
 - [ ] `39a2a6eb5c9b` sched/fair: Fix shift-out-of-bounds in load_balance() — [`39a2a6eb_shift_out_of_bounds_in.md`](bugs/39a2a6eb_shift_out_of_bounds_in.md)

@@ -92,6 +92,7 @@ struct task_struct *kstep_kthread_create(const char *name);
 void kstep_kthread_bind(struct task_struct *p, const struct cpumask *mask);
 void kstep_kthread_start(struct task_struct *p);
 void kstep_kthread_syncwake(struct task_struct *waker, struct task_struct *wakee);
+void kstep_kthread_wake_continue(struct task_struct *waker, struct task_struct *wakee);
 void kstep_kthread_block(struct task_struct *p);
 void kstep_kthread_yield(struct task_struct *p);
 

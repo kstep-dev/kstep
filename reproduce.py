@@ -748,6 +748,13 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="revert_force_wakeup_preemption", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="15257cc2f905~1"),
+            Linux(name="fixed", version="15257cc2f905"),
+        ],
+    ),
 ]
 
 
