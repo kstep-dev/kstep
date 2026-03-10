@@ -202,6 +202,19 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="hrtick_reprogram", num_cpus=2),
+        linux=[
+            Linux(
+                name="buggy",
+                version="156ec6f42b8d300dbbf382738ff35c8bad8f4c3a~1",
+            ),
+            Linux(
+                name="fixed",
+                version="156ec6f42b8d300dbbf382738ff35c8bad8f4c3a",
+            ),
+        ],
+    ),
 ]
 
 

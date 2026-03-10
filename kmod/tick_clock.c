@@ -2,6 +2,7 @@
 #include <linux/sched_clock.h>
 #if defined(CONFIG_PARAVIRT) && defined(CONFIG_X86_64)
 #include <asm/timer.h>
+#include <asm/paravirt.h>
 #endif
 
 #include "internal.h"
@@ -20,9 +21,13 @@ void kstep_sched_clock_tick(void) {
 
 void kstep_sched_clock_init(void) {
   KSYM_IMPORT(__sched_clock_offset);
-  KSYM_IMPORT(paravirt_set_sched_clock);
   *KSYM___sched_clock_offset = 0;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+  KSYM_IMPORT(paravirt_set_sched_clock);
   KSYM_paravirt_set_sched_clock(kstep_sched_clock_get);
+#else
+  pv_ops.time.sched_clock = kstep_sched_clock_get;
+#endif
   TRACE_INFO("Mocked sched clock");
 }
 
