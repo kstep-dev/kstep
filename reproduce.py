@@ -248,6 +248,13 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="charge_percpu_cpuusage", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="248cc9993d1c~1"),
+            Linux(name="fixed", version="248cc9993d1c"),
+        ],
+    ),
 ]
 
 
