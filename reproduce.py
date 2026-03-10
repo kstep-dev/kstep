@@ -400,6 +400,13 @@ bugs = [
             Linux(name="fixed", version="76f970ce51c8"),
         ],
     ),
+    Bug(
+        driver=Driver(name="forceidle_starvation", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="8039e96fcc1d~1"),
+            Linux(name="fixed", version="8039e96fcc1d"),
+        ],
+    ),
 ]
 
 

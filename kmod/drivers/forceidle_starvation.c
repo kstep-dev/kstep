@@ -23,23 +23,29 @@ static struct task_struct *task;
 static int resched_seen;
 static int tick_count;
 
-static void on_tick_begin(void) {
+static void on_tick_end(void) {
   struct rq *rq1 = cpu_rq(1);
 
   if (!rq1->curr || rq1->curr->pid == 0)
     return;
 
   tick_count++;
-  int need_resched = test_tsk_need_resched(rq1->curr);
 
-  TRACE_INFO("tick %d: CPU1 curr=%s pid=%d need_resched=%d nr_running=%d "
-             "exec=%llu prev_exec=%llu",
-             tick_count, rq1->curr->comm, rq1->curr->pid, need_resched,
-             rq1->cfs.nr_running, rq1->curr->se.sum_exec_runtime,
-             rq1->curr->se.prev_sum_exec_runtime);
+  TRACE_INFO("tick_end %d: CPU1 curr=%s pid=%d need_resched=%d nr_running=%d "
+             "exec=%llu prev_exec=%llu forceidle=%d",
+             tick_count, rq1->curr->comm, rq1->curr->pid,
+             test_tsk_need_resched(rq1->curr), rq1->cfs.nr_running,
+             rq1->curr->se.sum_exec_runtime,
+             rq1->curr->se.prev_sum_exec_runtime,
+             rq1->core->core_forceidle);
 
-  if (need_resched && tick_count > 3)
+  // Detect reschedule: prev_sum_exec_runtime changes when task is re-picked
+  if (tick_count > 3 && rq1->curr->se.prev_sum_exec_runtime > 0)
     resched_seen = 1;
+
+  // Re-set core_forceidle (pick_next_task clears it on reschedule)
+  if (rq1->core_enabled)
+    rq1->core->core_forceidle = 1;
 }
 
 static void setup(void) {
@@ -112,14 +118,14 @@ static void run(void) {
 #else
 static void setup(void) {}
 static void run(void) { kstep_pass("kernel version not applicable"); }
-static void on_tick_begin(void) {}
+static void on_tick_end(void) {}
 #endif
 
 KSTEP_DRIVER_DEFINE{
     .name = "forceidle_starvation",
     .setup = setup,
     .run = run,
-    .on_tick_begin = on_tick_begin,
+    .on_tick_end = on_tick_end,
     .step_interval_us = 10000,
     .tick_interval_ns = 4000000,
 };
