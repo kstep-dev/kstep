@@ -20,92 +20,93 @@
 
 #if LINUX_VERSION_CODE == KERNEL_VERSION(5, 7, 0)
 
-KSYM_IMPORT(sd_llc);
-
 static void setup(void) {
   kstep_topo_init();
-  const char *mc[] = {"1-2"};
-  kstep_topo_set_mc(mc, 1);
   kstep_topo_apply();
+  kstep_topo_print();
 }
 
 static void run(void) {
-  int cpu = 1;
-
-  struct sched_domain *cached = rcu_dereference_check(
-      per_cpu(*KSYM_sd_llc, cpu), true);
-  if (!cached) {
-    kstep_fail("sd_llc is NULL for cpu %d", cpu);
-    return;
-  }
-
-  int orig_flags = cached->flags;
-  TRACE_INFO("sd_llc[%d] flags=0x%x", cpu, orig_flags);
-
-  if (!(orig_flags & 0x0200)) { // SD_SHARE_PKG_RESOURCES = 0x0200
-    kstep_fail("sd_llc missing SD_SHARE_PKG_RESOURCES");
-    return;
-  }
-
-  // Try to open the flags sysctl for writing.
-  // Buggy kernel: 0644 → open succeeds.
-  // Fixed kernel: 0444 → open fails with -EACCES.
-  const char *path = "/proc/sys/kernel/sched_domain/cpu1/domain0/flags";
-  struct file *file = filp_open(path, O_WRONLY, 0);
-
-  if (IS_ERR(file)) {
-    // Fixed kernel: write denied
-    kstep_pass("flags sysctl is read-only (open err=%ld)", PTR_ERR(file));
-    return;
-  }
-
-  // Buggy kernel: write allowed — clear SD_SHARE_PKG_RESOURCES
-  int new_flags = orig_flags & ~0x0200;
-  char buf[32];
-  int len = snprintf(buf, sizeof(buf), "%d\n", new_flags);
-
-  loff_t pos = 0;
-  ssize_t ret = kernel_write(file, buf, len, &pos);
-  filp_close(file, NULL);
-
-  if (ret < 0) {
-    kstep_pass("flags write rejected (ret=%ld)", (long)ret);
-    return;
-  }
-
-  TRACE_INFO("Wrote flags 0x%x (removed SD_SHARE_PKG_RESOURCES)", new_flags);
-
-  // Verify: sd_llc should still point to the same domain (stale!)
-  struct sched_domain *after = rcu_dereference_check(
-      per_cpu(*KSYM_sd_llc, cpu), true);
-  int after_flags = after ? after->flags : -1;
-
-  TRACE_INFO("After write: sd_llc[%d] flags=0x%x", cpu, after_flags);
-
-  // Walk domains explicitly to find SD_SHARE_PKG_RESOURCES
-  struct sched_domain *sd;
-  bool walk_found = false;
-  rcu_read_lock();
-  for_each_domain(cpu, sd) {
-    if (sd->flags & 0x0200) {
-      walk_found = true;
-      break;
+  // First, find which CPUs have sched domains by checking the sysctl dir
+  const char *path = "/proc/sys/kernel/sched_domain/cpu0/domain0/flags";
+  struct file *rfile = filp_open(path, O_RDONLY, 0);
+  if (IS_ERR(rfile)) {
+    TRACE_INFO("cpu0 domain0 flags not available, trying cpu1");
+    path = "/proc/sys/kernel/sched_domain/cpu1/domain0/flags";
+    rfile = filp_open(path, O_RDONLY, 0);
+    if (IS_ERR(rfile)) {
+      kstep_fail("no sched_domain flags file found");
+      return;
     }
   }
-  rcu_read_unlock();
 
-  TRACE_INFO("Domain walk SD_SHARE_PKG_RESOURCES: %s",
-             walk_found ? "found" : "NOT found");
+  // Read current flags value
+  char buf[32] = {0};
+  loff_t pos = 0;
+  ssize_t nread = kernel_read(rfile, buf, sizeof(buf) - 1, &pos);
+  filp_close(rfile, NULL);
 
-  // The bug: cached sd_llc still exists, but the domain it points to
-  // no longer has SD_SHARE_PKG_RESOURCES. This stale pointer means
-  // code using sd_llc will make decisions based on outdated topology.
-  if (after && !(after->flags & 0x0200)) {
-    kstep_fail("stale sd_llc: cached domain flags=0x%x, "
-               "SD_SHARE_PKG_RESOURCES cleared but pointer not updated",
-               after_flags);
+  if (nread <= 0) {
+    kstep_fail("could not read flags (ret=%ld)", (long)nread);
+    return;
+  }
+  buf[nread] = '\0';
+
+  long orig_flags = 0;
+  if (kstrtol(strim(buf), 10, &orig_flags)) {
+    kstep_fail("could not parse flags: '%s'", buf);
+    return;
+  }
+  TRACE_INFO("flags at %s = %ld (0x%lx)", path, orig_flags, orig_flags);
+
+  // Try to open for writing.
+  // Buggy kernel: 0644 → open succeeds.
+  // Fixed kernel: 0444 → open fails with -EACCES.
+  struct file *wfile = filp_open(path, O_WRONLY, 0);
+
+  if (IS_ERR(wfile)) {
+    kstep_pass("flags sysctl is read-only (err=%ld)", PTR_ERR(wfile));
+    return;
+  }
+
+  // Write a modified value (clear SD_BALANCE_NEWIDLE = 0x0002)
+  long new_flags = orig_flags & ~0x0002L;
+  int len = snprintf(buf, sizeof(buf), "%ld\n", new_flags);
+  pos = 0;
+  ssize_t nwritten = kernel_write(wfile, buf, len, &pos);
+  filp_close(wfile, NULL);
+
+  if (nwritten < 0) {
+    kstep_pass("flags write rejected (ret=%ld)", (long)nwritten);
+    return;
+  }
+
+  // Verify flags actually changed by reading back
+  rfile = filp_open(path, O_RDONLY, 0);
+  if (IS_ERR(rfile)) {
+    kstep_fail("could not reopen flags for verification");
+    return;
+  }
+  memset(buf, 0, sizeof(buf));
+  pos = 0;
+  nread = kernel_read(rfile, buf, sizeof(buf) - 1, &pos);
+  filp_close(rfile, NULL);
+
+  long readback = 0;
+  if (nread > 0) {
+    buf[nread] = '\0';
+    kstrtol(strim(buf), 10, &readback);
+  }
+
+  TRACE_INFO("After write: flags=%ld (0x%lx), expected=%ld",
+             readback, readback, new_flags);
+
+  if (readback == new_flags && new_flags != orig_flags) {
+    kstep_fail("flags writable via sysctl: changed from 0x%lx to 0x%lx "
+               "without update_top_cache_domain()",
+               orig_flags, readback);
   } else {
-    kstep_pass("no stale sd_llc detected");
+    kstep_pass("flags not changed as expected");
   }
 }
 

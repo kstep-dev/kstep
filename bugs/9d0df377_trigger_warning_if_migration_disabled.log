@@ -139,3 +139,117 @@ Bug triggered! `nr_pinned` went from 0 to 4294967295 (UINT_MAX underflow). Let m
 
 Bug confirmed on buggy kernel. Now let's verify the fix:
 
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 9d0df3779745 migration_underflow_fixed 2>&1 | tail
+   -5
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 6 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=migration_underflow_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=migration_underflow_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run driver on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py migration_underflow --linux_name migration_underflow_fixed
+  2>&1 | tail -20
+  └ 21 lines...
+
+● Check fixed kernel result
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+● Check key lines in fixed log
+  $ cd /users/szhong/kSTEP && grep -E "BEFORE|AFTER|pass|nr_pinned|migration_disabled|WARN"
+  data/latest.log
+  └ 2 lines...
+
+● Check fixed log for results
+  $ cd /users/szhong/kSTEP && grep -E "BEFORE|AFTER|pass|fail|nr_pinned|migration_disabled"
+  data/latest.log
+  └ 2 lines...
+
+● Check for driver output
+  $ cd /users/szhong/kSTEP && grep "nr_pinned\|migration_underflow\|Running driver\|WARN"
+  data/latest.log
+  └ 2 lines...
+
+● Check latest log symlink
+  $ cd /users/szhong/kSTEP && ls -la data/latest.log data/latest.jsonl
+  └ 3 lines...
+
+● Find our log file
+  $ cd /users/szhong/kSTEP && ls -lt data/logs/ | head -10
+  └ 11 lines...
+
+● Check our fixed kernel log
+  $ cd /users/szhong/kSTEP && grep "nr_pinned\|migration_underflow\|WARN"
+  data/logs/log-20260310_105930.log | head -10
+  └ 11 lines...
+
+● Check fixed kernel JSONL
+  $ cd /users/szhong/kSTEP && cat data/logs/log-20260310_105930.jsonl
+  └ 2 lines...
+
+Bug reproduction confirmed:
+- **Buggy kernel**: `nr_pinned` underflowed from 0 → 4294967295 (FAIL)
+- **Fixed kernel**: WARN_ON_ONCE fired, `nr_pinned` stayed at 0 (PASS)
+
+Now let me update TODO.md, add to reproduce.py, commit and push:
+
+● Find bug in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n "9d0df3779745" TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && tail -5 reproduce.py
+  └ 6 lines...
+
+● Find bugs list format
+  $ cd /users/szhong/kSTEP && grep -A2 "^bugs = \[" reproduce.py | head -5
+  └ 4 lines...
+
+● Check Bug entry format
+  $ cd /users/szhong/kSTEP && grep -B1 -A5 'Bug(' reproduce.py | head -40
+  └ 41 lines...
+
+● Find end of bugs list
+  $ cd /users/szhong/kSTEP && grep -B1 "^]" reproduce.py | tail -5
+  └ 3 lines...
+
+● Find line of bugs list end
+  $ cd /users/szhong/kSTEP && grep -n "^]" reproduce.py
+  └ 2 lines...
+
+● Read reproduce.py lines 510-515
+  └ 6 lines read
+
+Now let me make all the updates:
+
+✗ Edit reproduce.py
+  No match found
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+● Read reproduce.py lines 509-515
+  └ 7 lines read
+
+● Edit reproduce.py (+7)
+

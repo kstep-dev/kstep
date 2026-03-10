@@ -306,3 +306,128 @@ Bug confirmed on buggy kernel. Now let me check why it timed out - the QEMU proc
   sched_switch_prev_fixed 2>&1 | tail -3
   └ 1 line...
 
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 4 lines...
+
+Good, checkout done. Now build and run on fixed kernel:
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sched_switch_prev_fixed 2>&1 | tail -3
+  └ 1 line...
+
+● read_bash
+  └ 4 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_switch_prev_fixed 2>&1 | tail -3
+  └ 4 lines...
+
+● Run on fixed kernel
+  $ cd /users/szhong/kSTEP && timeout 90 ./run.py sched_switch_prev --linux_name
+  sched_switch_prev_fixed 2>&1 | tail -3
+  └ 1 line...
+
+● Check fixed kernel log
+  $ grep -l "sched_switch_prev_fixed" /users/szhong/kSTEP/data/logs/*.log | tail -1 | xargs tail -15
+  └ 16 lines...
+
+
+
+Bug is fixed on the fixed kernel: `prev_state=0` (TASK_RUNNING) matches `real_state=0`. Let me check the JSONL and then kill the stale QEMU:
+
+● Check fixed kernel jsonl
+  $ ls -lt /users/szhong/kSTEP/data/logs/*.jsonl | head -3 && cat
+  /users/szhong/kSTEP/data/logs/log-20260310_105335.jsonl 2>/dev/null; cat
+  /users/szhong/kSTEP/data/logs/log-20260310_105359.jsonl 2>/dev/null
+  └ 4 lines...
+
+● Check fixed jsonl
+  $ cat /users/szhong/kSTEP/data/logs/log-20260310_105933.jsonl
+  └ 2 lines...
+
+● Find correct fixed jsonl
+  $ grep -l "sched_switch_prev_fixed" /users/szhong/kSTEP/data/logs/*.jsonl | tail -1 | xargs cat
+  └ 1 line...
+
+● Find jsonl with our driver
+  $ grep -rl "sched_switch_prev" /users/szhong/kSTEP/data/logs/*.jsonl 2>/dev/null
+  └ 1 line...
+
+● Get matching jsonl
+  $ grep -l "sched_switch_prev_fixed" /users/szhong/kSTEP/data/logs/*.log | tail -1 | xargs basename
+   | sed 's/\.log/.jsonl/' | xargs -I{} cat /users/szhong/kSTEP/data/logs/{}
+  └ 2 lines...
+
+Confirmed:
+- **Buggy kernel**: `fail` - `prev_state=1` (stale TASK_INTERRUPTIBLE) but `__state=0` (TASK_RUNNING)
+- **Fixed kernel**: `pass` - `prev_state=0` (correctly updated to TASK_RUNNING)
+
+Now let me kill stale QEMU, update TODO.md, reproduce.py, and commit:
+
+● Kill stale QEMU
+  $ ps aux | grep qemu | grep "sched_switch_prev" | grep -v grep | awk '{print $2}' | xargs -r kill
+  2>/dev/null; echo "done"
+  └ 2 lines...
+
+● Find TODO entry
+  $ cd /users/szhong/kSTEP && grep -n "8feb053d5319" TODO.md
+  └ 2 lines...
+
+It's already marked as done in TODO.md. Let me check if it's already in reproduce.py:
+
+● Check reproduce.py
+  $ cd /users/szhong/kSTEP && grep "8feb053d\|sched_switch_prev" reproduce.py
+  └ 4 lines...
+
+● Check existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/sched_switch_prev*
+  └ 2 lines...
+
+This bug was already reproduced with `sched_switch_prev_state.c`. Let me clean up my redundant driver:
+
+● Clean up redundant files
+  $ cd /users/szhong/kSTEP && rm kmod/drivers/sched_switch_prev.c && git checkout -- TODO.md
+  2>/dev/null; git --no-pager status
+  └ 17 lines...
+
+● Restore clean state
+  $ cd /users/szhong/kSTEP && git checkout -- kmod/drivers/sched_switch_prev.c 2>/dev/null; git
+  restore kmod/drivers/sched_switch_prev.c 2>/dev/null; echo "status:"; git --no-pager diff --stat
+  └ 8 lines...
+
+● Check if file exists in git
+  $ cd /users/szhong/kSTEP && git --no-pager show HEAD:kmod/drivers/sched_switch_prev.c 2>/dev/null
+  | head -5; echo "exit: $?"
+  └ 7 lines...
+
+● Compare existing drivers
+  $ cd /users/szhong/kSTEP && git --no-pager show HEAD:kmod/drivers/sched_switch_prev.c | wc -l &&
+  git --no-pager show HEAD:kmod/drivers/sched_switch_prev_state.c 2>/dev/null | head -5; echo "exit:
+   $?"
+  └ 8 lines...
+
+● Restore the original file
+  $ cd /users/szhong/kSTEP && git restore kmod/drivers/sched_switch_prev.c && git --no-pager status
+  --short
+  └ 7 lines...
+
+The bug `8feb053d5319` is already reproduced — TODO.md shows it as `[x]` with `driver:sched_switch_prev_state` and it's already in `reproduce.py`. My work was redundant. No changes to commit.
+
+The bug was already successfully reproduced in a previous session. Both `sched_switch_prev.c` and `sched_switch_prev_state.c` drivers exist and the TODO.md entry is marked complete.
+
+
+Total usage est:        6 Premium requests
+API time spent:         14m 15s
+Total session time:     55m 14s
+Total code changes:     +261 -65
+Breakdown by AI model:
+ claude-opus-4.6-1m      6.1m in, 44.3k out, 6.0m cached (Est. 6 Premium requests)

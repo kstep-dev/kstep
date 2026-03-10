@@ -512,6 +512,13 @@ bugs = [
             Linux(name="fixed", version="96500560f0c73c71bca1b27536c6254fa0e8ce37"),
         ],
     ),
+    Bug(
+        driver=Driver(name="migration_underflow"),
+        linux=[
+            Linux(name="buggy", version="9d0df37797453f168afdb2e6fd0353c73718ae9a~1"),
+            Linux(name="fixed", version="9d0df37797453f168afdb2e6fd0353c73718ae9a"),
+        ],
+    ),
 ]
 
 

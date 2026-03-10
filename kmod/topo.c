@@ -11,7 +11,13 @@ static void print_sd_flags(int flags) {
     flags &= ~name;                                                            \
     pr_cont("%s%s", &#name[3], flags ? ", " : "");                             \
   }
+#if __has_include(<linux/sched/sd_flags.h>)
 #include <linux/sched/sd_flags.h>
+#else
+  // Older kernels don't have sd_flags.h; just print the raw value.
+  pr_cont("0x%x", flags);
+  flags = 0;
+#endif
 #undef SD_FLAG
 }
 

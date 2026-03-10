@@ -170,3 +170,231 @@ Good, checkout complete. Now build:
   $ cd /users/szhong/kSTEP/linux/sd_flags_readonly_buggy && git apply ../objtool_symtab.patch 2>&1
   └ 3 lines...
 
+● Find the line to patch
+  $ cd /users/szhong/kSTEP/linux/sd_flags_readonly_buggy && grep -n 'missing symbol table'
+  tools/objtool/elf.c
+  └ 2 lines...
+
+● Check context around line
+  $ cd /users/szhong/kSTEP/linux/sd_flags_readonly_buggy && sed -n '335,345p' tools/objtool/elf.c
+  └ 12 lines...
+
+● Manually fix objtool
+  $ cd /users/szhong/kSTEP/linux/sd_flags_readonly_buggy && sed -i 's/WARN("missing symbol
+  table");\n\t\treturn -1;/WARN("missing symbol table");\n\t\treturn 0;/' tools/objtool/elf.c
+  2>/dev/null; sed -i '340s/return -1;/return 0;/' tools/objtool/elf.c
+  └ 1 line...
+
+● Rebuild buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+Now build the kstep module:
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -15
+  └ 16 lines...
+
+● Check sd_flags.h existence
+  $ cd /users/szhong/kSTEP && find linux/sd_flags_readonly_buggy/include -name 'sd_flags*'
+  2>/dev/null && grep -rn 'sd_flags.h' kmod/topo.c
+  └ 2 lines...
+
+● Check topo.c sd_flags usage
+  $ cd /users/szhong/kSTEP && grep -n 'sd_flags.h\|SD_FLAG' kmod/topo.c | head -10
+  └ 4 lines...
+
+● Check version guards in topo.c
+  $ cd /users/szhong/kSTEP && grep -n 'VERSION_CODE\|LINUX_VERSION' kmod/topo.c | head -5
+  └ 5 lines...
+
+The `sd_flags.h` include in `topo.c` isn't guarded for older kernels. I need to add a version guard:
+
+● Read kmod/topo.c lines 1-20
+  └ 20 lines read
+
+● Edit kmod/topo.c (+6)
+
+● Rebuild kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -15
+  └ 16 lines...
+
+Build succeeded. Now run the driver:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy 2>&1 |
+   tail -20
+  └ 21 lines...
+
+Kernel panic. Let me check the full log:
+
+● Check log output
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log 2>/dev/null || cat data/latest.log
+  2>/dev/null | head -80
+  └ 81 lines...
+
+● Check kstep-related log lines
+  $ cd /users/szhong/kSTEP && grep -E 'kstep|kmod|TRACE|panic|BUG|sd_flags|topo'
+  data/logs/latest.log | head -40
+  └ 2 lines...
+
+● Check kstep log lines
+  $ cd /users/szhong/kSTEP && grep -E 'kstep|kmod|TRACE|panic|BUG|sd_flags|topo|get_map'
+  data/latest.log | head -40
+  └ 11 lines...
+
+The crash is likely because I'm referencing CPU 2 which doesn't exist with default 2 CPUs. Let me fix the driver and run with more CPUs:
+
+● Edit kmod/drivers/sd_flags_readonly.c (+1 -1)
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run with 4 CPUs
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy --cpus
+   4 2>&1 | tail -20
+  └ 7 lines...
+
+● Run with 4 CPUs
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy
+  --num_cpus 4 2>&1 | tail -20
+  └ 21 lines...
+
+● Get crash context
+  $ cd /users/szhong/kSTEP && grep -B20 'get_map' data/latest.log | head -40
+  └ 41 lines...
+
+The crash is in ACPI init, not our driver - it's a kernel boot issue. Let me check existing builds:
+
+● Check existing sd_flags build
+  $ cd /users/szhong/kSTEP && ls linux/sd_flags_buggy/Makefile 2>/dev/null && head -5
+  linux/sd_flags_buggy/Makefile 2>/dev/null
+  └ 7 lines...
+
+● Check kernel configs
+  $ cd /users/szhong/kSTEP && head -5 linux/config.current && ls linux/config.kstep*
+  └ 7 lines...
+
+● Check config for ACPI
+  $ cd /users/szhong/kSTEP && grep -c 'CONFIG_ACPI' linux/sd_flags_readonly_buggy/.config && grep
+  'CONFIG_ACPI=' linux/sd_flags_readonly_buggy/.config && grep 'CONFIG_SLUB_DEBUG'
+  linux/sd_flags_readonly_buggy/.config | head -5
+  └ 5 lines...
+
+● Check Makefile linux target
+  $ cd /users/szhong/kSTEP && cat Makefile | grep -A10 'linux:' | head -15
+  └ 12 lines...
+
+● Check config generation
+  $ cd /users/szhong/kSTEP && cat Makefile | grep -A15 'linux-config' | head -20
+  └ 20 lines...
+
+The crash is during kernel boot (ACPI init), not from our driver. Let me simplify to avoid topology manipulation which might not work on this kernel:
+
+● Edit kmod/drivers/sd_flags_readonly.c (+30 -45)
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy
+  --num_cpus 4 2>&1 | tail -20
+  └ 21 lines...
+
+● Read checkout script
+  $ cd /users/szhong/kSTEP && cat checkout_linux.py
+  └ 123 lines...
+
+● Check SLUB config
+  $ cd /users/szhong/kSTEP && grep 'CONFIG_SLUB\|CONFIG_SLAB' linux/sd_flags_readonly_buggy/.config
+  | head -5
+  └ 6 lines...
+
+● Try with acpi=off
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy
+  --num_cpus 4 --kernel_params acpi=off 2>&1 | tail -20
+  └ 21 lines...
+
+Progress - kernel boots now with `acpi=off`. The crash is in our module. Let me check the log:
+
+● Check driver output
+  $ cd /users/szhong/kSTEP && grep -E 'kstep|kmod|TRACE|domain|sd_flags|sched_domain|no sched'
+  data/latest.log | head -20
+  └ 17 lines...
+
+The crash is accessing a poisoned pointer. Let me simplify the driver to just test write access:
+
+● Edit kmod/drivers/sd_flags_readonly.c (+62 -48)
+
+Also remove the unused KSYM_IMPORT since we're not using sd_llc directly anymore:
+
+● Edit kmod/drivers/sd_flags_readonly.c (-2)
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy
+  --num_cpus 4 --kernel_params acpi=off 2>&1 | tail -20
+  └ 21 lines...
+
+The isolated CPUs don't have sched domains. I need to use `kstep_topo_apply()` to create them. Let me fix the driver:
+
+● Check topo_apply implementation
+  $ cd /users/szhong/kSTEP && cat kmod/topo.c | grep -A30 'kstep_topo_apply'
+  └ 32 lines...
+
+● Check topo_init implementation
+  $ cd /users/szhong/kSTEP && grep -A30 'kstep_topo_init' kmod/topo.c | head -35
+  └ 32 lines...
+
+● Check if rebuild functions exist
+  $ cd /users/szhong/kSTEP && grep -rn 'x86_topology_update\|rebuild_sched_domains'
+  linux/sd_flags_readonly_buggy/arch/x86/kernel/ 2>/dev/null | head -5 && grep -rn
+  'rebuild_sched_domains' linux/sd_flags_readonly_buggy/kernel/sched/ 2>/dev/null | head -5
+  └ 9 lines...
+
+Good, both exist. Let me update the driver to use topology setup:
+
+● Edit kmod/drivers/sd_flags_readonly.c (+5 -1)
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py sd_flags_readonly --linux_name sd_flags_readonly_buggy
+  --num_cpus 4 --kernel_params acpi=off 2>&1 | tail -30
+  └ 31 lines...
+
+● Check CPU boot info
+  $ cd /users/szhong/kSTEP && grep -E 'SMP|smpboot|Brought|CPU|online' data/latest.log | head -20
+  └ 16 lines...
+
+The crash is because `acpi=off` disables SMP. Let me try a different approach - patch the SLUB issue:
+
+● Verify buggy code exists
+  $ cd /users/szhong/kSTEP && git -C linux/sd_flags_readonly_buggy show
+  9818427c6270~1:kernel/sched/debug.c | grep -n '0644.*flags\|flags.*0644' | head -5
+  └ 2 lines...
+
+● Check SLUB get_map location
+  $ cd /users/szhong/kSTEP && grep -n 'get_map' linux/sd_flags_readonly_buggy/mm/slub.c | head -10
+  └ 5 lines...
+
+● Read get_map function
+  $ cd /users/szhong/kSTEP && sed -n '445,475p' linux/sd_flags_readonly_buggy/mm/slub.c
+  └ 32 lines...
+
+● Check object_map declaration
+  $ cd /users/szhong/kSTEP && grep -n 'object_map' linux/sd_flags_readonly_buggy/mm/slub.c | head -5
+  └ 6 lines...
+
+● Check MAX_OBJS_PER_PAGE
+  $ cd /users/szhong/kSTEP && grep 'MAX_OBJS_PER_PAGE' linux/sd_flags_readonly_buggy/mm/slub.c |
+  head -3
+  └ 4 lines...
+
