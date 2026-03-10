@@ -162,6 +162,19 @@ bugs = [
             Linux(name="fixed", version="04193d590b390ec7a0592630f46d559ec6564ba1"),
         ],
     ),
+    Bug(
+        driver=Driver(name="migrate_overflow"),
+        linux=[
+            Linux(
+                name="buggy",
+                version="0ec8d5aed4d14055aab4e2746def33f8b0d409c3~1",
+            ),
+            Linux(
+                name="fixed",
+                version="0ec8d5aed4d14055aab4e2746def33f8b0d409c3",
+            ),
+        ],
+    ),
 ]
 
 
