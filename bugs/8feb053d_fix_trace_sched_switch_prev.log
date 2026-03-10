@@ -219,3 +219,90 @@ The tracepoint shows `prev_state=128` (TASK_DEAD) - the kthread exited without a
   $ tail -30 /users/szhong/kSTEP/data/logs/log-20260310_103527.log
   └ 31 lines...
 
+The test kthread exits without a real context switch during the bug window. I need to ensure the kthread accumulates vruntime so the scheduler switches to the spinner. Let me redesign:
+
+● stop_bash
+  └ 1 line...
+
+● Read kmod/drivers/sched_switch_prev.c
+  └ 188 lines read
+
+● Edit kmod/drivers/sched_switch_prev.c (+45 -39)
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_switch_prev_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && timeout 120 ./run.py sched_switch_prev --linux_name
+  sched_switch_prev_buggy 2>&1 | tail -5
+  └ 1 line...
+
+● read_bash
+  └ 2 lines...
+
+Timed out. Let me check the log:
+
+✗ Check latest log
+  $ ls -lt /users/szhong/kSTEP/data/logs/*.log | head -3 && tail -30 "$(ls -t
+  /users/szhong/kSTEP/data/logs/*.log | head -1)"
+  Command blocked: contains dangerous shell expansion patterns (e.g., parameter transformation,
+  indirect expansion, or nested command substitution) that could enable arbitrary code
+  execution. Please rewrite the command without these expansion patterns.
+
+● List recent logs
+  $ ls -lt /users/szhong/kSTEP/data/logs/*.log | head -3
+  └ 4 lines...
+
+● Read latest log
+  $ tail -30 /users/szhong/kSTEP/data/logs/log-20260310_104308.log
+  └ 31 lines...
+
+That's a different driver's log. Let me find the right log:
+
+● Find correct log
+  $ grep -l "sched_switch_prev" /users/szhong/kSTEP/data/logs/*.log | tail -5
+  └ 6 lines...
+
+● Read sched_switch_prev log
+  $ tail -30 /users/szhong/kSTEP/data/logs/log-20260310_104211.log
+  └ 31 lines...
+
+The test kthread has lower vruntime than spinner so CFS picks it again (no switch). I need to reverse: let test kthread accumulate vruntime first, then create spinner with fresh vruntime.
+
+● Edit kmod/drivers/sched_switch_prev.c (+19 -18)
+
+● Build and run on buggy kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_switch_prev_buggy 2>&1 | tail -3 &&
+  timeout 90 ./run.py sched_switch_prev --linux_name sched_switch_prev_buggy 2>&1 | tail -3
+  └ 5 lines...
+
+● Check latest log
+  $ grep -l "sched_switch_prev" /users/szhong/kSTEP/data/logs/*.log | tail -1 | xargs tail -20
+  └ 21 lines...
+
+The bug is triggered! `prev_state=1` (TASK_INTERRUPTIBLE) but `real_state=0` (TASK_RUNNING). Now let me check the JSONL output and verify it properly reports failure:
+
+● Check JSONL output
+  $ grep -l "sched_switch_prev" /users/szhong/kSTEP/data/logs/*.jsonl | tail -1 | xargs cat
+  └ 1 line...
+
+● List jsonl files
+  $ ls -lt /users/szhong/kSTEP/data/logs/*.jsonl | head -5
+  └ 6 lines...
+
+● Check jsonl output
+  $ cat /users/szhong/kSTEP/data/logs/log-20260310_104532.jsonl
+  └ 2 lines...
+
+Bug confirmed on buggy kernel. Now let me check why it timed out - the QEMU process may still be running. Let me kill it and verify on the fixed kernel:
+
+● Find stale QEMU processes
+  $ ps aux | grep "sched_switch_prev" | grep qemu | grep -v grep | awk '{print $2}'
+  └ 3 lines...
+
+● Checkout fixed kernel
+  $ kill 2175766 2175765 2>/dev/null; sleep 1; ./checkout_linux.py 8feb053d5319
+  sched_switch_prev_fixed 2>&1 | tail -3
+  └ 1 line...
+

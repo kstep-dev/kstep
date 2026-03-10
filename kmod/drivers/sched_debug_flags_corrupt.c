@@ -4,25 +4,19 @@
 // then does pointer arithmetic `tmp += *ppos` for partial reads. On the second
 // read (non-zero ppos), kfree(tmp) frees an offset pointer, corrupting the heap.
 //
-// Reproduce: With slub_debug=FZ boot param, partial reads of the sched domain
-// flags file trigger SLUB corruption detection when kfree frees the offset pointer.
-// We detect the SLUB error via the TAINT_BAD_PAGE kernel taint flag.
+// Reproduce: Read /proc/sys/kernel/sched_domain/cpu0/domain0/flags with partial
+// reads. The second read with non-zero ppos triggers kfree on an offset pointer.
+// We detect this via an exported counter that fires when kfree arg != original alloc.
 
 #include <linux/version.h>
 #include <linux/fs.h>
-#include <linux/slab.h>
 
 #include "driver.h"
 #include "internal.h"
 
 #if LINUX_VERSION_CODE == KERNEL_VERSION(5, 9, 0)
 
-static bool check_slub_error(void) {
-  unsigned long *taint = (unsigned long *)kstep_ksym_lookup("tainted_mask");
-  if (!taint)
-    return false;
-  return test_bit(TAINT_BAD_PAGE, taint);
-}
+extern int kstep_sd_doflags_offset_count;
 
 static void setup(void) {}
 
@@ -35,12 +29,9 @@ static void run(void) {
   }
   filp_close(file, NULL);
 
-  bool tainted_before = check_slub_error();
+  int before = kstep_sd_doflags_offset_count;
 
-  // Partial reads trigger sd_ctl_doflags with non-zero *ppos.
-  // On buggy kernel: tmp += *ppos then kfree(tmp) frees offset pointer.
-  // With slub_debug=FZ, SLUB detects the invalid free and sets TAINT_BAD_PAGE.
-  for (int iter = 0; iter < 10; iter++) {
+  for (int iter = 0; iter < 5; iter++) {
     file = filp_open(path, O_RDONLY, 0);
     if (IS_ERR(file))
       break;
@@ -52,14 +43,13 @@ static void run(void) {
     filp_close(file, NULL);
   }
 
-  bool tainted_after = check_slub_error();
+  int after = kstep_sd_doflags_offset_count;
+  TRACE_INFO("offset_count: before=%d after=%d", before, after);
 
-  if (!tainted_before && tainted_after)
-    kstep_fail("SLUB detected kfree on offset pointer in sd_ctl_doflags");
-  else if (tainted_before)
-    kstep_fail("kernel already tainted before test");
+  if (after > before)
+    kstep_fail("kfree called on offset pointer %d times", after - before);
   else
-    kstep_pass("no heap corruption detected");
+    kstep_pass("no offset kfree detected");
 }
 
 #else

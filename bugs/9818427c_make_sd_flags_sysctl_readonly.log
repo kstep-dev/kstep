@@ -80,3 +80,93 @@ Let me look at the existing related driver and understand the kernel version:
   grep -B5 -A20 'highest_flag_domain\|lowest_flag_domain' | head -60
   └ 45 lines...
 
+● Read example driver
+  $ cd /users/szhong/kSTEP && head -60 kmod/drivers/cpus_share_cache.c
+  └ 61 lines...
+
+● Find drivers using topo
+  $ cd /users/szhong/kSTEP && grep -l 'kstep_topo_' kmod/drivers/*.c | head -5
+  └ 6 lines...
+
+● Read more of cpus_share_cache driver
+  $ cd /users/szhong/kSTEP && sed -n '55,150p' kmod/drivers/cpus_share_cache.c
+  └ 59 lines...
+
+● Read topo.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/topo.c | head -80
+  └ 81 lines...
+
+● Check run.py defaults
+  $ cd /users/szhong/kSTEP && python3 -c "import run; help(run)" 2>/dev/null || head -50 run.py
+  └ 80 lines...
+
+● stop_bash
+  └ 1 line...
+
+Now I have all the info I need. Let me create the driver and start the build process:
+
+● Create kmod/drivers/sd_flags_readonly.c (+123)
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 9818427c6270~1 sd_flags_readonly_buggy 2>&1 | tail
+   -5
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● Check existing builds
+  $ ls /users/szhong/kSTEP/linux/ 2>/dev/null && ls /users/szhong/kSTEP/build/ 2>/dev/null
+  └ 96 lines...
+
+I see `sd_flags_readonly_buggy` already shows in the linux directory. Let me wait for checkout to complete:
+
+● read_bash
+  └ 1 line...
+
+● Check if checkout running
+  $ ps aux | grep checkout_linux | grep -v grep
+  └ 9 lines...
+
+The checkout is running. Let me wait for it to complete:
+
+● read_bash
+  └ 6 lines...
+
+Good, checkout complete. Now build:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sd_flags_readonly_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Check build errors
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sd_flags_readonly_buggy 2>&1 | grep -i 'error' |
+   head -20
+  └ 6 lines...
+
+● Check build error details
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sd_flags_readonly_buggy 2>&1 | grep -B5
+  'thunk_64' | head -20
+  └ 10 lines...
+
+● Check for objtool patch
+  $ cd /users/szhong/kSTEP && ls linux/objtool_symtab.patch 2>/dev/null && cat
+  linux/objtool_symtab.patch | head -30
+  └ 15 lines...
+
+● Apply objtool patch
+  $ cd /users/szhong/kSTEP/linux/sd_flags_readonly_buggy && git apply ../objtool_symtab.patch 2>&1
+  └ 3 lines...
+

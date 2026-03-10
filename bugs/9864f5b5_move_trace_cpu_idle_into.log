@@ -42,3 +42,20 @@ Let me skip this and update TODO.md.
 
 ● Edit TODO.md (+1 -1)
 
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 9864f5b5943a - tracing
+  correctness issue not observable via kSTEP
+
+  The bug moves trace_cpu_idle() from arch-specific idle implementations
+  into generic default_idle_call() to avoid calling trace functions with...
+  └ 19 lines...
+
+**Skipped** `9864f5b5943a` — this is a tracing infrastructure correctness fix that moves `trace_cpu_idle()` from arch-specific idle code into generic `default_idle_call()` to avoid calling trace functions with RCU disabled. This doesn't affect scheduler behavior and cannot be observed through kSTEP's interfaces. Committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         1m 3s
+Total session time:     1m 46s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      259.1k in, 2.8k out, 233.8k cached (Est. 6 Premium requests)

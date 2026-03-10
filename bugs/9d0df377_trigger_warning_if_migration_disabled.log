@@ -73,3 +73,69 @@ Now I have enough info. Let me write the driver. The bug is simple: calling `mig
   linux/current/include/ 2>/dev/null | head -10
   └ 5 lines...
 
+● Read another simple driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/freeze.c
+  └ 39 lines...
+
+Now let me create the driver. The approach: call `migrate_enable()` without matching `migrate_disable()` on a kthread, then check `nr_pinned` underflow.
+
+● Create kmod/drivers/migration_underflow.c (+88)
+
+Actually, let me simplify - `migrate_enable()` acts on `current`, so I should just call it directly in `run()` and check `this_rq()`:
+
+● Edit kmod/drivers/migration_underflow.c (+25 -41)
+
+Now let's checkout the buggy kernel and build:
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 9d0df3779745~1 migration_underflow_buggy 2>&1
+  └ 7 lines...
+
+● read_bash
+  └ 7 lines...
+
+● read_bash
+  └ 7 lines...
+
+● read_bash
+  └ 7 lines...
+
+● read_bash
+  └ 7 lines...
+
+● read_bash
+  └ 10 lines...
+
+Good, checkout complete. Now let's build:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=migration_underflow_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=migration_underflow_buggy 2>&1 | tail -30
+  └ 31 lines...
+
+Build succeeded. Let's run it:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py migration_underflow --linux_name migration_underflow_buggy
+  2>&1 | tail -30
+  └ 31 lines...
+
+Bug triggered! `nr_pinned` went from 0 to 4294967295 (UINT_MAX underflow). Let me verify the log output:
+
+● Check log output
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | grep -E "fail|pass|nr_pinned|migration"
+  └ 2 lines...
+
+● Check log output
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "fail|pass|nr_pinned|migration"
+  └ 13 lines...
+
+● Check JSONL output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug confirmed on buggy kernel. Now let's verify the fix:
+
