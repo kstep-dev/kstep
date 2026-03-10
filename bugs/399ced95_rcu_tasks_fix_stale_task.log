@@ -66,3 +66,7 @@ Let me skip this and update TODO.md.
   $ cd /users/szhong/kSTEP && head -5 TODO.md
   └ 6 lines...
 
+● Edit TODO.md (+1 -1)
+
+Now commit and push:
+

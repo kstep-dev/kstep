@@ -21,7 +21,7 @@
 - [ ] `28156108fecb` sched: Fix the check of nr_running at queue wakelist — [`28156108_the_check_of_nr_running.md`](bugs/28156108_the_check_of_nr_running.md)
 - [-] `29b306c44eb5` PCI: Flush PCI probe workqueue on cpuset isolated partition change — [`29b306c4_pci_flush_pci_probe_workqueue.md`](bugs/29b306c4_pci_flush_pci_probe_workqueue.md) <!-- skipped:bug requires PCI device probing (pci_call_probe/schedule_work_on) which cannot be triggered from kSTEP drivers attempts:1 -->
 - [ ] `2cab4bd024d2` sched/debug: Fix the runnable tasks output — [`2cab4bd0_the_runnable_tasks_output.md`](bugs/2cab4bd0_the_runnable_tasks_output.md)
-- [ ] `399ced9594df` rcu/tasks: Fix stale task snapshot for Tasks Trace — [`399ced95_rcu_tasks_fix_stale_task.md`](bugs/399ced95_rcu_tasks_fix_stale_task.md)
+- [-] `399ced9594df` rcu/tasks: Fix stale task snapshot for Tasks Trace — [`399ced95_rcu_tasks_fix_stale_task.md`](bugs/399ced95_rcu_tasks_fix_stale_task.md) <!-- skipped:memory-ordering-bug-only-on-weakly-ordered-archs-not-x86-TSO attempts:1 -->
 - [ ] `3a7956e25e1d` kthread: Fix PF_KTHREAD vs to_kthread() race — [`3a7956e2_kthread_fix_pf_kthread_vs.md`](bugs/3a7956e2_kthread_fix_pf_kthread_vs.md)
 - [ ] `3ebb1b652239` Fix preemption string of preempt_dynamic_none — [`3ebb1b65_fix_preemption_string_of_preempt.md`](bugs/3ebb1b65_fix_preemption_string_of_preempt.md)
 - [ ] `42dc938a590c` sched/core: Mitigate race cpus_share_cache()/update_top_cache_domain() — [`42dc938a_mitigate_race_cpus_share_cache.md`](bugs/42dc938a_mitigate_race_cpus_share_cache.md)

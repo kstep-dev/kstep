@@ -54,3 +54,12 @@
   2>/dev/null
   └ 7 lines...
 
+● Get kernel version numbers
+  $ cd /users/szhong/kSTEP && git -C linux/current show 28156108fecb~1:Makefile | head -5
+  └ 6 lines...
+
+● Find buggy code lines
+  $ cd /users/szhong/kSTEP && git -C linux/current show 28156108fecb~1:kernel/sched/core.c | grep -n
+   "ttwu_queue_cond\|nr_running\|WF_ON_CPU\|ttwu_queue_wakelist" | head -20
+  └ 21 lines...
+
