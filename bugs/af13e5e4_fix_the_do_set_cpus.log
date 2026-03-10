@@ -376,3 +376,24 @@ The system hung because `msleep` depends on jiffies which kSTEP freezes. Need to
   "error|warning" | head -10
   └ 1 line...
 
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && timeout 90 ./run.py do_set_cpus_fix --linux_name do_set_cpus_fix_buggy
+   2>&1 | tail -5
+  └ 6 lines...
+
+Good - the buggy kernel produced output! Let me check the full log and output:
+
+● Check buggy kernel log
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | tail -20
+  └ 2 lines...
+
+● Check output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl 2>/dev/null
+  └ 2 lines...
+
+The buggy kernel correctly produces a **fail** message: "task stuck on CPU 1 - select_fallback_rq called with rq->lock held (recursive lock deadlock)". Now let me test on the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py af13e5e437dc do_set_cpus_fix_fixed 2>&1 | tail -5
+  └ 1 line...
+

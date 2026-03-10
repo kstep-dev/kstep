@@ -316,3 +316,27 @@ Now add to reproduce.py:
 
 ● Edit reproduce.py (+7)
 
+● Commit and push
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: balance_push_hotplug
+  (b5c4477366fb)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" && git push 2>&1 | tail -5
+  └ 7 lines...
+
+Successfully reproduced and committed. Here's a summary:
+
+**Bug**: `b5c4477366fb` — `balance_push()` doesn't check `cpu_dying()`, so a stale `balance_push_callback` (from failed hotplug rollback) incorrectly pushes kthreads off a CPU that isn't dying.
+
+**Driver**: `balance_push_hotplug` — Installs `balance_push_callback` on CPU 1 while it's fully online, then checks if a yielding kthread gets incorrectly pushed off.
+
+**Results**:
+- Buggy kernel: kthread pushed from CPU 1 → CPU 0 (**FAIL** — balance_push active despite CPU not dying)
+- Fixed kernel: kthread stayed on CPU 1 (**PASS** — `cpu_dying()` gate prevents spurious push)
+
+
+Total usage est:        6 Premium requests
+API time spent:         12m 58s
+Total session time:     29m 45s
+Total code changes:     +100 -4
+Breakdown by AI model:
+ claude-opus-4.6-1m      3.6m in, 40.4k out, 3.5m cached (Est. 6 Premium requests)

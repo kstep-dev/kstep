@@ -273,3 +273,37 @@ Let me check the kernel version and look at existing similar drivers more carefu
 ● Read shell output: Waiting up to 120 seconds for command output
   └ 1 line...
 
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 6 lines...
+
+● Verify buggy kernel state
+  $ cd /users/szhong/kSTEP && grep -n "set_load_weight" linux/current/kernel/sched/core.c && echo
+  "---" && grep -n "sched_post_fork\|sched_cgroup_fork" linux/current/kernel/sched/core.c
+  └ 10 lines...
+
+● Read set_load_weight and sched_post_fork
+  $ cd /users/szhong/kSTEP && sed -n '1217,1245p' linux/current/kernel/sched/core.c && echo "===" &&
+   sed -n '4443,4480p' linux/current/kernel/sched/core.c
+  └ 69 lines...
+
+● Check fork ordering in buggy kernel
+  $ cd /users/szhong/kSTEP && grep -n
+  "sched_post_fork\|sched_fork\|wake_up_new_task\|cgroup_post_fork" linux/current/kernel/fork.c |
+  head -20
+  └ 7 lines...
+
+● Read sched_fork in buggy kernel
+  $ cd /users/szhong/kSTEP && sed -n '4395,4440p' linux/current/kernel/sched/core.c
+  └ 46 lines...
+
+Now I have a clear picture. The buggy kernel has `set_load_weight` with TASK_NEW check and `sched_post_fork` that does cgroup init AFTER visibility. Let me check the kernel version and write the driver.
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && head -5 linux/current/Makefile
+  └ 6 lines...
+
+● Check version guard patterns
+  $ cd /users/szhong/kSTEP && grep "KERNEL_VERSION" kmod/drivers/pf_kthread_race.c
+  kmod/drivers/rqcf_act_skip_leak.c
+  └ 3 lines...
+
