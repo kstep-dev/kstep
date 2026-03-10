@@ -11,7 +11,7 @@
 #include "driver.h"
 #include "internal.h"
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+#if LINUX_VERSION_CODE == KERNEL_VERSION(7, 0, 0)
 
 static struct task_struct *solo_task;
 static struct task_struct *new_task;
@@ -69,7 +69,8 @@ static void run(void) {
 
   s64 key_new = (s64)(new_task->se.vruntime - cfs_rq->zero_vruntime);
   s64 key_solo = (s64)(solo_task->se.vruntime - cfs_rq->zero_vruntime);
-  TRACE_INFO("Phase 2: new_task key=%lld solo_task key=%lld", key_new, key_solo);
+  TRACE_INFO("Phase 2: new_task key=%lld solo_task key=%lld", key_new,
+             key_solo);
   TRACE_INFO("Phase 2: sum_w_vruntime=%lld sum_weight=%llu",
              cfs_rq->sum_w_vruntime, (u64)cfs_rq->sum_weight);
 
@@ -81,7 +82,8 @@ static void run(void) {
   if (key_after > threshold || key_after < -threshold) {
     kstep_fail("entity_key drifted to %lld (zero_vruntime stale)", key_after);
   } else {
-    kstep_pass("entity_key bounded at %lld (zero_vruntime tracking)", key_after);
+    kstep_pass("entity_key bounded at %lld (zero_vruntime tracking)",
+               key_after);
   }
 
   kstep_tick_repeat(10);
