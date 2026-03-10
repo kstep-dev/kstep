@@ -373,6 +373,23 @@ bugs = [
         ],
     ),
     Bug(
+        driver=Driver(name="uclamp_deadlock", num_cpus=2),
+        linux=[
+            Linux(
+                name="buggy",
+                version="e65855a52b47~1",
+                config=LINUX_ROOT_DIR / "config.uclamp_deadlock",
+                patch=LINUX_ROOT_DIR / "uclamp_deadlock_acpi.patch",
+            ),
+            Linux(
+                name="fixed",
+                version="e65855a52b47",
+                config=LINUX_ROOT_DIR / "config.uclamp_deadlock",
+                patch=LINUX_ROOT_DIR / "uclamp_deadlock_acpi.patch",
+            ),
+        ],
+    ),
+    Bug(
         driver=Driver(name="null_term_scaling", num_cpus=2),
         linux=[
             Linux(name="buggy", version="703066188f63~1"),

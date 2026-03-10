@@ -1,0 +1,8 @@
+# Disable STACK_VALIDATION to avoid objtool build failures on 5.8-rc6
+CONFIG_UNWINDER_FRAME_POINTER=y
+# CONFIG_UNWINDER_ORC is not set
+# CONFIG_STACK_VALIDATION is not set
+# Enable DEBUG_ATOMIC_SLEEP to detect sleeping-in-atomic-context
+CONFIG_DEBUG_ATOMIC_SLEEP=y
+# Required for static_key_enable to be a real function
+CONFIG_JUMP_LABEL=y

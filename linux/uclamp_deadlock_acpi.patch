@@ -1,0 +1,12 @@
+diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+index 54002670cb7a..43bd465370d9 100644
+--- a/drivers/acpi/bus.c
++++ b/drivers/acpi/bus.c
+@@ -1216,6 +1216,7 @@ static int __init acpi_bus_init(void)
+ 
+ 	/* Mimic structured exception handling */
+       error1:
++	return -ENODEV;
+ 	acpi_terminate();
+ 	return -ENODEV;
+ }
