@@ -596,6 +596,13 @@ bugs = [
             Linux(name="fixed", version="c2ae8b0df2d1"),
         ],
     ),
+    Bug(
+        driver=Driver(name="rseq_cpu_id_fork", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="ce3614daabea~1"),
+            Linux(name="fixed", version="ce3614daabea"),
+        ],
+    ),
 ]
 
 
