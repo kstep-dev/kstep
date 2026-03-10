@@ -244,3 +244,81 @@ I need to import and use the raw_spin_rq functions since they're not exported. L
   └ 7 lines...
 
 Let me simplify - use raw spinlock directly and rename my helper to avoid conflicts:
+
+● Edit kmod/drivers/forceidle_starvation.c (+3 -33)
+
+● Build kstep without locks
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=forceidle_starvation_buggy 2>&1 | tail -20
+  └ 16 lines...
+
+Build succeeded. Now let's run it:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py forceidle_starvation --linux_name forceidle_starvation_buggy
+  2>&1 | tail -20
+  └ 21 lines...
+
+● Check buggy kernel logs
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log
+  └ 2 lines...
+
+● Check log file
+  $ cd /users/szhong/kSTEP && cat data/latest.log 2>/dev/null | tail -60
+  └ 61 lines...
+
+Need 3 CPUs for this setup. Let me check how to configure that:
+
+● Check run.py options
+  $ cd /users/szhong/kSTEP && ./run.py --help 2>&1 | head -20
+  └ 17 lines...
+
+● Run with 3 CPUs
+  $ cd /users/szhong/kSTEP && ./run.py forceidle_starvation --linux_name forceidle_starvation_buggy
+  --num_cpus 3 2>&1 | tail -5
+  └ 6 lines...
+
+● Check output for key messages
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "panic|forceidle|tick
+  |Initial|resched|TRACE|pass|fail|core_force|kstep_topo" | head -30
+  └ 12 lines...
+
+● Check SMT usage in other drivers
+  $ cd /users/szhong/kSTEP && grep -B5 -A10 "kstep_topo_set_smt" kmod/drivers/*.c | head -40
+  └ 34 lines...
+
+I need to fix the SMT topology setup. Each CPU needs an entry:
+
+● Edit kmod/drivers/forceidle_starvation.c (+4 -2)
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=forceidle_starvation_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on buggy kernel with 3 CPUs
+  $ cd /users/szhong/kSTEP && ./run.py forceidle_starvation --linux_name forceidle_starvation_buggy
+  --num_cpus 3 2>&1 | tail -5
+  └ 6 lines...
+
+● Check key messages
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "tick
+  |Initial|resched|pass|fail|core_force|Core sched|TRACE|panic" | head -40
+  └ 41 lines...
+
+● Check pass/fail result
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "pass|fail" | head -5
+  └ 2 lines...
+
+● Check JSONL output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl 2>/dev/null | head -10
+  └ 2 lines...
+
+The bug triggers on the buggy kernel - `resched_seen=0` after 30 ticks with `core_forceidle` set. Now let me test on the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && python3 checkout_linux.py 8039e96fcc1d forceidle_starvation_fixed 2>&1
+  └ 10 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=forceidle_starvation_fixed 2>&1 | tail -5
+  └ 6 lines...
+

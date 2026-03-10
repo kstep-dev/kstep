@@ -169,3 +169,24 @@ Let me skip this bug and update TODO.md.
 
 ● Edit TODO.md (+1 -1)
 
+● Commit skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 7e406d1ff39b (requires
+  CONFIG_PREEMPT=y, kSTEP uses PREEMPT_NONE)
+
+  Bug manifests as double schedule() call in __cond_resched_lock() when
+  spin_unlock() triggers implicit preemption followed by explicit...
+  └ 13 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push
+  └ 10 lines...
+
+Done. Skipped `7e406d1ff39b` — the double preemption bug requires `CONFIG_PREEMPTION=y` to manifest (spin_unlock triggers implicit preemption + explicit `preempt_schedule_common()`), but kSTEP builds with `PREEMPT_NONE`. With that config, both buggy and fixed paths call `preempt_schedule_common()` exactly once. Even with full preemption, the extra `__schedule()` call is overhead-only with no observable context switch difference.
+
+
+Total usage est:        6 Premium requests
+API time spent:         9m 21s
+Total session time:     9m 56s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      1.6m in, 31.3k out, 1.5m cached (Est. 6 Premium requests)

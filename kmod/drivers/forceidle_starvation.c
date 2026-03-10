@@ -19,20 +19,6 @@
 
 #if LINUX_VERSION_CODE == KERNEL_VERSION(5, 13, 0)
 
-// Import unexported rq lock functions
-KSYM_IMPORT_TYPED(void(struct rq *, int), raw_spin_rq_lock_nested);
-KSYM_IMPORT_TYPED(void(struct rq *), raw_spin_rq_unlock);
-
-static inline void rq_lock_irqsave(struct rq *rq, unsigned long *flagsp) {
-  local_irq_save(*flagsp);
-  KSYM_raw_spin_rq_lock_nested(rq, 0);
-}
-
-static inline void rq_unlock_irqrestore(struct rq *rq, unsigned long flags) {
-  KSYM_raw_spin_rq_unlock(rq);
-  local_irq_restore(flags);
-}
-
 static struct task_struct *task;
 static int resched_seen;
 static int tick_count;
@@ -57,8 +43,10 @@ static void on_tick_begin(void) {
 }
 
 static void setup(void) {
-  const char *smt[] = {"1,2"};
-  kstep_topo_set_smt(smt, 1);
+  kstep_topo_init();
+  const char *smt[] = {"0", "1,2", "1,2"};
+  kstep_topo_set_smt(smt, 3);
+  kstep_topo_apply();
 
   task = kstep_task_create();
 }
@@ -66,7 +54,6 @@ static void setup(void) {
 static void run(void) {
   struct rq *rq1 = cpu_rq(1);
   struct rq *rq2 = cpu_rq(2);
-  unsigned long flags;
 
   kstep_task_pin(task, 1, 1);
   kstep_tick_repeat(3);
@@ -78,32 +65,22 @@ static void run(void) {
   KSYM_IMPORT(__sched_core_enabled);
   static_branch_enable(KSYM___sched_core_enabled);
 
-  rq_lock_irqsave(rq1, &flags);
+  // kSTEP is single-threaded with controlled ticks, direct field writes are safe
   rq1->core_enabled = true;
-  rq_unlock_irqrestore(rq1, flags);
-
-  rq_lock_irqsave(rq2, &flags);
   rq2->core_enabled = true;
-  rq_unlock_irqrestore(rq2, flags);
 
-  TRACE_INFO("Core scheduling enabled");
+  TRACE_INFO("Core scheduling enabled, core=%px, rq1=%px, rq2=%px",
+             rq1->core, rq1, rq2);
 
   // Set core_forceidle to simulate forced-idle sibling.
-  // In the buggy kernel, this field is in the per-rq section.
-  // In the fixed kernel, it's in the shared state section.
-  // Access via rq->core-> is correct for both since the field name is the same.
-  rq_lock_irqsave(rq1, &flags);
   rq1->core->core_forceidle = 1;
-  rq_unlock_irqrestore(rq1, flags);
 
   TRACE_INFO("core_forceidle set on core rq, CPU1 nr_running=%d",
              rq1->cfs.nr_running);
 
   // Clear any existing resched flag so we only detect new reschedules
-  rq_lock_irqsave(rq1, &flags);
   if (test_tsk_need_resched(rq1->curr))
     clear_tsk_need_resched(rq1->curr);
-  rq_unlock_irqrestore(rq1, flags);
 
   // Run many ticks to let the task consume its slice.
   // On the fixed kernel, task_tick_core will detect the starvation
@@ -115,14 +92,9 @@ static void run(void) {
   TRACE_INFO("After 30 ticks: resched_seen=%d", resched_seen);
 
   // Clean up
-  rq_lock_irqsave(rq1, &flags);
   rq1->core->core_forceidle = 0;
   rq1->core_enabled = false;
-  rq_unlock_irqrestore(rq1, flags);
-
-  rq_lock_irqsave(rq2, &flags);
   rq2->core_enabled = false;
-  rq_unlock_irqrestore(rq2, flags);
 
   static_branch_disable(KSYM___sched_core_enabled);
 

@@ -67,27 +67,44 @@ static void run(void) {
   // so the clock won't advance. On the fixed kernel, update_rq_clock()
   // is always called, advancing the clock.
   struct rq *rq = cpu_rq(1);
-  u64 clock_before = READ_ONCE(rq->clock);
+
+  // Verify parent is running on CPU 1
+  bool is_running = (rq->donor == parent);
+  bool is_queued = task_on_rq_queued(parent);
+  TRACE_INFO("parent: running=%d queued=%d cpu=%d",
+             is_running, is_queued, task_cpu(parent));
+
+  if (!is_running) {
+    kstep_fail("parent not running on CPU 1, cannot test");
+    return;
+  }
+
+  // Clear any existing need_resched by doing a tick
+  kstep_tick();
+
+  // Check TIF_NEED_RESCHED before sched_move_task
+  int resched_before = test_tsk_need_resched(parent);
 
   // Call sched_move_task as sched_autogroup_exit_task would.
   // With sysctl=0 and task in non-root cgroup "spawn":
   //   sched_get_task_group(p) = "spawn" cgroup tg
   //   p->sched_task_group    = "spawn" cgroup tg
-  //   Buggy: match → early return before update_rq_clock
-  //   Fixed: no early bail → update_rq_clock called
+  //   Buggy: match → early return (no dequeue/enqueue, no resched_curr)
+  //   Fixed: no early bail → dequeue/put_prev/change_group/enqueue/
+  //          set_next/resched_curr → TIF_NEED_RESCHED set
   fn(parent, true);
 
-  u64 clock_after = READ_ONCE(rq->clock);
+  int resched_after = test_tsk_need_resched(parent);
 
-  TRACE_INFO("rq clock: before=%llu after=%llu delta=%llu",
-             clock_before, clock_after, clock_after - clock_before);
+  TRACE_INFO("TIF_NEED_RESCHED: before=%d after=%d",
+             resched_before, resched_after);
 
-  if (clock_before == clock_after) {
-    kstep_fail("sched_move_task early bail: rq->clock not updated "
+  if (!resched_after) {
+    kstep_fail("sched_move_task bailed early: TIF_NEED_RESCHED not set "
                "(detach_task_cfs_rq skipped)");
   } else {
-    kstep_pass("sched_move_task full path: rq->clock advanced by %llu",
-               clock_after - clock_before);
+    kstep_pass("sched_move_task full path: TIF_NEED_RESCHED set "
+               "(resched_curr called after dequeue/enqueue)");
   }
 
   kstep_tick_repeat(5);

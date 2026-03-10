@@ -393,6 +393,13 @@ bugs = [
             Linux(name="fixed", version="70ee7947a290"),
         ],
     ),
+    Bug(
+        driver=Driver(name="sched_move", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="76f970ce51c8~1"),
+            Linux(name="fixed", version="76f970ce51c8"),
+        ],
+    ),
 ]
 
 

@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 27/400 reproduced**
+**Total: 28/400 reproduced**
 
 ---
 
@@ -42,7 +42,7 @@
 - [-] `6d337eab041d` sched: Fix migrate_disable() vs set_cpus_allowed_ptr() — [`6d337eab_migrate_disable_set_cpus_allowed_ptr.md`](bugs/6d337eab_migrate_disable_set_cpus_allowed_ptr.md) <!-- skipped:requires CONFIG_PREEMPT_RT which depends on ARCH_SUPPORTS_RT not available for x86 at v5.10-rc1 attempts:1 -->
 - [x] `703066188f63` sched/fair: Null terminate buffer when updating tunable_scaling — [`70306618_null_terminate_buffer_when_updating.md`](bugs/70306618_null_terminate_buffer_when_updating.md) <!-- driver:null_term_scaling attempts:1 -->
 - [x] `70ee7947a290` sched: fix warning in sched_setaffinity — [`70ee7947_fix_warning_in_schedsetaffinity.md`](bugs/70ee7947_fix_warning_in_schedsetaffinity.md) <!-- driver:setaffinity_warn attempts:1 -->
-- [ ] `76f970ce51c8` Revert "sched/core: Reduce cost of sched_move_task when config autogroup" — [`76f970ce_schedcore_reduce_cost_of_schedmovetask.md`](bugs/76f970ce_schedcore_reduce_cost_of_schedmovetask.md)
+- [x] `76f970ce51c8` Revert "sched/core: Reduce cost of sched_move_task when config autogroup" — [`76f970ce_schedcore_reduce_cost_of_schedmovetask.md`](bugs/76f970ce_schedcore_reduce_cost_of_schedmovetask.md) <!-- driver:sched_move attempts:1 -->
 - [-] `771fac5e26c1` Revert "cpufreq: CPPC: Add support for frequency invariance" — [`771fac5e_cpufreq_cppc_add_support_for.md`](bugs/771fac5e_cpufreq_cppc_add_support_for.md) <!-- skipped:bug is in cpufreq/cppc driver not scheduler; scheduler change is only EXPORT_SYMBOL removal attempts:1 -->
 - [x] `77d7dc8bef48` sched/mmcid: Revert the complex CID management — [`77d7dc8b_the_complex_cid_management.md`](bugs/77d7dc8b_the_complex_cid_management.md) <!-- driver:mmcid_compact attempts:1 -->
 - [-] `7e406d1ff39b` sched: Avoid double preemption in __cond_resched_*lock*() — [`7e406d1f_avoid_double_preemption_in_condreschedlock.md`](bugs/7e406d1f_avoid_double_preemption_in_condreschedlock.md) <!-- skipped:requires CONFIG_PREEMPT=y but kSTEP uses PREEMPT_NONE; double schedule is overhead-only with no observable state difference attempts:1 -->

@@ -222,3 +222,62 @@ Kernel built. Now let me examine the `arch_scale_freq_tick` and `scale_freq_tick
   linux/freq_tick_buggy/arch/x86/kernel/cpu/aperfmperf.c
   └ 42 lines...
 
+● Read reproduce.py
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -80
+  └ 81 lines...
+
+● Read more of reproduce.py
+  $ cd /users/szhong/kSTEP && sed -n '80,180p' reproduce.py
+  └ 102 lines...
+
+● Check reproduce.py build functions
+  $ cd /users/szhong/kSTEP && grep -A10 "def print_run_results\|def make_linux\|def make_kstep"
+  reproduce.py | head -30
+  └ 1 line...
+
+● Check Linux class definition
+  $ cd /users/szhong/kSTEP && grep -A20 "class Linux" checkout_linux.py | head -25
+  └ 22 lines...
+
+● Check config in Makefile
+  $ cd /users/szhong/kSTEP && grep "config" Makefile
+  └ 7 lines...
+
+● Check how config is used in checkout
+  $ cd /users/szhong/kSTEP && grep -A30 "def checkout_linux\|config" checkout_linux.py | head -50
+  └ 51 lines...
+
+● Check make_linux function
+  $ cd /users/szhong/kSTEP && grep -A30 "make_linux\|make_kstep" run.py | head -50
+  └ 50 lines...
+
+● Check config usage in reproduce.py
+  $ cd /users/szhong/kSTEP && grep -n "config" reproduce.py | head -20
+  └ 12 lines...
+
+● Read config merge logic
+  $ cd /users/szhong/kSTEP && sed -n '405,425p' reproduce.py
+  └ 22 lines...
+
+● Read example config fragment
+  $ cd /users/szhong/kSTEP && cat linux/forceidle_balancing.config 2>/dev/null
+  └ 2 lines...
+
+There's already a mechanism for extra config fragments in `reproduce.py`! Now let me create the config fragment and write the driver. Since I already built the kernel with NO_HZ_FULL, I just need the driver now.
+
+● Create linux/freq_tick.config (+3)
+
+● Create kmod/drivers/freq_tick.c (+132)
+
+Now let me build kstep and run on the buggy kernel:
+
+● Build kstep for buggy kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=freq_tick_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Build succeeded. Let me run the driver on the buggy kernel:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py freq_tick --linux_name freq_tick_buggy 2>&1 | tail -20
+  └ 21 lines...
+
