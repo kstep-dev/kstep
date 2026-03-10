@@ -568,6 +568,13 @@ bugs = [
             Linux(name="fixed", version="af13e5e437dc"),
         ],
     ),
+    Bug(
+        driver=Driver(name="ttwu_race", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="b6e13e85829f~1"),
+            Linux(name="fixed", version="b6e13e85829f"),
+        ],
+    ),
 ]
 
 

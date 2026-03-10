@@ -60,3 +60,164 @@
   2>/dev/null | grep -A 10 -i proxy
   └ 1 line...
 
+● Find linux config target
+  $ cd /users/szhong/kSTEP && grep -r "linux-config\|linux_config\|\.config" Makefile | head -20
+  └ 5 lines...
+
+● Find proxy exec Kconfig option
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:init/Kconfig 2>/dev/null |
+  grep -A 15 -i proxy 2>/dev/null; git -C linux/current grep "SCHED_PROXY_EXEC" c2ae8b0df2d1~1 --
+  "*Kconfig*" 2>/dev/null
+  └ 27 lines...
+
+● Find kstep config path
+  $ cd /users/szhong/kSTEP && grep "KSTEP_CONFIG" Makefile | head -10
+  └ 3 lines...
+
+● Check if proxy exec in kstep config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | grep -i proxy
+  └ 1 line...
+
+● Read full kstep config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep
+  └ 104 lines...
+
+Let me examine the kmod source code and existing driver patterns to understand the framework better.
+
+● Read kmod kthread.c
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c 2>/dev/null
+  └ 157 lines...
+
+● Read kmod task.c
+  $ cd /users/szhong/kSTEP && cat kmod/task.c 2>/dev/null | head -100
+  └ 101 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/*.c | head -20
+  └ 21 lines...
+
+● Read kmod internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+
+● Read buggy stats.h
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/stats.h | head
+  -220
+  └ 221 lines...
+
+● Read psi_types.h for flag values
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:include/linux/psi_types.h
+  2>/dev/null | head -40
+  └ 41 lines...
+
+● Read user.h for signal codes
+  $ cd /users/szhong/kSTEP && cat kmod/user.h 2>/dev/null
+  └ 18 lines...
+
+● Read user task.c
+  $ cd /users/szhong/kSTEP && cat user/task.c
+  └ 67 lines...
+
+● Check version guard patterns
+  $ cd /users/szhong/kSTEP && grep -r "LINUX_VERSION_CODE" kmod/drivers/*.c | head -10
+  └ 11 lines...
+
+● Check existing driver pattern
+  $ cd /users/szhong/kSTEP && head -20 kmod/drivers/core_enqueue.c
+  └ 21 lines...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:Makefile 2>/dev/null | head
+  -10
+  └ 11 lines...
+
+● Read a recent driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/do_set_cpus_fix.c
+  └ 114 lines...
+
+● Check PSI config
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:init/Kconfig 2>/dev/null |
+  grep -A 10 "config PSI" | head -15
+  └ 16 lines...
+
+● Check if PSI is enabled in builds
+  $ cd /users/szhong/kSTEP && ls build/v6.18_test/.config 2>/dev/null && grep CONFIG_PSI
+  build/v6.18_test/.config 2>/dev/null || echo "no config found"
+  └ 2 lines...
+
+● Find PSI in any build config
+  $ cd /users/szhong/kSTEP && for d in build/*/; do cfg="$d/.config"; if [ -f "$cfg" ]; then grep
+  "CONFIG_PSI" "$cfg" 2>/dev/null | head -3; echo "--- $d"; break; fi; done
+  └ 3 lines...
+
+● Check deactivate_task signature
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/core.c
+  2>/dev/null | grep -n "deactivate_task" | head -10
+  └ 5 lines...
+
+● Check deactivate_task implementation
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/core.c
+  2>/dev/null | sed -n '2135,2165p'
+  └ 32 lines...
+
+● Check deactivate_task declaration
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/sched.h
+  2>/dev/null | grep -n "deactivate_task\|activate_task" | head -5
+  └ 6 lines...
+
+● Check find_proxy_task and dequeue path
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/core.c
+  2>/dev/null | grep -B5 -A15 "find_proxy_task" | head -100
+  └ 101 lines...
+
+● Find DEQUEUE_SLEEP usage
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/core.c
+  2>/dev/null | grep -n "block_task\|DEQUEUE_SLEEP" | head -20
+  └ 14 lines...
+
+● Check dequeue_task in sched.h
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/sched.h
+  2>/dev/null | grep -n "dequeue_task\|block_task" | head -10
+  └ 7 lines...
+
+● Find dequeue_task definition
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/core.c
+  2>/dev/null | grep -n "^.*dequeue_task\b" | head -10
+  └ 11 lines...
+
+● Check psi_task_change error handling
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/psi.c
+  2>/dev/null | grep -A 20 "void psi_task_change"
+  └ 22 lines...
+
+● Read dequeue_task implementation
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/core.c
+  2>/dev/null | sed -n '2108,2130p'
+  └ 24 lines...
+
+● Check psi_flags_change for error detection
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/psi.c
+  2>/dev/null | grep -B5 -A15 "psi_flags_change"
+  └ 86 lines...
+
+Now I have a solid understanding. The bug is in `psi_dequeue()` which returns early on `DEQUEUE_SLEEP` without checking if `TSK_ONCPU` is set. Let me create the driver.
+
+● Edit linux/config.kstep (+5)
+
+● Create kmod/drivers/psi_dequeue_proxy.c (+135)
+
+Now let's checkout the buggy kernel and build:
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py c2ae8b0df2d1~1 psi_dequeue_proxy_buggy 2>&1
+  └ 7 lines...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 7 lines...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 7 lines...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 7 lines...
+

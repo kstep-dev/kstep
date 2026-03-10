@@ -35,3 +35,19 @@ Let me skip this and update TODO.md.
 
 ● Edit TODO.md (+1 -1)
 
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: bf2c59fce407 (requires CPU hotplug,
+   not supported by kSTEP)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" && git push
+  └ 15 lines...
+
+**Skipped** `bf2c59fce407` — this bug requires actual CPU hotplug (taking a CPU offline), which triggers `idle_task_exit()` → `mmdrop()` after RCU stops monitoring the dying CPU. The kSTEP framework has no CPU hotplug support, so this bug cannot be reproduced. TODO.md updated and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         52s
+Total session time:     1m 3s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      230.2k in, 2.2k out, 201.8k cached (Est. 6 Premium requests)
