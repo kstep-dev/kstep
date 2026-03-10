@@ -1,0 +1,18 @@
+● Read bugs/505da668_sched_clock_avoid_false_sharing.md
+  └ 38 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the commit patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 505da6689305 2>/dev/null | head -200
+  └ 201 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && head -60 reproduce.py
+  └ 61 lines...
+
+● Read rest of the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 505da6689305 2>/dev/null | tail -200
+  └ 200 lines...
+

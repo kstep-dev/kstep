@@ -29,7 +29,7 @@
 - [ ] `505da6689305` sched/clock: Avoid false sharing for sched_clock_irqtime — [`505da668_sched_clock_avoid_false_sharing.md`](bugs/505da668_sched_clock_avoid_false_sharing.md)
 - [ ] `5324953c06bd` Fix wakeup_preempt's next_class tracking — [`5324953c_fix_wakeup_preempts_next_class.md`](bugs/5324953c_fix_wakeup_preempts_next_class.md)
 - [ ] `565790d28b1e` sched: Fix balance_callback() — [`565790d2_fix_balance_callback.md`](bugs/565790d2_fix_balance_callback.md)
-- [ ] `5657c1167835` sched/core: Fix NULL pointer access fault in sched_setaffinity() with non-SMP configs — [`5657c116_fix_null_pointer_access_fault.md`](bugs/5657c116_fix_null_pointer_access_fault.md)
+- [-] `5657c1167835` sched/core: Fix NULL pointer access fault in sched_setaffinity() with non-SMP configs — [`5657c116_fix_null_pointer_access_fault.md`](bugs/5657c116_fix_null_pointer_access_fault.md) <!-- skipped:bug requires non-SMP kernel (CONFIG_SMP=n) which is incompatible with kSTEP's SMP requirement attempts:1 -->
 - [ ] `58c644ba512c` sched/idle: Fix arch_cpu_idle() vs tracing — [`58c644ba_schedidle_fix_arch_cpu_idle_tracing.md`](bugs/58c644ba_schedidle_fix_arch_cpu_idle_tracing.md)
 - [ ] `5aec788aeb8e` sched: Fix TASK_state comparisons — [`5aec788a_task_state_comparisons.md`](bugs/5aec788a_task_state_comparisons.md)
 - [ ] `5b6547ed97f4` sched/core: Fix forceidle balancing — [`5b6547ed_forceidle_balancing.md`](bugs/5b6547ed_forceidle_balancing.md)

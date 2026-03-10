@@ -1,0 +1,22 @@
+● Read bugs/5657c116_fix_null_pointer_access_fault.md
+  └ 38 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5657c1167835 2>/dev/null | head -200
+  └ 108 lines...
+
+This bug only occurs in non-SMP kernel configs, but kSTEP requires SMP (CPU 0 reserved for driver). This is fundamentally incompatible — I'll skip it.
+
+● Find bug line in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n '5657c1167835' TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+

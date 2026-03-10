@@ -1,0 +1,27 @@
+● Read bugs/565790d2_fix_balance_callback.md
+  └ 25 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Check patch stats
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 565790d28b1e --stat 2>/dev/null | head
+  -20
+  └ 21 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Read full patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 565790d28b1e 2>/dev/null | head -300
+  └ 300 lines...
+
+● Read similar driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/balance_push_splice.c
+  └ 75 lines...
+
+● Read rest of patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 565790d28b1e 2>/dev/null | tail -300
+  └ 301 lines...
+
