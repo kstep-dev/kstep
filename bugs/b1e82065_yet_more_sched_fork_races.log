@@ -65,3 +65,211 @@ Let me fetch the LKML discussion for more context and check existing drivers for
   kmod/drivers/rqcf_act_skip_leak.c 2>/dev/null | head -80
   └ 80 lines...
 
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+
+● Find ksym_lookup usage
+  $ cd /users/szhong/kSTEP && grep -rn "kstep_ksym_lookup\|ksym_lookup" kmod/ --include="*.c"
+  --include="*.h" | head -20
+  └ 21 lines...
+
+● Find TASK_NEW usage
+  $ cd /users/szhong/kSTEP && grep -rn "TASK_NEW" kmod/ --include="*.c" --include="*.h" | head -10
+  └ 1 line...
+
+Let me check the kernel version and look at existing similar drivers more carefully.
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py b1e8206582f9~1 sched_fork_buggy 2>&1 | tail -5
+  └ 1 line...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 6 lines...
+
+● Find set_load_weight in buggy kernel
+  $ cd /users/szhong/kSTEP && grep -n "set_load_weight" linux/current/kernel/sched/core.c
+  └ 6 lines...
+
+● Read set_load_weight function
+  $ cd /users/szhong/kSTEP && sed -n '1210,1260p' linux/current/kernel/sched/core.c
+  └ 52 lines...
+
+● Find TASK_NEW definition
+  $ cd /users/szhong/kSTEP && grep -n "TASK_NEW" linux/current/include/linux/sched.h | head -5
+  └ 2 lines...
+
+● Check current HEAD
+  $ cd /users/szhong/kSTEP/linux/current && git log --oneline -5
+  └ 6 lines...
+
+● Read set_load_weight buggy version
+  $ cd /users/szhong/kSTEP && sed -n '835,870p' linux/current/kernel/sched/core.c
+  └ 37 lines...
+
+● Check commit ancestry
+  $ cd /users/szhong/kSTEP/linux/current && git log --oneline b1e8206582f9~3..b1e8206582f9
+  2>/dev/null
+  └ 8 lines...
+
+● Check diff between buggy and fix
+  $ cd /users/szhong/kSTEP/linux/current && git diff HEAD b1e8206582f9 --stat 2>/dev/null
+  └ 81 lines...
+
+● Stop shell
+  └ 1 line...
+
+● Check actual diff for scheduler files
+  $ cd /users/szhong/kSTEP/linux/current && git diff HEAD b1e8206582f9 -- kernel/sched/core.c
+  kernel/fork.c include/linux/sched/task.h 2>/dev/null
+  └ 81 lines...
+
+● Stop shell
+  └ 1 line...
+
+● Check sched/core.c diff
+  $ cd /users/szhong/kSTEP/linux/current && git diff HEAD b1e8206582f9 -- kernel/sched/core.c
+  2>/dev/null | head -100
+  └ 101 lines...
+
+● Check specific function diffs
+  $ cd /users/szhong/kSTEP/linux/current && git diff HEAD b1e8206582f9 -- kernel/sched/core.c
+  2>/dev/null | grep -A5 -B5 "sched_post_fork\|sched_cgroup_fork\|set_load_weight"
+  └ 60 lines...
+
+● Find fork functions in buggy kernel
+  $ cd /users/szhong/kSTEP && grep -n "sched_post_fork\|sched_cgroup_fork"
+  linux/current/kernel/sched/core.c
+  └ 4 lines...
+
+● Read sched_post_fork in buggy kernel
+  $ cd /users/szhong/kSTEP && sed -n '3795,3820p' linux/current/kernel/sched/core.c
+  └ 26 lines...
+
+● Find fork calls in fork.c
+  $ cd /users/szhong/kSTEP && grep -n "sched_post_fork\|sched_cgroup_fork"
+  linux/current/kernel/fork.c
+  └ 2 lines...
+
+● Read sched_fork in buggy kernel
+  $ cd /users/szhong/kSTEP && sed -n '3740,3800p' linux/current/kernel/sched/core.c
+  └ 62 lines...
+
+● Find sched_task_group assignments
+  $ cd /users/szhong/kSTEP && grep -n "sched_task_group" linux/current/kernel/sched/core.c | head
+  -20
+  └ 4 lines...
+
+● Find sched_task_group in fork.c
+  $ cd /users/szhong/kSTEP && grep -n "sched_task_group" linux/current/kernel/fork.c
+  └ 1 line...
+
+● Read sched_task_group reference
+  $ cd /users/szhong/kSTEP && sed -n '3295,3315p' linux/current/kernel/sched/core.c
+  └ 22 lines...
+
+● Read sched_task_group comment
+  $ cd /users/szhong/kSTEP && sed -n '115,135p' linux/current/kernel/sched/core.c
+  └ 22 lines...
+
+● Find cpu_cgroup_fork
+  $ cd /users/szhong/kSTEP && grep -n "cpu_cgroup_fork" linux/current/kernel/sched/core.c
+  └ 4 lines...
+
+● Read cpu_cgroup_fork
+  $ cd /users/szhong/kSTEP && sed -n '8700,8730p' linux/current/kernel/sched/core.c
+  └ 32 lines...
+
+● Find fork path ordering
+  $ cd /users/szhong/kSTEP && grep -n "cgroup_post_fork\|sched_post_fork\|wake_up_new_task"
+  linux/current/kernel/fork.c | head -10
+  └ 6 lines...
+
+● Read fork path near visibility
+  $ cd /users/szhong/kSTEP && sed -n '2280,2320p' linux/current/kernel/fork.c
+  └ 41 lines...
+
+● Check what moved between functions
+  $ cd /users/szhong/kSTEP/linux/current && git show b1e8206582f9 -- kernel/sched/core.c 2>/dev/null
+   | grep -A50
+  "sched_cgroup_fork\|^+.*__set_task_cpu\|^-.*__set_task_cpu\|^+.*task_fork\|^-.*task_fork" | head
+  -80
+  └ 52 lines...
+
+● Check patches on top
+  $ cd /users/szhong/kSTEP/linux/current && git log --oneline -3 && echo "---" && git log --oneline
+  754e0b0e3560..HEAD 2>/dev/null | head -10
+  └ 5 lines...
+
+● See all patches applied on top
+  $ cd /users/szhong/kSTEP/linux/current && git log --oneline 754e0b0e3560..HEAD 2>/dev/null
+  └ 1 line...
+
+● Check relationship
+  $ cd /users/szhong/kSTEP/linux/current && git log --oneline HEAD...754e0b0e3560 2>/dev/null | head
+   -10
+  └ 11 lines...
+
+● Double-check set_load_weight in actual buggy code
+  $ cd /users/szhong/kSTEP && grep -n "set_load_weight" linux/current/kernel/sched/core.c
+  └ 6 lines...
+
+● Check the band-aid fix
+  $ cd /users/szhong/kSTEP/linux/current && git show 13765de8148f -- kernel/sched/core.c 2>/dev/null
+   | head -80
+  └ 81 lines...
+
+● Check if band-aid is in buggy kernel
+  $ cd /users/szhong/kSTEP/linux/current && git merge-base --is-ancestor 13765de8148f HEAD && echo
+  "yes" || echo "no"
+  └ 2 lines...
+
+● Check commit parents
+  $ cd /users/szhong/kSTEP/linux/current && git cat-file -p b1e8206582f9 2>/dev/null | head -10
+  └ 11 lines...
+
+● Check v5.17-rc4 parents
+  $ cd /users/szhong/kSTEP/linux/current && git cat-file -p 754e0b0e3560 2>/dev/null | head -15
+  └ 7 lines...
+
+● Read checkout script
+  $ cd /users/szhong/kSTEP && cat checkout_linux.py | head -80
+  └ 81 lines...
+
+● Read rest of checkout script
+  $ cd /users/szhong/kSTEP && cat checkout_linux.py | tail -80
+  └ 81 lines...
+
+● Check linux worktrees
+  $ cd /users/szhong/kSTEP && ls -la linux/ | grep sched_fork
+  └ 2 lines...
+
+● Compare HEAD with expected buggy commit
+  $ cd /users/szhong/kSTEP/linux/current && git log --oneline -1 754e0b0e3560 -- kernel/sched/core.c
+   2>/dev/null && git diff HEAD 754e0b0e3560 -- kernel/sched/core.c 2>/dev/null | head -20
+  └ 22 lines...
+
+● Re-checkout buggy kernel properly
+  $ cd /users/szhong/kSTEP && rm -rf linux/sched_fork_buggy && cd linux/master && git worktree prune
+   -v 2>/dev/null && cd /users/szhong/kSTEP && ./checkout_linux.py b1e8206582f9~1 sched_fork_buggy
+  2>&1 | tail -5
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 1 line...
+

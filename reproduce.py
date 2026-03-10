@@ -540,6 +540,13 @@ bugs = [
             Linux(name="fixed", version="9e81889c7648"),
         ],
     ),
+    Bug(
+        driver=Driver(name="balance_push_hotplug", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="b5c4477366fb~1"),
+            Linux(name="fixed", version="b5c4477366fb"),
+        ],
+    ),
 ]
 
 

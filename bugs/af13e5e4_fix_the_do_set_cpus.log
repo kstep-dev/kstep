@@ -109,3 +109,270 @@
   $ cd /users/szhong/kSTEP && cat kmod/drivers/set_cpus_allowed_lock.c
   └ 98 lines...
 
+● Get kernel version tag
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags af13e5e437dc~1 2>/dev/null || git
+   -C linux/current describe --tags --always af13e5e437dc~1
+  └ 2 lines...
+
+● Check kernel version context
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline --decorate af13e5e437dc | head -5
+  └ 6 lines...
+
+● Check kernel version from Makefile
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:Makefile | head -5
+  └ 6 lines...
+
+● Re-read select_fallback_rq
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:kernel/sched/core.c | sed -n
+  '3427,3490p'
+  └ 65 lines...
+
+● Read cpuset_cpus_allowed_fallback
+  $ cd /users/szhong/kSTEP && git -C linux/current show af13e5e437dc~1:kernel/cgroup/cpuset.c | grep
+   -A 30 "cpuset_cpus_allowed_fallback"
+  └ 45 lines...
+
+● Read kthread.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Read Makefile for build config
+  $ cd /users/szhong/kSTEP && cat Makefile | head -60
+  └ 61 lines...
+
+● Check scripts directory
+  $ cd /users/szhong/kSTEP && ls scripts/
+  └ 5 lines...
+
+● Read linux build target
+  $ cd /users/szhong/kSTEP && cat Makefile | grep -A 30 "linux:"
+  └ 31 lines...
+
+● Check linux checkout/build process
+  $ cd /users/szhong/kSTEP && ls scripts/*.py | head -5 && cat checkout_linux.py | head -80
+  └ 86 lines...
+
+● Read kernel config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep 2>/dev/null | head -50
+  └ 51 lines...
+
+● Check lockdep config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep 2>/dev/null | grep -i
+  "lockdep\|debug_lock\|prove_lock" | head -10
+  └ 1 line...
+
+● Check cgroup config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | grep -i "cgroup"
+  └ 5 lines...
+
+● Read run_qemu function
+  $ cd /users/szhong/kSTEP && cat run.py | grep -A 30 "def run_qemu"
+  └ 32 lines...
+
+● Read boot args and QEMU setup
+  $ cd /users/szhong/kSTEP && cat run.py | grep -A 50 "boot_args" | head -60
+  └ 61 lines...
+
+● Find instrumentation variables
+  $ cd /users/szhong/kSTEP && grep -r
+  "kstep_migrate_disable_pi_locked\|kstep_bp_splice_count\|extern atomic_t kstep" kmod/
+  --include="*.c" --include="*.h" | head -10
+  └ 9 lines...
+
+● Check kSTEP kernel patch
+  $ cd /users/szhong/kSTEP && cat linux/cov.c | head -30
+  └ 13 lines...
+
+● Check for kernel patches
+  $ cd /users/szhong/kSTEP && ls linux/*.patch 2>/dev/null; ls linux/*.c 2>/dev/null
+  └ 4 lines...
+
+● Find drivers with CPU hotplug
+  $ cd /users/szhong/kSTEP && grep -l "cpu.*online\|hotplug\|cpu_down\|cpu_up\|disable_nonboot_cpus"
+   kmod/drivers/*.c | head -5
+  └ 4 lines...
+
+● Find kstep_write usage
+  $ cd /users/szhong/kSTEP && grep -l "kstep_write" kmod/drivers/*.c 2>/dev/null | head -10
+  └ 1 line...
+
+● Find CPU control usage
+  $ cd /users/szhong/kSTEP && grep -l "kstep_write\|cpu_down\|disable_hotplug_cpu" kmod/drivers/*.c
+  kmod/*.c 2>/dev/null | head -10
+  └ 2 lines...
+
+● Read main.c
+  $ cd /users/szhong/kSTEP && cat kmod/main.c | head -80
+  └ 64 lines...
+
+● Read kstep_write implementation
+  $ cd /users/szhong/kSTEP && grep -A 20 "void kstep_write" kmod/kernel.c
+  └ 22 lines...
+
+● Read run_test.py
+  $ cd /users/szhong/kSTEP && cat run_test.py | head -80
+  └ 81 lines...
+
+● Read log parser
+  $ cd /users/szhong/kSTEP && cat scripts/parse_log.py | head -50
+  └ 51 lines...
+
+● Read reproduce.py end
+  $ cd /users/szhong/kSTEP && tail -100 reproduce.py
+  └ 101 lines...
+
+● Read reproduce.py result checking
+  $ cd /users/szhong/kSTEP && cat reproduce.py | grep -A 30 "def run_bug\|def check\|def
+  verify\|pass\|fail\|result\|status" | head -50
+  └ 51 lines...
+
+● Read print_run_results
+  $ cd /users/szhong/kSTEP && cat run.py | grep -A 20 "def print_run_results"
+  └ 21 lines...
+
+● Read tick.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/tick.c
+  └ 165 lines...
+
+● Read isolation.c
+  $ cd /users/szhong/kSTEP && cat kmod/isolation.c
+  └ 76 lines...
+
+● Read task.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/task.c
+  └ 113 lines...
+
+Now I have a good understanding of the bug and a plan. Let me implement the driver.
+
+● Find stop_one_cpu usage
+  $ cd /users/szhong/kSTEP && grep -r "stop_one_cpu_nowait\|cpu_stop_work" kmod/ --include="*.c"
+  --include="*.h" | head -10
+  └ 11 lines...
+
+● Find stop_one_cpu header
+  $ cd /users/szhong/kSTEP && grep -rn "stop_one_cpu_nowait" linux/current/include/ | head -5
+  └ 5 lines...
+
+● Read similar driver pattern
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migration_cpu_stop_requeue.c | head -80
+  └ 80 lines...
+
+Now let me create the driver. I'll checkout the buggy kernel first in parallel.
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py af13e5e437dc~1 do_set_cpus_fix_buggy 2>&1 | tail
+  -5
+  └ 1 line...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 1 line...
+
+While the checkout runs, let me create the driver:
+
+● Create kmod/drivers/do_set_cpus_fix.c (+102)
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 6 lines...
+
+
+
+Good, checkout complete. Now let me build the buggy kernel and kstep module:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=do_set_cpus_fix_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=do_set_cpus_fix_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Build error. Let me check the compilation error:
+
+● Check compilation error
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=do_set_cpus_fix_buggy 2>&1 | grep
+  "do_set_cpus_fix" | head -20
+  └ 17 lines...
+
+Need to add missing includes. Let me fix:
+
+● Edit kmod/drivers/do_set_cpus_fix.c (+2)
+
+● Rebuild kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=do_set_cpus_fix_buggy 2>&1 | grep -E
+  "error|warning|do_set_cpus_fix" | head -20
+  └ 14 lines...
+
+● Check modpost error
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=do_set_cpus_fix_buggy 2>&1 | grep -B5 "Error 1"
+  | head -20
+  └ 7 lines...
+
+`stop_one_cpu_nowait` is not exported. Need to use ksym_lookup. Let me fix:
+
+● Read kmod/drivers/do_set_cpus_fix.c
+  └ 103 lines read
+
+● Edit kmod/drivers/do_set_cpus_fix.c (+9)
+
+● Edit kmod/drivers/do_set_cpus_fix.c (+1 -1)
+
+● Rebuild kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=do_set_cpus_fix_buggy 2>&1 | grep -E
+  "error|warning|do_set_cpus_fix" | head -20
+  └ 12 lines...
+
+Build succeeded. Let me run it on the buggy kernel:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && timeout 60 ./run.py do_set_cpus_fix --linux_name do_set_cpus_fix_buggy
+   2>&1 | tail -5
+  └ 1 line...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 2 lines...
+
+The QEMU hung (timeout killed it). Let me check the log:
+
+● Check buggy kernel log
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log 2>/dev/null | tail -30
+  └ 1 line...
+
+● Check log file
+  $ cd /users/szhong/kSTEP && ls -la data/logs/latest.log && cat data/logs/latest.log | head -50
+  └ 2 lines...
+
+● Find log files
+  $ cd /users/szhong/kSTEP && ls -la data/logs/latest* 2>/dev/null; ls data/logs/ 2>/dev/null | tail
+   -5
+  └ 6 lines...
+
+● Find latest log
+  $ cd /users/szhong/kSTEP && readlink data/logs/latest.log 2>/dev/null; ls -la data/logs/*.log
+  2>/dev/null | tail -5
+  └ 6 lines...
+
+● Check latest log
+  $ cd /users/szhong/kSTEP && cat data/logs/log-20260310_121204.log | tail -40
+  └ 41 lines...
+
+The system hung because `msleep` depends on jiffies which kSTEP freezes. Need to use busy-wait instead:
+
+● Edit kmod/drivers/do_set_cpus_fix.c (+2 -1)
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=do_set_cpus_fix_buggy 2>&1 | grep -E
+  "error|warning" | head -10
+  └ 1 line...
+
