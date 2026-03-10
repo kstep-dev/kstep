@@ -1,0 +1,50 @@
+● Read bugs/b6e13e85_ttwu_race.md
+  └ 40 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 b6e13e85829f 2>/dev/null | head -300
+  └ 301 lines...
+
+● Read AGENTS.md
+  └ 43 lines read
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Read rest of patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 b6e13e85829f 2>/dev/null | tail -200
+  └ 201 lines...
+
+Let me look at existing driver examples and understand the kernel version.
+
+● Read example driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/cpus_share_cache.c
+  └ 113 lines...
+
+● Get kernel version info
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline b6e13e85829f~1 -1
+  └ 2 lines...
+
+● Find related drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ttwu* 2>/dev/null; grep -l
+  "ttwu\|wake_entry\|wakelist" kmod/drivers/*.c 2>/dev/null | head -5
+  └ 6 lines...
+
+● Read wakelist driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/nr_running_wakelist.c
+  └ 111 lines...
+
+● Read internal header
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -60
+  └ 61 lines...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline b6e13e85829f~1 -1 && git -C
+  linux/current describe --tags b6e13e85829f~1 2>/dev/null || echo "No tag" && head -5
+  linux/current/Makefile
+  └ 8 lines...
+

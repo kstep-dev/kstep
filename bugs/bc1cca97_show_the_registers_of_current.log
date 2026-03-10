@@ -1,0 +1,56 @@
+● Read bugs/bc1cca97_show_the_registers_of_current.md
+  └ 37 lines read
+
+● Check patch stats
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 bc1cca97e6da --stat 2>&1 | head -20
+  └ 21 lines...
+
+● Read full patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 bc1cca97e6da 2>&1 | head -120
+  └ 120 lines...
+
+● Read patch diff
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 bc1cca97e6da 2>&1 | tail -80
+  └ 81 lines...
+
+● List directory kmod
+  └ 26 files found
+
+● Check driver API header
+  $ cd /users/szhong/kSTEP && head -100 kmod/driver.h 2>/dev/null || head -100 kmod/include/driver.h
+   2>/dev/null
+  └ 101 lines...
+
+Let me check existing drivers for patterns and the kernel version:
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Check kernel versions
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline bc1cca97e6da -1 && git -C
+  linux/current log --oneline bc1cca97e6da~1 -1
+  └ 3 lines...
+
+● Find dump_cpu_task in buggy kernel
+  $ cd /users/szhong/kSTEP && git -C linux/current show bc1cca97e6da~1:kernel/sched/core.c 2>&1 |
+  grep -n "dump_cpu_task" | head -5
+  └ 2 lines...
+
+This bug is about diagnostic output quality in `dump_cpu_task()` — it improves the register display during RCU stall detection on non-NMI architectures (ARM64/RISC-V). On x86 (which kSTEP uses), `trigger_single_cpu_backtrace()` via NMI already works, making both buggy and fixed kernels produce useful output. Additionally, triggering RCU stalls requires real hardirq context, which kSTEP's controlled tick mechanism doesn't provide. This is not reproducible with kSTEP.
+
+Let me skip this and update TODO.md:
+
+● Find bug line in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n 'bc1cca97e6da' TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Read TODO.md lines 74-74
+  └ 1 line read
+
+● Edit TODO.md (+1 -1)
+

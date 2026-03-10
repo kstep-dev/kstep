@@ -71,7 +71,7 @@
 - [ ] `b1e8206582f9` sched: Fix yet more sched_fork() races — [`b1e82065_yet_more_sched_fork_races.md`](bugs/b1e82065_yet_more_sched_fork_races.md)
 - [x] `b5c4477366fb` sched: Use cpu_dying() to fix balance_push vs hotplug-rollback — [`b5c44773_use_cpu_dying_to_fix.md`](bugs/b5c44773_use_cpu_dying_to_fix.md) <!-- driver:balance_push_hotplug attempts:1 -->
 - [ ] `b6e13e85829f` sched/core: Fix ttwu() race — [`b6e13e85_ttwu_race.md`](bugs/b6e13e85_ttwu_race.md)
-- [ ] `bc1cca97e6da` sched/debug: Show the registers of 'current' in dump_cpu_task() — [`bc1cca97_show_the_registers_of_current.md`](bugs/bc1cca97_show_the_registers_of_current.md)
+- [-] `bc1cca97e6da` sched/debug: Show the registers of 'current' in dump_cpu_task() — [`bc1cca97_show_the_registers_of_current.md`](bugs/bc1cca97_show_the_registers_of_current.md) <!-- skipped:diagnostic-output-quality-bug-on-non-NMI-archs-not-reproducible-on-x86 attempts:1 -->
 - [ ] `bf2c59fce407` sched/core: Fix illegal RCU from offline CPUs — [`bf2c59fc_illegal_rcu_from_offline_cpus.md`](bugs/bf2c59fc_illegal_rcu_from_offline_cpus.md)
 - [ ] `c2ae8b0df2d1` sched/core: Fix psi_dequeue() for Proxy Execution — [`c2ae8b0d_psi_dequeue_for_proxy_execution.md`](bugs/c2ae8b0d_psi_dequeue_for_proxy_execution.md)
 - [ ] `c662e2b1e8cf` sched: Fix sched_delayed vs sched_core — [`c662e2b1_sched_delayed_vs_sched_core.md`](bugs/c662e2b1_sched_delayed_vs_sched_core.md)
