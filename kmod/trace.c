@@ -90,7 +90,8 @@ static void on_sched_group_alloc(unsigned long ip, unsigned long parent_ip,
   int cpu = (int)regs_get_kernel_argument(KSTEP_FTRACE_REGS_TO_PT(fregs), 3);
 
 // https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+// Landed in v6.18-rc3 but LINUX_VERSION_CODE stays 6.18.0
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
   cfs_rq->zero_vruntime = INIT_TIME_NS;
 #else
   cfs_rq->min_vruntime = INIT_TIME_NS;

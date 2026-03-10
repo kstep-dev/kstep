@@ -45,7 +45,8 @@ static void kstep_reset_runqueue(struct rq *rq) {
 
   // reset cfs rq
 // https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+// Landed in v6.18-rc3 but LINUX_VERSION_CODE stays 6.18.0
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
   rq->cfs.zero_vruntime = INIT_TIME_NS;
 #else
   rq->cfs.min_vruntime = INIT_TIME_NS;

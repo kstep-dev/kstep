@@ -18,7 +18,7 @@
 #include "driver.h"
 #include "internal.h"
 
-#if LINUX_VERSION_CODE == KERNEL_VERSION(6, 18, 0)
+#if LINUX_VERSION_CODE == KERNEL_VERSION(6, 18, 0) && !defined(MM_CID_ONCPU)
 
 #include <linux/mm_types.h>
 

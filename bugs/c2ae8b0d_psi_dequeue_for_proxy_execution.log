@@ -373,3 +373,152 @@ Let me fix the framework compatibility issues for this kernel version:
   2>/dev/null | head -5
   └ 4 lines...
 
+● Recheck vfs_mkdir commit
+  $ cd /users/szhong/kSTEP && git -C linux/master describe --tags e12d203b8c88 2>/dev/null && git -C
+   linux/master log --oneline e12d203b8c88 -1 2>/dev/null
+  └ 3 lines...
+
+● Check commit ancestry
+  $ cd /users/szhong/kSTEP && git -C linux/master log --oneline --ancestry-path
+  e12d203b8c88..73cbcfe255f7 2>/dev/null | wc -l && git -C linux/master merge-base --is-ancestor
+  e12d203b8c88 73cbcfe255f7 2>/dev/null && echo "ancestor" || echo "not ancestor"
+  └ 3 lines...
+
+● Check mmcid_compact error area
+  $ cd /users/szhong/kSTEP && sed -n '45,60p' kmod/drivers/mmcid_compact.c
+  └ 17 lines...
+
+Let me fix all the compatibility issues at once:
+
+● Edit kmod/reset.c (+2 -1)
+
+● Edit kmod/drivers/lag_vruntime.c (+1 -1)
+
+● Edit kmod/kernel.c (+2 -1)
+
+● Edit kmod/trace.c (+2 -1)
+
+Now fix the reset.c sum_w_vruntime/sum_weight guard and the mmcid_compact driver:
+
+● Read kmod/reset.c lines 53-70
+  └ 18 lines read
+
+● Check mmcid version guard
+  $ cd /users/szhong/kSTEP && head -15 kmod/drivers/mmcid_compact.c
+  └ 15 lines...
+
+● Check struct fields
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/sched.h
+  2>/dev/null | grep -n "sum_w_vruntime\|sum_weight\|avg_load\b" | head -5
+  └ 2 lines...
+
+● Check mm_cid type
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:include/linux/sched.h
+  2>/dev/null | grep -A5 "mm_cid\b" | head -10
+  └ 11 lines...
+
+● Check mmcid references
+  $ cd /users/szhong/kSTEP && grep -n "MM_CID_UNSET\|mm_cidmask\|mm_cid"
+  kmod/drivers/mmcid_compact.c | head -10
+  └ 8 lines...
+
+● Check MM_CID defines
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:include/linux/sched.h
+  2>/dev/null | grep "MM_CID" | head -10
+  └ 3 lines...
+
+● Check mm_cidmask signature
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:include/linux/sched/mm.h
+  2>/dev/null | grep -B2 -A10 "mm_cidmask"
+  └ 1 line...
+
+● Find mm_cidmask definition
+  $ cd /users/szhong/kSTEP && git -C linux/current grep "mm_cidmask" c2ae8b0df2d1~1 -- include/
+  2>/dev/null | head -5
+  └ 3 lines...
+
+● Get mm_cidmask return type
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:include/linux/mm_types.h
+  2>/dev/null | grep -A5 "mm_cidmask"
+  └ 14 lines...
+
+● Check for MM_CID defines
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:include/linux/sched.h
+  2>/dev/null | grep "define MM_CID" | head -5
+  └ 1 line...
+
+● Check MM_CID defines in old kernel
+  $ cd /users/szhong/kSTEP && git -C linux/do_set_cpus_fix_buggy show HEAD:include/linux/sched.h
+  2>/dev/null | grep "define MM_CID" | head -5
+  └ 1 line...
+
+● Find MM_CID_ONCPU define
+  $ cd /users/szhong/kSTEP && git -C linux/current grep "MM_CID_ONCPU" c2ae8b0df2d1~1 -- include/
+  2>/dev/null | head -5
+  └ 3 lines...
+
+● Check if MM_CID_ONCPU exists before mmcid fix
+  $ cd /users/szhong/kSTEP && git -C linux/master show 77d7dc8bef48~1:include/linux/rseq_types.h
+  2>/dev/null | grep "MM_CID_ONCPU" | head -3
+  └ 1 line...
+
+● Check if rseq_types.h is included
+  $ cd /users/szhong/kSTEP && grep -r "include.*rseq_types"
+  linux/psi_dequeue_proxy_buggy/include/linux/sched.h 2>/dev/null | head -3
+  └ 2 lines...
+
+Good. So `MM_CID_ONCPU` is available via the include chain. Let me add the guard to mmcid_compact:
+
+● Read kmod/drivers/mmcid_compact.c lines 16-22
+  └ 6 lines read
+
+● Edit kmod/drivers/mmcid_compact.c (+1 -1)
+
+Now let's try building again:
+
+● Build kstep again
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=psi_dequeue_proxy_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Check rq locking in kmod
+  $ cd /users/szhong/kSTEP && grep -rn "task_rq_lock\|rq_lock\|raw_spin_rq" kmod/*.c
+  kmod/drivers/*.c 2>/dev/null | grep -v "psi_dequeue" | head -10
+  └ 11 lines...
+
+● Check sched_setscheduler usage
+  $ cd /users/szhong/kSTEP && grep -rn "sched_setscheduler" kmod/*.c kmod/drivers/*.c 2>/dev/null |
+  grep -v "psi_dequeue" | head -10
+  └ 11 lines...
+
+● Check rq lock usage pattern
+  $ cd /users/szhong/kSTEP && grep -A5 "raw_spin_rq_lock" kmod/drivers/forceidle_balancing.c | head
+  -10
+  └ 6 lines...
+
+● Check how drivers set FIFO
+  $ cd /users/szhong/kSTEP && grep -B2 "sched_set_fifo\|sched_setscheduler"
+  kmod/drivers/fix_balance_callback.c | head -10
+  └ 11 lines...
+
+● Check rq lock implementation
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/sched.h
+  2>/dev/null | grep -A5 "raw_spin_rq_lock_irqsave\|static inline void raw_spin_rq_lock(" | head -20
+  └ 21 lines...
+
+● Check rq_lock_nested for non-exported deps
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/sched.h
+  2>/dev/null | grep -A10 "raw_spin_rq_lock_nested"
+  └ 29 lines...
+
+● Check symbol exports
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/core.c
+  2>/dev/null | grep
+  "EXPORT_SYMBOL.*raw_spin_rq\|EXPORT_SYMBOL.*task_rq_lock\|EXPORT_SYMBOL.*sched_setscheduler" |
+  head -10
+  └ 1 line...
+
+● Check forceidle driver version and imports
+  $ cd /users/szhong/kSTEP && head -5 kmod/drivers/forceidle_balancing.c && grep
+  "LINUX_VERSION\|KSYM_IMPORT\|kstep_ksym" kmod/drivers/forceidle_balancing.c | head -10
+  └ 8 lines...
+

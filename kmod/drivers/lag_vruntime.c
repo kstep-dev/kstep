@@ -30,7 +30,7 @@ static void run(void) {
 
 static void on_tick_begin(void) {
   struct rq *rq = cpu_rq(1);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
   s64 min_vruntime = rq->cfs.zero_vruntime - INIT_TIME_NS;
 #else
   s64 min_vruntime = rq->cfs.min_vruntime - INIT_TIME_NS;

@@ -403,3 +403,32 @@ Now add to reproduce.py:
 
 The file was already tracked with the same content. Now let me commit and push:
 
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git add -A && git diff --cached --stat
+  └ 7 lines...
+
+● Commit changes
+  $ cd /users/szhong/kSTEP && git commit -m "reproduce: delayed_vs_core (c662e2b1e8cf)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+  └ 3 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced bug `c662e2b1e8cf` ("sched: Fix sched_delayed vs sched_core"):
+
+- **Bug**: `sched_core_enqueue()` doesn't check `p->se.sched_delayed`, so a delayed task can be incorrectly added to the core scheduling tree during migration
+- **Buggy kernel**: task added to core_tree with `sched_delayed=1` ✗
+- **Fixed kernel**: task correctly excluded from core_tree ✓
+- **Driver**: `delayed_vs_core` — enables core scheduling, sets a core cookie, simulates delayed-dequeue state, then calls `sched_core_enqueue()` to verify the guard
+- Committed and pushed as `28144d9`
+
+
+Total usage est:        6 Premium requests
+API time spent:         11m 17s
+Total session time:     28m 9s
+Total code changes:     +147 -2
+Breakdown by AI model:
+ claude-opus-4.6-1m      5.9m in, 31.9k out, 5.8m cached (Est. 6 Premium requests)
