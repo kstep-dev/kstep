@@ -20,3 +20,267 @@
   2>/dev/null | head -200
   └ 183 lines...
 
+● Read another driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migration_cpu_stop_warn.c
+  └ 105 lines...
+
+● Read existing driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/balance_push_splice.c
+  └ 75 lines...
+
+● Read kthread helper
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+
+● Check kernel version near commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 3a7956e25e1d~1..3a7956e25e1d | head
+   -5
+  └ 2 lines...
+
+● Find kernel version tag
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags 3a7956e25e1d~1 2>/dev/null || git
+   -C linux/current log --oneline --all --decorate 3a7956e25e1d~1 -1
+  └ 2 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -60
+  └ 61 lines...
+
+● Check kernel version from Makefile
+  $ cd /users/szhong/kSTEP && python3 -c "
+  import subprocess
+  result = subprocess.run(['git', '-C', 'linux/current', 'show', '3a7956e25e1d~1:Makefile'],
+  capture_output=True, text=True)
+  for line in result.stdout.split('\n')[:10]:...
+  └ 13 lines...
+
+Now I have a clear picture of the bug. Let me implement the driver and test it.
+
+● Create kmod/drivers/pf_kthread_race.c (+76)
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 3a7956e25e1d~1 pf_kthread_race_buggy 2>&1 | tail
+  -5
+  └ 6 lines...
+
+Now let me build the buggy kernel and kSTEP module:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=pf_kthread_race_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kSTEP module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=pf_kthread_race_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Check build errors
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=pf_kthread_race_buggy 2>&1 | grep -E
+  "error:|Error" | head -20
+  └ 6 lines...
+
+● Check tick_clock.c issue
+  $ cd /users/szhong/kSTEP && grep -n "paravirt_set_sched_clock\|paravirt_sched_clock"
+  kmod/tick_clock.c
+  └ 5 lines...
+
+● Check kernel for symbol
+  $ cd /users/szhong/kSTEP && grep -rn "paravirt_set_sched_clock"
+  linux/pf_kthread_race_buggy/arch/x86/include/ 2>/dev/null | head -5
+  └ 1 line...
+
+● Check paravirt.h
+  $ cd /users/szhong/kSTEP && grep -rn "paravirt_set_sched_clock\|paravirt_sched_clock"
+  linux/pf_kthread_race_buggy/arch/x86/include/asm/paravirt.h 2>/dev/null | head -10
+  └ 2 lines...
+
+● Read kmod/tick_clock.c
+  └ 63 lines read
+
+● Find when symbol was added
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline --all --diff-filter=A -S
+  "paravirt_set_sched_clock" -- arch/x86/include/asm/paravirt.h 2>/dev/null | head -5
+  └ 1 line...
+
+● Find symbol introduction
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline --all -S "paravirt_set_sched_clock"
+   -- arch/x86/ 2>/dev/null | head -5
+  └ 3 lines...
+
+● Check commit order
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 3a7956e25e1d~1..a0e2bf7cb700
+  2>/dev/null | wc -l
+  └ 2 lines...
+
+● Check pv_ops for sched_clock
+  $ cd /users/szhong/kSTEP && grep -n "sched_clock"
+  linux/pf_kthread_race_buggy/arch/x86/include/asm/paravirt_types.h 2>/dev/null | head -10
+  └ 2 lines...
+
+Good, `pv_ops.time.sched_clock` exists. The issue is the version check boundary. Let me fix tick_clock.c to use `kstep_ksym_lookup` for `paravirt_set_sched_clock`:
+
+● Read kmod/tick_clock.c lines 22-32
+  └ 11 lines read
+
+● Edit kmod/tick_clock.c (+8 -6)
+
+● Rebuild kSTEP module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=pf_kthread_race_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+Build succeeded. Now let me run the driver on the buggy kernel:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py pf_kthread_race --linux_name pf_kthread_race_buggy 2>&1 |
+  tail -20
+  └ 21 lines...
+
+I can see the WARN trace fired. Let me check the log for the full output:
+
+● Check bug reproduction
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | grep -E
+  "WARN|fail|pass|status|PF_KTHREAD|kthread_is_per_cpu|end trace"
+  └ 2 lines...
+
+● Check log output
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  "WARN|fail|pass|status|PF_KTHREAD|kthread_is_per_cpu|end trace"
+  └ 8 lines...
+
+The WARN fired. Let me check the JSON output for the pass/fail status:
+
+● Check JSONL output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug reproduces on buggy kernel. Now let me test on the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 3a7956e25e1d pf_kthread_race_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=pf_kthread_race_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kSTEP for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=pf_kthread_race_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py pf_kthread_race --linux_name pf_kthread_race_fixed 2>&1 |
+  tail -10
+  └ 11 lines...
+
+● Check fixed kernel results
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl && echo "---" && cat data/latest.log | grep -E
+  "WARN|fail|pass|status|PF_KTHREAD|kthread_is_per_cpu"
+  └ 3 lines...
+
+● Check full log
+  $ cd /users/szhong/kSTEP && cat data/latest.log | tail -30
+  └ 31 lines...
+
+● Check ksym_lookup impl
+  $ cd /users/szhong/kSTEP && grep -A 10 "kstep_ksym_lookup" kmod/sym.c
+  └ 24 lines...
+
+● Verify tick_clock.c changes
+  $ cd /users/szhong/kSTEP && cat kmod/tick_clock.c
+  └ 66 lines...
+
+● Edit kmod/tick_clock.c (+1 -1)
+
+● Rebuild kSTEP for fixed
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=pf_kthread_race_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py pf_kthread_race --linux_name pf_kthread_race_fixed 2>&1 |
+  tail -10
+  └ 11 lines...
+
+● Check fixed kernel results
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl && echo "---" && cat data/latest.log | grep -E
+  "WARN|fail|pass|PF_KTHREAD|kthread_is_per_cpu"
+  └ 7 lines...
+
+Bug confirmed:
+- **Buggy kernel**: `fail` — WARN fires in `to_kthread()`
+- **Fixed kernel**: `pass` — `__to_kthread()` handles it gracefully, no WARN
+
+Now let me update TODO.md, add to reproduce.py, and commit:
+
+● Find TODO entry
+  $ cd /users/szhong/kSTEP && grep -n "3a7956e25e1d" TODO.md
+  └ 2 lines...
+
+● Count reproduced bugs
+  $ cd /users/szhong/kSTEP && grep -c "^\- \[x\]" TODO.md
+  └ 2 lines...
+
+● Check current total
+  $ cd /users/szhong/kSTEP && grep "^\*\*Total:" TODO.md
+  └ 2 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+Now add to reproduce.py:
+
+● Check reproduce.py end
+  $ cd /users/szhong/kSTEP && tail -20 reproduce.py
+  └ 21 lines...
+
+● Find last Bug entry
+  $ cd /users/szhong/kSTEP && grep -n "Bug(" reproduce.py | tail -5
+  └ 6 lines...
+
+● Read reproduce.py lines 265-280
+  └ 16 lines read
+
+● Edit reproduce.py (+7)
+
+Now commit and push:
+
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git add -A && git status --short
+  └ 12 lines...
+
+● Stage only my changes
+  $ cd /users/szhong/kSTEP && git reset HEAD && git add TODO.md kmod/drivers/pf_kthread_race.c
+  kmod/tick_clock.c reproduce.py && git status --short
+  └ 20 lines...
+
+● Commit changes
+  $ cd /users/szhong/kSTEP && git commit -m "reproduce: pf_kthread_race (3a7956e25e1d)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+  └ 4 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1 | tail -5
+  └ 3 lines...
+
+Successfully reproduced the bug. Here's the summary:
+
+**Bug**: `3a7956e25e1d` — TOCTOU race in `kthread_is_per_cpu()` where `to_kthread()` fires `WARN_ON(!(p->flags & PF_KTHREAD))` when PF_KTHREAD is cleared between an external check and the internal check.
+
+**Driver**: `pf_kthread_race` — Creates a kthread, clears its PF_KTHREAD flag (simulating `begin_new_exec()`), then calls `kthread_is_per_cpu()`.
+
+- **Buggy kernel**: WARN fires in `to_kthread()` → `fail`
+- **Fixed kernel**: `__to_kthread()` gracefully returns NULL → `pass`
+
+Also fixed `kmod/tick_clock.c` to handle kernels where `paravirt_set_sched_clock` doesn't exist yet (added mid-5.12 cycle).
+
+
+Total usage est:        6 Premium requests
+API time spent:         5m 30s
+Total session time:     10m 59s
+Total code changes:     +94 -9
+Breakdown by AI model:
+ claude-opus-4.6-1m      2.6m in, 17.2k out, 2.6m cached (Est. 6 Premium requests)
