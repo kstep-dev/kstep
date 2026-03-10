@@ -74,3 +74,133 @@
   2>/dev/null
   └ 3 lines...
 
+● Check kernel_write in 5.15-rc2
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:fs/read_write.c | grep -A 30
+  "__kernel_write"
+  └ 76 lines...
+
+● Get full __kernel_write
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:fs/read_write.c | grep -B 2
+  -A 40 "ssize_t __kernel_write"
+  └ 43 lines...
+
+● Check exported VFS symbols
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:fs/read_write.c | grep -B1
+  "EXPORT_SYMBOL" | head -20
+  └ 20 lines...
+
+● Check kstep internal header
+  $ cd /users/szhong/kSTEP && grep -n "EXPORT_SYMBOL" kmod/internal.h 2>/dev/null | head -20; echo
+  "---"; cat kmod/internal.h | head -50
+  └ 52 lines...
+
+● Check build system
+  $ cd /users/szhong/kSTEP && cat Makefile | head -80
+  └ 80 lines...
+
+● Check vm_mmap export
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:mm/util.c | grep -B2 -A2
+  "EXPORT.*vm_mmap\|EXPORT.*vm_munmap" | head -10
+  └ 6 lines...
+
+● Check kthread_use_mm export
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:kernel/kthread.c | grep -A3
+  "kthread_use_mm\|kthread_unuse_mm" | head -20
+  └ 21 lines...
+
+● Check an example driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/rt_runtime_toggle.c
+  └ 23 lines...
+
+● Check tunable_scaling declaration
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:kernel/sched/sched.h | grep
+  -n "sysctl_sched_tunable_scaling\|SCHED_TUNABLESCALING" | head -10
+  └ 2 lines...
+
+● Check kernel config for stack init
+  $ cd /users/szhong/kSTEP && cat scripts/kstep_config 2>/dev/null | grep -i
+  "init_stack\|INIT_LOCAL\|GCC_PLUGIN_STRUCTLEAK" || echo "not found"; ls scripts/ | head -20
+  └ 21 lines...
+
+● Find config files
+  $ cd /users/szhong/kSTEP && find scripts/ -name "*config*" -o -name "*.config" | head -10
+  └ 1 line...
+
+● Find kernel config in Makefile
+  $ cd /users/szhong/kSTEP && grep -r
+  "kstep_config\|defconfig\|\.config\|linux-config\|linux_config" Makefile | head -10
+  └ 5 lines...
+
+● Find KSTEP_CONFIG path
+  $ cd /users/szhong/kSTEP && grep "KSTEP_CONFIG" Makefile
+  └ 3 lines...
+
+● Check stack init config
+  $ cd /users/szhong/kSTEP && grep -i "init_stack\|INIT_LOCAL\|STRUCTLEAK" linux/config.kstep
+  linux/config.kstep.x86_64 2>/dev/null
+  └ 1 line...
+
+● Check linux-config target
+  $ cd /users/szhong/kSTEP && grep -A 10 "linux-config:" Makefile
+  └ 11 lines...
+
+Now let me write the driver and start building.
+
+● Check TUNABLESCALING enum
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:kernel/sched/sched.h | grep
+  "SCHED_TUNABLESCALING" | head -5
+  └ 1 line...
+
+● Find tunable scaling constants
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:kernel/sched/sched.h | grep
+  -i "tunable" | head -10
+  └ 3 lines...
+
+● Check tunable scaling enum
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:include/linux/sched/sysctl.h
+  | grep -i "SCALING\|TUNABLE" | head -10
+  └ 6 lines...
+
+Good. Now let me create the driver:
+
+● Create kmod/drivers/null_term_scaling.c (+106)
+
+Now let's checkout the buggy kernel and build:
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 703066188f63~1 null_term_scaling_buggy 2>&1 | tail
+   -5
+  └ 6 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=null_term_scaling_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=null_term_scaling_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Find correct mmap constants
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:include/linux/mman.h | head
+  -20; echo "---"; git -C linux/current grep "PROT_READ\b" -- include/uapi/asm-generic/mman-common.h
+   | head -5
+  └ 23 lines...
+
+● Edit kmod/drivers/null_term_scaling.c (+1)
+
+● Rebuild kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=null_term_scaling_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Check reset.c usage
+  $ cd /users/szhong/kSTEP && grep -n "last_decay_max_lb_cost" kmod/reset.c
+  └ 2 lines...
+
+● Check sched_domain fields
+  $ cd /users/szhong/kSTEP && git -C linux/current show
+  703066188f63~1:include/linux/sched/topology.h | grep "decay_max_lb_cost" | head -5
+  └ 2 lines...
+
+● Read kmod/reset.c lines 70-90
+  └ 21 lines read
+

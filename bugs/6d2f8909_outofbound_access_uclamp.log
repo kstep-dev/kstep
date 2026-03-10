@@ -123,3 +123,176 @@ Now let me check the kernel version and internal.h:
   grep -B5 -A15 "UCLAMP_BUCKETS"
   └ 29 lines...
 
+Now I have a clear picture. The bug: `uclamp_bucket_id(1024) = 1024/51 = 20` with 20 buckets (OOB), but with default 5 buckets the bug doesn't manifest. I need `CONFIG_UCLAMP_BUCKETS_COUNT=20`.
+
+Let me start the implementation:
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 6d2f8909a5fa~1 uclamp_oob_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+Now I need to configure with 20 uclamp buckets. Let me create the .config with the extra setting before building:
+
+● Generate initial .config
+  $ cd /users/szhong/kSTEP && ARCH=$(uname -m) && cd linux/uclamp_oob_buggy &&
+  ./scripts/kconfig/merge_config.sh -n ../../linux/config.kstep ../../linux/config.kstep.${ARCH}
+  2>&1 | tail -5
+  └ 4 lines...
+
+● Check current bucket count
+  $ cd /users/szhong/kSTEP/linux/uclamp_oob_buggy && grep "UCLAMP_BUCKETS" .config
+  └ 2 lines...
+
+● Set 20 uclamp buckets
+  $ cd /users/szhong/kSTEP/linux/uclamp_oob_buggy && sed -i
+  's/CONFIG_UCLAMP_BUCKETS_COUNT=5/CONFIG_UCLAMP_BUCKETS_COUNT=20/' .config && make olddefconfig
+  2>&1 | tail -5 && grep "UCLAMP_BUCKETS" .config && touch .config
+  └ 5 lines...
+
+Now let me write the driver and build:
+
+● Create kmod/drivers/uclamp_oob.c (+74)
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=uclamp_oob_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=uclamp_oob_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+Now run the test:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py uclamp_oob --linux_name uclamp_oob_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Check log output
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log 2>/dev/null || cat data/latest.log
+  2>/dev/null | head -30
+  └ 31 lines...
+
+● Check JSONL output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug triggers on buggy kernel. Now build and test the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 6d2f8909a5fa uclamp_oob_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+✗ Configure fixed kernel with 20 buckets
+  $ cd /users/szhong/kSTEP/linux/uclamp_oob_fixed && ./scripts/kconfig/merge_config.sh -n
+  ../../linux/config.kstep ../../linux/config.kstep.$(uname -m) 2>&1 | tail -3 && sed -i
+  's/CONFIG_UCLAMP_BUCKETS_COUNT=5/CONFIG_UCLAMP_BUCKETS_COUNT=20/' .config && make olddefconfig
+  2>&1 | tail -3 && grep "UCLAMP_BUCKETS" .config && touch .config
+  Command blocked: contains dangerous shell expansion patterns (e.g., parameter transformation,
+  indirect expansion, or nested command substitution) that could enable arbitrary code
+  execution. Please rewrite the command without these expansion patterns.
+
+● Generate .config for fixed kernel
+  $ cd /users/szhong/kSTEP/linux/uclamp_oob_fixed && ARCH=x86_64 &&
+  ./scripts/kconfig/merge_config.sh -n ../../linux/config.kstep ../../linux/config.kstep.x86_64 2>&1
+   | tail -3
+  └ 3 lines...
+
+● Set 20 buckets for fixed kernel
+  $ cd /users/szhong/kSTEP/linux/uclamp_oob_fixed && sed -i
+  's/CONFIG_UCLAMP_BUCKETS_COUNT=5/CONFIG_UCLAMP_BUCKETS_COUNT=20/' .config && make olddefconfig
+  2>&1 | tail -3 && grep "UCLAMP_BUCKETS" .config && touch .config
+  └ 5 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=uclamp_oob_fixed 2>&1 | tail -10
+  └ 11 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=uclamp_oob_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py uclamp_oob --linux_name uclamp_oob_fixed 2>&1 | tail -15
+  └ 16 lines...
+
+● Check fixed kernel output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug confirmed:
+- **Buggy**: `bucket_id=20 >= UCLAMP_BUCKETS=20` → FAIL (out-of-bounds)
+- **Fixed**: `bucket_id=19 < UCLAMP_BUCKETS=20` → PASS
+
+Now update TODO.md, reproduce.py, and commit:
+
+● Check reproduce.py end
+  $ cd /users/szhong/kSTEP && tail -5 reproduce.py
+  └ 6 lines...
+
+● Find TODO entry
+  $ cd /users/szhong/kSTEP && grep -n "6d2f8909a5fa" TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Check reproduce.py bug entries
+  $ cd /users/szhong/kSTEP && grep -n "reproduce.py\|Bug(" reproduce.py | tail -20
+  └ 21 lines...
+
+● See last entries in reproduce.py
+  $ cd /users/szhong/kSTEP && tail -30 reproduce.py | head -25
+  └ 26 lines...
+
+● See last Bug entry format
+  $ cd /users/szhong/kSTEP && sed -n '346,365p' reproduce.py
+  └ 20 lines...
+
+Now I need to check if the `Bug` format supports a kernel config override. Since the build requires `CONFIG_UCLAMP_BUCKETS_COUNT=20`, I need to handle this. Let me look at the `Linux` dataclass and `make_linux` to see if there's a config option:
+
+● Check Linux class
+  $ cd /users/szhong/kSTEP && grep -B5 -A20 "class Linux" reproduce.py | head -30
+  └ 1 line...
+
+● Check Linux dataclass
+  $ cd /users/szhong/kSTEP && grep -B5 -A20 "class Linux" checkout_linux.py run.py
+  └ 27 lines...
+
+There's a `config` field in the `Linux` class for an extra config fragment. I can create a config fragment file and reference it.
+
+● Check how config is used
+  $ cd /users/szhong/kSTEP && grep -A20 "def checkout_linux" checkout_linux.py | head -30
+  └ 22 lines...
+
+● Check make_linux for config handling
+  $ cd /users/szhong/kSTEP && grep -A30 "def make_linux" run.py | head -35
+  └ 32 lines...
+
+● Check reproduce.py main function
+  $ cd /users/szhong/kSTEP && grep -A40 "def main\b" reproduce.py | head -45
+  └ 42 lines...
+
+● Check reproduce function
+  $ cd /users/szhong/kSTEP && grep -B5 -A20 "def reproduce" reproduce.py
+  └ 25 lines...
+
+The `reproduce` function supports `linux.config` - an extra config fragment merged with the default. I'll create a config fragment for the 20 buckets setting:
+
+● Create linux/uclamp_oob.config (+2)
+
+Now update TODO.md and reproduce.py:
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+Now add the bug to reproduce.py:
+
+● Read reproduce.py lines 353-362
+  └ 8 lines read
+
+● Edit reproduce.py (+15)
+
+Now commit and push:
+

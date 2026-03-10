@@ -132,3 +132,19 @@
 
 ● Edit TODO.md (+1 -1)
 
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 6d337eab041d - requires
+  CONFIG_PREEMPT_RT (ARCH_SUPPORTS_RT unavailable on x86 at v5.10-rc1)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" && git push
+  └ 12 lines...
+
+**Skipped** `6d337eab041d`. The bug exists only in `migrate_disable()`/`migrate_enable()` code paths guarded by `#ifdef CONFIG_PREEMPT_RT`. At this kernel version (v5.10-rc1), `CONFIG_PREEMPT_RT` depends on `ARCH_SUPPORTS_RT` which is not available for x86_64, making the bug unreproducible with kSTEP.
+
+
+Total usage est:        6 Premium requests
+API time spent:         2m 52s
+Total session time:     3m 48s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      932.0k in, 9.6k out, 879.7k cached (Est. 6 Premium requests)

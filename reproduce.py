@@ -357,6 +357,21 @@ bugs = [
             Linux(name="fixed", version="5ebde09d9170"),
         ],
     ),
+    Bug(
+        driver=Driver(name="uclamp_oob", num_cpus=2),
+        linux=[
+            Linux(
+                name="buggy",
+                version="6d2f8909a5fa~1",
+                config=LINUX_ROOT_DIR / "uclamp_oob.config",
+            ),
+            Linux(
+                name="fixed",
+                version="6d2f8909a5fa",
+                config=LINUX_ROOT_DIR / "uclamp_oob.config",
+            ),
+        ],
+    ),
 ]
 
 
