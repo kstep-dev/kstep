@@ -1,0 +1,52 @@
+● Read bugs/96500560_avoid_double_calling_update_rq.md
+  └ 39 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 96500560f0c7 2>/dev/null | head -200
+  └ 160 lines...
+
+Let me examine the kernel code and existing drivers for reference.
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -60
+  └ 61 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/*.c | head -10
+  └ 11 lines...
+
+● Get rest of the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 96500560f0c7 | tail -100
+  └ 101 lines...
+
+● Read similar existing driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/balance_push_splice.c
+  └ 75 lines...
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 96500560f0c7~1 double_clock_buggy 2>&1 | tail -5
+  └ 1 line...
+
+● Check internal.h header
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/internal.h | head -50
+  └ 2 lines...
+
+● read_bash
+  └ 1 line...
+
+● Find internal.h
+  $ find /users/szhong/kSTEP/kmod -name "internal.h" 2>/dev/null
+  └ 2 lines...
+
+● read_bash
+  └ 1 line...
+
+● Read kmod/internal.h
+  └ 89 lines read
+
+● read_bash
+  └ 1 line...
+

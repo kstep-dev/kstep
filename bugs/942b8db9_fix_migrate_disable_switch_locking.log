@@ -4,41 +4,116 @@
 ● Read kmod/driver.h
   └ 110 lines read
 
-● Read the commit patch
+● Read the patch
   $ cd /users/szhong/kSTEP && git -C linux/current show -U32 942b8db96500 2>/dev/null | head -300
   └ 301 lines...
 
-● Read sample drivers
-  $ cd /users/szhong/kSTEP && cat kmod/drivers/*.c | head -200
-  └ 201 lines...
+Let me look at existing drivers for patterns and check what's available for migrate_disable.
 
 ● List existing drivers
-  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
-  └ 21 lines...
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -30
+  └ 31 lines...
 
-● Search for migration-related code
-  $ cd /users/szhong/kSTEP && grep -l "migrate_disable\|migration_disabled\|cpus_ptr\|cpus_mask"
-  kmod/*.c kmod/*.h 2>/dev/null
+● Find drivers using migrate
+  $ cd /users/szhong/kSTEP && grep -l "migrate" kmod/drivers/*.c 2>/dev/null
+  └ 7 lines...
+
+● Search for migrate_disable usage
+  $ cd /users/szhong/kSTEP && grep -rn "migrate_disable\|migration_disabled" kmod/ --include="*.c"
+  --include="*.h" | head -30
+  └ 31 lines...
+
+There's already a driver for this exact bug! Let me read it and check if it's already in reproduce.py.
+
+● Read kmod/drivers/migrate_disable_lock.c
+  └ 70 lines read
+
+● Check TODO status
+  $ cd /users/szhong/kSTEP && grep "942b8db9" TODO.md | head -5
   └ 2 lines...
 
-● Read kmod/internal.h
-  └ 89 lines read
-
-● Search migration-related code in kmod
-  $ cd /users/szhong/kSTEP && grep -n "migrate\|migration" kmod/isolation.c kmod/kthread.c
-  kmod/task.c 2>/dev/null | head -30
-  └ 2 lines...
-
-● Check KSYM_IMPORT mechanism
-  $ cd /users/szhong/kSTEP && grep -rn "KSYM_IMPORT\|ksym" kmod/ksym.h kmod/ksym.c 2>/dev/null |
-  head -30
+● Check if already in reproduce.py
+  $ cd /users/szhong/kSTEP && grep "migrate_disable_lock\|942b8db9" reproduce.py | head -10
   └ 1 line...
 
-● Read kthread module
-  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
-  └ 157 lines...
+● Find the atomic variable definition
+  $ cd /users/szhong/kSTEP && grep -rn "kstep_migrate_disable_pi_locked" --include="*.c"
+  --include="*.h" kmod/ scripts/ 2>/dev/null
+  └ 4 lines...
 
-● Read task module
-  $ cd /users/szhong/kSTEP && cat kmod/task.c
-  └ 113 lines...
+● Find all references to the variable
+  $ cd /users/szhong/kSTEP && grep -rn "kstep_migrate_disable_pi_locked" --include="*.c"
+  --include="*.h" --include="*.patch" . 2>/dev/null
+  └ 4 lines...
+
+● stop_bash
+  └ 1 line...
+
+● Check scripts directory
+  $ cd /users/szhong/kSTEP && find scripts/ -name "*.py" -o -name "*.sh" -o -name "*.patch"
+  2>/dev/null | head -20 && echo "---" && ls scripts/
+  └ 24 lines...
+
+● Search for the variable in scripts/linux
+  $ cd /users/szhong/kSTEP && grep -rn "kstep_migrate" scripts/ linux/ 2>/dev/null | head -20
+  └ 1 line...
+
+● stop_bash
+  └ 1 line...
+
+● Check kmod contents
+  $ cd /users/szhong/kSTEP && ls kmod/
+  └ 4 lines...
+
+● Find kstep_migrate in kmod
+  $ cd /users/szhong/kSTEP && find kmod/ -name "*.c" -o -name "*.h" | xargs grep -l "kstep_migrate"
+  2>/dev/null
+  └ 2 lines...
+
+● Check Makefile for build process
+  $ cd /users/szhong/kSTEP && cat Makefile | head -80
+  └ 80 lines...
+
+● Check checkout script
+  $ cd /users/szhong/kSTEP && cat checkout_linux.py
+  └ 123 lines...
+
+● Check linux-patch target
+  $ cd /users/szhong/kSTEP && grep -A 20 "linux-patch" Makefile
+  └ 31 lines...
+
+● Read kmod/main.c
+  └ 63 lines read
+
+● Read kmod/sym.c
+  └ 70 lines read
+
+● Read kmod/drivers/balance_push_splice.c
+  └ 74 lines read
+
+● Check how bp_splice_count is used
+  $ cd /users/szhong/kSTEP && grep -rn "kstep_bp_splice" --include="*.c" --include="*.h" kmod/ |
+  head -20
+  └ 5 lines...
+
+● Check kernel-side cov.c
+  $ cd /users/szhong/kSTEP && cat linux/cov.c
+  └ 13 lines...
+
+● Search for bp_splice in linux dir
+  $ cd /users/szhong/kSTEP && grep -rn "kstep_bp_splice_count" linux/ 2>/dev/null | head -10
+  └ 1 line...
+
+● stop_bash
+  └ 1 line...
+
+● Check exported symbols in main
+  $ cd /users/szhong/kSTEP && grep -rn "EXPORT_SYMBOL" kmod/main.c
+  └ 1 line...
+
+● Search for kernel instrumentation
+  $ cd /users/szhong/kSTEP && grep -rn
+  "kprobe\|register_kprobe\|kretprobe\|tracepoint\|register_trace" kmod/ --include="*.c"
+  --include="*.h" | grep -v "sym.c" | head -20
+  └ 12 lines...
 

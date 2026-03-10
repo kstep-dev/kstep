@@ -473,6 +473,13 @@ bugs = [
             Linux(name="fixed", version="91caa5ae2424"),
         ],
     ),
+    Bug(
+        driver=Driver(name="migrate_disable_lock", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="942b8db96500~1"),
+            Linux(name="fixed", version="942b8db96500"),
+        ],
+    ),
 ]
 
 

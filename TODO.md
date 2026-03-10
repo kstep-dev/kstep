@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 36/400 reproduced**
+**Total: 37/400 reproduced**
 
 ---
 
@@ -58,7 +58,7 @@
 - [ ] `8feb053d5319` sched: Fix trace_sched_switch(.prev_state) — [`8feb053d_fix_trace_sched_switch_prev.md`](bugs/8feb053d_fix_trace_sched_switch_prev.md)
 - [x] `91caa5ae2424` Fix the bug that task won't enqueue into core tree when update cookie — [`91caa5ae_fix_bug_that_task_wont.md`](bugs/91caa5ae_fix_bug_that_task_wont.md) <!-- driver:core_enqueue attempts:1 -->
 - [x] `91dabf33ae5d` sched: Fix race in task_call_func() — [`91dabf33_fix_race_task_call_func.md`](bugs/91dabf33_fix_race_task_call_func.md) <!-- driver:task_call_func_race attempts:1 -->
-- [ ] `942b8db96500` sched: Fix migrate_disable_switch() locking — [`942b8db9_fix_migrate_disable_switch_locking.md`](bugs/942b8db9_fix_migrate_disable_switch_locking.md)
+- [x] `942b8db96500` sched: Fix migrate_disable_switch() locking — [`942b8db9_fix_migrate_disable_switch_locking.md`](bugs/942b8db9_fix_migrate_disable_switch_locking.md) <!-- driver:migrate_disable_lock attempts:1 -->
 - [ ] `96500560f0c7` Avoid double calling update_rq_clock() in __balance_push_cpu_stop() — [`96500560_avoid_double_calling_update_rq.md`](bugs/96500560_avoid_double_calling_update_rq.md)
 - [ ] `9818427c6270` sched/debug: Make sd->flags sysctl read-only — [`9818427c_make_sd_flags_sysctl_readonly.md`](bugs/9818427c_make_sd_flags_sysctl_readonly.md)
 - [ ] `9864f5b5943a` cpuidle: Move trace_cpu_idle() into generic code — [`9864f5b5_move_trace_cpu_idle_into.md`](bugs/9864f5b5_move_trace_cpu_idle_into.md)
