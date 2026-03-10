@@ -1,0 +1,34 @@
+● Read AGENTS.md
+  └ 43 lines read
+
+● Read bugs/3ebb1b65_fix_preemption_string_of_preempt.md
+  └ 35 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 3ebb1b652239 2>/dev/null | head -200
+  └ 92 lines...
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Get kernel version info
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 3ebb1b652239~1 -1 2>/dev/null
+  └ 2 lines...
+
+● View a simple example driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/default.c
+  └ 58 lines...
+
+● View another example driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/freeze.c
+  └ 39 lines...
+
+● Get version info and examples
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 3ebb1b652239~1 -5 && grep -r
+  "LINUX_VERSION_CODE" kmod/drivers/ | head -5
+  └ 11 lines...
+

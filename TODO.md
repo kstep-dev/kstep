@@ -25,7 +25,7 @@
 - [ ] `3a7956e25e1d` kthread: Fix PF_KTHREAD vs to_kthread() race — [`3a7956e2_kthread_fix_pf_kthread_vs.md`](bugs/3a7956e2_kthread_fix_pf_kthread_vs.md)
 - [ ] `3ebb1b652239` Fix preemption string of preempt_dynamic_none — [`3ebb1b65_fix_preemption_string_of_preempt.md`](bugs/3ebb1b65_fix_preemption_string_of_preempt.md)
 - [ ] `42dc938a590c` sched/core: Mitigate race cpus_share_cache()/update_top_cache_domain() — [`42dc938a_mitigate_race_cpus_share_cache.md`](bugs/42dc938a_mitigate_race_cpus_share_cache.md)
-- [ ] `494dcdf46e5c` sched: Fix build warning without CONFIG_SYSCTL — [`494dcdf4_fix_build_warning_without_config.md`](bugs/494dcdf4_fix_build_warning_without_config.md)
+- [-] `494dcdf46e5c` sched: Fix build warning without CONFIG_SYSCTL — [`494dcdf4_fix_build_warning_without_config.md`](bugs/494dcdf4_fix_build_warning_without_config.md) <!-- skipped:build-time-compiler-warning-not-runtime-bug attempts:1 -->
 - [ ] `505da6689305` sched/clock: Avoid false sharing for sched_clock_irqtime — [`505da668_sched_clock_avoid_false_sharing.md`](bugs/505da668_sched_clock_avoid_false_sharing.md)
 - [ ] `5324953c06bd` Fix wakeup_preempt's next_class tracking — [`5324953c_fix_wakeup_preempts_next_class.md`](bugs/5324953c_fix_wakeup_preempts_next_class.md)
 - [ ] `565790d28b1e` sched: Fix balance_callback() — [`565790d2_fix_balance_callback.md`](bugs/565790d2_fix_balance_callback.md)

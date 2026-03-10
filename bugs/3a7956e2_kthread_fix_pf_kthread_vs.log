@@ -1,0 +1,22 @@
+● Read AGENTS.md
+  └ 43 lines read
+
+● Read bugs/3a7956e2_kthread_fix_pf_kthread_vs.md
+  └ 42 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 3a7956e25e1d 2>/dev/null | head -300
+  └ 301 lines...
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Check scheduler changes in patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 3a7956e25e1d -- kernel/sched/
+  2>/dev/null | head -200
+  └ 183 lines...
+

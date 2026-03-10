@@ -1,0 +1,19 @@
+● Read bugs/494dcdf4_fix_build_warning_without_config.md
+  └ 35 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 494dcdf46e5c 2>&1 | head -120
+  └ 121 lines...
+
+This is a **build-time compiler warning**, not a runtime scheduler bug. There's no runtime behavior to reproduce with kSTEP. I'll mark it as skipped.
+
+● Find the TODO entry
+  $ cd /users/szhong/kSTEP && grep -n '494dcdf46e5c' TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+

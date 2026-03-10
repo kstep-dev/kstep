@@ -1,0 +1,10 @@
+● Read bugs/42dc938a_mitigate_race_cpus_share_cache.md
+  └ 38 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 42dc938a590c 2>/dev/null | head -200
+  └ 109 lines...
+
