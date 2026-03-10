@@ -90,9 +90,9 @@ void kstep_reset_runqueues(void) {
 }
 
 void kstep_reset_cpumask(void) {
-  KSYM_IMPORT_TYPED(int, distribute_cpu_mask_prev);
 // https://github.com/torvalds/linux/commit/46a87b3851f0d6eb05e6d83d5c5a30df0eca8f76
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
+  KSYM_IMPORT_TYPED(int, distribute_cpu_mask_prev);
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     int *ptr = per_cpu_ptr(KSYM_distribute_cpu_mask_prev, cpu);
     *ptr = 0;

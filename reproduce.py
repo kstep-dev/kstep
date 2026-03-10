@@ -716,6 +716,21 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="vtime_warn"),
+        linux=[
+            Linux(
+                name="buggy",
+                version="f1dfdab694eb~1",
+                config=LINUX_ROOT_DIR / "nohz_full.config",
+            ),
+            Linux(
+                name="fixed",
+                version="f1dfdab694eb",
+                config=LINUX_ROOT_DIR / "nohz_full.config",
+            ),
+        ],
+    ),
 ]
 
 
