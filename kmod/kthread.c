@@ -40,6 +40,7 @@ static struct kstep_kthread *kt_find(struct task_struct *p) {
     if (pool[i].allocated && pool[i].task == p)
       return &pool[i];
   panic("kstep: task %d (%s) is not a managed kthread", p->pid, p->comm);
+  return NULL;
 }
 
 /* ---- thread function ---- */
