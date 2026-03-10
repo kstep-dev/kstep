@@ -94,8 +94,14 @@ static void run(void)
 	}
 	TRACE_INFO("Registered kprobe on hrtick at %pS", hrtick_kp.addr);
 
-	// Enable hrtick via sched features debugfs
-	kstep_write("/sys/kernel/debug/sched/features", "HRTICK", 6);
+	// Enable hrtick via sched_features bitmask
+	{
+		unsigned int *feat = kstep_ksym_lookup("sysctl_sched_features");
+		if (!feat)
+			panic("Failed to find sysctl_sched_features");
+		*feat |= (1U << __SCHED_FEAT_HRTICK);
+		TRACE_INFO("Enabled HRTICK sched feature (features=0x%x)", *feat);
+	}
 
 	// Create CFS thread on CPU 1
 	cfs_thread = kthread_create(cfs_thread_fn, NULL, "hrtick_cfs");

@@ -1,19 +1,17 @@
 // Reproduce: sched: Fix race against ptrace_freeze_trace()
 // https://github.com/torvalds/linux/commit/d136122f5845
 //
-// Bug: In __schedule(), prev->state is read BEFORE rq->lock (READ 1), then
-// double-checked AFTER the lock (prev_state == prev->state). If the state
-// changes between reads, the double-check fails and deactivate_task() is
-// skipped. The task stays on_rq with a sleeping state.
+// Bug: __schedule() reads prev->state BEFORE rq->lock (READ 1), then
+// double-checks (prev_state == prev->state) AFTER. ptrace_freeze_traced()
+// can change state between reads, failing the double-check and skipping
+// deactivate_task(). Task stays on_rq with a sleeping state.
 //
 // Fix: Read prev->state once AFTER rq->lock; use control dependency.
 //
-// Strategy: A kprobe on update_rq_clock fires between READ 1 and the
-// double-check on the buggy kernel. It toggles the target's state between
-// TASK_INTERRUPTIBLE and TASK_UNINTERRUPTIBLE each time. On the buggy
-// kernel, this creates an infinite loop where the task is never deactivated
-// (toggle_count grows). On the fixed kernel, the single read sees the
-// toggled (still non-zero) state and deactivates correctly (toggle_count=1).
+// Strategy: A kprobe on update_rq_clock toggles the target's sleeping state
+// each time __schedule runs on CPU 1. On the buggy kernel, the double-check
+// fails repeatedly (many toggles). On the fixed kernel, the single read
+// after the kprobe sees non-zero state and deactivates immediately.
 
 #include "driver.h"
 #include "internal.h"
@@ -25,7 +23,7 @@
 static struct task_struct *target;
 static volatile bool armed;
 static struct kprobe kp;
-static int toggle_count;
+static volatile int toggle_count;
 
 static int kp_pre(struct kprobe *p, struct pt_regs *regs)
 {
@@ -54,45 +52,46 @@ static void setup(void)
 target = kstep_kthread_create("target");
 kstep_kthread_bind(target, cpumask_of(1));
 kstep_kthread_start(target);
-
-kp.symbol_name = "update_rq_clock";
-kp.pre_handler = kp_pre;
-int ret = register_kprobe(&kp);
-if (ret < 0)
-pr_err("ptrace_freeze: register_kprobe failed: %d\n", ret);
-else
-TRACE_INFO("kprobe on update_rq_clock registered");
 }
 
 static void run(void)
 {
 kstep_tick_repeat(5);
 
-// Block target: enters wait_event -> set_current_state(TASK_INTERRUPTIBLE)
-// -> schedule() -> __schedule(preempt=false)
+// Block target: it will call wait_event -> schedule()
 kstep_kthread_block(target);
 
-// Arm kprobe to toggle state during __schedule
+// Register kprobe now (after initial ticks to avoid interference)
+kp.symbol_name = "update_rq_clock";
+kp.pre_handler = kp_pre;
+int ret = register_kprobe(&kp);
+if (ret < 0) {
+kstep_fail("register_kprobe failed: %d", ret);
+return;
+}
+TRACE_INFO("kprobe registered, arming");
+
+// Arm and tick
 armed = true;
-
-// Tick to let target call schedule(); kprobe toggles state in the window
 kstep_tick_repeat(10);
-
 armed = false;
+
+int tc = toggle_count;
+int on_rq = READ_ONCE(target->on_rq);
+long state = READ_ONCE(target->state);
+
 unregister_kprobe(&kp);
 
 TRACE_INFO("result: toggle_count=%d on_rq=%d state=0x%lx",
-   toggle_count, target->on_rq, target->state);
+   tc, on_rq, state);
 
-// On buggy kernel: many toggles (double-check kept failing)
-// On fixed kernel: 1-2 toggles (deactivation succeeded immediately)
-if (toggle_count >= 5) {
+// Buggy: many toggles (double-check kept failing, blocking deactivation)
+// Fixed: few toggles (deactivation succeeded on first schedule)
+if (tc >= 5) {
 kstep_fail("ptrace race: toggle_count=%d "
-   "(double-check prevented deactivation repeatedly)",
-   toggle_count);
+   "(double-check prevented deactivation)", tc);
 } else {
-kstep_pass("task deactivated correctly (toggle_count=%d)",
-   toggle_count);
+kstep_pass("task deactivated correctly (toggle_count=%d)", tc);
 }
 }
 

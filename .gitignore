@@ -23,3 +23,6 @@ __pycache__
 
 # Corpus
 /data/corpus/*.json
+
+# Bug reproduction logs
+bugs/*.log
