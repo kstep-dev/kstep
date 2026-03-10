@@ -74,7 +74,8 @@ static void kstep_reset_runqueue(struct rq *rq) {
     sd->nr_balance_failed = 0;
     sd->max_newidle_lb_cost = 0;
 // https://github.com/torvalds/linux/commit/e60b56e46b384cee1ad34e6adc164d883049c6c3
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
+// Note: dev kernels v5.15-rc+ already have the rename before 5.16 release
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0)
     sd->last_decay_max_lb_cost = jiffies;
 #else
     sd->next_decay_max_lb_cost = jiffies;

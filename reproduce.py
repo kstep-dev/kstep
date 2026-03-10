@@ -291,6 +291,13 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="cpus_share_cache", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="42dc938a590c~1"),
+            Linux(name="fixed", version="42dc938a590c"),
+        ],
+    ),
 ]
 
 
