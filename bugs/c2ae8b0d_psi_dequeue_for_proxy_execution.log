@@ -389,7 +389,70 @@ Now add to reproduce.py:
 
 Now commit and push:
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    ● Check sched_set_fifo export
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git add -A && git status --short
+  └ 8 lines...
+
+● Check all changes
+  $ cd /users/szhong/kSTEP && git --no-pager diff --name-only HEAD
+  └ 7 lines...
+
+● Check driver diff
+  $ cd /users/szhong/kSTEP && git --no-pager diff kmod/drivers/psi_dequeue_proxy.c | head -5
+  └ 1 line...
+
+● Check driver content
+  $ cd /users/szhong/kSTEP && head -30 kmod/drivers/psi_dequeue_proxy.c
+  └ 31 lines...
+
+● Check staged diff
+  $ cd /users/szhong/kSTEP && git --no-pager diff --cached kmod/drivers/psi_dequeue_proxy.c | head
+  -30
+  └ 1 line...
+
+● Check last commit for driver
+  $ cd /users/szhong/kSTEP && git --no-pager log --oneline -1 -- kmod/drivers/psi_dequeue_proxy.c
+  └ 2 lines...
+
+● Check HEAD version of driver
+  $ cd /users/szhong/kSTEP && git --no-pager show HEAD:kmod/drivers/psi_dequeue_proxy.c | head -30
+  └ 31 lines...
+
+The driver was already committed in the previous batch. I just need to commit the TODO.md and reproduce.py updates.
+
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git add TODO.md reproduce.py && git --no-pager diff --cached --stat
+  └ 8 lines...
+
+● Git commit
+  $ cd /users/szhong/kSTEP && git commit -m "reproduce: psi_dequeue_proxy (c2ae8b0df2d1)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>&1
+  └ 3 lines...
+
+● Git push
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced and committed. Here's the summary:
+
+**Bug**: `psi_dequeue()` returns early on `DEQUEUE_SLEEP` without clearing `TSK_RUNNING`, assuming `psi_task_switch()` will handle it. Proxy Execution violates this assumption.
+
+**Reproduction**: 
+- Start kthread on CPU 1 → `psi_flags=0x14` (TSK_RUNNING|TSK_ONCPU)
+- Clear TSK_ONCPU via `psi_task_change` (simulating proxy switch-off) → `psi_flags=0x4`
+- Dequeue with `DEQUEUE_SLEEP`
+- **Buggy**: `psi_flags=0x4` (TSK_RUNNING not cleared) ❌
+- **Fixed**: `psi_flags=0x0` (properly cleared) ✅
+
+
+Total usage est:        6 Premium requests
+API time spent:         9m 46s
+Total session time:     23m 27s
+Total code changes:     +48 -36
+Breakdown by AI model:
+ claude-opus-4.6-1m      5.8m in, 29.1k out, 5.7m cached (Est. 6 Premium requests)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ● Check sched_set_fifo export
   $ cd /users/szhong/kSTEP && git -C linux/current grep
   "EXPORT_SYMBOL.*sched_set_fifo\|EXPORT_SYMBOL.*sched_set" c2ae8b0df2d1~1 -- kernel/sched/
   2>/dev/null | head -5
@@ -578,3 +641,106 @@ Good, the fixed kernel is checked out. Let me update the symlink and build:
   tail -3)
   └ 1 line...
 
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 4 lines...
+
+● Setup and build fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py c2ae8b0df2d1 psi_dequeue_proxy_fixed 2>&1 | tail
+  -3 && make linux LINUX_NAME=psi_dequeue_proxy_fixed 2>&1 | tail -5
+  └ 9 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=psi_dequeue_proxy_fixed 2>&1 | tail -10
+  └ 11 lines...
+
+● Run driver on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py psi_dequeue_proxy --linux_name psi_dequeue_proxy_fixed 2>&1 |
+   tail -15
+  └ 16 lines...
+
+● Check output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+The fixed kernel passes. Let me also verify the buggy kernel still shows the failure by re-running:
+
+● Re-verify buggy kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=psi_dequeue_proxy_buggy 2>&1 | tail -3 &&
+  ./run.py psi_dequeue_proxy --linux_name psi_dequeue_proxy_buggy 2>&1 | grep -E
+  "psi_flags|inconsistent|status|Exiting"
+  └ 9 lines...
+
+● Check buggy output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug successfully reproduced:
+- **Buggy kernel**: `psi_flags=0x4` after DEQUEUE_SLEEP (TSK_RUNNING not cleared) → FAIL ✓
+- **Fixed kernel**: `psi_flags=0x0` after DEQUEUE_SLEEP (flags properly cleared) → PASS ✓
+
+Now let me update reproduce.py, TODO.md, commit and push:
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && tail -5 reproduce.py
+  └ 6 lines...
+
+● Find TODO entry
+  $ cd /users/szhong/kSTEP && grep "c2ae8b0df2d1" TODO.md
+  └ 2 lines...
+
+● Check Bug entry format
+  $ cd /users/szhong/kSTEP && grep -A5 "Bug(" reproduce.py | tail -20
+  └ 21 lines...
+
+The bug is already in reproduce.py. Now let me check the current TODO count and commit:
+
+● Count reproduced bugs
+  $ cd /users/szhong/kSTEP && grep -c "^\- \[x\]" TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+Good, the count is already correct at 51. Let me check what needs to be committed:
+
+● Check changes to commit
+  $ cd /users/szhong/kSTEP && git --no-pager diff --stat
+  └ 6 lines...
+
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git --no-pager diff --stat --cached
+  └ 1 line...
+
+● Check full git status
+  $ cd /users/szhong/kSTEP && git --no-pager status --short | head -20
+  └ 6 lines...
+
+● Check recent commits
+  $ cd /users/szhong/kSTEP && git --no-pager log --oneline -5
+  └ 6 lines...
+
+The commit was already made by a previous session! The bug is already reproduced and committed. Let me verify everything is pushed:
+
+● Check unpushed commits
+  $ cd /users/szhong/kSTEP && git --no-pager log --oneline origin/bugs..HEAD
+  └ 1 line...
+
+Everything is already committed and pushed. The bug reproduction is complete:
+
+**Summary:**
+- **Bug**: `psi_dequeue()` unconditionally returns early on `DEQUEUE_SLEEP`, leaving `TSK_RUNNING` set for proxy execution tasks
+- **Driver**: `psi_dequeue_proxy` — creates two kthreads on CPU 1 (CFS target + FIFO preemptor), forces preemption so target has `TSK_RUNNING` without `TSK_ONCPU`, then dequeues with `DEQUEUE_SLEEP`
+- **Buggy kernel**: `psi_flags=0x4` after dequeue (TSK_RUNNING not cleared) → triggers "psi: inconsistent task state!"
+- **Fixed kernel**: `psi_flags=0x0` after dequeue (properly cleared) → no error
+
+
+Total usage est:        6 Premium requests
+API time spent:         28m 38s
+Total session time:     1h 1m 33s
+Total code changes:     +156 -12
+Breakdown by AI model:
+ claude-opus-4.6-1m      17.4m in, 84.7k out, 17.2m cached (Est. 6 Premium requests)

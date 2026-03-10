@@ -187,3 +187,204 @@ I'll use a kprobe on `update_rq_clock` (called between the two reads) to determi
 
 Now let me build and test on the buggy kernel:
 
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ptrace_freeze_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Check build errors
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ptrace_freeze_buggy 2>&1 | grep -i "error" |
+  head -20
+  └ 6 lines...
+
+● Check detailed build error
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ptrace_freeze_buggy 2>&1 | grep -B5
+  "thunk_64\|Error" | head -30
+  └ 17 lines...
+
+● Check existing kernel checkouts
+  $ cd /users/szhong/kSTEP && ls linux/ | head -20
+  └ 21 lines...
+
+● Check existing builds
+  $ cd /users/szhong/kSTEP && ls build/ | head -20
+  └ 21 lines...
+
+● Read Makefile build process
+  $ cd /users/szhong/kSTEP && cat Makefile | head -100
+  └ 100 lines...
+
+● Find kernel versions of existing checkouts
+  $ cd /users/szhong/kSTEP && for d in linux/*/; do v=$(head -5 "$d/Makefile" 2>/dev/null | grep
+  "VERSION\|PATCHLEVEL\|SUBLEVEL" | awk '{print $3}' | tr '\n' '.'); echo "$d: $v"; done 2>/dev/null
+   | grep "5\.\|4\." | sort | head -20
+  └ 21 lines...
+
+● Check if 5.8 builds exist
+  $ cd /users/szhong/kSTEP && ls build/ | grep -i "5.8\|ptrace" | head -10
+  └ 1 line...
+
+● Check kernel config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | grep -i "PREEMPT\|KPROBE\|FTRACE\|OBJTOOL" |
+  head -20
+  └ 4 lines...
+
+● Check x86_64 config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep.x86_64
+  └ 6 lines...
+
+The build issue is a known objtool incompatibility with kernel 5.8 and newer toolchains. Let me try to fix it:
+
+● Check thunk_64.S
+  $ cd /users/szhong/kSTEP/linux/ptrace_freeze_buggy && cat arch/x86/entry/thunk_64.S | head -30
+  └ 31 lines...
+
+● Check objtool
+  $ cd /users/szhong/kSTEP/linux/ptrace_freeze_buggy && tools/objtool/objtool --version 2>/dev/null
+  || echo "objtool not found"
+  └ 8 lines...
+
+● Check thunk_64.o symbol table
+  $ cd /users/szhong/kSTEP/linux/ptrace_freeze_buggy && readelf -s arch/x86/entry/thunk_64.o 2>&1 |
+  head -5
+  └ 2 lines...
+
+● Check assembler version
+  $ cd /users/szhong/kSTEP/linux/ptrace_freeze_buggy && as --version | head -1
+  └ 2 lines...
+
+● Read checkout_linux.py
+  $ cd /users/szhong/kSTEP && cat checkout_linux.py
+  └ 123 lines...
+
+● Check for patches
+  $ cd /users/szhong/kSTEP && ls linux/*.patch 2>/dev/null; ls scripts/*.patch 2>/dev/null; ls
+  linux/patches/ 2>/dev/null
+  └ 3 lines...
+
+● Read objtool patch
+  $ cd /users/szhong/kSTEP && cat linux/objtool_symtab.patch
+  └ 14 lines...
+
+There's already a patch for this. Let me apply it:
+
+● Apply objtool patch
+  $ cd /users/szhong/kSTEP/linux/ptrace_freeze_buggy && patch -p1 --forward --batch <
+  ../objtool_symtab.patch 2>&1
+  └ 2 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ptrace_freeze_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Kernel built. Now build kstep and run:
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=ptrace_freeze_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Build succeeded! Now let's run on the buggy kernel:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py ptrace_freeze --linux_name ptrace_freeze_buggy 2>&1 | tail
+  -30
+  └ 31 lines...
+
+● Check boot log
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | head -60
+  └ 2 lines...
+
+● Check log
+  $ cd /users/szhong/kSTEP && cat data/latest.log | head -60
+  └ 61 lines...
+
+● Run with filtered output
+  $ cd /users/szhong/kSTEP && ./run.py ptrace_freeze --linux_name ptrace_freeze_buggy 2>&1 | grep -E
+   "kstep|ptrace|target|kprobe|TRACE|fail|pass|panic|BUG|driver" | head -30
+  └ 15 lines...
+
+● Check cov.c
+  $ cd /users/szhong/kSTEP && cat linux/cov.c | head -60
+  └ 13 lines...
+
+● Check if cov patched in
+  $ cd /users/szhong/kSTEP && grep -n "cov.c\|cov.o\|sanitize"
+  linux/ptrace_freeze_buggy/kernel/Makefile 2>/dev/null | head -10
+  └ 7 lines...
+
+● Check sched Makefile
+  $ cd /users/szhong/kSTEP && grep -n "cov\|sanitize"
+  linux/ptrace_freeze_buggy/kernel/sched/Makefile 2>/dev/null
+  └ 3 lines...
+
+● Check if patches were duplicated
+  $ cd /users/szhong/kSTEP && tail -5 linux/ptrace_freeze_buggy/kernel/Makefile && echo "---" &&
+  tail -5 linux/ptrace_freeze_buggy/kernel/sched/Makefile
+  └ 12 lines...
+
+● Check memory allocator and ACPI config
+  $ cd /users/szhong/kSTEP && cat linux/ptrace_freeze_buggy/.config | grep
+  "SLAB\|SLUB\|SLAB_FREELIST\|KCOV\|ACPI=\|KASAN" | head -10
+  └ 11 lines...
+
+● Check preemption config
+  $ cd /users/szhong/kSTEP && cat linux/ptrace_freeze_buggy/.config | grep "PREEMPT" | head -10
+  └ 5 lines...
+
+● Check full crash trace
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -A 50 "BUG:" | head -60
+  └ 1 line...
+
+● List recent logs
+  $ cd /users/szhong/kSTEP && ls -lt data/logs/ | head -5
+  └ 6 lines...
+
+● Check full crash trace from our run
+  $ cd /users/szhong/kSTEP && grep -A 60 "BUG:" data/logs/log-20260310_135112.log | head -80
+  └ 1 line...
+
+● Find crash info in log
+  $ cd /users/szhong/kSTEP && grep "BUG\|panic\|fault\|get_map\|Oops\|Call Trace\|RIP"
+  data/logs/log-20260310_135112.log | head -20
+  └ 4 lines...
+
+● Find our log file
+  $ cd /users/szhong/kSTEP && ls -lt data/logs/ | grep "13:50\|13:51" | head -10
+  └ 10 lines...
+
+● Find our log
+  $ cd /users/szhong/kSTEP && grep "ptrace_freeze\|driver=" data/logs/log-20260310_135021.log | head
+   -3
+  └ 4 lines...
+
+● Check crash details in our log
+  $ cd /users/szhong/kSTEP && grep "BUG\|panic\|fault\|Oops\|Call Trace\|RIP\|get_map\|acpi\|kmem"
+  data/logs/log-20260310_135021.log | head -30
+  └ 27 lines...
+
+The crash is a pre-existing ACPI/SLUB issue in 5.8-rc6. Let me try booting with ACPI disabled:
+
+● Run with ACPI off
+  $ cd /users/szhong/kSTEP && ./run.py ptrace_freeze --linux_name ptrace_freeze_buggy
+  --kernel_params acpi=off 2>&1 | grep -E
+  "kstep|ptrace|target|kprobe|TRACE|fail|pass|panic|BUG|driver|version|on_rq" | head -30
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Stop shell
+  └ 1 line...
+
+● Check latest log
+  $ cd /users/szhong/kSTEP && ls -lt data/logs/ | head -5
+  └ 6 lines...
+
+● Check log output
+  $ cd /users/szhong/kSTEP && grep "ptrace_freeze\|panic\|BUG\|Oops\|kstep\|target\|kprobe\|on_rq\|f
+  ail\|pass\|driver=\|insmod\|Loading" data/logs/log-20260310_135249.log | head -20
+  └ 9 lines...
+
+● Check end of log
+  $ cd /users/szhong/kSTEP && tail -30 data/logs/log-20260310_135249.log
+  └ 31 lines...
+

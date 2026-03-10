@@ -373,3 +373,126 @@ Build succeeded. Now let's run the driver on the buggy kernel:
   --kernel_params "acpi=noirq" 2>&1 | tail -10
   └ 11 lines...
 
+● Check current and rebuild
+  $ cd /users/szhong/kSTEP && readlink linux/current && make kstep LINUX_NAME=rseq_cpu_id_fork_buggy
+   2>&1 | tail -5
+  └ 7 lines...
+
+● Check all errors
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=rseq_cpu_id_fork_buggy 2>&1 | grep "error:" |
+  head -5
+  └ 4 lines...
+
+● Check ptrace_freeze version guard
+  $ cd /users/szhong/kSTEP && grep "LINUX_VERSION\|KERNEL_VERSION" kmod/drivers/ptrace_freeze.c |
+  head -3
+  └ 2 lines...
+
+● Check ptrace_freeze includes
+  $ cd /users/szhong/kSTEP && grep -n "cpu_rq\|internal.h" kmod/drivers/ptrace_freeze.c | head -5
+  └ 2 lines...
+
+● Check ptrace_freeze header
+  $ cd /users/szhong/kSTEP && head -5 kmod/drivers/ptrace_freeze.c
+  └ 6 lines...
+
+● Check ptrace_freeze includes
+  $ cd /users/szhong/kSTEP && grep -n "#include" kmod/drivers/ptrace_freeze.c | head -5
+  └ 4 lines...
+
+● Edit kmod/drivers/ptrace_freeze.c (+1)
+
+● Rebuild kSTEP
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=rseq_cpu_id_fork_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+Now let me try with `acpi=noirq`:
+
+● Run with acpi=noirq
+  $ cd /users/szhong/kSTEP && ./run.py rseq_cpu_id_fork --linux_name rseq_cpu_id_fork_buggy
+  --kernel_params "acpi=noirq" 2>&1 | tail -10
+  └ 11 lines...
+
+● Check SMP with acpi=noirq
+  $ cd /users/szhong/kSTEP && ls -lt data/logs/*.log | head -1 | awk '{print $NF}' | xargs grep -E
+  "Allowing|Brought|nr_cpu_ids|SMP"
+  └ 9 lines...
+
+● Read checkout script
+  $ cd /users/szhong/kSTEP && cat checkout_linux.py
+  └ 123 lines...
+
+● Check Makefile linux target
+  $ cd /users/szhong/kSTEP && head -20 Makefile | grep -A5 "linux"
+  └ 13 lines...
+
+● Check linux build target
+  $ cd /users/szhong/kSTEP && grep -A20 "^linux:" Makefile
+  └ 22 lines...
+
+● Read kstep config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | head -50
+  └ 51 lines...
+
+● Check SLUB and ACPI in config
+  $ cd /users/szhong/kSTEP && grep "SLUB\|SLAB\|ACPI" linux/config.kstep
+  └ 2 lines...
+
+● Disable SLUB_DEBUG and update config
+  $ cd /users/szhong/kSTEP/linux/rseq_cpu_id_fork_buggy && sed -i 's/CONFIG_SLUB_DEBUG=y/#
+  CONFIG_SLUB_DEBUG is not set/' .config && make olddefconfig 2>&1 | tail -3
+  └ 4 lines...
+
+● Rebuild kernel without SLUB_DEBUG
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=rseq_cpu_id_fork_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kSTEP
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=rseq_cpu_id_fork_buggy 2>&1 | tail -5
+  └ 3 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py rseq_cpu_id_fork --linux_name rseq_cpu_id_fork_buggy 2>&1 |
+  tail -15
+  └ 16 lines...
+
+● Check JSON output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+The bug triggered on the buggy kernel — `rseq_event_mask` is `0x2` (SIGNAL only, no MIGRATE bit). Now let me verify it's fixed on the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py ce3614daabea rseq_cpu_id_fork_fixed 2>&1 | tail -3
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 4 lines...
+
+● Read shell output: Waiting up to 5 seconds for command output
+  └ 1 line...
+
+● Apply patches to fixed kernel
+  $ cd /users/szhong/kSTEP && cd linux/rseq_cpu_id_fork_fixed && git apply ../objtool_symtab.patch
+  2>&1 && sed -i 's/CONFIG_SLUB_DEBUG=y/# CONFIG_SLUB_DEBUG is not set/' .config 2>/dev/null; echo
+  "done"
+  └ 2 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=rseq_cpu_id_fork_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kSTEP for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=rseq_cpu_id_fork_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py rseq_cpu_id_fork --linux_name rseq_cpu_id_fork_fixed 2>&1 |
+  tail -15
+  └ 16 lines...
+
+● Disable SLUB_DEBUG in fixed kernel
+  $ cd /users/szhong/kSTEP/linux/rseq_cpu_id_fork_fixed && sed -i 's/CONFIG_SLUB_DEBUG=y/#
+  CONFIG_SLUB_DEBUG is not set/' .config && make olddefconfig 2>&1 | tail -3
+  └ 4 lines...
+

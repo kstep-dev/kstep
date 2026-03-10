@@ -16,6 +16,7 @@
 // the fixed kernel the single-read logic correctly deactivates the task.
 
 #include "driver.h"
+#include "internal.h"
 #include <linux/kprobes.h>
 #include <linux/version.h>
 
