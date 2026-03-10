@@ -337,3 +337,139 @@ The bug triggers on the buggy kernel - `resched_seen=0` after 30 ticks with `cor
   └ 23 lines...
 
 I see - the detection needs to happen after the tick, not before. On the fixed kernel, `prev_sum_exec_runtime` changes (showing reschedules happened), but `need_resched` is cleared before the next tick's `on_tick_begin`. Let me use `on_tick_end` instead:
+
+● Edit kmod/drivers/forceidle_starvation.c (+5 -4)
+
+● Edit kmod/drivers/forceidle_starvation.c (+2 -2)
+
+● Build and run on fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=forceidle_starvation_fixed 2>&1 | tail -5 &&
+  ./run.py forceidle_starvation --linux_name forceidle_starvation_fixed --num_cpus 3 2>&1 | tail -5
+  └ 11 lines...
+
+● Check fixed kernel output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl && echo "---" && cat data/latest.log | grep -E
+  "tick_end|Initial|After 30|core_force|Core sched" | head -20
+  └ 23 lines...
+
+I see - `core_forceidle` gets cleared by `pick_next_task()` during the reschedule. I need to either re-set it each tick or detect the reschedule differently. Let me re-set `core_forceidle` after each tick and detect changes in `prev_sum_exec_runtime`:
+
+● Edit kmod/drivers/forceidle_starvation.c (+9 -4)
+
+Now rebuild and test both kernels:
+
+● Build and run fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=forceidle_starvation_fixed 2>&1 | tail -3 &&
+  ./run.py forceidle_starvation --linux_name forceidle_starvation_fixed --num_cpus 3 2>&1 | tail -3
+  └ 7 lines...
+
+● Check fixed result
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Fixed kernel passes. Now verify the buggy kernel still fails:
+
+● Build and run buggy kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=forceidle_starvation_buggy 2>&1 | tail -3 &&
+  ./run.py forceidle_starvation --linux_name forceidle_starvation_buggy --num_cpus 3 2>&1 | tail -3
+  └ 7 lines...
+
+● Check buggy result
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug reproduces on buggy kernel (fail) and is fixed on fixed kernel (pass). Now let me update TODO.md, reproduce.py, and commit:
+
+● Find TODO entry
+  $ cd /users/szhong/kSTEP && grep "8039e96fcc1d" TODO.md
+  └ 2 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Count reproduced bugs
+  $ cd /users/szhong/kSTEP && grep -c "\- \[x\]" TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+
+Now add to reproduce.py:
+
+● Check reproduce.py end
+  $ cd /users/szhong/kSTEP && tail -30 reproduce.py
+  └ 31 lines...
+
+● Find bugs list
+  $ cd /users/szhong/kSTEP && grep -n "^bugs = \[" reproduce.py
+  └ 2 lines...
+
+● Find end of bugs list
+  $ cd /users/szhong/kSTEP && grep -n "^]" reproduce.py | head -3
+  └ 2 lines...
+
+● Read reproduce.py lines 398-403
+  └ 6 lines read
+
+● Edit reproduce.py (+7)
+
+Now commit and push:
+
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git add -A && git --no-pager diff --cached --stat
+  └ 9 lines...
+
+● Stage only my changes
+  $ cd /users/szhong/kSTEP && git reset HEAD && git add kmod/drivers/forceidle_starvation.c
+  kmod/drivers/reject_affinity.c reproduce.py TODO.md && git --no-pager diff --cached --stat
+  └ 13 lines...
+
+● Check reject_affinity changes
+  $ cd /users/szhong/kSTEP && git --no-pager diff kmod/drivers/reject_affinity.c | head -20
+  └ 1 line...
+
+● Verify reject_affinity change
+  $ cd /users/szhong/kSTEP && grep "task_cpu_possible_mask" kmod/drivers/reject_affinity.c
+  └ 6 lines...
+
+● Check if reject_affinity is staged
+  $ cd /users/szhong/kSTEP && git --no-pager diff --staged kmod/drivers/reject_affinity.c | head -5
+  └ 1 line...
+
+● Check reject_affinity history
+  $ cd /users/szhong/kSTEP && git --no-pager log --oneline -5 -- kmod/drivers/reject_affinity.c
+  └ 3 lines...
+
+● Check if change already committed
+  $ cd /users/szhong/kSTEP && git --no-pager show 19ded69 -- kmod/drivers/reject_affinity.c | head
+  -20
+  └ 21 lines...
+
+Good, the reject_affinity fix was already committed. My changes are only the 3 files. Let me commit:
+
+● Commit changes
+  $ cd /users/szhong/kSTEP && git commit -m "reproduce: forceidle_starvation (8039e96fcc1d)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+  └ 3 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced bug `8039e96fcc1d` (forced idle sibling starvation corner case):
+
+- **Buggy kernel**: Task runs 30 ticks with `core_forceidle` set, `prev_sum_exec_runtime` stays at 0 → no reschedule → starvation (**fail**)
+- **Fixed kernel**: `task_tick_core()` detects starvation and calls `resched_curr()`, `prev_sum_exec_runtime` updates → task gets rescheduled (**pass**)
+
+Driver: `kmod/drivers/forceidle_starvation.c`, committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         10m 58s
+Total session time:     18m 37s
+Total code changes:     +225 -60
+Breakdown by AI model:
+ claude-opus-4.6-1m      6.4m in, 37.9k out, 6.3m cached (Est. 6 Premium requests)

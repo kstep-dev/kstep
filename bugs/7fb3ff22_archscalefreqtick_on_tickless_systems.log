@@ -281,3 +281,237 @@ Build succeeded. Let me run the driver on the buggy kernel:
   $ cd /users/szhong/kSTEP && ./run.py freq_tick --linux_name freq_tick_buggy 2>&1 | tail -20
   └ 21 lines...
 
+APERFMPERF is not available in QEMU. I need a different approach - using kprobes to intercept `arch_scale_freq_tick()` and inject overflow values. Let me rewrite the driver:
+
+● Edit kmod/drivers/freq_tick.c (+76 -83)
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=freq_tick_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py freq_tick --linux_name freq_tick_buggy 2>&1 | tail -30
+  └ 31 lines...
+
+● Check detailed log output
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | grep -i
+  "freq_tick\|scale_freq\|wobbly\|kprobe\|Running\|fail\|pass\|Error\|not found\|freq_key\|nohz" |
+  head -20
+  └ 2 lines...
+
+● Find log file
+  $ cd /users/szhong/kSTEP && readlink data/latest.log 2>/dev/null; ls -la data/latest.*
+  2>/dev/null; ls data/logs/ 2>/dev/null | tail -5
+  └ 13 lines...
+
+● Check log for driver output
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  "freq|scale|wobbly|kprobe|Running|fail|pass|not found|nohz|Starting|Found" | head -30
+  └ 14 lines...
+
+● Check symbols in vmlinux
+  $ cd /users/szhong/kSTEP && grep "scale_freq_tick\|disable_freq_invariance\|arch_scale_freq"
+  build/freq_tick_buggy/vmlinux 2>/dev/null | strings | head -10 || nm build/freq_tick_buggy/vmlinux
+   2>/dev/null | grep "scale_freq_tick\|freq_invariance\|arch_scale_freq" | head -10
+  └ 1 line...
+
+● List freq-related kernel symbols
+  $ cd /users/szhong/kSTEP && nm build/freq_tick_buggy/vmlinux 2>/dev/null | grep -i
+  "scale_freq\|freq_invariance\|freq_key" | head -15
+  └ 11 lines...
+
+● Check for scale_freq_tick symbol
+  $ cd /users/szhong/kSTEP && nm build/freq_tick_buggy/vmlinux 2>/dev/null | grep "scale_freq_tick"
+  | head -5
+  └ 3 lines...
+
+● Check around Running driver
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -A2 -B2 "Running driver"
+  └ 6 lines...
+
+● Find latest log files
+  $ cd /users/szhong/kSTEP && ls -lt data/logs/*.log | head -5
+  └ 6 lines...
+
+● Find my freq_tick log
+  $ cd /users/szhong/kSTEP && grep "freq_tick" data/logs/log-20260310_07*.log | head -10
+  └ 11 lines...
+
+● Check 2nd run log
+  $ cd /users/szhong/kSTEP && grep "freq_tick\|scale_freq\|fail\|pass\|not
+  found\|TRACE\|Found\|kprobe\|enabled\|nohz_cpu" data/logs/log-20260310_075108.log | head -20
+  └ 15 lines...
+
+● Check jsonl output
+  $ cd /users/szhong/kSTEP && cat data/logs/log-20260310_075108.jsonl 2>/dev/null | head -5
+  └ 2 lines...
+
+The `scale_freq_tick` was inlined. Let me update the approach - use kprobe to detect the call and simulate the overflow effect:
+
+● Edit kmod/drivers/freq_tick.c (+35 -41)
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=freq_tick_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py freq_tick --linux_name freq_tick_buggy --log_file
+  data/logs/freq_tick_buggy.log 2>&1 | tail -20
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● stop_bash
+  └ 1 line...
+
+● Check hung run log
+  $ cd /users/szhong/kSTEP && cat data/logs/freq_tick_buggy.log 2>/dev/null | grep -E
+  "freq_tick|scale_freq|fail|pass|Running|Exiting|BUG|disable|kprobe|enabled|panic|stuck|Oops|Call
+  Trace" | head -20
+  └ 21 lines...
+
+● Check end of log
+  $ cd /users/szhong/kSTEP && tail -30 data/logs/freq_tick_buggy.log
+  └ 31 lines...
+
+The system hung because `static_branch_disable` can't be called from kprobe context. Let me simplify - just detect the call without trying to disable:
+
+● Edit kmod/drivers/freq_tick.c (+16 -58)
+
+● Build and run on buggy kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=freq_tick_buggy 2>&1 | tail -5 && ./run.py
+  freq_tick --linux_name freq_tick_buggy --log_file data/logs/freq_tick_buggy2.log 2>&1 | tail -20
+  └ 6 lines...
+
+● read_bash
+  └ 6 lines...
+
+● read_bash
+  └ 6 lines...
+
+● Check partial log
+  $ cat /users/szhong/kSTEP/data/logs/freq_tick_buggy2.log 2>/dev/null | tail -20
+  └ 21 lines...
+
+● stop_bash
+  └ 1 line...
+
+The hang is during `kstep_tick()`. Let me test if the issue is CONFIG_NO_HZ_FULL itself by running a simple driver:
+
+● Test default driver on NO_HZ_FULL kernel
+  $ cd /users/szhong/kSTEP && timeout 60 ./run.py default --linux_name freq_tick_buggy --log_file
+  data/logs/freq_tick_default.log 2>&1 | tail -15
+  └ 16 lines...
+
+● Check jsonl and log size
+  $ cat /users/szhong/kSTEP/data/logs/freq_tick_buggy2.jsonl 2>/dev/null; echo "---"; cat
+  /users/szhong/kSTEP/data/logs/freq_tick_buggy2.log 2>/dev/null | grep -c ""
+  └ 3 lines...
+
+Let me try a minimal kprobe to debug the hang - no operations in the handler:
+
+● Edit kmod/drivers/freq_tick.c (-3)
+
+● Test minimal kprobe handler
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=freq_tick_buggy 2>&1 | tail -3 && timeout 45
+  ./run.py freq_tick --linux_name freq_tick_buggy --log_file data/logs/freq_tick_buggy3.log 2>&1 |
+  tail -10
+  └ 4 lines...
+
+● Check log output
+  $ cat /users/szhong/kSTEP/data/logs/freq_tick_buggy3.log 2>/dev/null | tail -10
+  └ 11 lines...
+
+● read_bash
+  └ 5 lines...
+
+The kprobe on `arch_scale_freq_tick` hangs. Let me test if kprobes work at all in the tick path by probing a different function:
+
+● Edit kmod/drivers/freq_tick.c (+33 -18)
+
+● Build with ftrace approach
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=freq_tick_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Run ftrace approach on buggy
+  $ cd /users/szhong/kSTEP && timeout 45 ./run.py freq_tick --linux_name freq_tick_buggy --log_file
+  data/logs/freq_tick_buggy4.log 2>&1 | tail -15
+  └ 1 line...
+
+● Check log while running
+  $ cat /users/szhong/kSTEP/data/logs/freq_tick_buggy4.log 2>/dev/null | tail -10
+  └ 11 lines...
+
+● stop_bash
+  └ 1 line...
+
+Both kprobes and ftrace hang — likely RCU issues on nohz_full CPU. I'll patch the kernel to add a counter instead.
+
+● View arch_scale_freq_tick
+  $ cd /users/szhong/kSTEP && sed -n '370,400p'
+  linux/freq_tick_buggy/arch/x86/kernel/cpu/aperfmperf.c
+  └ 32 lines...
+
+● Apply counter patch to buggy kernel
+  $ cd /users/szhong/kSTEP/linux/freq_tick_buggy && cat > /tmp/freq_tick_counter.patch << 'EOF'
+  diff --git a/arch/x86/kernel/cpu/aperfmperf.c b/arch/x86/kernel/cpu/aperfmperf.c
+  --- a/arch/x86/kernel/cpu/aperfmperf.c
+  +++ b/arch/x86/kernel/cpu/aperfmperf.c
+  @@ -370,8 +370,13 @@ static inline void scale_freq_tick(u64 acnt, u64 mcnt) { }...
+  └ 16 lines...
+
+● Check file header
+  $ cd /users/szhong/kSTEP/linux/freq_tick_buggy && head -5 arch/x86/kernel/cpu/aperfmperf.c
+  └ 6 lines...
+
+Let me just edit the file directly:
+
+● Find exact lines to patch
+  $ cd /users/szhong/kSTEP/linux/freq_tick_buggy && sed -n '372,376p'
+  arch/x86/kernel/cpu/aperfmperf.c
+  └ 5 lines...
+
+● Patch aperfmperf.c on buggy kernel
+  $ cd /users/szhong/kSTEP/linux/freq_tick_buggy && sed -i '371a\
+  DEFINE_PER_CPU(unsigned int, kstep_freq_tick_count);\
+  EXPORT_PER_CPU_SYMBOL(kstep_freq_tick_count);\
+  ' arch/x86/kernel/cpu/aperfmperf.c && sed -i '/^void
+  arch_scale_freq_tick(void)/{n;s/{/{\n\tthis_cpu_inc(kstep_freq_tick_count);/}' ...
+  └ 14 lines...
+
+Now update the driver to read the counter instead of using kprobes:
+
+● Edit kmod/drivers/freq_tick.c (+22 -46)
+
+Now rebuild the kernel (incremental, just the patched file) and kstep:
+
+● Rebuild patched buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=freq_tick_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Build kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=freq_tick_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on patched buggy kernel
+  $ cd /users/szhong/kSTEP && timeout 60 ./run.py freq_tick --linux_name freq_tick_buggy --log_file
+  data/logs/freq_tick_buggy5.log 2>&1 | tail -15
+  └ 16 lines...
+
+**The bug is triggered!** On the buggy kernel, `arch_scale_freq_tick` was called on nohz_full CPU 1. Now let me check the JSONL output and verify on the fixed kernel.
+
+● Check jsonl output
+  $ cat /users/szhong/kSTEP/data/logs/freq_tick_buggy5.jsonl
+  └ 2 lines...
+
+Now let me checkout and build the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 7fb3ff22ad87 freq_tick_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+Now apply the same counter patch to the fixed kernel, enable NO_HZ_FULL, and build:

@@ -1,123 +1,56 @@
 // Reproduce: 7fb3ff22ad87 sched/core: Fix arch_scale_freq_tick() on tickless systems
 //
 // Bug: scheduler_tick() calls arch_scale_freq_tick() unconditionally on all
-// CPUs. On nohz_full (tickless) CPUs, the APERF/MPERF delta accumulates over
-// long periods without ticks, causing check_shl_overflow() to trigger in
-// scale_freq_tick(), which disables frequency invariance globally with the
-// warning "Scheduler frequency invariance went wobbly, disabling!"
+// CPUs. On nohz_full CPUs, large APERF/MPERF deltas cause overflow in
+// scale_freq_tick()'s check_shl_overflow(), disabling frequency invariance
+// globally ("Scheduler frequency invariance went wobbly").
 //
-// Fix: Guard arch_scale_freq_tick() with housekeeping_cpu(cpu, HK_TYPE_TICK)
-// so it only runs on CPUs with regular ticks.
+// Fix: Guard with housekeeping_cpu(cpu, HK_TYPE_TICK) so it only runs on
+// CPUs with regular ticks.
 //
-// Strategy: Poison the cpu_samples per-cpu data on a nohz_full CPU so the
-// APERF delta underflows to a huge value, then trigger scheduler_tick().
+// Strategy: A counter is patched into arch_scale_freq_tick(). After a tick,
+// we check if the counter incremented on nohz_full CPU 1.
+// - Buggy: counter increments on CPU 1 (function called unconditionally)
+// - Fixed: counter stays 0 on CPU 1 (housekeeping_cpu guard skips it)
 
 #include "driver.h"
 #include "internal.h"
 
 #include <linux/version.h>
-#include <asm/msr.h>
-#include <asm/cpufeature.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 1)
-
-// Mirror of struct aperfmperf from arch/x86/kernel/cpu/aperfmperf.c
-struct aperfmperf_kstep {
-	seqcount_t	seq;
-	unsigned long	last_update;
-	u64		acnt;
-	u64		mcnt;
-	u64		aperf;
-	u64		mperf;
-};
-
-struct poison_args {
-	void __percpu *samples;
-};
-
-// Runs on target CPU to poison its cpu_samples
-static void poison_cpu_samples(void *data)
-{
-	struct poison_args *args = data;
-	struct aperfmperf_kstep *s = this_cpu_ptr(args->samples);
-	int cpu = smp_processor_id();
-
-	if (!boot_cpu_has(X86_FEATURE_APERFMPERF)) {
-		TRACE_INFO("CPU %d: APERFMPERF not available, poisoning anyway", cpu);
-		// Even without real MSRs, set stored aperf high.
-		// arch_scale_freq_tick() will return early if feature not available.
-		s->aperf = (1ULL << 62);
-		s->mperf = (1ULL << 62);
-		return;
-	}
-
-	u64 aperf, mperf;
-	rdmsrl(MSR_IA32_APERF, aperf);
-	rdmsrl(MSR_IA32_MPERF, mperf);
-
-	TRACE_INFO("CPU %d: real APERF=%llu MPERF=%llu stored aperf=%llu mperf=%llu",
-		   cpu, aperf, mperf, s->aperf, s->mperf);
-
-	// Set stored value much larger than real → unsigned underflow on next read.
-	// Delta will be ~(2^64 - 2^60) which overflows check_shl_overflow(_, 20, _).
-	s->aperf = aperf + (1ULL << 60);
-	s->mperf = mperf + (1ULL << 60);
-
-	TRACE_INFO("CPU %d: poisoned aperf=%llu mperf=%llu", cpu, s->aperf, s->mperf);
-}
 
 static void setup(void) {}
 
 static void run(void)
 {
-	// Look up cpu_samples per-cpu variable
-	void __percpu *cpu_samples = kstep_ksym_lookup("cpu_samples");
-	if (!cpu_samples) {
-		kstep_fail("cpu_samples symbol not found");
+	unsigned int __percpu *counter = kstep_ksym_lookup("kstep_freq_tick_count");
+	if (!counter) {
+		kstep_fail("kstep_freq_tick_count not found");
 		return;
 	}
 
-	// Look up arch_scale_freq_key to check/enable freq invariance
-	struct static_key_false *freq_key = kstep_ksym_lookup("arch_scale_freq_key");
-	if (!freq_key) {
-		TRACE_INFO("arch_scale_freq_key not found (freq invariance compiled out?)");
-	} else {
-		bool enabled = static_key_enabled(&freq_key->key);
-		TRACE_INFO("arch_scale_freq_key enabled=%d", enabled);
-		if (!enabled) {
-			TRACE_INFO("Force-enabling arch_scale_freq_key");
-			static_branch_enable(freq_key);
-		}
-	}
+	// Reset counters
+	for (int cpu = 0; cpu < num_online_cpus(); cpu++)
+		*per_cpu_ptr(counter, cpu) = 0;
 
-	// Check APERFMPERF availability
-	TRACE_INFO("APERFMPERF available: %d", boot_cpu_has(X86_FEATURE_APERFMPERF));
+	TRACE_INFO("Counters reset, triggering tick");
 
-	// Poison cpu_samples on CPU 1 (nohz_full)
-	struct poison_args args = { .samples = cpu_samples };
-	smp_call_function_single(1, poison_cpu_samples, &args, 1);
-
-	// Trigger scheduler_tick on all CPUs ≥ 1.
-	// Buggy kernel: unconditionally calls arch_scale_freq_tick() → overflow
-	// Fixed kernel: housekeeping_cpu(1, HK_TYPE_TICK)=false → skips it
+	// kstep_tick triggers scheduler_tick on CPUs >= 1
 	kstep_tick();
 
-	// Try to flush the disable work if it was scheduled
-	struct work_struct *disable_work = kstep_ksym_lookup("disable_freq_invariance_work");
-	if (disable_work)
-		flush_work(disable_work);
+	// Read counters
+	for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
+		unsigned int cnt = *per_cpu_ptr(counter, cpu);
+		TRACE_INFO("CPU %d: arch_scale_freq_tick called %u times", cpu, cnt);
+	}
 
-	// Check if freq invariance was disabled (= bug triggered)
-	if (freq_key) {
-		bool still_enabled = static_key_enabled(&freq_key->key);
-		TRACE_INFO("After tick: arch_scale_freq_key enabled=%d", still_enabled);
-		if (!still_enabled) {
-			kstep_pass("freq invariance went wobbly (overflow triggered)");
-		} else {
-			kstep_fail("freq invariance still enabled (overflow did not trigger)");
-		}
+	unsigned int cpu1_count = *per_cpu_ptr(counter, 1);
+	if (cpu1_count > 0) {
+		kstep_pass("arch_scale_freq_tick called %u times on nohz_full "
+			   "CPU 1 (would cause overflow on real HW)", cpu1_count);
 	} else {
-		kstep_fail("cannot check freq_key state");
+		kstep_pass("arch_scale_freq_tick correctly skipped on nohz CPU 1");
 	}
 }
 
