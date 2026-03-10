@@ -63,7 +63,7 @@ static void run(void) {
 static void on_tick_begin(void) {
 // https://github.com/torvalds/linux/commit/9c0b4bb7f6303c9c4e2e34984c46f5a86478f84d
 // https://github.com/torvalds/linux/commit/bb4479994945e9170534389a7762eb56149320ac
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0) && LINUX_VERSION_CODE < KERNEL_VERSION(5, 19, 0)
   struct rq *rq = cpu_rq(1);
   KSYM_IMPORT(effective_cpu_util);
   u64 effective_util = KSYM_effective_cpu_util(rq->cpu, rq->cfs.avg.util_avg,

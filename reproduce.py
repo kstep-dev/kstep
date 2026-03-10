@@ -319,6 +319,13 @@ bugs = [
             Linux(name="fixed", version="5bc78502322a"),
         ],
     ),
+    Bug(
+        driver=Driver(name="task_state_cmp", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="5aec788aeb8e~1"),
+            Linux(name="fixed", version="5aec788aeb8e"),
+        ],
+    ),
 ]
 
 

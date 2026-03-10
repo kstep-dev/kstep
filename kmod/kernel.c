@@ -207,7 +207,7 @@ void kstep_cgroup_add_task(const char *name, int pid) {
 
 void kstep_freeze_task(struct task_struct *p) {
 // https://github.com/torvalds/linux/commit/f5d39b020809146cc28e6e73369bf8065e0310aa
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
   static_branch_inc(&freezer_active);
 #else
   atomic_inc(&system_freezing_cnt);
@@ -222,7 +222,7 @@ void kstep_freeze_task(struct task_struct *p) {
   KSYM_freeze_task(p);
 
   *KSYM_pm_freezing = false;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
   static_branch_dec(&freezer_active);
 #else
   atomic_dec(&system_freezing_cnt);
