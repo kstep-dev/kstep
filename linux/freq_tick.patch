@@ -1,0 +1,18 @@
+diff --git a/arch/x86/kernel/cpu/aperfmperf.c b/arch/x86/kernel/cpu/aperfmperf.c
+index 1f60a2b27936..0fbaf8375714 100644
+--- a/arch/x86/kernel/cpu/aperfmperf.c
++++ b/arch/x86/kernel/cpu/aperfmperf.c
+@@ -369,9 +369,13 @@ static void scale_freq_tick(u64 acnt, u64 mcnt)
+ static inline void bp_init_freq_invariance(void) { }
+ static inline void scale_freq_tick(u64 acnt, u64 mcnt) { }
+ #endif /* CONFIG_X86_64 && CONFIG_SMP */
++DEFINE_PER_CPU(unsigned int, kstep_freq_tick_count);
++EXPORT_PER_CPU_SYMBOL(kstep_freq_tick_count);
++
+ 
+ void arch_scale_freq_tick(void)
+ {
++	this_cpu_inc(kstep_freq_tick_count);
+ 	struct aperfmperf *s = this_cpu_ptr(&cpu_samples);
+ 	u64 acnt, mcnt, aperf, mperf;
+ 

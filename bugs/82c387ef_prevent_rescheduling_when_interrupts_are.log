@@ -1,0 +1,105 @@
+● Read bugs/82c387ef_prevent_rescheduling_when_interrupts_are.md
+  └ 39 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the commit patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 82c387ef7568 2>/dev/null | head -300
+  └ 139 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && head -80 reproduce.py
+  └ 81 lines...
+
+● Check kthread implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c 2>/dev/null | head -60
+  └ 60 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -30
+  └ 31 lines...
+
+● Check a simple existing driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/freeze.c
+  └ 39 lines...
+
+● Check default driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/default.c
+  └ 58 lines...
+
+● Check irq usage in kmod
+  $ cd /users/szhong/kSTEP && grep -r "local_irq" kmod/ --include="*.c" --include="*.h" | head -20
+  └ 1 line...
+
+● Check internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -80
+  └ 80 lines...
+
+● Get kernel version tag
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags 82c387ef7568~1 2>/dev/null
+  └ 2 lines...
+
+● Check kernel version near commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 82c387ef7568 -3 2>/dev/null
+  └ 4 lines...
+
+● Check preempt config
+  $ cd /users/szhong/kSTEP && grep -E "PREEMPT|CONFIG_PREEMPT" linux/config 2>/dev/null | head -20
+  └ 1 line...
+
+● Find kernel config files
+  $ cd /users/szhong/kSTEP && find . -name "*.config" -o -name "kconfig*" -o -name "config*" | grep
+  -i config | head -20
+  └ 21 lines...
+
+● Check Makefile for config
+  $ cd /users/szhong/kSTEP && cat Makefile | head -80
+  └ 80 lines...
+
+● Find .config files
+  $ cd /users/szhong/kSTEP && find linux/ -maxdepth 2 -name ".config" 2>/dev/null | head -10
+  └ 11 lines...
+
+● Check linux config/patch targets
+  $ cd /users/szhong/kSTEP && grep -r "linux-config" Makefile | head -5 && grep "linux-patch"
+  Makefile | head -5
+  └ 7 lines...
+
+● Check preempt settings in existing config
+  $ cd /users/szhong/kSTEP && grep -E "PREEMPT" linux/freeze_buggy/.config 2>/dev/null | head -20
+  └ 10 lines...
+
+Now I understand the bug. Let me checkout the buggy kernel and write the driver.
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 82c387ef7568~1 cond_resched_irq_buggy 2>&1 | tail
+  -5
+  └ 6 lines...
+
+● Check kernel version numbers
+  $ cd /users/szhong/kSTEP && grep "^VERSION\|^PATCHLEVEL\|^SUBLEVEL"
+  linux/cond_resched_irq_buggy/Makefile | head -5
+  └ 4 lines...
+
+Good, KERNEL_VERSION(6,14,0). Now let me write the driver:
+
+● Create kmod/drivers/cond_resched_irq.c (+68)
+
+Now let me build the buggy kernel and kstep:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=cond_resched_irq_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Build kstep for buggy kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=cond_resched_irq_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Build succeeded. Now run the driver:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py cond_resched_irq --linux_name cond_resched_irq_buggy 2>&1 |
+  tail -30
+  └ 31 lines...
+

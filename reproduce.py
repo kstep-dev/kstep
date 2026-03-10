@@ -407,6 +407,23 @@ bugs = [
             Linux(name="fixed", version="8039e96fcc1d"),
         ],
     ),
+    Bug(
+        driver=Driver(name="freq_tick"),
+        linux=[
+            Linux(
+                name="buggy",
+                version="7fb3ff22ad87~1",
+                config=LINUX_ROOT_DIR / "freq_tick.config",
+                patch=LINUX_ROOT_DIR / "freq_tick.patch",
+            ),
+            Linux(
+                name="fixed",
+                version="7fb3ff22ad87",
+                config=LINUX_ROOT_DIR / "freq_tick.config",
+                patch=LINUX_ROOT_DIR / "freq_tick.patch",
+            ),
+        ],
+    ),
 ]
 
 

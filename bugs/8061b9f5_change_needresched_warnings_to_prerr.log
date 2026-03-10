@@ -1,0 +1,117 @@
+● Read bugs/8061b9f5_change_needresched_warnings_to_prerr.md
+  └ 38 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 8061b9f5e111 2>/dev/null | head -200
+  └ 70 lines...
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Find callers of resched_latency_warn
+  $ cd /users/szhong/kSTEP && grep -rn "resched_latency_warn" linux/current/kernel/sched/
+  2>/dev/null | head -20
+  └ 18 lines...
+
+● Read example driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/default.c
+  └ 58 lines...
+
+● Check resched_latency_warn calling code
+  $ cd /users/szhong/kSTEP && sed -n '5430,5540p' linux/current/kernel/sched/core.c
+  └ 112 lines...
+
+● Check tick implementation
+  $ cd /users/szhong/kSTEP && cat kmod/tick.c 2>/dev/null | head -60
+  └ 61 lines...
+
+● Check LATENCY_WARN feature
+  $ cd /users/szhong/kSTEP && grep -n "LATENCY_WARN" linux/current/kernel/sched/features.h
+  2>/dev/null
+  └ 2 lines...
+
+● Check LATENCY_WARN usage
+  $ cd /users/szhong/kSTEP && grep -rn "sched_feat.*LATENCY_WARN" linux/current/kernel/sched/
+  2>/dev/null
+  └ 3 lines...
+
+● Read more of tick.c
+  $ cd /users/szhong/kSTEP && sed -n '60,150p' kmod/tick.c
+  └ 91 lines...
+
+● Check need_resched usage in kmod
+  $ cd /users/szhong/kSTEP && grep -n "need_resched\|TIF_NEED_RESCHED" kmod/*.c kmod/*.h 2>/dev/null
+   | head -20
+  └ 1 line...
+
+● Check how to write sched features
+  $ cd /users/szhong/kSTEP && grep -n "kstep_write\|debugfs\|sched_feat\|features" kmod/*.c
+  kmod/drivers/*.c 2>/dev/null | head -20
+  └ 9 lines...
+
+● Find kstep_sleep in tick.c
+  $ cd /users/szhong/kSTEP && grep -n "kstep_sleep\b" kmod/tick.c
+  └ 4 lines...
+
+● Find kstep_sleep definition
+  $ cd /users/szhong/kSTEP && grep -n "kstep_sleep\b" kmod/*.c | head -20
+  └ 7 lines...
+
+● Read kstep_sleep implementation
+  $ cd /users/szhong/kSTEP && sed -n '145,175p' kmod/tick.c
+  └ 21 lines...
+
+● Read task.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/task.c
+  └ 113 lines...
+
+● Read kthread implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Check kernel preemption config
+  $ cd /users/szhong/kSTEP && grep -rn "CONFIG_PREEMPT" linux/current/.config 2>/dev/null | head -10
+  └ 1 line...
+
+● Find kernel config
+  $ cd /users/szhong/kSTEP && find build -name ".config" 2>/dev/null | head -5
+  └ 1 line...
+
+● Check preempt config in scripts
+  $ cd /users/szhong/kSTEP && cat scripts/linux_config 2>/dev/null | grep -i preempt | head -10
+  └ 1 line...
+
+● Find kernel config files
+  $ cd /users/szhong/kSTEP && find . -name "*.config" -o -name "kconfig*" -o -name "defconfig*"
+  2>/dev/null | grep -v linux/current | head -10
+  └ 11 lines...
+
+● Check Makefile for config
+  $ cd /users/szhong/kSTEP && cat Makefile | head -80
+  └ 80 lines...
+
+● Check SCHED_DEBUG config
+  $ cd /users/szhong/kSTEP && grep -i "SCHED_DEBUG"
+  linux/fix_sched_delayed_vs_cfs_bandwidth_buggy/.config | head -5
+  └ 2 lines...
+
+● Check preempt config
+  $ cd /users/szhong/kSTEP && grep -i "preempt"
+  linux/fix_sched_delayed_vs_cfs_bandwidth_buggy/.config | head -10
+  └ 10 lines...
+
+● Check clock advancement
+  $ cd /users/szhong/kSTEP && grep -n
+  "kstep_sched_clock_tick\|kstep_jiffies_tick\|tick_interval_ns\|sched_clock" kmod/*.c kmod/*.h |
+  head -20
+  └ 21 lines...
+
+● Check HZ config
+  $ cd /users/szhong/kSTEP && grep -n "HZ\|CONFIG_HZ"
+  linux/fix_sched_delayed_vs_cfs_bandwidth_buggy/.config | head -10
+  └ 10 lines...
+

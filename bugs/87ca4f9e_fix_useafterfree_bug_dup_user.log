@@ -1,0 +1,73 @@
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read bugs/87ca4f9e_fix_useafterfree_bug_dup_user.md
+  └ 25 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 87ca4f9efbd7 2>/dev/null | head -200
+  └ 151 lines...
+
+Let me examine the existing drivers and kSTEP internals to understand available patterns.
+
+● Read task.c for fork implementation
+  $ cd /users/szhong/kSTEP && cat kmod/task.c 2>/dev/null | head -100
+  └ 101 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -30
+  └ 31 lines...
+
+● Read kthread.c for kthread API
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c 2>/dev/null
+  └ 157 lines...
+
+● Read user-space task code
+  $ cd /users/szhong/kSTEP && cat user/task.c 2>/dev/null
+  └ 67 lines...
+
+● Read affinity-related driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/reject_affinity.c 2>/dev/null
+  └ 98 lines...
+
+● Read race condition driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/pf_kthread_race.c 2>/dev/null
+  └ 76 lines...
+
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h 2>/dev/null
+  └ 90 lines...
+
+● Find ksym_lookup
+  $ cd /users/szhong/kSTEP && grep -n "kstep_ksym_lookup" kmod/*.c kmod/*.h 2>/dev/null | head -20
+  └ 12 lines...
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 87ca4f9efbd7~1 dup_uaf_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● See reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | tail -30
+  └ 31 lines...
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && head -5 linux/current/Makefile
+  └ 6 lines...
+
+● Find relevant functions in buggy kernel
+  $ cd /users/szhong/kSTEP && grep -n 'dup_user_cpus_ptr\|do_set_cpus_allowed\|user_cpus_ptr'
+  linux/current/kernel/sched/core.c | head -30
+  └ 29 lines...
+
+● Read reproduce.py structure
+  $ cd /users/szhong/kSTEP && head -40 reproduce.py
+  └ 41 lines...
+
+● Read buggy dup_user_cpus_ptr
+  $ cd /users/szhong/kSTEP && sed -n '2612,2630p' linux/current/kernel/sched/core.c
+  └ 19 lines...
+
+● Read more of reproduce.py
+  $ cd /users/szhong/kSTEP && sed -n '40,200p' reproduce.py
+  └ 162 lines...
+
