@@ -26,10 +26,14 @@ void kstep_sched_clock_init(void) {
   // lookup to handle kernels where the symbol does not yet exist.
   typedef void (*set_sc_fn)(u64 (*)(void));
   set_sc_fn set_fn = (set_sc_fn)kstep_ksym_lookup("paravirt_set_sched_clock");
-  if (set_fn)
+  if (set_fn) {
     set_fn(kstep_sched_clock_get);
-  else
-    panic("paravirt_set_sched_clock not found");
+  } else {
+    // Fallback for kernels < 5.12: directly patch pv_ops.time.sched_clock
+    KSYM_IMPORT(pv_ops);
+    KSYM_pv_ops->time.sched_clock =
+        (unsigned long long (*)(void))kstep_sched_clock_get;
+  }
   TRACE_INFO("Mocked sched clock");
 }
 

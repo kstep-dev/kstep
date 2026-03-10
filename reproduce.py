@@ -298,6 +298,13 @@ bugs = [
             Linux(name="fixed", version="42dc938a590c"),
         ],
     ),
+    Bug(
+        driver=Driver(name="fix_balance_callback", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="565790d28b1e~1"),
+            Linux(name="fixed", version="565790d28b1e"),
+        ],
+    ),
 ]
 
 

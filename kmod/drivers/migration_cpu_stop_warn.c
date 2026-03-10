@@ -48,7 +48,9 @@ static void run(void) {
   }
 
   // Ensure victim's migration_pending is NULL so we hit the !pending branch
+#if defined(CONFIG_SMP) && LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 0)
   TRACE_INFO("migration_pending=%px", victim->migration_pending);
+#endif
 
   // Craft a migration_arg that simulates a migrate_enable() path:
   //   dest_cpu = -1 (migrate_enable), pending = NULL
