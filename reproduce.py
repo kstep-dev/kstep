@@ -641,6 +641,13 @@ bugs = [
             Linux(name="fixed", version="d136122f58458479fd8926020ba2937de61d7f65"),
         ],
     ),
+    Bug(
+        driver=Driver(name="softirq_inactive_cpu", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="e0b257c3b71bd98a4866c3daecf000998aaa4927~1"),
+            Linux(name="fixed", version="e0b257c3b71bd98a4866c3daecf000998aaa4927"),
+        ],
+    ),
 ]
 
 
