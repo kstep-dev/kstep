@@ -526,6 +526,13 @@ bugs = [
             Linux(name="fixed", version="9818427c6270a9ce8c52c8621026fe9cebae0f92"),
         ],
     ),
+    Bug(
+        driver=Driver(name="set_cpus_allowed_lock"),
+        linux=[
+            Linux(name="buggy", version="abfc01077df66593f128d966fdad1d042facc9ac~1"),
+            Linux(name="fixed", version="abfc01077df66593f128d966fdad1d042facc9ac"),
+        ],
+    ),
 ]
 
 
