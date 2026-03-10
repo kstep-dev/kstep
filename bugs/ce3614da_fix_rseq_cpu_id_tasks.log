@@ -368,3 +368,8 @@ Build succeeded. Now let's run the driver on the buggy kernel:
   --kernel_params "slub_debug=-" 2>&1 | tail -10
   └ 11 lines...
 
+● Run with acpi=noirq
+  $ cd /users/szhong/kSTEP && ./run.py rseq_cpu_id_fork --linux_name rseq_cpu_id_fork_buggy
+  --kernel_params "acpi=noirq" 2>&1 | tail -10
+  └ 11 lines...
+

@@ -589,6 +589,13 @@ bugs = [
             Linux(name="fixed", version="ca4984a7dd86"),
         ],
     ),
+    Bug(
+        driver=Driver(name="psi_dequeue_proxy", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="c2ae8b0df2d1~1"),
+            Linux(name="fixed", version="c2ae8b0df2d1"),
+        ],
+    ),
 ]
 
 

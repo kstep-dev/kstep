@@ -290,3 +290,31 @@ Now add to reproduce.py:
 
 ● Edit reproduce.py (+7)
 
+● Commit changes
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: uclamp_flag_idle
+  (ca4984a7dd86)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>&1
+  └ 9 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced and committed. Here's a summary:
+
+**Bug**: `UCLAMP_FLAG_IDLE` gets stuck when `uclamp_update_active()` does dec-then-inc on the only uclamp task, transiently hitting 0 active tasks during the dec (setting the flag), but the inc doesn't clear it.
+
+**Driver**: Creates a cgroup with `cpu.uclamp.max=50%`, adds a single task pinned to CPU 1, wakes it, then changes cgroup uclamp.max to 80% to trigger `uclamp_update_active()`.
+
+**Results**:
+- Buggy kernel: `uclamp_flags=0x1` with `nr_running=1` → **fail** ✓
+- Fixed kernel: `uclamp_flags=0x0` with `nr_running=1` → **pass** ✓
+
+
+Total usage est:        6 Premium requests
+API time spent:         5m 58s
+Total session time:     21m 51s
+Total code changes:     +81 -2
+Breakdown by AI model:
+ claude-opus-4.6-1m      2.9m in, 16.6k out, 2.8m cached (Est. 6 Premium requests)
