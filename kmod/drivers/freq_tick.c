@@ -8,49 +8,65 @@
 // Fix: Guard with housekeeping_cpu(cpu, HK_TYPE_TICK) so it only runs on
 // CPUs with regular ticks.
 //
-// Strategy: A counter is patched into arch_scale_freq_tick(). After a tick,
-// we check if the counter incremented on nohz_full CPU 1.
-// - Buggy: counter increments on CPU 1 (function called unconditionally)
-// - Fixed: counter stays 0 on CPU 1 (housekeeping_cpu guard skips it)
+// Strategy: Use a kprobe on arch_scale_freq_tick to count calls per CPU.
+// After a scheduler tick, check whether the function was called on the
+// nohz_full CPU 1 (which is non-housekeeping due to isolcpus=nohz,...,1).
+// - Buggy: kprobe fires on CPU 1 (function called unconditionally)
+// - Fixed: kprobe does NOT fire on CPU 1 (housekeeping_cpu guard skips it)
 
 #include "driver.h"
 #include "internal.h"
 
+#include <linux/kprobes.h>
 #include <linux/version.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 2, 1)
+
+static DEFINE_PER_CPU(unsigned int, freq_tick_count);
+
+static int freq_tick_pre_handler(struct kprobe *p, struct pt_regs *regs)
+{
+	this_cpu_inc(freq_tick_count);
+	return 0;
+}
+
+static struct kprobe freq_tick_kp = {
+	.symbol_name = "arch_scale_freq_tick",
+	.pre_handler = freq_tick_pre_handler,
+};
 
 static void setup(void) {}
 
 static void run(void)
 {
-	unsigned int __percpu *counter = kstep_ksym_lookup("kstep_freq_tick_count");
-	if (!counter) {
-		kstep_fail("kstep_freq_tick_count not found");
+	int ret = register_kprobe(&freq_tick_kp);
+	if (ret < 0) {
+		kstep_fail("Failed to register kprobe on arch_scale_freq_tick: %d", ret);
 		return;
 	}
 
-	// Reset counters
 	for (int cpu = 0; cpu < num_online_cpus(); cpu++)
-		*per_cpu_ptr(counter, cpu) = 0;
+		per_cpu(freq_tick_count, cpu) = 0;
 
-	TRACE_INFO("Counters reset, triggering tick");
+	TRACE_INFO("Kprobe registered, triggering tick");
 
 	// kstep_tick triggers scheduler_tick on CPUs >= 1
 	kstep_tick();
 
-	// Read counters
 	for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
-		unsigned int cnt = *per_cpu_ptr(counter, cpu);
+		unsigned int cnt = per_cpu(freq_tick_count, cpu);
 		TRACE_INFO("CPU %d: arch_scale_freq_tick called %u times", cpu, cnt);
 	}
 
-	unsigned int cpu1_count = *per_cpu_ptr(counter, 1);
+	unsigned int cpu1_count = per_cpu(freq_tick_count, 1);
+
+	unregister_kprobe(&freq_tick_kp);
+
 	if (cpu1_count > 0) {
-		kstep_pass("arch_scale_freq_tick called %u times on nohz_full "
-			   "CPU 1 (would cause overflow on real HW)", cpu1_count);
+		kstep_pass("Bug: arch_scale_freq_tick called %u times on "
+			   "non-housekeeping CPU 1", cpu1_count);
 	} else {
-		kstep_pass("arch_scale_freq_tick correctly skipped on nohz CPU 1");
+		kstep_fail("arch_scale_freq_tick not called on CPU 1");
 	}
 }
 

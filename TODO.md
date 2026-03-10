@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 30/400 reproduced**
+**Total: 31/400 reproduced**
 
 ---
 
@@ -50,7 +50,7 @@
 - [x] `8039e96fcc1d` Fix forced idle sibling starvation corner case — [`8039e96f_forced_idle_sibling_starvation_corner.md`](bugs/8039e96f_forced_idle_sibling_starvation_corner.md) <!-- driver:forceidle_starvation attempts:1 -->
 - [ ] `8061b9f5e111` sched/debug: Change need_resched warnings to pr_err — [`8061b9f5_change_needresched_warnings_to_prerr.md`](bugs/8061b9f5_change_needresched_warnings_to_prerr.md)
 - [ ] `82c387ef7568` sched/core: Prevent rescheduling when interrupts are disabled — [`82c387ef_prevent_rescheduling_when_interrupts_are.md`](bugs/82c387ef_prevent_rescheduling_when_interrupts_are.md)
-- [ ] `87ca4f9efbd7` Fix use-after-free bug in dup_user_cpus_ptr() — [`87ca4f9e_fix_useafterfree_bug_dup_user.md`](bugs/87ca4f9e_fix_useafterfree_bug_dup_user.md)
+- [x] `87ca4f9efbd7` Fix use-after-free bug in dup_user_cpus_ptr() — [`87ca4f9e_fix_useafterfree_bug_dup_user.md`](bugs/87ca4f9e_fix_useafterfree_bug_dup_user.md) <!-- driver:dup_user_cpus_uaf attempts:1 -->
 - [ ] `8a6edb5257e2` sched: Fix migration_cpu_stop() requeueing — [`8a6edb52_fix_migration_cpu_stop_requeueing.md`](bugs/8a6edb52_fix_migration_cpu_stop_requeueing.md)
 - [ ] `8ba09b1dc131` sched: print stack trace with KERN_INFO — [`8ba09b1d_print_stack_trace_with_kern.md`](bugs/8ba09b1d_print_stack_trace_with_kern.md)
 - [ ] `8d4d9c7b4333` sched/debug: Fix memory corruption caused by multiple small reads of flags — [`8d4d9c7b_fix_memory_corruption_caused_multiple.md`](bugs/8d4d9c7b_fix_memory_corruption_caused_multiple.md)

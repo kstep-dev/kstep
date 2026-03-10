@@ -103,3 +103,96 @@ Build succeeded. Now run the driver:
   tail -30
   └ 31 lines...
 
+The bug wasn't triggered. Let me investigate why `cond_resched()` didn't call `schedule()`:
+
+● Check cond_resched definition in headers
+  $ cd /users/szhong/kSTEP && grep -r "cond_resched"
+  linux/cond_resched_irq_buggy/include/linux/sched.h 2>/dev/null | head -20
+  └ 21 lines...
+
+● Check cond_resched definitions
+  $ cd /users/szhong/kSTEP && grep -rn "cond_resched\b" linux/cond_resched_irq_buggy/include/linux/
+  --include="*.h" | grep -v
+  "might_cond_resched\|rcu_cond_resched\|cond_resched_rwlock\|cond_resched_lock\|cond_resched_stall"
+   | head -20
+  └ 21 lines...
+
+● Check _cond_resched implementation
+  $ cd /users/szhong/kSTEP && grep -A 30 "static __always_inline int _cond_resched"
+  linux/cond_resched_irq_buggy/include/linux/sched.h
+  └ 41 lines...
+
+● Read main.c
+  $ cd /users/szhong/kSTEP && cat kmod/main.c
+  └ 64 lines...
+
+● Check preempt state in main
+  $ cd /users/szhong/kSTEP && grep -n "preempt_disable\|preempt_enable" kmod/main.c 2>/dev/null |
+  head -20
+  └ 1 line...
+
+● Read tick.c
+  $ cd /users/szhong/kSTEP && cat kmod/tick.c
+  └ 165 lines...
+
+● Check preempt in tick.c
+  $ cd /users/szhong/kSTEP && grep -n "preempt" kmod/tick.c 2>/dev/null | head -20
+  └ 1 line...
+
+Let me add more debugging to understand why the bug isn't triggering:
+
+● Edit kmod/drivers/cond_resched_irq.c (+4 -3)
+
+● Build and run with extra debug
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=cond_resched_irq_buggy 2>&1 | tail -5 &&
+  ./run.py cond_resched_irq --linux_name cond_resched_irq_buggy 2>&1 | tail -20
+  └ 26 lines...
+
+● Check for cond_resched overrides
+  $ cd /users/szhong/kSTEP && grep -rn "__cond_resched\|should_resched\|cond_resched" kmod/*.c
+  kmod/*.h | grep -v "drivers/" | head -20
+  └ 1 line...
+
+● Check preempt count manipulation
+  $ cd /users/szhong/kSTEP && grep -rn "preempt_count\|PREEMPT_MASK\|HARDIRQ\|SOFTIRQ" kmod/*.c
+  kmod/*.h | grep -v "drivers/" | head -20
+  └ 4 lines...
+
+● Edit kmod/drivers/cond_resched_irq.c (+6 -4)
+
+● Build and run with should_resched debug
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=cond_resched_irq_buggy 2>&1 | tail -5 &&
+  ./run.py cond_resched_irq --linux_name cond_resched_irq_buggy 2>&1 | tail -15
+  └ 21 lines...
+
+Found it! On x86, `should_resched()` checks the per-CPU `__preempt_count` which has NEED_RESCHED encoded as a bit. `set_tsk_need_resched()` only sets the thread_info flag. I need to also call `set_preempt_need_resched()`:
+
+✗ Edit kmod/drivers/cond_resched_irq.c
+  No match found
+
+● Read kmod/drivers/cond_resched_irq.c
+  └ 70 lines read
+
+● Edit kmod/drivers/cond_resched_irq.c (+4 -2)
+
+● Build and run with preempt need resched
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=cond_resched_irq_buggy 2>&1 | tail -5 &&
+  ./run.py cond_resched_irq --linux_name cond_resched_irq_buggy 2>&1 | tail -15
+  └ 21 lines...
+
+The bug is triggered! `__cond_resched returned 1, irqs_disabled=0` — interrupts were re-enabled by the buggy `cond_resched()`. But I notice the `kstep_fail()` message didn't appear. Let me check the log:
+
+● Check jsonl output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl 2>/dev/null
+  └ 2 lines...
+
+● Check for pass/fail messages
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | grep -E "fail|pass|FAIL|PASS|Bug|bug"
+  └ 2 lines...
+
+The bug is reproduced — `kstep_fail` message is in the jsonl output. Now let me verify the fix. First, checkout the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 82c387ef7568 cond_resched_irq_fixed 2>&1 | tail -5
+  └ 6 lines...
+

@@ -424,6 +424,13 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="dup_user_cpus_uaf", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="87ca4f9efbd7~1"),
+            Linux(name="fixed", version="87ca4f9efbd7"),
+        ],
+    ),
 ]
 
 

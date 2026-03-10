@@ -115,3 +115,73 @@
   linux/fix_sched_delayed_vs_cfs_bandwidth_buggy/.config | head -10
   └ 10 lines...
 
+● Check run.py for crash detection
+  $ cd /users/szhong/kSTEP && cat run.py | head -80
+  └ 81 lines...
+
+● Read similar warning-based driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migration_cpu_stop_warn.c
+  └ 107 lines...
+
+● Check commit version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 8061b9f5e111~1..8061b9f5e111
+  2>/dev/null
+  └ 2 lines...
+
+● Get kernel version for buggy commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 8061b9f5e111~1 -1 2>/dev/null &&
+  git -C linux/current describe --tags --abbrev=0 8061b9f5e111~1 2>/dev/null
+  └ 3 lines...
+
+● Check kernel version from Makefile
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8061b9f5e111~1:Makefile | head -6
+  └ 7 lines...
+
+● Read kstep_write implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kernel.c
+  └ 241 lines...
+
+● Read debugfs_try_write implementation
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/null_term_scaling.c
+  └ 96 lines...
+
+● Check features.h for bit position
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8061b9f5e111~1:kernel/sched/features.h
+  2>/dev/null
+  └ 81 lines...
+
+● stop_bash
+  └ 1 line...
+
+● Get features.h content
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8061b9f5e111~1:kernel/sched/features.h
+  2>/dev/null | cat
+  └ 124 lines...
+
+● Check internal.h includes
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -60
+  └ 61 lines...
+
+● Check KSYM_IMPORT macro
+  $ cd /users/szhong/kSTEP && grep -n "KSYM_IMPORT\|kstep_ksym_lookup" kmod/internal.h kmod/*.h |
+  head -20
+  └ 15 lines...
+
+● Check KSYM initialization
+  $ cd /users/szhong/kSTEP && grep -A5 "KSYM_IMPORT_RAW\|ksym_resolve\|ksym_init" kmod/main.c | head
+   -40
+  └ 1 line...
+
+● Check ksym.c
+  $ cd /users/szhong/kSTEP && grep -rn "KSYM_IMPORT_RAW\|kstep_ksym_lookup" kmod/ksym.c 2>/dev/null
+  | head -20
+  └ 1 line...
+
+● Find kstep_ksym_lookup definition
+  $ cd /users/szhong/kSTEP && grep -rn "kstep_ksym_lookup" kmod/*.c | head -10
+  └ 11 lines...
+
+● Read sym.c
+  $ cd /users/szhong/kSTEP && cat kmod/sym.c
+  └ 71 lines...
+

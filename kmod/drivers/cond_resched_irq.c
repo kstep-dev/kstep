@@ -31,18 +31,23 @@ static void run(void) {
   irqs_before = irqs_disabled();
 
   // Set NEED_RESCHED on the current task, simulating what happens when
-  // a wakeup occurs during an interrupt-disabled section.
+  // a wakeup occurs during an interrupt-disabled section. On x86,
+  // both the thread flag AND the preempt_count NEED_RESCHED bit must be set.
   set_tsk_need_resched(current);
+  set_preempt_need_resched();
 
-  TRACE_INFO("irqs_disabled=%d need_resched=%d before cond_resched",
-             irqs_before, test_tsk_need_resched(current));
+  TRACE_INFO("irqs_disabled=%d need_resched=%d preempt_count=0x%x "
+             "should_resched=%d before cond_resched",
+             irqs_before, test_tsk_need_resched(current),
+             preempt_count(), should_resched(0));
 
   // On the buggy kernel, cond_resched() sees NEED_RESCHED and calls
   // schedule(), which re-enables interrupts. On the fixed kernel,
   // cond_resched() checks irqs_disabled() and returns early.
-  cond_resched();
+  int ret = __cond_resched();
 
   irqs_after = irqs_disabled();
+  TRACE_INFO("__cond_resched returned %d, irqs_disabled=%d", ret, irqs_after);
   TRACE_INFO("irqs_disabled=%d after cond_resched", irqs_after);
 
   if (irqs_before && !irqs_after) {
