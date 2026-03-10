@@ -49,8 +49,10 @@ static void run(void) {
 
   TRACE_INFO("Requesting affinity mask: %*pbl (includes impossible CPU %d)",
              cpumask_pr_args(bad_mask), impossible_cpu);
+#ifdef task_cpu_possible_mask
   TRACE_INFO("task_cpu_possible_mask: %*pbl",
              cpumask_pr_args(task_cpu_possible_mask(task)));
+#endif
 
   // Call set_cpus_allowed_ptr with the invalid mask
   // Buggy kernel: returns 0 (success), sets cpus_mask to include impossible CPU
