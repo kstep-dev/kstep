@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 68/400 reproduced**
+**Total: 69/400 reproduced**
 
 ---
 
@@ -96,7 +96,7 @@
 
 ## CFS (Completely Fair Scheduler) (32)
 
-- [ ] `02dbb7246c5b` Fix clearing of has_idle_cores flag in select_idle_cpu() — [`02dbb724_fix_clearing_of_has_idle.md`](bugs/02dbb724_fix_clearing_of_has_idle.md)
+- [x] `02dbb7246c5b` Fix clearing of has_idle_cores flag in select_idle_cpu() — [`02dbb724_fix_clearing_of_has_idle.md`](bugs/02dbb724_fix_clearing_of_has_idle.md) <!-- driver:idle_cores_llc attempts:1 -->
 - [-] `111688ca1c4a` Fix negative imbalance in imbalance calculation — [`111688ca_fix_negative_imbalance_in_imbalance.md`](bugs/111688ca_fix_negative_imbalance_in_imbalance.md) <!-- skipped:kernel-5.6.0-compat-issues-acpi-pci-objtool-jiffies-ftrace attempts:1 -->
 - [x] `15257cc2f905` sched/fair: Revert force wakeup preemption — [`15257cc2_revert_force_wakeup_preemption.md`](bugs/15257cc2_revert_force_wakeup_preemption.md) <!-- driver:revert_force_wakeup_preemption attempts:1 -->
 - [ ] `289de3598481` sched/fair: Fix statistics for find_idlest_group() — [`289de359_statistics_for_find_idlest_group.md`](bugs/289de359_statistics_for_find_idlest_group.md)

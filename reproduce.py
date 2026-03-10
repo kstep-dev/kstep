@@ -770,6 +770,13 @@ bugs = [
         ],
         plot_format="curr_task",
     ),
+    Bug(
+        driver=Driver(name="idle_cores_llc", num_cpus=7),
+        linux=[
+            Linux(name="buggy", version="02dbb7246c5bbbbe1607ebdc546ba5c454a664b1~1"),
+            Linux(name="fixed", version="02dbb7246c5bbbbe1607ebdc546ba5c454a664b1"),
+        ],
+    ),
 ]
 
 
