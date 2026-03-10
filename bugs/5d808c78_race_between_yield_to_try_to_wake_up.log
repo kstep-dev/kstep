@@ -1,0 +1,23 @@
+● Read bugs/5d808c78_race_between_yield_to_try_to_wake_up.md
+  └ 43 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the commit patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5d808c78d972 2>/dev/null | head -300
+  └ 107 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Read kthread.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Search for yield_to usage
+  $ cd /users/szhong/kSTEP && grep -r "kstep_kthread_yield\|yield_to" kmod/ --include='*.c'
+  --include='*.h' | head -30
+  └ 4 lines...
+

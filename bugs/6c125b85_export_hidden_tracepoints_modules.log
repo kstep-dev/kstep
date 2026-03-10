@@ -1,0 +1,19 @@
+● Read bugs/6c125b85_export_hidden_tracepoints_modules.md
+  └ 37 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 6c125b85f3c8 2>/dev/null | head -200
+  └ 97 lines...
+
+This is a compile-time/module-loading issue (missing symbol exports), not a runtime scheduler bug. The bug file explicitly says it cannot be reproduced with kSTEP. I'll skip it.
+
+● Find bug line in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n '6c125b85f3c8' TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+

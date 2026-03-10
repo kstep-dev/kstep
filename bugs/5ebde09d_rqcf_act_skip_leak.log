@@ -1,0 +1,22 @@
+● Read bugs/5ebde09d_rqcf_act_skip_leak.md
+  └ 25 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the commit patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5ebde09d9170 2>/dev/null | head -300
+  └ 248 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -60
+  └ 61 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Find RQCF flag definitions
+  $ cd /users/szhong/kSTEP && grep -r "RQCF" linux/current/kernel/sched/ 2>/dev/null | head -30
+  └ 22 lines...
+
