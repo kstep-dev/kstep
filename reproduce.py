@@ -534,6 +534,13 @@ bugs = [
         ],
     ),
     Bug(
+        driver=Driver(name="do_set_cpus_fix"),
+        linux=[
+            Linux(name="buggy", version="af13e5e437dc~1"),
+            Linux(name="fixed", version="af13e5e437dc"),
+        ],
+    ),
+    Bug(
         driver=Driver(name="affine_move_self", num_cpus=4),
         linux=[
             Linux(name="buggy", version="9e81889c7648~1"),
