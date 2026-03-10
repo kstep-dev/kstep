@@ -386,6 +386,13 @@ bugs = [
             Linux(name="fixed", version="77d7dc8bef48"),
         ],
     ),
+    Bug(
+        driver=Driver(name="setaffinity_warn", num_cpus=4),
+        linux=[
+            Linux(name="buggy", version="70ee7947a290~1"),
+            Linux(name="fixed", version="70ee7947a290"),
+        ],
+    ),
 ]
 
 

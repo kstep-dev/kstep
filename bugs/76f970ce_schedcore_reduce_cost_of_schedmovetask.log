@@ -115,3 +115,49 @@
 
 ● Request failed due to a transient API error. Retrying...
 
+● Request failed due to a transient API error. Retrying...
+
+● Read topo.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/topo.c
+  └ 242 lines...
+
+● Read run.py to understand execution
+  $ cd /users/szhong/kSTEP && cat run.py | head -80
+  └ 81 lines...
+
+● Check kernel version numbers
+  $ cd /users/szhong/kSTEP && head -5 linux/current/Makefile | grep "VERSION\|PATCHLEVEL\|SUBLEVEL"
+  └ 5 lines...
+
+● Verify kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -5 && echo "---" && head -6
+  linux/current/Makefile
+  └ 13 lines...
+
+● Check fix commit location
+  $ cd /users/szhong/kSTEP && git -C linux/current log --all --oneline 76f970ce51c8 -1 2>/dev/null
+  && git -C linux/current log --all --oneline 76f970ce51c8~1 -1 2>/dev/null
+  └ 3 lines...
+
+● Resolve fix commit
+  $ cd /users/szhong/kSTEP && git -C linux/current rev-parse 76f970ce51c8 2>/dev/null && git -C
+  linux/current show --oneline -s 76f970ce51c8 2>/dev/null
+  └ 3 lines...
+
+● Check parent commit
+  $ cd /users/szhong/kSTEP && git -C linux/current show --oneline -s 76f970ce51c8~1 && echo "---" &&
+   git -C linux/current rev-parse 76f970ce51c8~1
+  └ 4 lines...
+
+● Find kernel version for buggy commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 76f970ce51c8~1 --ancestry-path
+  --merges --first-parent | head -5 && echo "---" && git -C linux/current describe --tags --abbrev=0
+   76f970ce51c8~1 2>/dev/null || git -C linux/current tag --contains 76f970ce51c8~1
+  --sort=version:refname | head -3
+  └ 4 lines...
+
+● Verify worktree checkout
+  $ cd /users/szhong/kSTEP && ls -la linux/current && git -C linux/sched_move_buggy log --oneline -3
+   && echo "---" && head -6 linux/sched_move_buggy/Makefile
+  └ 12 lines...
+

@@ -98,3 +98,111 @@
 
 ● Request failed due to a transient API error. Retrying...
 
+● Check kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current show 70ee7947a290~1:Makefile | head -10
+  └ 11 lines...
+
+Now I have a clear understanding of the bug. Let me create the driver and start testing.
+
+● Create kmod/drivers/setaffinity_warn.c (+138)
+
+Now let me checkout the buggy kernel and build:
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 70ee7947a290~1 setaffinity_warn_buggy 2>&1 | tail
+  -5
+  └ 6 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=setaffinity_warn_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=setaffinity_warn_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Good, build succeeded. Now let me run it:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py setaffinity_warn --linux_name setaffinity_warn_buggy
+  --num_cpus 4 2>&1 | tail -20
+  └ 21 lines...
+
+I can see the WARN_ON_ONCE triggered! The stack trace shows `__sched_setaffinity+0xf8/0x110` which is exactly the code path with the WARN. Let me check the log for the kstep_fail message:
+
+● Check bug detection output
+  $ cd /users/szhong/kSTEP && grep -E "kstep_|pass|fail|WARN|status" data/logs/latest.log | tail -20
+  └ 2 lines...
+
+● Check test result
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "status|pass|fail|WARN" | tail -10
+  └ 4 lines...
+
+● Check JSONL output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl | tail -5
+  └ 6 lines...
+
+The bug is reproduced on the buggy kernel. The WARN_ON_ONCE fires at `kernel/sched/syscalls.c:1203` in `__sched_setaffinity`. Now let me test on the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 70ee7947a290 setaffinity_warn_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=setaffinity_warn_fixed 2>&1 | tail -5 && make
+  kstep LINUX_NAME=setaffinity_warn_fixed 2>&1 | tail -5
+  └ 11 lines...
+
+● Run driver on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py setaffinity_warn --linux_name setaffinity_warn_fixed
+  --num_cpus 4 2>&1 | tail -10
+  └ 11 lines...
+
+● Check fixed kernel result
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl | tail -3
+  └ 4 lines...
+
+Bug triggers on buggy kernel (`fail`), no warning on fixed kernel (`pass`). Now let me add it to reproduce.py and update TODO.md.
+
+● Find bugs list location
+  $ cd /users/szhong/kSTEP && grep -n "bugs = \[" reproduce.py
+  └ 2 lines...
+
+● Find TODO entry for this bug
+  $ cd /users/szhong/kSTEP && grep -n "70ee7947a290" TODO.md
+  └ 2 lines...
+
+● Count reproduced bugs
+  $ cd /users/szhong/kSTEP && grep -c "\- \[x\]" TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Check reproduce.py end of bugs list
+  $ cd /users/szhong/kSTEP && tail -5 reproduce.py | head -3; echo "---"; sed -n '18,25p'
+  reproduce.py
+  └ 13 lines...
+
+● Find end of bugs list
+  $ cd /users/szhong/kSTEP && grep -n "^]" reproduce.py | head -3
+  └ 2 lines...
+
+● Read reproduce.py lines 383-389
+  └ 7 lines read
+
+✗ Edit reproduce.py
+  No match found
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+● Read reproduce.py lines 383-390
+  └ 7 lines read
+
+● Edit reproduce.py (+7)
+
+Now commit and push:
+

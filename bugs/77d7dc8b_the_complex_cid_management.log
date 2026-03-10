@@ -182,3 +182,27 @@ Now let me make all the updates:
 
 ● Edit TODO.md (+1 -1)
 
+● Commit changes
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: mmcid_compact (77d7dc8bef48)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>&1
+  └ 4 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced bug `77d7dc8bef48` (sched/mmcid: Revert the complex CID management).
+
+**Summary:**
+- **Bug**: Complex CID management uses lazy-put on context switch-out — cidmask bits stay set, requiring compaction work (`task_tick_mm_cid` → `task_work_add`) that forces arbitrary tasks into cleanup work on exit to userspace, causing latency spikes.
+- **Fix**: Simple bitmap allocation clears cidmask bits immediately via `cpumask_clear_cpu()` on switch-out.
+- **Driver**: `mmcid_compact` — after pausing a task, cidmask weight remains 1 on buggy (lazy-cached) but drops to 0 on fixed (immediately freed).
+
+
+Total usage est:        6 Premium requests
+API time spent:         5m 17s
+Total session time:     9m 17s
+Total code changes:     +100 -2
+Breakdown by AI model:
+ claude-opus-4.6-1m      1.8m in, 17.6k out, 1.7m cached (Est. 6 Premium requests)
