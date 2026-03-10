@@ -1,0 +1,24 @@
+● Read bugs/8d737320_fix_build_for_modules_using.md
+  └ 36 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 8d737320166b 2>/dev/null | head -200
+  └ 92 lines...
+
+This is a build-time bug (missing `EXPORT_SYMBOL_GPL`), not a runtime bug. Let me verify whether we can demonstrate the build failure, then skip appropriately.
+
+● Check if kSTEP uses the affected function
+  $ cd /users/szhong/kSTEP && grep -r "set_tsk_need_resched\|__trace_set_need_resched" kmod/
+  2>/dev/null | head -20
+  └ 4 lines...
+
+● Check header definition
+  $ cd /users/szhong/kSTEP && git -C linux/current grep -n "set_tsk_need_resched" -- include/
+  2>/dev/null | head -20
+  └ 2 lines...
+
+● Check set_tsk_need_resched definition
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8d737320166b~1:include/linux/sched.h
+  2>/dev/null | grep -A 20 "static inline void set_tsk_need_resched"
+  └ 22 lines...
+

@@ -1,0 +1,36 @@
+● Read bugs/8ba09b1d_print_stack_trace_with_kern.md
+  └ 42 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 8ba09b1dc131 2>/dev/null | head -200
+  └ 94 lines...
+
+This is a logging-level-only bug (`show_stack` vs `show_stack_loglvl` in `sched_show_task()`). It doesn't affect scheduler behavior — only the log level prefix of stack traces. Let me check if there's any precedent for such bugs in the project.
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && head -60 reproduce.py
+  └ 61 lines...
+
+● Count skipped bugs
+  $ cd /users/szhong/kSTEP && grep -c '\- \[-\]' TODO.md
+  └ 2 lines...
+
+● Check for similar logging bugs
+  $ cd /users/szhong/kSTEP && grep 'log\|KERN_INFO\|printk\|cosmetic\|logging' TODO.md | head -20
+  └ 16 lines...
+
+This is a pure logging cosmetic bug — changing `show_stack()` to `show_stack_loglvl()` to use KERN_INFO. No scheduler behavior is affected. This cannot be reproduced via kSTEP. I'll skip it.
+
+● Find the line in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n '8ba09b1dc131' TODO.md
+  └ 2 lines...
+
+● Find the counter line
+  $ cd /users/szhong/kSTEP && grep -n 'Total:.*reproduced' TODO.md | head -3
+  └ 2 lines...
+
+● Edit TODO.md (+1 -1)
+

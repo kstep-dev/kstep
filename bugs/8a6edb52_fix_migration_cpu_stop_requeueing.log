@@ -1,0 +1,58 @@
+● Read bugs/8a6edb52_fix_migration_cpu_stop_requeueing.md
+  └ 39 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 8a6edb5257e2 2>/dev/null | head -300
+  └ 301 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Read rest of patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 8a6edb5257e2 2>/dev/null | tail -100
+  └ 101 lines...
+
+● Get buggy kernel version info
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 8a6edb5257e2~1 -1
+  └ 2 lines...
+
+● Find migration drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | grep -i migra
+  └ 4 lines...
+
+● Read reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -60
+  └ 61 lines...
+
+● Read migration driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migrate_overflow.c
+  └ 77 lines...
+
+● Read existing migration_cpu_stop driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migration_cpu_stop_warn.c
+  └ 107 lines...
+
+● Find affine_move_task in buggy kernel
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8a6edb5257e2~1:kernel/sched/core.c | grep -n
+   "affine_move_task" | head -10
+  └ 4 lines...
+
+● Get kernel version info
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 8a6edb5257e2~1 -1 && git -C
+  linux/current log --oneline 8a6edb5257e2 -1
+  └ 3 lines...
+
+● Read buggy migration_cpu_stop
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8a6edb5257e2~1:kernel/sched/core.c | sed -n
+  '1893,2000p'
+  └ 108 lines...
+
+● Read buggy affine_move_task
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8a6edb5257e2~1:kernel/sched/core.c | sed -n
+  '2190,2320p'
+  └ 132 lines...
+

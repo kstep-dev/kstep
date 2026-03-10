@@ -1,0 +1,44 @@
+● Read bugs/8d4d9c7b_fix_memory_corruption_caused_multiple.md
+  └ 39 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 8d4d9c7b4333 2>/dev/null | head -200
+  └ 138 lines...
+
+● Grep "kstep_read|filp_open|kernel_read|vfs_read" (/users/szhong/kSTEP/kmod)
+  └ 7 files found
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -30
+  └ 31 lines...
+
+● Check kernel.c for read functions
+  $ cd /users/szhong/kSTEP && grep -n 'kstep_read\|kernel_read\|filp_open\|vfs_read' kmod/kernel.c |
+   head -30
+  └ 2 lines...
+
+● Check drivers that use file operations
+  $ cd /users/szhong/kSTEP && grep -n 'filp_open\|kernel_read\|vfs_read'
+  kmod/drivers/null_term_scaling.c kmod/drivers/setaffinity_warn.c
+  └ 3 lines...
+
+● Read kmod/kernel.c
+  └ 240 lines read
+
+● Check kernel version of buggy commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -1 8d4d9c7b4333~1 2>/dev/null
+  └ 2 lines...
+
+● Determine kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline --format='%H %s' 8d4d9c7b4333~1 -1
+  && git -C linux/current describe --tags 8d4d9c7b4333~1 2>/dev/null || git -C linux/current log
+  --oneline 8d4d9c7b4333~1 -5
+  └ 3 lines...
+
+● Check kernel version from Makefile
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8d4d9c7b4333~1:Makefile | head -5
+  └ 6 lines...
+
