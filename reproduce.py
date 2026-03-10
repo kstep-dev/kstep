@@ -505,6 +505,13 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="double_clock"),
+        linux=[
+            Linux(name="buggy", version="96500560f0c73c71bca1b27536c6254fa0e8ce37~1"),
+            Linux(name="fixed", version="96500560f0c73c71bca1b27536c6254fa0e8ce37"),
+        ],
+    ),
 ]
 
 
