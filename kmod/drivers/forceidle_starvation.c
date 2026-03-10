@@ -17,7 +17,7 @@
 
 #include "internal.h"
 
-#if LINUX_VERSION_CODE == KERNEL_VERSION(5, 13, 0)
+#if LINUX_VERSION_CODE == KERNEL_VERSION(5, 13, 0) && defined(CONFIG_SCHED_CORE)
 
 static struct task_struct *task;
 static int resched_seen;

@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 66/400 reproduced**
+**Total: 67/400 reproduced**
 
 ---
 
@@ -92,7 +92,7 @@
 - [x] `f1dfdab694eb` sched/vtime: Prevent unstable evaluation of WARN(vtime->state) — [`f1dfdab6_prevent_unstable_evaluation_warnvtimestate.md`](bugs/f1dfdab6_prevent_unstable_evaluation_warnvtimestate.md) <!-- driver:vtime_warn attempts:1 -->
 - [-] `f912d051619d` sched: remove redundant on_rq status change — [`f912d051_remove_redundant_on_rq_status_change.md`](bugs/f912d051_remove_redundant_on_rq_status_change.md) <!-- skipped:pure-code-cleanup-no-behavioral-difference-redundant-assignments-set-identical-values attempts:1 -->
 - [x] `fd844ba9ae59` Check cpus_mask, not cpus_ptr in __set_cpus_allowed_ptr(), to fix mask corruption — [`fd844ba9_check_cpus_mask_not_cpus_ptr___set_cpus_allowed_ptr.md`](bugs/fd844ba9_check_cpus_mask_not_cpus_ptr___set_cpus_allowed_ptr.md) <!-- driver:cpus_mask_check attempts:1 -->
-- [ ] `fe7a11c78d2a` Fix unbalance set_rq_online/offline() in sched_cpu_deactivate() — [`fe7a11c7_fix_unbalance_set_rq_onlineoffline_sched_cpu_deactivate.md`](bugs/fe7a11c7_fix_unbalance_set_rq_onlineoffline_sched_cpu_deactivate.md)
+- [x] `fe7a11c78d2a` Fix unbalance set_rq_online/offline() in sched_cpu_deactivate() — [`fe7a11c7_fix_unbalance_set_rq_onlineoffline_sched_cpu_deactivate.md`](bugs/fe7a11c7_fix_unbalance_set_rq_onlineoffline_sched_cpu_deactivate.md) <!-- driver:rq_online_rollback attempts:1 -->
 
 ## CFS (Completely Fair Scheduler) (32)
 

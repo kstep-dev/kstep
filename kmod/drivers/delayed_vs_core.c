@@ -17,7 +17,7 @@
 
 #include "internal.h"
 
-#if LINUX_VERSION_CODE == KERNEL_VERSION(6, 11, 0)
+#if LINUX_VERSION_CODE == KERNEL_VERSION(6, 11, 0) && defined(ENQUEUE_DELAYED)
 
 static struct task_struct *task_a;
 

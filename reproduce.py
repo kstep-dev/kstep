@@ -755,6 +755,13 @@ bugs = [
             Linux(name="fixed", version="15257cc2f905"),
         ],
     ),
+    Bug(
+        driver=Driver(name="rq_online_rollback", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="fe7a11c78d2a~1"),
+            Linux(name="fixed", version="fe7a11c78d2a"),
+        ],
+    ),
 ]
 
 

@@ -17,7 +17,7 @@
 #include <linux/kthread.h>
 #include <linux/version.h>
 
-#if LINUX_VERSION_CODE == KERNEL_VERSION(5, 6, 0)
+#if LINUX_VERSION_CODE == KERNEL_VERSION(5, 6, 0) && defined(CONFIG_VIRT_CPU_ACCOUNTING_GEN)
 
 #define TARGET_CPU 1
 
@@ -71,9 +71,14 @@ static void run(void) {
   // Debug: check that toggler is actually running on CPU 1
   {
     struct task_struct *curr = READ_ONCE(target_rq->curr);
+#ifdef CONFIG_VIRT_CPU_ACCOUNTING_GEN
     TRACE_INFO("CPU %d curr: pid=%d comm=%s vtime.state=%d vtime.cpu=%d",
                TARGET_CPU, curr->pid, curr->comm,
                READ_ONCE(curr->vtime.state), READ_ONCE(curr->vtime.cpu));
+#else
+    TRACE_INFO("CPU %d curr: pid=%d comm=%s",
+               TARGET_CPU, curr->pid, curr->comm);
+#endif
     TRACE_INFO("toggler pid=%d on_cpu=%d", toggler_task->pid,
                toggler_task->on_cpu);
   }
