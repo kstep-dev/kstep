@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 5/400 reproduced**
+**Total: 6/400 reproduced**
 
 ---
 
@@ -14,7 +14,7 @@
 - [ ] `1293771e4353` sched: Fix migration_cpu_stop() WARN — [`1293771e_fix_migration_cpu_stop_warn.md`](bugs/1293771e_fix_migration_cpu_stop_warn.md)
 - [ ] `156ec6f42b8d` sched/features: Fix hrtick reprogramming — [`156ec6f4_fix_hrtick_reprogramming.md`](bugs/156ec6f4_fix_hrtick_reprogramming.md)
 - [-] `15faafc6b449` sched,init: Fix DEBUG_PREEMPT vs early boot — [`15faafc6_init_fix_debug_preempt_vs.md`](bugs/15faafc6_init_fix_debug_preempt_vs.md) <!-- skipped:boot-time-only-init-task-flag-management-identical-post-boot-state attempts:1 -->
-- [ ] `1862d8e264de` sched: Fix faulty assertion in sched_change_end() — [`1862d8e2_fix_faulty_assertion_in_sched.md`](bugs/1862d8e2_fix_faulty_assertion_in_sched.md)
+- [x] `1862d8e264de` sched: Fix faulty assertion in sched_change_end() — [`1862d8e2_fix_faulty_assertion_in_sched.md`](bugs/1862d8e2_fix_faulty_assertion_in_sched.md) <!-- driver:sched_change_assert attempts:1 -->
 - [ ] `223baf9d17f2` sched: Fix performance regression introduced by mm_cid — [`223baf9d_performance_regression_introduced_by_mm.md`](bugs/223baf9d_performance_regression_introduced_by_mm.md)
 - [ ] `234a503e670b` sched: Reject CPU affinity changes based on task_cpu_possible_mask() — [`234a503e_reject_cpu_affinity_changes_based.md`](bugs/234a503e_reject_cpu_affinity_changes_based.md)
 - [ ] `248cc9993d1c` sched/cpuacct: Fix charge percpu cpuusage — [`248cc999_charge_percpu_cpuusage.md`](bugs/248cc999_charge_percpu_cpuusage.md)

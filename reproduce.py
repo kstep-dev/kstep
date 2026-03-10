@@ -189,6 +189,19 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="sched_change_assert", num_cpus=2),
+        linux=[
+            Linux(
+                name="buggy",
+                version="1862d8e264def8425d682f1177e22f9fe7d947ea~1",
+            ),
+            Linux(
+                name="fixed",
+                version="1862d8e264def8425d682f1177e22f9fe7d947ea",
+            ),
+        ],
+    ),
 ]
 
 

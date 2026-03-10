@@ -2,6 +2,20 @@
 
 #include "internal.h"
 
+// FTRACE_OPS_FL_RECURSION was renamed from FTRACE_OPS_FL_RECURSION_SAFE in 5.11
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
+#define FTRACE_OPS_FL_RECURSION FTRACE_OPS_FL_RECURSION_SAFE
+#endif
+
+// Before 5.11, ftrace callbacks use struct pt_regs instead of struct ftrace_regs
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 11, 0)
+#define KSTEP_FTRACE_REGS struct pt_regs
+#define KSTEP_FTRACE_REGS_TO_PT(fregs) (fregs)
+#else
+#define KSTEP_FTRACE_REGS struct ftrace_regs
+#define KSTEP_FTRACE_REGS_TO_PT(fregs) ((void *)(fregs))
+#endif
+
 #define KSTEP_TRACE_FUNC(name, callback)                                       \
   do {                                                                         \
     static struct ftrace_ops callback##_op = {                                 \
@@ -25,10 +39,10 @@ static DEFINE_PER_CPU(int, lb_dst_cpu);
 static DEFINE_PER_CPU(struct sched_domain *, lb_sd);
 static void on_sched_balance_enter(unsigned long ip, unsigned long parent_ip,
                                    struct ftrace_ops *op,
-                                   struct ftrace_regs *fregs) {
-  int this_cpu = (int)regs_get_kernel_argument((void *)fregs, 0);
+                                   KSTEP_FTRACE_REGS *fregs) {
+  int this_cpu = (int)regs_get_kernel_argument(KSTEP_FTRACE_REGS_TO_PT(fregs), 0);
   struct sched_domain *sd =
-      (struct sched_domain *)regs_get_kernel_argument((void *)fregs, 2);
+      (struct sched_domain *)regs_get_kernel_argument(KSTEP_FTRACE_REGS_TO_PT(fregs), 2);
   if (this_cpu == 0 || kstep_jiffies_get() == 0)
     return;
   __this_cpu_write(lb_dst_cpu, this_cpu);
@@ -49,7 +63,7 @@ void kstep_trace_sched_balance_begin(void) {
 // find_busiest_group -> sched_balance_find_src_group
 static void on_sched_balance_selected(unsigned long ip, unsigned long parent_ip,
                                       struct ftrace_ops *op,
-                                      struct ftrace_regs *fregs) {
+                                      KSTEP_FTRACE_REGS *fregs) {
   int cpu = __this_cpu_read(lb_dst_cpu);
   struct sched_domain *sd = __this_cpu_read(lb_sd);
   if (cpu == 0 || kstep_jiffies_get() == 0)
@@ -70,10 +84,10 @@ void kstep_trace_sched_balance_selected(void) {
 // Also sets min_vruntime for new task groups
 static void on_sched_group_alloc(unsigned long ip, unsigned long parent_ip,
                                  struct ftrace_ops *op,
-                                 struct ftrace_regs *fregs) {
-  struct task_group *tg = (void *)regs_get_kernel_argument((void *)fregs, 0);
-  struct cfs_rq *cfs_rq = (void *)regs_get_kernel_argument((void *)fregs, 1);
-  int cpu = (int)regs_get_kernel_argument((void *)fregs, 3);
+                                 KSTEP_FTRACE_REGS *fregs) {
+  struct task_group *tg = (void *)regs_get_kernel_argument(KSTEP_FTRACE_REGS_TO_PT(fregs), 0);
+  struct cfs_rq *cfs_rq = (void *)regs_get_kernel_argument(KSTEP_FTRACE_REGS_TO_PT(fregs), 1);
+  int cpu = (int)regs_get_kernel_argument(KSTEP_FTRACE_REGS_TO_PT(fregs), 3);
 
 // https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
