@@ -53,14 +53,15 @@ static void run(void)
 	// kstep_tick triggers scheduler_tick on CPUs >= 1
 	kstep_tick();
 
+	// Disable kprobe before reading results to avoid re-entry
+	disable_kprobe(&freq_tick_kp);
+
 	for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
 		unsigned int cnt = per_cpu(freq_tick_count, cpu);
 		TRACE_INFO("CPU %d: arch_scale_freq_tick called %u times", cpu, cnt);
 	}
 
 	unsigned int cpu1_count = per_cpu(freq_tick_count, 1);
-
-	unregister_kprobe(&freq_tick_kp);
 
 	if (cpu1_count > 0) {
 		kstep_pass("Bug: arch_scale_freq_tick called %u times on "

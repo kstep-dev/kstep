@@ -438,6 +438,13 @@ bugs = [
             Linux(name="fixed", version="82c387ef7568"),
         ],
     ),
+    Bug(
+        driver=Driver(name="resched_warn", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="8061b9f5e111~1"),
+            Linux(name="fixed", version="8061b9f5e111"),
+        ],
+    ),
 ]
 
 

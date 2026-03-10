@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 32/400 reproduced**
+**Total: 33/400 reproduced**
 
 ---
 
@@ -48,7 +48,7 @@
 - [-] `7e406d1ff39b` sched: Avoid double preemption in __cond_resched_*lock*() — [`7e406d1f_avoid_double_preemption_in_condreschedlock.md`](bugs/7e406d1f_avoid_double_preemption_in_condreschedlock.md) <!-- skipped:requires CONFIG_PREEMPT=y but kSTEP uses PREEMPT_NONE; double schedule is overhead-only with no observable state difference attempts:1 -->
 - [x] `7fb3ff22ad87` sched/core: Fix arch_scale_freq_tick() on tickless systems — [`7fb3ff22_archscalefreqtick_on_tickless_systems.md`](bugs/7fb3ff22_archscalefreqtick_on_tickless_systems.md) <!-- driver:freq_tick attempts:1 -->
 - [x] `8039e96fcc1d` Fix forced idle sibling starvation corner case — [`8039e96f_forced_idle_sibling_starvation_corner.md`](bugs/8039e96f_forced_idle_sibling_starvation_corner.md) <!-- driver:forceidle_starvation attempts:1 -->
-- [ ] `8061b9f5e111` sched/debug: Change need_resched warnings to pr_err — [`8061b9f5_change_needresched_warnings_to_prerr.md`](bugs/8061b9f5_change_needresched_warnings_to_prerr.md)
+- [x] `8061b9f5e111` sched/debug: Change need_resched warnings to pr_err — [`8061b9f5_change_needresched_warnings_to_prerr.md`](bugs/8061b9f5_change_needresched_warnings_to_prerr.md) <!-- driver:resched_warn attempts:1 -->
 - [x] `82c387ef7568` sched/core: Prevent rescheduling when interrupts are disabled — [`82c387ef_prevent_rescheduling_when_interrupts_are.md`](bugs/82c387ef_prevent_rescheduling_when_interrupts_are.md) <!-- driver:cond_resched_irq attempts:1 -->
 - [x] `87ca4f9efbd7` Fix use-after-free bug in dup_user_cpus_ptr() — [`87ca4f9e_fix_useafterfree_bug_dup_user.md`](bugs/87ca4f9e_fix_useafterfree_bug_dup_user.md) <!-- driver:dup_user_cpus_uaf attempts:1 -->
 - [ ] `8a6edb5257e2` sched: Fix migration_cpu_stop() requeueing — [`8a6edb52_fix_migration_cpu_stop_requeueing.md`](bugs/8a6edb52_fix_migration_cpu_stop_requeueing.md)

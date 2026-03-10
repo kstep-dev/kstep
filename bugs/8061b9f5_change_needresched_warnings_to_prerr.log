@@ -195,3 +195,104 @@ Now let me checkout the buggy kernel and build:
   $ cd /users/szhong/kSTEP && ./checkout_linux.py 8061b9f5e111~1 resched_warn_buggy 2>&1 | tail -5
   └ 6 lines...
 
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=resched_warn_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep for buggy kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=resched_warn_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+Build succeeded. Let me run it on the buggy kernel:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py resched_warn --linux_name resched_warn_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Check log output
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | grep -E
+  "KSTEP|status|WARN|resched_latency|need_resched" | head -20
+  └ 2 lines...
+
+● Check log for results
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  "status|WARN|resched_latency|need_resched|kstep_fail|kstep_pass|Setting" | head -20
+  └ 10 lines...
+
+The WARN fired on the buggy kernel. Let me check the test result:
+
+● Check test output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl | tail -5
+  └ 6 lines...
+
+Bug triggers on buggy kernel — `kstep_fail` detected the WARN. Now let me test the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 8061b9f5e111 resched_warn_fixed 2>&1 | tail -3
+  └ 4 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=resched_warn_fixed 2>&1 | tail -3
+  └ 4 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=resched_warn_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py resched_warn --linux_name resched_warn_fixed 2>&1 | tail -10
+  └ 11 lines...
+
+● Check fixed kernel results
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl | tail -3 && echo "---" && cat data/latest.log |
+   grep -E "status|WARNING|resched_latency|pr_err|need_resched" | head -10
+  └ 7 lines...
+
+Bug reproduces on buggy kernel (WARN + `kstep_fail`) and is fixed on the fixed kernel (`pr_err` without TAINT_WARN + `kstep_pass`). Now let me update TODO.md, reproduce.py, and commit.
+
+● Find the bug in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n "8061b9f5e111" TODO.md
+  └ 2 lines...
+
+● Count current reproduced
+  $ cd /users/szhong/kSTEP && grep -c "\- \[x\]" TODO.md
+  └ 2 lines...
+
+● Find total counter
+  $ cd /users/szhong/kSTEP && grep -n "Total:.*reproduced" TODO.md | head -3
+  └ 2 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+Now add to reproduce.py:
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && tail -20 reproduce.py
+  └ 21 lines...
+
+● Check bugs list format
+  $ cd /users/szhong/kSTEP && grep -A5 "^bugs = \[" reproduce.py | head -10
+  └ 7 lines...
+
+● Check Bug class structure
+  $ cd /users/szhong/kSTEP && grep -B2 -A15 "class Bug" reproduce.py | head -30
+  └ 18 lines...
+
+● Check existing similar entries
+  $ cd /users/szhong/kSTEP && grep -B1 -A12
+  "migration_cpu_stop_warn\|resched_warn\|null_term_scaling" reproduce.py | head -30
+  └ 30 lines...
+
+● Find end of bugs list
+  $ cd /users/szhong/kSTEP && grep -n "^]" reproduce.py | head -3
+  └ 2 lines...
+
+● Read reproduce.py lines 435-441
+  └ 7 lines read
+
+● Edit reproduce.py (+7)
+
+Now commit and push:
+

@@ -257,3 +257,31 @@ Now update TODO.md:
 
 Now commit and push:
 
+● Git commit
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: cond_resched_irq
+  (82c387ef7568)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>&1
+  └ 4 lines...
+
+● Git push
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced and committed. Here's the summary:
+
+**Bug**: `82c387ef7568` — `__cond_resched()` calls `schedule()` even when interrupts are disabled, re-enabling interrupts and violating the interrupt-disabled invariant.
+
+**Driver**: `cond_resched_irq` — Disables interrupts, sets NEED_RESCHED (both thread flag and x86 preempt_count bit), then calls `__cond_resched()`. On the buggy kernel, `schedule()` runs and re-enables interrupts. On the fixed kernel, the added `!irqs_disabled()` check causes it to return early.
+
+**Results**:
+- Buggy kernel: `__cond_resched` returned 1, `irqs_disabled=0` → **FAIL** ✓
+- Fixed kernel: `__cond_resched` returned 0, `irqs_disabled=1` → **PASS** ✓
+
+
+Total usage est:        6 Premium requests
+API time spent:         6m 57s
+Total session time:     11m 53s
+Total code changes:     +91 -12
+Breakdown by AI model:
+ claude-opus-4.6-1m      2.4m in, 23.4k out, 2.4m cached (Est. 6 Premium requests)
