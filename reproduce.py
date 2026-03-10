@@ -445,6 +445,13 @@ bugs = [
             Linux(name="fixed", version="8061b9f5e111"),
         ],
     ),
+    Bug(
+        driver=Driver(name="freq_tick", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="7fb3ff22ad87~1"),
+            Linux(name="fixed", version="7fb3ff22ad87"),
+        ],
+    ),
 ]
 
 
