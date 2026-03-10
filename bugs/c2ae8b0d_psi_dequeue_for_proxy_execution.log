@@ -221,3 +221,155 @@ Now let's checkout the buggy kernel and build:
 ● Read shell output: Waiting up to 60 seconds for command output
   └ 7 lines...
 
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 7 lines...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 7 lines...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 10 lines...
+
+● Build buggy linux kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=psi_dequeue_proxy_buggy 2>&1 | tail -30
+  └ 31 lines...
+
+Good, kernel built. Now let me check if CONFIG_PSI was enabled and build kstep:
+
+● Verify PSI config
+  $ cd /users/szhong/kSTEP && grep CONFIG_PSI linux/psi_dequeue_proxy_buggy/.config | head -5
+  └ 3 lines...
+
+● Build kstep for buggy kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=psi_dequeue_proxy_buggy 2>&1 | tail -30
+  └ 31 lines...
+
+● Check linux-patch target
+  $ cd /users/szhong/kSTEP && grep -A 20 "linux-patch" Makefile | head -25
+  └ 26 lines...
+
+● List scripts
+  $ cd /users/szhong/kSTEP && ls scripts/ 2>/dev/null
+  └ 5 lines...
+
+● Check existing 6.18 build
+  $ cd /users/szhong/kSTEP && ls build/do_set_cpus_fix_buggy/ 2>/dev/null
+  └ 2 lines...
+
+● Check reset.c version issue
+  $ cd /users/szhong/kSTEP && cat kmod/reset.c | grep -n "min_vruntime" | head -5
+  └ 2 lines...
+
+● Read reset.c for version guard
+  $ cd /users/szhong/kSTEP && cat kmod/reset.c | head -60
+  └ 61 lines...
+
+● Check cfs_rq field names
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/sched.h
+  2>/dev/null | grep -n "min_vruntime\|avg_vruntime\|zero_vruntime" | head -10
+  └ 5 lines...
+
+● Check do_set_cpus build version
+  $ cd /users/szhong/kSTEP && git -C linux/master log --oneline do_set_cpus_fix_buggy 2>/dev/null |
+  head -1; git -C linux/master show-ref --head 2>/dev/null | grep do_set 2>/dev/null; ls -la
+  linux/do_set_cpus_fix_buggy 2>/dev/null | head -3
+  └ 4 lines...
+
+● Check do_set_cpus kernel commit
+  $ cd /users/szhong/kSTEP && git -C linux/do_set_cpus_fix_buggy log --oneline -1 2>/dev/null
+  └ 2 lines...
+
+● Check do_set_cpus kernel fields
+  $ cd /users/szhong/kSTEP && git -C linux/do_set_cpus_fix_buggy show HEAD:kernel/sched/sched.h
+  2>/dev/null | grep "min_vruntime\|zero_vruntime" | head -5
+  └ 3 lines...
+
+● Check zero_vruntime commit
+  $ cd /users/szhong/kSTEP && git -C linux/master log --oneline 79f3f9bedd14 -1 2>/dev/null && git
+  -C linux/master describe --tags 79f3f9bedd14 2>/dev/null
+  └ 3 lines...
+
+● Find vruntime rename commit
+  $ cd /users/szhong/kSTEP && git -C linux/master log --oneline --all --format="%h %s" --
+  kernel/sched/sched.h 2>/dev/null | grep -i "zero_vruntime\|min_vruntime.*rename\|vruntime.*rename"
+   | head -5
+  └ 1 line...
+
+● Check do_set_cpus commit version
+  $ cd /users/szhong/kSTEP && git -C linux/master describe --tags 73cbcfe255f7 2>/dev/null
+  └ 2 lines...
+
+● Check kmod Makefile
+  $ cd /users/szhong/kSTEP && cat kmod/Makefile
+  └ 2 lines...
+
+● Get all build errors
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=psi_dequeue_proxy_buggy 2>&1 | grep
+  "Error\|error:" | head -20
+  └ 20 lines...
+
+● Check zero_vruntime commit changes
+  $ cd /users/szhong/kSTEP && git -C linux/master show 79f3f9bedd14 --stat 2>/dev/null | head -10
+  └ 10 lines...
+
+● Verify zero_vruntime exists
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/sched.h
+  2>/dev/null | grep -c "zero_vruntime"
+  └ 2 lines...
+
+Let me fix the framework compatibility issues for this kernel version:
+
+● Find all min_vruntime refs
+  $ cd /users/szhong/kSTEP && grep -n "min_vruntime" kmod/reset.c kmod/trace.c
+  kmod/drivers/lag_vruntime.c
+  └ 7 lines...
+
+● See context of errors
+  $ cd /users/szhong/kSTEP && sed -n '45,65p' kmod/reset.c && echo "---" && sed -n '90,100p'
+  kmod/trace.c && echo "---" && sed -n '30,45p' kmod/drivers/lag_vruntime.c && echo "---" && sed -n
+  '95,105p' kmod/kernel.c
+  └ 62 lines...
+
+● Check vfs_mkdir signature
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:include/linux/fs.h
+  2>/dev/null | grep -A2 "vfs_mkdir"
+  └ 4 lines...
+
+✗ view: view file
+  "path": Required
+
+● Read kmod/reset.c lines 47-53
+  └ 6 lines read
+
+● Read kmod/trace.c lines 92-100
+  └ 9 lines read
+
+● Read kmod/kernel.c lines 90-110
+  └ 20 lines read
+
+● Read kmod/drivers/lag_vruntime.c lines 30-42
+  └ 13 lines read
+
+● Check mmcid_compact guard
+  $ cd /users/szhong/kSTEP && head -5 kmod/drivers/mmcid_compact.c
+  └ 6 lines...
+
+● Check mmcid version guard
+  $ cd /users/szhong/kSTEP && grep "LINUX_VERSION_CODE" kmod/drivers/mmcid_compact.c | head -3
+  └ 2 lines...
+
+● Check vfs_mkdir change commit
+  $ cd /users/szhong/kSTEP && git -C linux/master log --oneline --all e12d203b8c88 -1 2>/dev/null &&
+   git -C linux/master describe e12d203b8c88 2>/dev/null
+  └ 3 lines...
+
+● Check vfs_mkdir in do_set_cpus kernel
+  $ cd /users/szhong/kSTEP && grep "vfs_mkdir" linux/do_set_cpus_fix_buggy/include/linux/fs.h
+  2>/dev/null | head -3
+  └ 2 lines...
+
+● Full vfs_mkdir signature in do_set_cpus
+  $ cd /users/szhong/kSTEP && grep -A2 "vfs_mkdir" linux/do_set_cpus_fix_buggy/include/linux/fs.h
+  2>/dev/null | head -5
+  └ 4 lines...
+

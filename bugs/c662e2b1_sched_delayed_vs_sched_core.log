@@ -266,3 +266,140 @@ The bug triggers on the buggy kernel: `After enqueue with sched_delayed=1: enque
   $ cd /users/szhong/kSTEP && grep "delayed_vs_core" data/logs/log-20260310_130700.log
   └ 1 line...
 
+● Check end of log
+  $ cd /users/szhong/kSTEP && tail -30 data/logs/log-20260310_130700.log
+  └ 31 lines...
+
+● Check latest log files
+  $ cd /users/szhong/kSTEP && ls -lt data/logs/ | head -10
+  └ 11 lines...
+
+● Run driver and capture output
+  $ cd /users/szhong/kSTEP && ./run.py delayed_vs_core --linux_name delayed_vs_core_buggy --num_cpus
+   3 2>&1 && sleep 1 && readlink data/latest.jsonl && cat data/latest.jsonl
+  └ 234 lines...
+
+Bug confirmed on buggy kernel: `{"status":"fail","message":"sched_delayed task added to core_tree (buggy): enqueued=1"}`. Now let me verify the fix:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py c662e2b1e8cf delayed_vs_core_fixed 2>&1 | tail -5
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 6 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=delayed_vs_core_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=delayed_vs_core_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+✗ Run driver on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py delayed_vs_core --linux_name delayed_vs_core_fixed --num_cpus
+   3 2>&1 | grep -E "enqueue|delayed|fail|pass|Exiting" && sleep 1 && cat "$(readlink
+  data/latest.jsonl)"
+  Command blocked: contains dangerous shell expansion patterns (e.g., parameter transformation,
+  indirect expansion, or nested command substitution) that could enable arbitrary code
+  execution. Please rewrite the command without these expansion patterns.
+
+● Run driver on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py delayed_vs_core --linux_name delayed_vs_core_fixed --num_cpus
+   3 2>&1 | grep -E "enqueue|delayed|fail|pass|Exiting"
+  └ 17 lines...
+
+The fix works correctly:
+- **Buggy kernel**: `After enqueue with sched_delayed=1: enqueued=1` (BUG - task added to core_tree)
+- **Fixed kernel**: `After enqueue with sched_delayed=1: enqueued=0` (CORRECT - task excluded)
+
+Let me verify the JSONL output and then update everything:
+
+● Check if already in reproduce.py
+  $ cd /users/szhong/kSTEP && grep -n "c662e2b1e8cf" reproduce.py
+  └ 1 line...
+
+● Find bug in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n "c662e2b1e8cf" TODO.md
+  └ 2 lines...
+
+● Check fixed kernel JSONL
+  $ cat /users/szhong/kSTEP/data/logs/log-20260310_131704.jsonl
+  └ 2 lines...
+
+Now let me update TODO.md, add to reproduce.py, and commit:
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && tail -5 reproduce.py
+  └ 6 lines...
+
+● Check Bug entry format
+  $ cd /users/szhong/kSTEP && grep -A2 "Bug(" reproduce.py | tail -20
+  └ 21 lines...
+
+● Check similar entry format
+  $ cd /users/szhong/kSTEP && grep -B2 -A8 "core_enqueue" reproduce.py
+  └ 12 lines...
+
+Now let me update all files:
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+Now add to reproduce.py:
+
+● Find insertion point
+  $ cd /users/szhong/kSTEP && grep -n "core_enqueue" reproduce.py
+  └ 2 lines...
+
+● Read reproduce.py lines 468-480
+  └ 13 lines read
+
+● Edit reproduce.py (+7)
+
+● Stage changes
+  $ cd /users/szhong/kSTEP && git add -A && git status --short
+  └ 7 lines...
+
+● Check driver file status
+  $ cd /users/szhong/kSTEP && git status --short kmod/drivers/delayed_vs_core.c
+  └ 1 line...
+
+● Check staged files
+  $ cd /users/szhong/kSTEP && git diff --cached --name-only
+  └ 6 lines...
+
+● Check driver file exists
+  $ ls -la /users/szhong/kSTEP/kmod/drivers/delayed_vs_core.c
+  └ 2 lines...
+
+● Stage driver file
+  $ cd /users/szhong/kSTEP && git add kmod/drivers/delayed_vs_core.c && git diff --cached
+  --name-only
+  └ 6 lines...
+
+● Check git status of driver
+  $ cd /users/szhong/kSTEP && git status kmod/drivers/delayed_vs_core.c
+  └ 5 lines...
+
+● Check if driver already committed
+  $ cd /users/szhong/kSTEP && git --no-pager log --oneline -1 -- kmod/drivers/delayed_vs_core.c
+  └ 2 lines...
+
+● Check if driver changed
+  $ cd /users/szhong/kSTEP && git --no-pager diff HEAD -- kmod/drivers/delayed_vs_core.c | head -5
+  └ 1 line...
+
+The file was already tracked with the same content. Now let me commit and push:
+

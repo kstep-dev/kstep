@@ -474,6 +474,13 @@ bugs = [
         ],
     ),
     Bug(
+        driver=Driver(name="delayed_vs_core", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="c662e2b1e8cf~1"),
+            Linux(name="fixed", version="c662e2b1e8cf"),
+        ],
+    ),
+    Bug(
         driver=Driver(name="migrate_disable_lock", num_cpus=2),
         linux=[
             Linux(name="buggy", version="942b8db96500~1"),
