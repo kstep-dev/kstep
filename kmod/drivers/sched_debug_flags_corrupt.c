@@ -6,12 +6,11 @@
 //
 // Reproduce: With slub_debug=FZ boot param, partial reads of the sched domain
 // flags file trigger SLUB corruption detection when kfree frees the offset pointer.
-// We detect the error by scanning the kernel log buffer for SLUB error messages.
+// We detect the SLUB error via the TAINT_BAD_PAGE kernel taint flag.
 
 #include <linux/version.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
-#include <linux/sysctl.h>
 
 #include "driver.h"
 #include "internal.h"
@@ -19,7 +18,6 @@
 #if LINUX_VERSION_CODE == KERNEL_VERSION(5, 9, 0)
 
 static bool check_slub_error(void) {
-  // SLUB errors set TAINT_BAD_PAGE in the kernel taint flags
   unsigned long *taint = (unsigned long *)kstep_ksym_lookup("tainted_mask");
   if (!taint)
     return false;
@@ -29,52 +27,37 @@ static bool check_slub_error(void) {
 static void setup(void) {}
 
 static void run(void) {
-  const char *paths[] = {
-    "/proc/sys/kernel/sched_domain/cpu1/domain0/flags",
-    "/proc/sys/kernel/sched_domain/cpu0/domain0/flags",
-    NULL,
-  };
-
-  struct file *file = NULL;
-  const char *found_path = NULL;
-  for (int i = 0; paths[i]; i++) {
-    file = filp_open(paths[i], O_RDONLY, 0);
-    if (!IS_ERR(file)) {
-      found_path = paths[i];
-      filp_close(file, NULL);
-      break;
-    }
-    file = NULL;
-  }
-
-  if (!found_path) {
-    kstep_fail("no flags procfs file available");
+  const char *path = "/proc/sys/kernel/sched_domain/cpu0/domain0/flags";
+  struct file *file = filp_open(path, O_RDONLY, 0);
+  if (IS_ERR(file)) {
+    kstep_fail("cannot open %s: %ld", path, PTR_ERR(file));
     return;
   }
+  filp_close(file, NULL);
 
-  TRACE_INFO("Using %s", found_path);
+  bool tainted_before = check_slub_error();
 
   // Partial reads trigger sd_ctl_doflags with non-zero *ppos.
   // On buggy kernel: tmp += *ppos then kfree(tmp) frees offset pointer.
-  // With slub_debug=FZ, SLUB detects the invalid free.
+  // With slub_debug=FZ, SLUB detects the invalid free and sets TAINT_BAD_PAGE.
   for (int iter = 0; iter < 10; iter++) {
-    file = filp_open(found_path, O_RDONLY, 0);
+    file = filp_open(path, O_RDONLY, 0);
     if (IS_ERR(file))
       break;
 
     char buf[4];
     loff_t pos = 0;
-    ssize_t ret;
-
-    ret = kernel_read(file, buf, 1, &pos);
-    if (ret > 0)
-      ret = kernel_read(file, buf, 1, &pos);
-
+    kernel_read(file, buf, 1, &pos);
+    kernel_read(file, buf, 1, &pos);
     filp_close(file, NULL);
   }
 
-  if (check_slub_error())
+  bool tainted_after = check_slub_error();
+
+  if (!tainted_before && tainted_after)
     kstep_fail("SLUB detected kfree on offset pointer in sd_ctl_doflags");
+  else if (tainted_before)
+    kstep_fail("kernel already tainted before test");
   else
     kstep_pass("no heap corruption detected");
 }
