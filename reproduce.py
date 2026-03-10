@@ -480,6 +480,13 @@ bugs = [
             Linux(name="fixed", version="942b8db96500"),
         ],
     ),
+    Bug(
+        driver=Driver(name="sched_switch_prev_state", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="8feb053d5319~1"),
+            Linux(name="fixed", version="8feb053d5319"),
+        ],
+    ),
 ]
 
 
