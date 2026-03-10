@@ -48,7 +48,6 @@ static void run(void) {
 
   irqs_after = irqs_disabled();
   TRACE_INFO("__cond_resched returned %d, irqs_disabled=%d", ret, irqs_after);
-  TRACE_INFO("irqs_disabled=%d after cond_resched", irqs_after);
 
   if (irqs_before && !irqs_after) {
     kstep_fail("cond_resched enabled interrupts in irq-disabled context");

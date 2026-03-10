@@ -152,3 +152,29 @@ Now add the bug to reproduce.py. Let me find the right place to insert:
 
 Now commit and push:
 
+● Commit changes
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: dup_user_cpus_uaf
+  (87ca4f9efbd7)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>&1
+  └ 4 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced bug `87ca4f9efbd7` (use-after-free in `dup_user_cpus_ptr()`).
+
+**Summary:**
+- **Driver**: `dup_user_cpus_uaf` — simulates the race where `do_set_cpus_allowed()` NULLs `src->user_cpus_ptr` between `dup_task_struct` and `dup_user_cpus_ptr` during fork
+- **Buggy kernel**: `dst->user_cpus_ptr` retains stale pointer → use-after-free/double-free risk (**fail**)
+- **Fixed kernel**: `dst->user_cpus_ptr` correctly cleared to NULL upfront (**pass**)
+- TODO.md updated (31/400), reproduce.py updated, committed and pushed
+
+
+Total usage est:        6 Premium requests
+API time spent:         6m 3s
+Total session time:     9m 42s
+Total code changes:     +120 -2
+Breakdown by AI model:
+ claude-opus-4.6-1m      1.4m in, 19.8k out, 1.4m cached (Est. 6 Premium requests)

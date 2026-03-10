@@ -185,3 +185,13 @@
   $ cd /users/szhong/kSTEP && cat kmod/sym.c
   └ 71 lines...
 
+Now I have a good understanding of the bug and the approach. Let me create the driver.
+
+● Create kmod/drivers/resched_warn.c (+87)
+
+Now let me checkout the buggy kernel and build:
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 8061b9f5e111~1 resched_warn_buggy 2>&1 | tail -5
+  └ 6 lines...
+

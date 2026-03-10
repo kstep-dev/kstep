@@ -431,6 +431,13 @@ bugs = [
             Linux(name="fixed", version="87ca4f9efbd7"),
         ],
     ),
+    Bug(
+        driver=Driver(name="cond_resched_irq", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="82c387ef7568~1"),
+            Linux(name="fixed", version="82c387ef7568"),
+        ],
+    ),
 ]
 
 

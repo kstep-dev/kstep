@@ -196,3 +196,64 @@ The bug is reproduced — `kstep_fail` message is in the jsonl output. Now let m
   $ cd /users/szhong/kSTEP && ./checkout_linux.py 82c387ef7568 cond_resched_irq_fixed 2>&1 | tail -5
   └ 6 lines...
 
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=cond_resched_irq_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build and run on fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=cond_resched_irq_fixed 2>&1 | tail -5 &&
+  ./run.py cond_resched_irq --linux_name cond_resched_irq_fixed 2>&1 | tail -15
+  └ 21 lines...
+
+● Check fixed kernel output
+  $ cat /users/szhong/kSTEP/data/latest.jsonl
+  └ 2 lines...
+
+Bug confirmed:
+- **Buggy kernel**: `__cond_resched returned 1, irqs_disabled=0` → FAIL (interrupts re-enabled)
+- **Fixed kernel**: `__cond_resched returned 0, irqs_disabled=1` → PASS (cond_resched skipped)
+
+Now let me clean up the driver and move to the refinement stage:
+
+● Read kmod/drivers/cond_resched_irq.c
+  └ 72 lines read
+
+Let me clean up the redundant debug log line:
+
+● Edit kmod/drivers/cond_resched_irq.c (-1)
+
+Now add it to `reproduce.py`:
+
+● Check end of reproduce.py
+  $ cd /users/szhong/kSTEP && tail -40 reproduce.py
+  └ 41 lines...
+
+● Find bugs list start
+  $ cd /users/szhong/kSTEP && grep -n "^bugs = \[" reproduce.py
+  └ 2 lines...
+
+● Find bugs list end
+  $ cd /users/szhong/kSTEP && grep -n "^\]" reproduce.py | head -5
+  └ 2 lines...
+
+● Read reproduce.py lines 430-434
+  └ 5 lines read
+
+● Edit reproduce.py (+7)
+
+Now update TODO.md:
+
+● Find bug entry in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n "82c387ef7568" TODO.md
+  └ 2 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Find total counter
+  $ cd /users/szhong/kSTEP && grep -n "Total:" TODO.md | head -3
+  └ 2 lines...
+
+● Edit TODO.md (+1 -1)
+
+Now commit and push:
+
