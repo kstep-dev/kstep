@@ -314,7 +314,31 @@ Now update TODO.md:
 
 ● Edit TODO.md (+1 -1)
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      ● Read shell output: Waiting up to 120 seconds for command output
+● Git commit
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: do_set_cpus_fix (af13e5e437dc)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>&1
+  └ 4 lines...
+
+● Git push
+  $ cd /users/szhong/kSTEP && git push 2>&1 | tail -5
+  └ 3 lines...
+
+Successfully reproduced bug `af13e5e437dc`:
+
+- **Buggy kernel**: Deadlock — task stuck on CPU 1 due to recursive `rq->lock` acquisition in `__balance_push_cpu_stop()` → `select_fallback_rq()` → `set_cpus_allowed_force()`
+- **Fixed kernel**: Task migrates to CPU 0 — `select_fallback_rq()` called before `rq_lock()`, avoiding the deadlock
+
+Driver `do_set_cpus_fix` (already existed) added to `reproduce.py`, TODO.md updated (47/400), committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         5m 23s
+Total session time:     20m 41s
+Total code changes:     +9 -2
+Breakdown by AI model:
+ claude-opus-4.6-1m      2.8m in, 12.0k out, 2.7m cached (Est. 6 Premium requests)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          ● Read shell output: Waiting up to 120 seconds for command output
   └ 1 line...
 
 ● Read shell output: Waiting up to 120 seconds for command output
@@ -421,3 +445,133 @@ Now update TODO.md:
 ● Read shell output: Waiting up to 180 seconds for command output
   └ 3 lines...
 
+● Read shell output: Waiting up to 300 seconds for command output
+  └ 4 lines...
+
+Good, worktree is ready. Now build and test:
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && ln -sfn /users/szhong/kSTEP/linux/do_set_cpus_fix_fixed linux/current
+  && mkdir -p build/do_set_cpus_fix_fixed && ln -sfn /users/szhong/kSTEP/build/do_set_cpus_fix_fixed
+   build/current && make linux LINUX_NAME=do_set_cpus_fix_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=do_set_cpus_fix_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run on fixed kernel
+  $ cd /users/szhong/kSTEP && timeout 90 ./run.py do_set_cpus_fix --linux_name do_set_cpus_fix_fixed
+   2>&1 | tail -10
+  └ 11 lines...
+
+● Check fixed kernel output
+  $ cat /users/szhong/kSTEP/data/latest.jsonl
+  └ 2 lines...
+
+Excellent! The reproduction works perfectly:
+- **Buggy kernel**: `fail` - task stuck on CPU 1 (deadlock)
+- **Fixed kernel**: `pass` - task migrated to CPU 0 (no deadlock)
+
+Now let me add to reproduce.py, update TODO.md, and commit:
+
+● Read reproduce.py lines 1-30
+  └ 30 lines read
+
+● Find related entry in reproduce.py
+  $ cd /users/szhong/kSTEP && grep -n "set_cpus_allowed_lock" reproduce.py
+  └ 2 lines...
+
+● Read reproduce.py lines 528-543
+  └ 16 lines read
+
+● Edit reproduce.py (+7)
+
+Now update TODO.md:
+
+● Find bug in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n "af13e5e437dc" TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Count done items
+  $ cd /users/szhong/kSTEP && grep -c "\- \[x\]" TODO.md
+  └ 2 lines...
+
+The entry is already marked as done (47 `[x]` entries matching the "47/400 reproduced" header). Looks like a previous session may have partially set this up. Let me verify the driver file exists and everything is consistent, then commit:
+
+● Check git status
+  $ cd /users/szhong/kSTEP && git --no-pager status --short
+  └ 6 lines...
+
+● Check all changes
+  $ cd /users/szhong/kSTEP && git --no-pager diff --name-only HEAD
+  └ 5 lines...
+
+● Check driver file status
+  $ cd /users/szhong/kSTEP && git --no-pager diff HEAD -- kmod/drivers/do_set_cpus_fix.c
+  2>/dev/null; ls kmod/drivers/do_set_cpus_fix.c
+  └ 2 lines...
+
+● Check recent commits
+  $ cd /users/szhong/kSTEP && git --no-pager log --oneline -3
+  └ 4 lines...
+
+● Check latest commit contents
+  $ cd /users/szhong/kSTEP && git --no-pager show --stat HEAD
+  └ 16 lines...
+
+● Check driver commit history
+  $ cd /users/szhong/kSTEP && git --no-pager log --oneline --all -- kmod/drivers/do_set_cpus_fix.c |
+   head -5
+  └ 2 lines...
+
+● Check original driver
+  $ cd /users/szhong/kSTEP && git --no-pager show b8aa615 -- kmod/drivers/do_set_cpus_fix.c | head
+  -30
+  └ 31 lines...
+
+● Check my changes vs committed
+  $ cd /users/szhong/kSTEP && git --no-pager diff HEAD -- kmod/drivers/do_set_cpus_fix.c
+  reproduce.py
+  └ 19 lines...
+
+● Check driver changes since original commit
+  $ cd /users/szhong/kSTEP && git --no-pager diff b8aa615..HEAD -- kmod/drivers/do_set_cpus_fix.c |
+  head -40
+  └ 1 line...
+
+● Compare committed vs working
+  $ cd /users/szhong/kSTEP && git --no-pager show HEAD:kmod/drivers/do_set_cpus_fix.c | md5sum;
+  md5sum kmod/drivers/do_set_cpus_fix.c
+  └ 3 lines...
+
+The driver is already committed (matching HEAD). The only uncommitted change is adding the Bug entry to reproduce.py. Let me commit and push:
+
+● Commit and push
+  $ cd /users/szhong/kSTEP && git add reproduce.py && git commit -m "reproduce: add do_set_cpus_fix
+  to reproduce.py (af13e5e437dc)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" && git push 2>&1
+  └ 12 lines...
+
+Successfully reproduced and committed. Here's a summary:
+
+**Bug**: `af13e5e437dc` — `__balance_push_cpu_stop()` calls `select_fallback_rq()` while holding `rq->lock`, causing recursive lock deadlock via `set_cpus_allowed_force()`.
+
+**Driver**: `do_set_cpus_fix.c` — Marks CPU 1 as inactive and schedules `__balance_push_cpu_stop` on CPU 1's stopper thread with a task pinned exclusively to CPU 1.
+
+**Results**:
+- **Buggy kernel**: ❌ Task stuck on CPU 1 (stopper thread deadlocks on recursive rq->lock)
+- **Fixed kernel**: ✅ Task migrated to CPU 0 (select_fallback_rq called before rq_lock)
+
+
+Total usage est:        6 Premium requests
+API time spent:         21m 47s
+Total session time:     1h 0m 8s
+Total code changes:     +123 -2
+Breakdown by AI model:
+ claude-opus-4.6-1m      13.2m in, 63.1k out, 13.1m cached (Est. 6 Premium requests)

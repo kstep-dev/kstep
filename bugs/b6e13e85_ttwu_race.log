@@ -283,3 +283,215 @@ Now let me build and test on the buggy kernel:
   arch/x86/entry/Makefile
   └ 1 line...
 
+● Check assembler and object
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && as --version | head -1; readelf -S
+  arch/x86/entry/thunk_64.o 2>/dev/null | head -20
+  └ 2 lines...
+
+● Build objtool
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && make -C tools/objtool 2>&1 | tail -20
+  └ 21 lines...
+
+● Build objtool without Werror
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && make HOSTCFLAGS="-Wno-error" -C tools/objtool
+  2>&1 | tail -10
+  └ 11 lines...
+
+● Build objtool forcing no Werror
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && EXTRA_CFLAGS="-Wno-error" CFLAGS="-Wno-error"
+  make -C tools/objtool CC="gcc -Wno-error" 2>&1 | tail -10
+  └ 11 lines...
+
+Good, objtool is now built. Let me retry the kernel build:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Find build errors
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | grep -i "error:" | head
+  -10
+  └ 1 line...
+
+● Find all errors
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | grep -i
+  "error\|Error\|ERROR" | head -20
+  └ 6 lines...
+
+● Check objtool exists
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && ls -la tools/objtool/objtool
+  └ 2 lines...
+
+● Test objtool on thunk_64
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && rm -f arch/x86/entry/thunk_64.o &&
+  tools/objtool/objtool check arch/x86/entry/thunk_64.S 2>&1; echo "---"; gcc -c -o
+  /tmp/thunk_64_test.o arch/x86/entry/thunk_64.S 2>&1 | head -5; tools/objtool/objtool check
+  /tmp/thunk_64_test.o 2>&1
+  └ 8 lines...
+
+● Skip objtool for thunk_64
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && echo 'OBJECT_FILES_NON_STANDARD_thunk_64.o := y'
+   >> arch/x86/entry/Makefile
+  └ 1 line...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Kernel built. Now build kstep module and run:
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=ttwu_race_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Good, it built successfully. Let me run it:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py ttwu_race --linux_name ttwu_race_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+Kernel panic! Let me check the log:
+
+● Check crash log
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | head -80
+  └ 2 lines...
+
+● Check latest log
+  $ cd /users/szhong/kSTEP && cat data/latest.log | head -100
+  └ 101 lines...
+
+● Check for bug trace
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -A5
+  "kstep\|TRACE\|BUG\|NULL\|panic\|ttwu\|is_same_group\|find_matching" | head -60
+  └ 41 lines...
+
+● Check QEMU CPU config
+  $ cd /users/szhong/kSTEP && grep -n "cpu\|smp\|CPUS" run.py | head -20
+  └ 10 lines...
+
+● Check CPU parameter handling
+  $ cd /users/szhong/kSTEP && grep -A5 "num_cpus" run.py | head -20
+  └ 21 lines...
+
+I see - default is 2 CPUs. I need to either use `--num_cpus 3` or redesign my driver for 2 CPUs. Let me redesign for 2 CPUs (CPU 0 reserved, CPU 1 for both tasks).
+
+Actually, looking at the bug description strategy: "Need minimum 3 CPUs (CPU 0 reserved)". Let me use `--num_cpus 3`:
+
+● Run with 3 CPUs
+  $ cd /users/szhong/kSTEP && ./run.py ttwu_race --linux_name ttwu_race_buggy --num_cpus 3 2>&1 |
+  tail -10
+  └ 11 lines...
+
+● Check for relevant output
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  "kstep|TRACE|ttwu_race|sched_ttwu|is_same_group|find_matching|NULL|Oops|BUG|Call Trace|task_x" |
+  head -30
+  └ 11 lines...
+
+● Check module loading
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E "kstep|kmod|insmod|init" | head -20
+  └ 21 lines...
+
+● Check QEMU machine config
+  $ cd /users/szhong/kSTEP && grep "acpi\|ACPI\|machine" run.py | head -10
+  └ 3 lines...
+
+● Check ACPI config
+  $ cd /users/szhong/kSTEP && grep "CONFIG_ACPI" linux/config.kstep linux/config.kstep.x86_64
+  └ 3 lines...
+
+● Disable ACPI
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && scripts/config --disable ACPI --disable
+  ACPI_PROCESSOR && make olddefconfig 2>&1 | tail -3
+  └ 4 lines...
+
+● Rebuild kernel without ACPI
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=ttwu_race_buggy 2>&1 | tail -5
+  └ 3 lines...
+
+● Force rebuild kstep
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=ttwu_race_buggy 2>&1
+  └ 3 lines...
+
+● Check kmod exists
+  $ cd /users/szhong/kSTEP && ls -la build/ttwu_race_buggy/kmod/kmod.ko && ls -la
+  build/ttwu_race_buggy/rootfs.cpio
+  └ 3 lines...
+
+● Force rebuild kstep
+  $ cd /users/szhong/kSTEP && rm -f build/ttwu_race_buggy/kmod/kmod.ko && make kstep
+  LINUX_NAME=ttwu_race_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Run with 3 CPUs no ACPI
+  $ cd /users/szhong/kSTEP && ./run.py ttwu_race --linux_name ttwu_race_buggy --num_cpus 3 2>&1 |
+  tail -10
+  └ 11 lines...
+
+● Check output
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  "kstep|TRACE|ttwu|task|cpu|affinity|BUG|Oops|fail|pass" | head -30
+  └ 19 lines...
+
+● Re-enable ACPI
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && scripts/config --enable ACPI --enable
+  ACPI_PROCESSOR && make olddefconfig 2>&1 | tail -3
+  └ 4 lines...
+
+● Check log location
+  $ cd /users/szhong/kSTEP && cat data/latest.log 2>/dev/null | head -1; ls -la data/logs/
+  2>/dev/null | head -5
+  └ 7 lines...
+
+● Rebuild with ACPI
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && rm -f build/ttwu_race_buggy/kmod/kmod.ko && make kstep
+  LINUX_NAME=ttwu_race_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run with ACPI and 3 CPUs
+  $ cd /users/szhong/kSTEP && ./run.py ttwu_race --linux_name ttwu_race_buggy --num_cpus 3 2>&1 |
+  tail -5
+  └ 6 lines...
+
+● Check get_map crash
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -A30 "get_map"
+  └ 47 lines...
+
+● Try SLAB allocator
+  $ cd /users/szhong/kSTEP/linux/ttwu_race_buggy && scripts/config --disable SLUB --enable SLAB &&
+  make olddefconfig 2>&1 | tail -3
+  └ 4 lines...
+
+● Build with SLAB
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=ttwu_race_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Rebuild kstep
+  $ cd /users/szhong/kSTEP && rm -f build/ttwu_race_buggy/kmod/kmod.ko && make kstep
+  LINUX_NAME=ttwu_race_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Run with SLAB allocator
+  $ cd /users/szhong/kSTEP && ./run.py ttwu_race --linux_name ttwu_race_buggy --num_cpus 3 2>&1 |
+  tail -10
+  └ 11 lines...
+
+● Check crash type
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  "kstep|TRACE|ttwu|task_x|BUG|NULL|Oops|is_same|sched_ttwu|fatal|Fatal" | head -20
+  └ 20 lines...
+
+The bug is triggered! I can see:
+1. `BUG: kernel NULL pointer dereference, address: 0000000000000078`
+2. `ttwu_do_wakeup → sched_ttwu_pending → trigger_ttwu_pending [kmod]`
+
+This is exactly the NULL deref in `is_same_group()` when iterating mismatched `se->cfs_rq` pointers. Now let me verify it's fixed on the fixed kernel.
+
