@@ -255,6 +255,13 @@ bugs = [
             Linux(name="fixed", version="248cc9993d1c"),
         ],
     ),
+    Bug(
+        driver=Driver(name="sched_debug_output", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="2cab4bd024d2~1"),
+            Linux(name="fixed", version="2cab4bd024d2"),
+        ],
+    ),
 ]
 
 
