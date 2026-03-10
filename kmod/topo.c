@@ -220,8 +220,12 @@ void kstep_cpu_set_freq(int cpu, int scale) {
   // https://elixir.bootlin.com/linux/v6.14.11/source/arch/x86/include/asm/topology.h#L287-L293
   // generic:
   // https://elixir.bootlin.com/linux/v6.14.11/source/include/linux/arch_topology.h#L33-L38
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
   KSYM_IMPORT(arch_freq_scale);
   *per_cpu_ptr(KSYM_arch_freq_scale, cpu) = scale;
+#else
+  panic("kstep_cpu_set_freq not supported for this kernel");
+#endif
 }
 
 void kstep_cpu_set_capacity(int cpu, int scale) {

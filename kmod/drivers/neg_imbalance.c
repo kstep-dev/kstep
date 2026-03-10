@@ -11,48 +11,44 @@
 // Fix: Before the formula, check if local->avg_load >= busiest->avg_load
 // and return imbalance=0 if so.
 //
-// Reproduce: Use asymmetric CPU capacities to create the condition.
-// CPU 1 (low capacity=256) with 1 task → group_fully_busy, avg_load ~4096
-// CPU 2 (full capacity=1024) with 3 tasks → group_overloaded, avg_load ~3072
-// Since local->avg_load > busiest->avg_load, the bug triggers.
-// One migratable task on CPU 2 gets wrongly pulled to CPU 1 on buggy kernel.
+// Reproduce: Use task weight asymmetry. CPU 1 runs 1 heavy task (nice -20,
+// weight=88761) making it group_fully_busy with very high avg_load. CPU 2
+// runs 3 light tasks (nice 0, weight=1024) making it group_overloaded but
+// with much lower avg_load. The unsigned subtraction wraps, causing a wrong
+// migration from CPU 2 to CPU 1.
 
 #include "driver.h"
 #include "internal.h"
 
 #if LINUX_VERSION_CODE == KERNEL_VERSION(5, 6, 0)
 
-static struct task_struct *task_local;
-static struct task_struct *tasks_busiest[2];
+static struct task_struct *heavy_task;
+static struct task_struct *light_tasks[2];
 static struct task_struct *task_migrator;
 
 static void setup(void) {
-  // CPU 1: low capacity → high avg_load per task
-  // CPU 2: full capacity → lower avg_load per task
-  kstep_cpu_set_capacity(1, SCHED_CAPACITY_SCALE / 4);
-  kstep_cpu_set_capacity(2, SCHED_CAPACITY_SCALE);
-
   // Separate clusters: {0}, {1}, {2}
   kstep_topo_init();
   const char *cls[] = {"0", "1", "2"};
   kstep_topo_set_cls(cls, ARRAY_SIZE(cls));
   kstep_topo_apply();
 
-  task_local = kstep_task_create();
+  heavy_task = kstep_task_create();
   for (int i = 0; i < 2; i++)
-    tasks_busiest[i] = kstep_task_create();
+    light_tasks[i] = kstep_task_create();
   task_migrator = kstep_task_create();
 }
 
 static void run(void) {
-  // CPU 1: 1 task → group_fully_busy
-  // avg_load = group_load * 1024 / 256 ≈ 4096
-  kstep_task_pin(task_local, 1, 1);
+  // CPU 1: 1 heavy task (nice -20, weight=88761) → group_fully_busy
+  // avg_load ≈ 88761 (much higher than CPU 2)
+  kstep_task_pin(heavy_task, 1, 1);
+  kstep_task_set_prio(heavy_task, -20);
 
-  // CPU 2: 3 tasks → group_overloaded (nr_running=3 > group_weight=1)
-  // avg_load = 3 * group_load * 1024 / 1024 ≈ 3072
+  // CPU 2: 3 light tasks (nice 0, weight=1024) → group_overloaded
+  // avg_load ≈ 3072 (much lower than CPU 1)
   for (int i = 0; i < 2; i++)
-    kstep_task_pin(tasks_busiest[i], 2, 2);
+    kstep_task_pin(light_tasks[i], 2, 2);
   kstep_task_pin(task_migrator, 2, 2);
 
   // Let PELT load averages build up
