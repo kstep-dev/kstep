@@ -20,3 +20,13 @@
   $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5324953c06bd 2>/dev/null | tail -200
   └ 201 lines...
 
+● Check commit history
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 5324953c06bd~3..5324953c06bd
+  2>/dev/null
+  └ 4 lines...
+
+● Read parent commit for wakeup_preempt
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 704069649b5b -- kernel/sched/core.c
+  2>/dev/null | head -150
+  └ 151 lines...
+

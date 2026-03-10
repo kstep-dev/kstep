@@ -26,7 +26,7 @@
 - [x] `3ebb1b652239` Fix preemption string of preempt_dynamic_none <!-- driver:preempt_str attempts:1 --> — [`3ebb1b65_fix_preemption_string_of_preempt.md`](bugs/3ebb1b65_fix_preemption_string_of_preempt.md)
 - [x] `42dc938a590c` sched/core: Mitigate race cpus_share_cache()/update_top_cache_domain() — [`42dc938a_mitigate_race_cpus_share_cache.md`](bugs/42dc938a_mitigate_race_cpus_share_cache.md) <!-- driver:cpus_share_cache attempts:1 -->
 - [-] `494dcdf46e5c` sched: Fix build warning without CONFIG_SYSCTL — [`494dcdf4_fix_build_warning_without_config.md`](bugs/494dcdf4_fix_build_warning_without_config.md) <!-- skipped:build-time-compiler-warning-not-runtime-bug attempts:1 -->
-- [ ] `505da6689305` sched/clock: Avoid false sharing for sched_clock_irqtime — [`505da668_sched_clock_avoid_false_sharing.md`](bugs/505da668_sched_clock_avoid_false_sharing.md)
+- [-] `505da6689305` sched/clock: Avoid false sharing for sched_clock_irqtime — [`505da668_sched_clock_avoid_false_sharing.md`](bugs/505da668_sched_clock_avoid_false_sharing.md) <!-- skipped:boot-time-init-ordering-bug-cannot-reproduce-in-kstep attempts:1 -->
 - [ ] `5324953c06bd` Fix wakeup_preempt's next_class tracking — [`5324953c_fix_wakeup_preempts_next_class.md`](bugs/5324953c_fix_wakeup_preempts_next_class.md)
 - [ ] `565790d28b1e` sched: Fix balance_callback() — [`565790d2_fix_balance_callback.md`](bugs/565790d2_fix_balance_callback.md)
 - [-] `5657c1167835` sched/core: Fix NULL pointer access fault in sched_setaffinity() with non-SMP configs — [`5657c116_fix_null_pointer_access_fault.md`](bugs/5657c116_fix_null_pointer_access_fault.md) <!-- skipped:bug requires non-SMP kernel (CONFIG_SMP=n) which is incompatible with kSTEP's SMP requirement attempts:1 -->
