@@ -22,3 +22,15 @@ This is a build-time bug (missing `EXPORT_SYMBOL_GPL`), not a runtime bug. Let m
   2>/dev/null | grep -A 20 "static inline void set_tsk_need_resched"
   └ 22 lines...
 
+This is a build-time bug (missing `EXPORT_SYMBOL_GPL`), not a runtime bug. The bug manifests as a link error when building modules that use `set_tsk_need_resched()`. This cannot be reproduced as a runtime kSTEP driver. Let me skip it.
+
+● Find bug entry in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n "8d737320166b" TODO.md
+  └ 2 lines...
+
+● Check TODO.md header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+

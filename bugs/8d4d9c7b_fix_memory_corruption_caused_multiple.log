@@ -42,3 +42,12 @@
   $ cd /users/szhong/kSTEP && git -C linux/current show 8d4d9c7b4333~1:Makefile | head -5
   └ 6 lines...
 
+● View driver using file operations
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/null_term_scaling.c
+  └ 96 lines...
+
+● View default driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/default.c
+  └ 58 lines...
+
+Now I understand the bug. Let me create the driver and start the build process.

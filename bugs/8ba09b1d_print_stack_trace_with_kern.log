@@ -34,3 +34,19 @@ This is a pure logging cosmetic bug — changing `show_stack()` to `show_stack_l
 
 ● Edit TODO.md (+1 -1)
 
+● Commit and push
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 8ba09b1dc131 - cosmetic log-level
+  bug, not reproducible via kSTEP
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" && git push
+  └ 16 lines...
+
+**Skipped** `8ba09b1dc131` — this is a cosmetic log-level fix (`show_stack` → `show_stack_loglvl` with `KERN_INFO`). It only changes the printk log level of stack traces in `sched_show_task()` and has zero impact on scheduler behavior. Not reproducible via kSTEP. TODO.md updated and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         1m 0s
+Total session time:     1m 10s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      203.5k in, 3.1k out, 180.6k cached (Est. 6 Premium requests)
