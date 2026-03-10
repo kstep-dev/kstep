@@ -22,12 +22,14 @@ void kstep_sched_clock_tick(void) {
 void kstep_sched_clock_init(void) {
   KSYM_IMPORT(__sched_clock_offset);
   *KSYM___sched_clock_offset = 0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
-  KSYM_IMPORT(paravirt_set_sched_clock);
-  KSYM_paravirt_set_sched_clock(kstep_sched_clock_get);
-#else
-  pv_ops.time.sched_clock = kstep_sched_clock_get;
-#endif
+  // paravirt_set_sched_clock was added mid-cycle in v5.12; use runtime
+  // lookup to handle kernels where the symbol does not yet exist.
+  typedef void (*set_sc_fn)(u64 (*)(void));
+  set_sc_fn set_fn = (set_sc_fn)kstep_ksym_lookup("paravirt_set_sched_clock");
+  if (set_fn)
+    set_fn(kstep_sched_clock_get);
+  else
+    pv_ops.time.sched_clock = kstep_sched_clock_get;
   TRACE_INFO("Mocked sched clock");
 }
 

@@ -269,6 +269,13 @@ bugs = [
             Linux(name="fixed", version="28156108fecb"),
         ],
     ),
+    Bug(
+        driver=Driver(name="pf_kthread_race", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="3a7956e25e1d~1"),
+            Linux(name="fixed", version="3a7956e25e1d"),
+        ],
+    ),
 ]
 
 
