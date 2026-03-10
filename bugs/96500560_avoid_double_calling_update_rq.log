@@ -50,3 +50,302 @@ Let me examine the kernel code and existing drivers for reference.
 ● read_bash
   └ 1 line...
 
+● Get kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -1 96500560f0c7~1 2>/dev/null
+  └ 1 line...
+
+● Get kernel version tag
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline --format="%H %s" 96500560f0c7~1 -1
+  && git -C linux/current describe --tags 96500560f0c7~1 2>/dev/null || echo "no tag"
+  └ 5 lines...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 6 lines...
+
+
+
+Good, checkout complete. Let me examine the kernel source to understand `update_rq_clock()` and check for double-update detection.
+
+● Check update_rq_clock impl
+  $ cd /users/szhong/kSTEP && grep -n 'update_rq_clock\|RQCF_UPDATED\|WARN.*clock'
+  linux/current/kernel/sched/core.c | head -30
+  └ 29 lines...
+
+● Find update_rq_clock definition
+  $ cd /users/szhong/kSTEP && grep -n 'void update_rq_clock' linux/current/kernel/sched/core.c
+  └ 3 lines...
+
+● Check RQCF flags
+  $ cd /users/szhong/kSTEP && grep -n 'RQCF_UPDATED\|assert_clock_updated\|WARN_DOUBLE_CLOCK'
+  linux/current/kernel/sched/sched.h | head -20
+  └ 13 lines...
+
+There's `SCHED_WARN_ON(rq->clock_update_flags & RQCF_UPDATED)` — the double call should trigger a warning. Let me examine the full path.
+
+● Check when RQCF_UPDATED is cleared
+  $ cd /users/szhong/kSTEP && grep -n 'RQCF_UPDATED\|rq_unpin_lock\|rq_pin_lock\|clock_update_flags'
+   linux/current/kernel/sched/sched.h | head -30
+  └ 31 lines...
+
+● Read update_rq_clock
+  $ cd /users/szhong/kSTEP && sed -n '750,780p' linux/current/kernel/sched/core.c
+  └ 32 lines...
+
+● Find balance_push path
+  $ cd /users/szhong/kSTEP && grep -n '__balance_push_cpu_stop\|__migrate_task'
+  linux/current/kernel/sched/core.c | head -20
+  └ 9 lines...
+
+● Read __migrate_task
+  $ cd /users/szhong/kSTEP && sed -n '2479,2510p' linux/current/kernel/sched/core.c
+  └ 33 lines...
+
+● Read __balance_push_cpu_stop
+  $ cd /users/szhong/kSTEP && sed -n '8065,8110p' linux/current/kernel/sched/core.c
+  └ 47 lines...
+
+● Read update_rq_clock body
+  $ cd /users/szhong/kSTEP && sed -n '770,800p' linux/current/kernel/sched/core.c
+  └ 32 lines...
+
+● Verify buggy kernel commit
+  $ cd /users/szhong/kSTEP && git -C linux/double_clock_buggy log --oneline -1
+  └ 2 lines...
+
+● Check buggy __migrate_task
+  $ cd /users/szhong/kSTEP && grep -A5 'static struct rq \*__migrate_task'
+  linux/double_clock_buggy/kernel/sched/core.c
+  └ 7 lines...
+
+● Full __migrate_task in buggy kernel
+  $ cd /users/szhong/kSTEP && sed -n '/static struct rq \*__migrate_task/,/^}/p'
+  linux/double_clock_buggy/kernel/sched/core.c
+  └ 13 lines...
+
+The buggy kernel has `update_rq_clock(rq)` inside `__migrate_task()`. The `__balance_push_cpu_stop()` also calls it before, causing a double call. `SCHED_WARN_ON(rq->clock_update_flags & RQCF_UPDATED)` should fire. Let me check the kernel config and plan the approach.
+
+● Check if config exists
+  $ cd /users/szhong/kSTEP && ls build/double_clock_buggy/.config 2>/dev/null || echo "No config yet
+   - need to build first"
+  └ 2 lines...
+
+● Check kernel config flags
+  $ cd /users/szhong/kSTEP && cat build/double_clock_buggy/.config 2>/dev/null | grep -i
+  'SCHED_DEBUG\|HOTPLUG_CPU\|CONFIG_SMP' | head -10
+  └ 1 line...
+
+● Check kernel config script
+  $ cd /users/szhong/kSTEP && cat scripts/linux_config.py 2>/dev/null | head -60
+  └ 1 line...
+
+● Check existing builds
+  $ cd /users/szhong/kSTEP && ls build/ 2>/dev/null
+  └ 42 lines...
+
+● Check config in build system
+  $ cd /users/szhong/kSTEP && grep -r 'SCHED_DEBUG\|HOTPLUG_CPU' Makefile scripts/ 2>/dev/null |
+  head -20
+  └ 1 line...
+
+● Check config from existing build
+  $ cd /users/szhong/kSTEP && cat build/master/.config 2>/dev/null | grep -i
+  'SCHED_DEBUG\|HOTPLUG_CPU\|CONFIG_SMP' | head -10
+  └ 1 line...
+
+● Find any .config
+  $ cd /users/szhong/kSTEP && find build/v6.14 -name '.config' -exec grep -l 'SCHED_DEBUG\|HOTPLUG'
+  {} \; 2>/dev/null | head -3
+  └ 1 line...
+
+● Find any config file
+  $ cd /users/szhong/kSTEP && find build -name '.config' -print -quit 2>/dev/null && find build
+  -name 'config' -print -quit 2>/dev/null
+  └ 2 lines...
+
+● Check kernel config from existing build
+  $ cd /users/szhong/kSTEP && grep -E 'SCHED_DEBUG|HOTPLUG_CPU|CONFIG_SMP|SCHED_WARN'
+  build/core_enqueue_fixed_tree/.config | head -10
+  └ 7 lines...
+
+`CONFIG_SCHED_DEBUG=y` and `CONFIG_HOTPLUG_CPU=y` — the double `update_rq_clock()` should trigger `SCHED_WARN_ON`. Now let me verify the SCHED_WARN_ON behavior and write the driver.
+
+● Check SCHED_WARN_ON in core.c
+  $ cd /users/szhong/kSTEP && grep -n 'SCHED_WARN_ON' linux/double_clock_buggy/kernel/sched/core.c |
+   head -5
+  └ 6 lines...
+
+● Check SCHED_WARN_ON definition
+  $ cd /users/szhong/kSTEP && grep -n 'SCHED_WARN_ON' linux/double_clock_buggy/kernel/sched/sched.h
+  | head -5
+  └ 6 lines...
+
+● Check SCHED_WARN_ON macro
+  $ cd /users/szhong/kSTEP && grep -B2 -A5 '#define SCHED_WARN_ON'
+  linux/double_clock_buggy/kernel/sched/sched.h
+  └ 1 line...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && head -5 linux/double_clock_buggy/Makefile | grep VERSION
+  └ 3 lines...
+
+● Get full kernel version
+  $ cd /users/szhong/kSTEP && grep -E '^VERSION|^PATCHLEVEL|^SUBLEVEL'
+  linux/double_clock_buggy/Makefile | head -3
+  └ 4 lines...
+
+● Read migration_cpu_stop in buggy
+  $ cd /users/szhong/kSTEP && sed -n '/^static int migration_cpu_stop/,/^}/p'
+  linux/double_clock_buggy/kernel/sched/core.c | head -60
+  └ 61 lines...
+
+● Read update_rq_clock in buggy
+  $ cd /users/szhong/kSTEP && sed -n '/^void update_rq_clock/,/^}/p'
+  linux/double_clock_buggy/kernel/sched/core.c
+  └ 22 lines...
+
+The warning is behind `sched_feat(WARN_DOUBLE_CLOCK)`. Let me check if it's enabled by default.
+
+● Check WARN_DOUBLE_CLOCK default
+  $ cd /users/szhong/kSTEP && grep 'WARN_DOUBLE_CLOCK'
+  linux/double_clock_buggy/kernel/sched/features.h
+  └ 2 lines...
+
+● Read run.py header
+  $ cd /users/szhong/kSTEP && head -80 run.py
+  └ 81 lines...
+
+● Check CPU config in run.py
+  $ cd /users/szhong/kSTEP && grep -n 'num_cpus\|ncpu\|smp' run.py | head -20
+  └ 5 lines...
+
+● Read hotplug driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migrate_swap_hotplug.c
+  └ 108 lines...
+
+● Read RQCF related driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/rqcf_act_skip_leak.c
+  └ 94 lines...
+
+Now I have a clear picture. Let me write the driver. The key insight: in the buggy kernel, `__migrate_task()` calls `update_rq_clock()` internally. I can detect this by clearing `RQCF_UPDATED` after calling `update_rq_clock()` (like `__balance_push_cpu_stop` does), then calling `__migrate_task()`, and checking if `RQCF_UPDATED` gets re-set.
+
+● Create kmod/drivers/double_clock.c (+130)
+
+Now let me build and test on the buggy kernel:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=double_clock_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=double_clock_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Build successful. Now let's run it:
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py double_clock --linux_name double_clock_buggy --num_cpus 3
+  2>&1 | tail -30
+  └ 31 lines...
+
+● Check log output
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log
+  └ 2 lines...
+
+● Check latest log
+  $ cd /users/szhong/kSTEP && cat data/latest.log
+  └ 216 lines...
+
+● Check jsonl output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+The symbol `__migrate_task` couldn't be found. Let me check available symbols:
+
+● Check kernel symbols
+  $ cd /users/szhong/kSTEP && grep '__migrate_task' build/double_clock_buggy/vmlinux 2>/dev/null |
+  head -5 || nm build/double_clock_buggy/vmlinux 2>/dev/null | grep migrate_task | head -10
+  └ 1 line...
+
+● Search migrate symbols
+  $ cd /users/szhong/kSTEP && nm build/double_clock_buggy/vmlinux 2>/dev/null | grep -i migrate |
+  head -20
+  └ 21 lines...
+
+● Find relevant kernel symbols
+  $ cd /users/szhong/kSTEP && nm build/double_clock_buggy/vmlinux 2>/dev/null | grep
+  '__migrate_task\|move_queued_task\|migration_cpu_stop\|balance_push' | head -20
+  └ 7 lines...
+
+`__migrate_task` was inlined by the compiler. Let me use a different approach — disassemble `__balance_push_cpu_stop` to count `update_rq_clock` calls (2 in buggy, 1 in fixed), and also trigger migration to demonstrate the bug.
+
+● Read kmod/drivers/double_clock.c
+  └ 129 lines read
+
+● Edit kmod/drivers/double_clock.c (+36 -93)
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=double_clock_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py double_clock --linux_name double_clock_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Check test result
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+The scan found only 1 call. Let me verify by disassembling the actual function:
+
+● Disassemble __balance_push_cpu_stop
+  $ cd /users/szhong/kSTEP && objdump -d build/double_clock_buggy/vmlinux
+  --start-address=0xffffffff81083b70 --stop-address=0xffffffff81083c70 | grep -E
+  'update_rq_clock|call|ret\b' | head -20
+  └ 14 lines...
+
+● Full disasm for key functions
+  $ cd /users/szhong/kSTEP && objdump -d build/double_clock_buggy/vmlinux
+  --start-address=0xffffffff81083b70 --stop-address=0xffffffff81083e00 | grep -E
+  'update_rq_clock|move_queued|migrate|select_fallback|ret\b|retq' | head -20
+  └ 6 lines...
+
+I see! There are 2 calls to `update_rq_clock` but my scan stops at an early `ret` (at offset 0x145). The second call is at offset 0x1F9. Let me fix the scanning to cover the full function.
+
+● Find function size
+  $ cd /users/szhong/kSTEP && nm build/double_clock_buggy/vmlinux | sort | grep -A1
+  '__balance_push_cpu_stop'
+  └ 3 lines...
+
+Function is 656 bytes (0x290). Need to scan more and not stop at early `ret`. Let me fix the driver:
+
+● Edit kmod/drivers/double_clock.c (+3 -7)
+
+● Edit kmod/drivers/double_clock.c (+8 -1)
+
+● Build and run on buggy
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=double_clock_buggy 2>&1 | tail -5 && ./run.py
+  double_clock --linux_name double_clock_buggy 2>&1 | tail -5
+  └ 11 lines...
+
+● Check result
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug detected on buggy kernel (2 calls). Now let's checkout the fixed kernel and verify the fix:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 96500560f0c7 double_clock_fixed 2>&1 | tail -5
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
