@@ -1,0 +1,34 @@
+● Read bugs/9e81889c_fix_affine_move_task_self.md
+  └ 37 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 9e81889c7648 2>/dev/null | head -300
+  └ 300 lines...
+
+● Read AGENTS.md
+  $ cd /users/szhong/kSTEP && head -100 AGENTS.md
+  └ 44 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Check kthread.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c 2>/dev/null | head -80
+  └ 81 lines...
+
+● Read more kthread.c
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c 2>/dev/null | head -200
+  └ 157 lines...
+
+● Read task.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/task.c 2>/dev/null | head -100
+  └ 101 lines...
+
+● Read a similar driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/dup_user_cpus_uaf.c 2>/dev/null
+  └ 111 lines...
+

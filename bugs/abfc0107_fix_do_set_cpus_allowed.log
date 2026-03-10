@@ -1,0 +1,10 @@
+● Read bugs/abfc0107_fix_do_set_cpus_allowed.md
+  └ 40 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 abfc01077df6 2>/dev/null | head -300
+  └ 301 lines...
+

@@ -579,3 +579,27 @@ Now let me make all the updates:
 ● Edit TODO.md (+1 -1)
 
 Now add to reproduce.py. Let me find the right place:
+
+● Find bugs list
+  $ cd /users/szhong/kSTEP && grep -n 'bugs = \[' reproduce.py
+  └ 2 lines...
+
+● Find end of bugs list
+  $ cd /users/szhong/kSTEP && grep -n '^\]' reproduce.py | head -3
+  └ 2 lines...
+
+● Read reproduce.py lines 518-522
+  └ 5 lines read
+
+● Edit reproduce.py (+7)
+
+Now commit and push:
+
+● Check git status
+  $ cd /users/szhong/kSTEP && git add -A && git status --short | head -20
+  └ 8 lines...
+
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git --no-pager diff --cached --stat | head -20
+  └ 8 lines...
+

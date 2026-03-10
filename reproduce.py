@@ -519,6 +519,13 @@ bugs = [
             Linux(name="fixed", version="9d0df37797453f168afdb2e6fd0353c73718ae9a"),
         ],
     ),
+    Bug(
+        driver=Driver(name="sd_flags_readonly", num_cpus=4),
+        linux=[
+            Linux(name="buggy", version="9818427c6270a9ce8c52c8621026fe9cebae0f92~1"),
+            Linux(name="fixed", version="9818427c6270a9ce8c52c8621026fe9cebae0f92"),
+        ],
+    ),
 ]
 
 

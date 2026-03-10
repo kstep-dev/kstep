@@ -1,0 +1,20 @@
+● Read bugs/9ed20baf_fix_setup_preempt_mode_return.md
+  └ 38 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 9ed20bafc858 2>/dev/null | head -200
+  └ 92 lines...
+
+This bug is a boot-time parameter parsing issue where `setup_preempt_mode()` returns inverted success/failure codes for `__setup()` callbacks. The bug file itself states: "This bug cannot be reproduced through runtime kSTEP execution since it occurs during kernel boot parameter processing."
+
+The actual preemption mode IS applied correctly (the function calls `sched_dynamic_update(mode)` before returning) — only the return value to the boot parameter handler is wrong. This means there's no observable scheduling behavior difference at runtime.
+
+Let me skip this and update TODO.md.
+
+● Find the bug line in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n '9ed20bafc858' TODO.md
+  └ 2 lines...
+

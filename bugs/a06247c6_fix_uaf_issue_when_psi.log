@@ -1,0 +1,23 @@
+● Read bugs/a06247c6_fix_uaf_issue_when_psi.md
+  └ 25 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Check patch stats
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 a06247c6804f --stat 2>/dev/null | head
+  -20
+  └ 21 lines...
+
+The bug requires userspace file I/O (open/write/poll on /proc/pressure files) with concurrent trigger replacement — outside kSTEP's kernel-level scheduler simulation scope. Let me skip this one.
+
+● Find bug line in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n 'a06247c6804f' TODO.md | head -5
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+
