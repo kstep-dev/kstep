@@ -582,6 +582,13 @@ bugs = [
             Linux(name="fixed", version="b6e13e85829f"),
         ],
     ),
+    Bug(
+        driver=Driver(name="uclamp_flag_idle", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="ca4984a7dd86~1"),
+            Linux(name="fixed", version="ca4984a7dd86"),
+        ],
+    ),
 ]
 
 

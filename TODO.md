@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 49/400 reproduced**
+**Total: 50/400 reproduced**
 
 ---
 
@@ -75,7 +75,7 @@
 - [-] `bf2c59fce407` sched/core: Fix illegal RCU from offline CPUs — [`bf2c59fc_illegal_rcu_from_offline_cpus.md`](bugs/bf2c59fc_illegal_rcu_from_offline_cpus.md) <!-- skipped:requires-cpu-hotplug-not-supported-by-kstep attempts:1 -->
 - [ ] `c2ae8b0df2d1` sched/core: Fix psi_dequeue() for Proxy Execution — [`c2ae8b0d_psi_dequeue_for_proxy_execution.md`](bugs/c2ae8b0d_psi_dequeue_for_proxy_execution.md)
 - [x] `c662e2b1e8cf` sched: Fix sched_delayed vs sched_core — [`c662e2b1_sched_delayed_vs_sched_core.md`](bugs/c662e2b1_sched_delayed_vs_sched_core.md) <!-- driver:delayed_vs_core attempts:1 -->
-- [ ] `ca4984a7dd86` sched: Fix UCLAMP_FLAG_IDLE setting — [`ca4984a7_uclamp_flag_idle_setting.md`](bugs/ca4984a7_uclamp_flag_idle_setting.md)
+- [x] `ca4984a7dd86` sched: Fix UCLAMP_FLAG_IDLE setting — [`ca4984a7_uclamp_flag_idle_setting.md`](bugs/ca4984a7_uclamp_flag_idle_setting.md) <!-- driver:uclamp_flag_idle attempts:1 -->
 - [ ] `ce3614daabea` sched: Fix unreliable rseq cpu_id for new tasks — [`ce3614da_fix_rseq_cpu_id_tasks.md`](bugs/ce3614da_fix_rseq_cpu_id_tasks.md)
 - [ ] `d136122f5845` sched: Fix race against ptrace_freeze_trace() — [`d136122f_fix_race_ptrace_freeze.md`](bugs/d136122f_fix_race_ptrace_freeze.md)
 - [ ] `d707faa64d03` sched/core: Add missing completion for affine_move_task() waiters — [`d707faa6_affine_move_task_completion.md`](bugs/d707faa6_affine_move_task_completion.md)

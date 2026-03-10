@@ -38,7 +38,7 @@ static void trigger_ttwu_pending(void *info)
 	sttp_fn_t sttp = (sttp_fn_t)kstep_ksym_lookup("sched_ttwu_pending");
 
 	// Create single-entry llist
-	p->wake_entry.next = NULL;
+	p->wake_entry.llist.next = NULL;
 	p->sched_remote_wakeup = 0;
 
 	// Mark rq as having pending wakeups

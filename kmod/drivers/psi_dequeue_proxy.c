@@ -10,11 +10,11 @@
 //
 // Fix: Also check (p->psi_flags & TSK_ONCPU) before the early return.
 //
-// Reproduction: Create two kthreads on CPU 1 (CFS target + FIFO preemptor).
-// Once the FIFO kthread preempts the CFS kthread, the CFS kthread has
-// psi_flags = TSK_RUNNING (no TSK_ONCPU). Then dequeue the CFS kthread
-// with DEQUEUE_SLEEP. On buggy kernel, TSK_RUNNING stays set; on fixed,
-// it is cleared. Waking the task on the buggy kernel triggers the error.
+// Reproduction: Start a kthread on CPU 1 so it gets psi_flags = TSK_RUNNING |
+// TSK_ONCPU. Then use psi_task_change to clear TSK_ONCPU (simulating the proxy
+// execution switch-off). Now dequeue with DEQUEUE_SLEEP. On buggy kernel,
+// TSK_RUNNING stays set; on fixed, it is cleared. Waking the task on the buggy
+// kernel triggers the "psi: inconsistent task state!" error.
 
 #include "internal.h"
 
@@ -22,80 +22,86 @@
 
 #ifdef CONFIG_PSI
 
-static struct task_struct *kt_target, *kt_preemptor;
+static struct task_struct *kt_target;
 
 static void setup(void) {
   kt_target = kstep_kthread_create("psi_tgt");
   kstep_kthread_bind(kt_target, cpumask_of(1));
-
-  kt_preemptor = kstep_kthread_create("psi_hog");
-  kstep_kthread_bind(kt_preemptor, cpumask_of(1));
 }
 
 static void run(void) {
   typedef bool (*dequeue_task_fn)(struct rq *, struct task_struct *, int);
+  typedef void (*psi_task_change_fn)(struct task_struct *, int, int);
+
   dequeue_task_fn ksym_dequeue_task =
       (dequeue_task_fn)kstep_ksym_lookup("dequeue_task");
-  if (!ksym_dequeue_task) {
-    kstep_fail("cannot resolve dequeue_task");
+  psi_task_change_fn ksym_psi_task_change =
+      (psi_task_change_fn)kstep_ksym_lookup("psi_task_change");
+
+  if (!ksym_dequeue_task || !ksym_psi_task_change) {
+    kstep_fail("cannot resolve symbols: dequeue_task=%p psi_task_change=%p",
+               ksym_dequeue_task, ksym_psi_task_change);
     return;
   }
 
-  // Step 1: Start target CFS kthread on CPU 1
+  // Step 1: Start target kthread on CPU 1
   kstep_kthread_start(kt_target);
   kstep_tick_repeat(5);
 
-  TRACE_INFO("target initial: psi_flags=0x%x on_rq=%d cpu=%d",
+  TRACE_INFO("step1 target: psi_flags=0x%x on_rq=%d cpu=%d",
              kt_target->psi_flags, kt_target->on_rq, task_cpu(kt_target));
 
-  // Step 2: Start FIFO preemptor to preempt target
-  struct sched_param sp = {.sched_priority = 80};
-  sched_setscheduler_nocheck(kt_preemptor, SCHED_FIFO, &sp);
-  kstep_kthread_start(kt_preemptor);
-  kstep_tick_repeat(5);
+  if (!(kt_target->psi_flags & TSK_ONCPU)) {
+    kstep_fail("target missing TSK_ONCPU after start (psi_flags=0x%x)",
+               kt_target->psi_flags);
+    return;
+  }
 
-  TRACE_INFO("target after preempt: psi_flags=0x%x on_rq=%d cpu=%d",
-             kt_target->psi_flags, kt_target->on_rq, task_cpu(kt_target));
+  // Step 2: Simulate proxy execution switch-off by clearing TSK_ONCPU.
+  // In real proxy execution, psi_task_switch() clears TSK_ONCPU when the
+  // blocked task is switched off CPU but stays on the runqueue.
+  ksym_psi_task_change(kt_target, TSK_ONCPU, 0);
 
-  // Verify target has TSK_RUNNING but not TSK_ONCPU
+  TRACE_INFO("step2 after clearing TSK_ONCPU: psi_flags=0x%x",
+             kt_target->psi_flags);
+
   if (!(kt_target->psi_flags & TSK_RUNNING)) {
     kstep_fail("target missing TSK_RUNNING (psi_flags=0x%x)",
                kt_target->psi_flags);
     return;
   }
   if (kt_target->psi_flags & TSK_ONCPU) {
-    kstep_fail("target still has TSK_ONCPU (psi_flags=0x%x)",
+    kstep_fail("TSK_ONCPU not cleared (psi_flags=0x%x)",
                kt_target->psi_flags);
     return;
   }
-  if (!task_on_rq_queued(kt_target)) {
-    kstep_fail("target not on runqueue");
-    return;
-  }
 
-  // Step 3: Simulate proxy-execution dequeue.
-  // Set state to TASK_UNINTERRUPTIBLE (as if blocked on a mutex)
-  // then dequeue with DEQUEUE_SLEEP.
-  struct rq_flags rf;
-  struct rq *rq = task_rq_lock(kt_target, &rf);
+  // Step 3: Dequeue with DEQUEUE_SLEEP (simulating proxy_deactivate).
+  // On buggy kernel: psi_dequeue sees DEQUEUE_SLEEP → returns early →
+  //   TSK_RUNNING stays set.
+  // On fixed kernel: psi_dequeue sees DEQUEUE_SLEEP but no TSK_ONCPU →
+  //   proceeds to clear all psi_flags.
+  struct rq *rq = cpu_rq(1);
+  unsigned long flags;
+  raw_spin_lock_irqsave(&rq->__lock, flags);
 
   WRITE_ONCE(kt_target->__state, TASK_UNINTERRUPTIBLE);
   ksym_dequeue_task(rq, kt_target, DEQUEUE_SLEEP | DEQUEUE_NOCLOCK);
-  WRITE_ONCE(kt_target->on_rq, 0);
 
   unsigned int psi_after = kt_target->psi_flags;
 
-  task_rq_unlock(rq, kt_target, &rf);
+  raw_spin_unlock_irqrestore(&rq->__lock, flags);
 
-  TRACE_INFO("after DEQUEUE_SLEEP: psi_flags=0x%x (buggy=0x%x fixed=0x0)",
+  TRACE_INFO("step3 after DEQUEUE_SLEEP: psi_flags=0x%x (expect buggy=0x%x fixed=0x0)",
              psi_after, TSK_RUNNING);
 
-  // Step 4: Wake the task — on buggy kernel this triggers
-  // "psi: inconsistent task state!" because TSK_RUNNING is already set
+  // Step 4: Wake the task. On buggy kernel this triggers
+  // "psi: inconsistent task state!" because psi_enqueue tries to set
+  // TSK_RUNNING on a task that already has it.
   wake_up_process(kt_target);
   kstep_tick_repeat(5);
 
-  TRACE_INFO("after wake: psi_flags=0x%x", kt_target->psi_flags);
+  TRACE_INFO("step4 after wake: psi_flags=0x%x", kt_target->psi_flags);
 
   if (psi_after & TSK_RUNNING) {
     kstep_fail("psi_dequeue did not clear TSK_RUNNING on DEQUEUE_SLEEP "

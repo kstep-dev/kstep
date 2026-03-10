@@ -1,0 +1,188 @@
+● Read bugs/d136122f_fix_race_ptrace_freeze.md
+  └ 37 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 d136122f5845 2>/dev/null | head -300
+  └ 183 lines...
+
+● Check kstep_freeze_task implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kernel.c | head -80
+  └ 81 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Search for relevant functions
+  $ cd /users/szhong/kSTEP && grep -n
+  "kstep_freeze_task\|kstep_task_pause\|TASK_TRACED\|__TASK_TRACED\|ptrace" kmod/kernel.c
+  kmod/task.c 2>/dev/null | head -40
+  └ 3 lines...
+
+● Read kstep_freeze_task
+  $ cd /users/szhong/kSTEP && sed -n '200,240p' kmod/kernel.c
+  └ 41 lines...
+
+● Read kstep_task_pause
+  $ cd /users/szhong/kSTEP && sed -n '85,120p' kmod/task.c
+  └ 29 lines...
+
+● Read existing freeze driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/freeze.c
+  └ 39 lines...
+
+● Read tick.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/tick.c
+  └ 165 lines...
+
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -80
+  └ 80 lines...
+
+● Check kernel version for this commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline d136122f5845 | head -1
+  └ 2 lines...
+
+● Read full task.c
+  $ cd /users/szhong/kSTEP && cat kmod/task.c
+  └ 113 lines...
+
+● Read user-space task code
+  $ cd /users/szhong/kSTEP && cat user/main.c
+  └ 2 lines...
+
+● List user directory
+  $ cd /users/szhong/kSTEP && ls user/
+  └ 2 lines...
+
+● Read user.h for sigcodes
+  $ cd /users/szhong/kSTEP && cat kmod/user.h
+  └ 18 lines...
+
+● Read user task.c
+  $ cd /users/szhong/kSTEP && cat user/task.c
+  └ 67 lines...
+
+● Read kthread.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Read example driver with kthread
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/affine_move_self.c
+  └ 155 lines...
+
+● Check task state field type
+  $ cd /users/szhong/kSTEP && git -C linux/current show d136122f5845~1:include/linux/sched.h
+  2>/dev/null | grep -n "volatile\|__state\|^\s*long\s*state" | head -10
+  └ 2 lines...
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline d136122f5845~1 | head -5 && git -C
+  linux/current describe --tags d136122f5845~1 2>/dev/null || git -C linux/current log --oneline
+  d136122f5845~5 | head -5
+  └ 7 lines...
+
+● Check task state defines
+  $ cd /users/szhong/kSTEP && git -C linux/current show d136122f5845~1:include/linux/sched.h
+  2>/dev/null | grep -n
+  "TASK_TRACED\|__TASK_TRACED\|TASK_WAKEKILL\|TASK_INTERRUPTIBLE\|TASK_UNINTERRUPTIBLE" | head -20
+  └ 20 lines...
+
+● Check Makefile for SMP config
+  $ cd /users/szhong/kSTEP && grep -n "cpu\|smp" Makefile | head -20
+  └ 1 line...
+
+● Check QEMU CPU config
+  $ cd /users/szhong/kSTEP && grep -n "cpu\|smp\|QEMU\|qemu" run.py | head -20
+  └ 19 lines...
+
+● Check exact kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --format="%H %s"
+  d136122f5845~1..d136122f5845~1 | head -1 && git -C linux/current show d136122f5845~1:Makefile
+  2>/dev/null | head -5
+  └ 6 lines...
+
+● Check driver config in run.py
+  $ cd /users/szhong/kSTEP && sed -n '20,60p' run.py
+  └ 42 lines...
+
+● Check num_cpus in run.py
+  $ cd /users/szhong/kSTEP && grep -n "num_cpus" run.py
+  └ 5 lines...
+
+● Check how num_cpus is passed
+  $ cd /users/szhong/kSTEP && sed -n '230,270p' run.py
+  └ 39 lines...
+
+● Check driver registry in run.py
+  $ cd /users/szhong/kSTEP && grep -n "DRIVERS\|drivers\[" run.py | head -30
+  └ 1 line...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && head -60 reproduce.py
+  └ 61 lines...
+
+● Check num_cpus in reproduce.py
+  $ cd /users/szhong/kSTEP && grep "num_cpus\|--num_cpus" reproduce.py | head -10
+  └ 11 lines...
+
+● Count existing bugs
+  $ cd /users/szhong/kSTEP && grep -c "Bug(" reproduce.py
+  └ 2 lines...
+
+Now let me understand the buggy code exactly and write the driver. Let me first check out the buggy kernel and verify the buggy code path.
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py d136122f5845~1 ptrace_freeze_buggy 2>&1 | tail -5
+  └ 1 line...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 6 lines...
+
+
+
+Good, kernel checked out. Now let me write the driver while also examining the exact buggy code.
+
+● Find ptrace freeze functions
+  $ cd /users/szhong/kSTEP && grep -n "ptrace_freeze_traced\|ptrace_unfreeze_traced"
+  linux/ptrace_freeze_buggy/kernel/ptrace.c | head -10
+  └ 8 lines...
+
+● Read buggy __schedule code
+  $ cd /users/szhong/kSTEP && sed -n '4100,4160p' linux/ptrace_freeze_buggy/kernel/sched/core.c
+  └ 61 lines...
+
+● Read ptrace_freeze_traced
+  $ cd /users/szhong/kSTEP && sed -n '170,210p' linux/ptrace_freeze_buggy/kernel/ptrace.c
+  └ 42 lines...
+
+Now I have a clear understanding of the bug. The key issue is in `__schedule()`:
+- **Buggy**: reads `prev->state` before `rq->lock`, then double-checks after. ptrace can change state between reads, causing deactivation to be skipped.
+- **Fixed**: reads once after lock, uses control dependency.
+
+I'll use a kprobe on `update_rq_clock` (called between the two reads) to deterministically toggle state.
+
+● Create kmod/drivers/ptrace_freeze.c (+105)
+
+Now let me build and test on the buggy kernel:
