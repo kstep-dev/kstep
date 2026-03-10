@@ -1,0 +1,37 @@
+● Read bugs/77d7dc8b_the_complex_cid_management.md
+  └ 39 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Check patch stats
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 77d7dc8bef48 --stat | head -30
+  └ 31 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -30
+  └ 31 lines...
+
+● Check drivers Makefile
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/Makefile
+  └ 2 lines...
+
+● Read patch for core.c and sched.h
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 77d7dc8bef48 -- kernel/sched/core.c
+  kernel/sched/sched.h | head -500
+  └ 501 lines...
+
+● Read existing mm_cid driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/mm_cid_perf.c
+  └ 101 lines...
+
+● Read sched.h patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 77d7dc8bef48 -- kernel/sched/sched.h |
+  head -800
+  └ 411 lines...
+
+● Read rest of core.c patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 77d7dc8bef48 -- kernel/sched/core.c |
+  tail -600
+  └ 599 lines...
+

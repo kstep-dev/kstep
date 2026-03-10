@@ -1,0 +1,55 @@
+● Read bugs/70ee7947_fix_warning_in_schedsetaffinity.md
+  └ 38 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 70ee7947a290 2>/dev/null | head -200
+  └ 101 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && tail -30 reproduce.py
+  └ 31 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Check if driver exists
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/setaffinity_warn.c 2>/dev/null || echo "driver
+  doesn't exist yet"
+  └ 2 lines...
+
+● Check reproduce.py structure
+  $ cd /users/szhong/kSTEP && head -80 reproduce.py
+  └ 81 lines...
+
+● Read similar warning driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migration_cpu_stop_warn.c
+  └ 107 lines...
+
+● Find drivers using cgroups
+  $ cd /users/szhong/kSTEP && grep -l "cgroup" kmod/drivers/*.c | head -5
+  └ 6 lines...
+
+● Check kernel version around commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 70ee7947a290~2..70ee7947a290
+  2>/dev/null | head -5
+  └ 3 lines...
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags 70ee7947a290~1 2>/dev/null || git
+   -C linux/current log -1 --format="%H %s" 70ee7947a290~1 2>/dev/null
+  └ 2 lines...
+
+● Read cgroup driver example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/h_nr_runnable.c
+  └ 77 lines...
+
+● Check for affinity helpers
+  $ cd /users/szhong/kSTEP && grep -n
+  "kstep_ksym_lookup\|kstep_task_setaffinity\|sched_setaffinity\|set_cpus_allowed" kmod/drivers/*.c
+  kmod/*.c kmod/*.h 2>/dev/null | head -20
+  └ 21 lines...
+

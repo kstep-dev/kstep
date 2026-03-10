@@ -1,0 +1,46 @@
+● Read AGENTS.md
+  └ 43 lines read
+
+● Read bugs/76f970ce_schedcore_reduce_cost_of_schedmovetask.md
+  └ 42 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 76f970ce51c8 2>/dev/null | head -300
+  └ 259 lines...
+
+● List directory kmod
+  └ 25 files found
+
+● Read driver.h header
+  $ cd /users/szhong/kSTEP && head -200 kmod/driver.h
+  └ 111 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Understand task_fork API
+  $ cd /users/szhong/kSTEP && cat kmod/driver.h | grep -A5 "kstep_task_fork"
+  └ 7 lines...
+
+● Read task.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/task.c | head -200
+  └ 113 lines...
+
+● Read an example driver
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/*.c | wc -l && cat kmod/drivers/even_idle_cpu.c
+  └ 44 lines...
+
+● Read user-side task code
+  $ cd /users/szhong/kSTEP && cat user/task.c
+  └ 67 lines...
+
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -100
+  └ 90 lines...
+
+● Read another example driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/h_nr_runnable.c 2>/dev/null || cat
+  kmod/drivers/balance_push_splice.c 2>/dev/null
+  └ 77 lines...
+
