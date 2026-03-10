@@ -627,6 +627,13 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="missed_user_cpus_ptr", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="df14b7f9efcd~1"),
+            Linux(name="fixed", version="df14b7f9efcd"),
+        ],
+    ),
 ]
 
 

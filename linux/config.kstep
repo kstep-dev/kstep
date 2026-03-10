@@ -106,3 +106,4 @@ CONFIG_SLUB_DEBUG=y
 # PSI (Pressure Stall Information)
 #
 CONFIG_PSI=y
+CONFIG_SCHED_PROXY_EXEC=y
