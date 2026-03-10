@@ -648,6 +648,13 @@ bugs = [
             Linux(name="fixed", version="e0b257c3b71bd98a4866c3daecf000998aaa4927"),
         ],
     ),
+    Bug(
+        driver=Driver(name="resetonfork_rt_uclamp", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="eaf5a92ebde5bca3bb2565616115bd6d579486cd~1"),
+            Linux(name="fixed", version="eaf5a92ebde5bca3bb2565616115bd6d579486cd"),
+        ],
+    ),
 ]
 
 

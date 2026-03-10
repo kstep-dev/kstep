@@ -86,7 +86,7 @@
 - [ ] `e38e5299747b` sched/hrtick: Fix hrtick() vs. scheduling context — [`e38e5299_hrtick_schedule_context.md`](bugs/e38e5299_hrtick_schedule_context.md)
 - [ ] `e65855a52b47` Fix a deadlock when enabling uclamp static key — [`e65855a5_fix_deadlock_enabling_uclamp_static.md`](bugs/e65855a5_fix_deadlock_enabling_uclamp_static.md)
 - [ ] `e932c4ab38f0` sched/core: Prevent wakeup of ksoftirqd during idle load balance — [`e932c4ab_prevent_wakeup_ksoftirqd_during_idle.md`](bugs/e932c4ab_prevent_wakeup_ksoftirqd_during_idle.md)
-- [ ] `eaf5a92ebde5` sched/core: Fix reset-on-fork from RT with uclamp — [`eaf5a92e_fix_resetonfork_rt_uclamp.md`](bugs/eaf5a92e_fix_resetonfork_rt_uclamp.md)
+- [x] `eaf5a92ebde5` sched/core: Fix reset-on-fork from RT with uclamp — [`eaf5a92e_fix_resetonfork_rt_uclamp.md`](bugs/eaf5a92e_fix_resetonfork_rt_uclamp.md) <!-- driver:resetonfork_rt_uclamp attempts:1 -->
 - [ ] `ec618b84f6e1` sched: Fix rq->nr_iowait ordering — [`ec618b84_fix_rqnr_iowait_ordering.md`](bugs/ec618b84_fix_rqnr_iowait_ordering.md)
 - [ ] `ef73d6a4ef0b` sched/wait: Fix a kthread_park race with wait_woken() — [`ef73d6a4_fix_kthread_park_race_wait_woken.md`](bugs/ef73d6a4_fix_kthread_park_race_wait_woken.md)
 - [ ] `f1dfdab694eb` sched/vtime: Prevent unstable evaluation of WARN(vtime->state) — [`f1dfdab6_prevent_unstable_evaluation_warnvtimestate.md`](bugs/f1dfdab6_prevent_unstable_evaluation_warnvtimestate.md)
