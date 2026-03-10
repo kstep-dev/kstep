@@ -610,6 +610,23 @@ bugs = [
             Linux(name="fixed", version="d707faa64d03"),
         ],
     ),
+    Bug(
+        driver=Driver(name="loadavg_race"),
+        linux=[
+            Linux(
+                name="buggy",
+                version="dbfb089d360b~1",
+                patch=LINUX_ROOT_DIR / "objtool_symtab.patch",
+                config=LINUX_ROOT_DIR / "config.loadavg_race",
+            ),
+            Linux(
+                name="fixed",
+                version="dbfb089d360b",
+                patch=LINUX_ROOT_DIR / "objtool_symtab.patch",
+                config=LINUX_ROOT_DIR / "config.loadavg_race",
+            ),
+        ],
+    ),
 ]
 
 
