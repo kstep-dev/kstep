@@ -51,3 +51,309 @@
   └ 58 lines...
 
 Now I understand the bug. Let me create the driver and start the build process.
+
+● Create kmod/drivers/sched_debug_flags_corrupt.c (+94)
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 8d4d9c7b4333~1 sched_debug_flags_corrupt_buggy
+  2>&1 | tail -5
+  └ 6 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sched_debug_flags_corrupt_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Check build errors
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sched_debug_flags_corrupt_buggy 2>&1 | grep -i
+  "error" | head -20
+  └ 6 lines...
+
+● Check thunk_64 build error
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sched_debug_flags_corrupt_buggy 2>&1 | grep -B5
+  "thunk_64" | head -20
+  └ 10 lines...
+
+● View main Makefile
+  $ cd /users/szhong/kSTEP && cat Makefile | head -100
+  └ 100 lines...
+
+● Check existing builds
+  $ cd /users/szhong/kSTEP && ls build/ | head -20
+  └ 21 lines...
+
+● Check objtool config
+  $ cd /users/szhong/kSTEP && grep -i 'STACK_VALIDATION\|OBJTOOL\|CONFIG_UNWINDER'
+  linux/config.kstep linux/config.kstep.x86_64 2>/dev/null
+  └ 1 line...
+
+● Check kernel .config
+  $ cd /users/szhong/kSTEP && grep -i 'STACK_VALIDATION\|OBJTOOL'
+  linux/sched_debug_flags_corrupt_buggy/.config 2>/dev/null | head -10
+  └ 3 lines...
+
+● List config files
+  $ cd /users/szhong/kSTEP && ls linux/config.kstep*
+  └ 2 lines...
+
+● View kstep config files
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep linux/config.kstep.x86_64
+  └ 104 lines...
+
+● Check existing builds and versions
+  $ cd /users/szhong/kSTEP && ls build/ | sort | head -40 && echo "---" && for d in build/*/; do if
+  [ -f "$d/image" ]; then name=$(basename $d); ver=$(strings "$d/image" 2>/dev/null | grep -oP
+  'Linux version \K\S+' | head -1); echo "$name -> $ver"; fi; done 2>/dev/null | head -30
+  └ 72 lines...
+
+● Check if any other driver uses 5.9
+  $ cd /users/szhong/kSTEP && grep -r "5, 9, 0\|5,9,0\|KERNEL_VERSION(5, 9" kmod/drivers/*.c
+  2>/dev/null | head -10
+  └ 2 lines...
+
+● Disable STACK_VALIDATION
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && sed -i
+  's/CONFIG_STACK_VALIDATION=y/# CONFIG_STACK_VALIDATION is not set/' .config && make olddefconfig
+  2>&1 | tail -5
+  └ 6 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sched_debug_flags_corrupt_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Check objtool-related configs
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -i
+  'RETPOLINE\|STACK_VALIDATION\|OBJTOOL' .config | head -10
+  └ 4 lines...
+
+● Check assembler version
+  $ as --version | head -2 && objdump --version | head -2
+  └ 5 lines...
+
+● Check thunk_64.S
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && cat arch/x86/entry/thunk_64.S |
+  head -40
+  └ 41 lines...
+
+● Find objtool symbol table fixes
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && git log --oneline --all
+  --grep="objtool.*symbol" -- tools/objtool/ | head -10
+  └ 11 lines...
+
+● Find the error message location
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && cat tools/objtool/elf.c | grep
+  -n "missing symbol table"
+  └ 2 lines...
+
+● Read linux/sched_debug_flags_corrupt_buggy/tools/objtool/elf.c lines 340-370
+  └ 31 lines read
+
+● Patch objtool to skip missing symtab
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && sed -i 's/WARN("missing symbol
+  table");/WARN("missing symbol table");/' tools/objtool/elf.c && sed -i '/WARN("missing symbol
+  table");/{n;s/return -1;/return 0; \/\* skip validation for missing symtab *\//}'
+  tools/objtool/elf.c && grep -A2 "missing symbol table" tools/objtool/elf.c
+  └ 4 lines...
+
+● Build buggy kernel with objtool fix
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=sched_debug_flags_corrupt_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Kernel built. Now build the kstep module and run:
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_debug_flags_corrupt_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py sched_debug_flags_corrupt --linux_name
+  sched_debug_flags_corrupt_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Read kmod/topo.c
+  └ 241 lines read
+
+● Check x86_topology_update in 5.9
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -r "x86_topology_update"
+  --include="*.c" --include="*.h" | head -5
+  └ 6 lines...
+
+● Check topology update mechanism
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -A10
+  "arch_update_cpu_topology" arch/x86/kernel/smpboot.c | head -15
+  └ 12 lines...
+
+● Check rebuild_sched_domains in 5.9
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -A20 "void
+  rebuild_sched_domains" kernel/sched/topology.c | head -30
+  └ 1 line...
+
+● Find rebuild_sched_domains
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -rn "rebuild_sched_domains"
+   kernel/sched/ | head -10
+  └ 4 lines...
+
+● Find rebuild_sched_domains definition
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -rn "void
+  rebuild_sched_domains\|int rebuild_sched_domains\|rebuild_sched_domains_locked" kernel/ include/ |
+   head -10
+  └ 12 lines...
+
+● View rebuild_sched_domains
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && sed -n '1010,1030p'
+  kernel/cgroup/cpuset.c
+  └ 22 lines...
+
+● View rebuild_sched_domains_locked
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && sed -n '980,1012p'
+  kernel/cgroup/cpuset.c
+  └ 34 lines...
+
+● Check executor for topo handling
+  $ cd /users/szhong/kSTEP && grep -n "topo_print\|sched_domain" kmod/driver_executor.c | head -20
+  └ 1 line...
+
+● Check executor setup/run calls
+  $ cd /users/szhong/kSTEP && grep -n "topo_print\|setup\|run\b" kmod/driver_executor.c | head -30
+  └ 5 lines...
+
+● Read kmod/driver_executor.c
+  └ 96 lines read
+
+● Check main.c for driver lifecycle
+  $ cd /users/szhong/kSTEP && grep -n "kstep_topo_print\|setup()\|\.run\b\|\.setup\b" kmod/main.c |
+  head -20
+  └ 3 lines...
+
+● Read kmod/main.c
+  └ 63 lines read
+
+● Check full boot log
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | head -50
+  └ 2 lines...
+
+● Find and read latest log
+  $ cd /users/szhong/kSTEP && ls data/latest* 2>/dev/null && cat data/latest.log 2>/dev/null | head
+  -60
+  └ 63 lines...
+
+● Search for sched domain registration in log
+  $ cd /users/szhong/kSTEP && grep -i
+  "sched_domain\|domain0\|register_sched_domain\|partition_sched_domains\|sd_alloc" data/latest.log
+  | head -20
+  └ 2 lines...
+
+Let me try a different approach - directly invoke the proc handler:
+
+● Check sd_ctl_doflags symbols
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -n
+  "sd_ctl_doflags\|__SD_FLAG_CNT\|sd_flag_debug" kernel/sched/debug.c | head -20
+  └ 7 lines...
+
+● Check if functions are static
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -n "static int
+  sd_ctl_doflags\|static.*sd_flag_debug" kernel/sched/debug.c | head -5
+  └ 2 lines...
+
+● Check sched domain sysctl registration
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -A30
+  "register_sched_domain_sysctl" kernel/sched/debug.c | head -40
+  └ 40 lines...
+
+● Check sysctl table setup
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -B5 -A20
+  "sd_ctl_dir\|sched_domain.*ctl_table\|sd_sysctl_header" kernel/sched/debug.c | head -40
+  └ 40 lines...
+
+● Check reset functions for sched domain changes
+  $ cd /users/szhong/kSTEP && grep -n "reset_runqueues\|rq->sd\|sched_domain" kmod/reset.c
+  2>/dev/null | head -20
+  └ 3 lines...
+
+● Read kmod/reset.c
+  └ 101 lines read
+
+Let me rewrite the driver with more debugging to find the right path:
+
+● Edit kmod/drivers/sched_debug_flags_corrupt.c (+91 -40)
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_debug_flags_corrupt_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Edit kmod/drivers/sched_debug_flags_corrupt.c (+1 -14)
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_debug_flags_corrupt_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Run on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py sched_debug_flags_corrupt --linux_name
+  sched_debug_flags_corrupt_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Check driver output
+  $ cd /users/szhong/kSTEP && grep -E "TRACE|domain|flags|open|Cannot|Found|fail|pass|iter|read"
+  data/latest.log
+  └ 15 lines...
+
+● View run.py for QEMU config
+  $ cd /users/szhong/kSTEP && head -100 run.py
+  └ 100 lines...
+
+● Edit kmod/drivers/sched_debug_flags_corrupt.c (+2 -2)
+
+● Rebuild and run without topo
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=sched_debug_flags_corrupt_buggy 2>&1 | tail -5
+  && ./run.py sched_debug_flags_corrupt --linux_name sched_debug_flags_corrupt_buggy 2>&1 | tail -5
+  └ 11 lines...
+
+● Check driver output
+  $ cd /users/szhong/kSTEP && grep -E "domain|flags|open|Cannot|Found|fail|No sched" data/latest.log
+  └ 14 lines...
+
+● Check for read/corruption output
+  $ cd /users/szhong/kSTEP && grep -E "iter|read|fail|pass|corrupt|alloc|OOPS|BUG|Slab"
+  data/latest.log
+  └ 29 lines...
+
+● Check proc_sys_call_handler
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -A50
+  "proc_sys_call_handler" fs/proc/proc_sysctl.c | head -60
+  └ 61 lines...
+
+● Check SLUB config
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && grep -i "SLUB\|SLAB" .config |
+  head -20
+  └ 9 lines...
+
+● Enable SLUB debug
+  $ cd /users/szhong/kSTEP/linux/sched_debug_flags_corrupt_buggy && sed -i 's/# CONFIG_SLUB_DEBUG is
+   not set/CONFIG_SLUB_DEBUG=y\nCONFIG_SLUB_DEBUG_ON=y/' .config && make olddefconfig 2>&1 | tail -5
+   && grep SLUB_DEBUG .config
+  └ 8 lines...
+
+Now I need to prevent the Makefile from regenerating the .config:
+
+● Rebuild kernel with SLUB debug
+  $ cd /users/szhong/kSTEP && touch -t 203001010000 linux/sched_debug_flags_corrupt_buggy/.config &&
+   make linux LINUX_NAME=sched_debug_flags_corrupt_buggy 2>&1 | tail -10
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+

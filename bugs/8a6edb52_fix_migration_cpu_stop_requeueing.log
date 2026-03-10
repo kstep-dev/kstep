@@ -56,3 +56,330 @@
   '2190,2320p'
   └ 132 lines...
 
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h 2>/dev/null | head -80
+  └ 80 lines...
+
+● Find ksym_lookup
+  $ cd /users/szhong/kSTEP && grep -rn "kstep_ksym_lookup\|ksym_lookup" kmod/ --include="*.c"
+  --include="*.h" | head -10
+  └ 11 lines...
+
+● Find struct defs in kmod
+  $ cd /users/szhong/kSTEP && grep -rn "set_affinity_pending\|migration_arg" kmod/ --include="*.c"
+  --include="*.h" | head -20
+  └ 5 lines...
+
+● Read buggy else-if branch
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8a6edb5257e2~1:kernel/sched/core.c | sed -n
+  '1960,2010p'
+  └ 51 lines...
+
+● Find set_affinity_pending struct
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8a6edb5257e2~1:kernel/sched/core.c | grep -n
+   "struct set_affinity_pending" | head -5
+  └ 6 lines...
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8a6edb5257e2~1:Makefile | head -6
+  └ 7 lines...
+
+● Read set_affinity_pending struct
+  $ cd /users/szhong/kSTEP && git -C linux/current show 8a6edb5257e2~1:kernel/sched/core.c | sed -n
+  '1855,1885p'
+  └ 31 lines...
+
+● Read setaffinity driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/setaffinity_warn.c 2>/dev/null
+  └ 138 lines...
+
+Now I have a clear understanding of the bug. Let me check the run.py defaults and then write the driver.
+
+● Check num_cpus in run.py
+  $ cd /users/szhong/kSTEP && grep -n "num.cpu\|num_cpu" run.py | head -10
+  └ 5 lines...
+
+● Check cpus usage in existing driver
+  $ cd /users/szhong/kSTEP && grep -n "cpus_ptr\|cpus_mask" kmod/drivers/migration_cpu_stop_warn.c
+  └ 4 lines...
+
+● Verify kernel version code
+  $ cd /users/szhong/kSTEP && python3 -c "
+  # Check KERNEL_VERSION for 5.12.0
+  v = 5*65536 + 12*256 + 0
+  print(f'KERNEL_VERSION(5,12,0) = {v} = 0x{v:x}')
+  "
+  └ 2 lines...
+
+✗ create
+  Expected ',' or '}' after property value in JSON at position 72 (line 1
+  column 73)
+
+● Create kmod/drivers/migration_cpu_stop_requeue.c (+136)
+
+Now let me checkout the buggy kernel and build:
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 8a6edb5257e2~1 migration_requeue_buggy 2>&1 | tail
+   -5
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 6 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=migration_requeue_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=migration_requeue_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Find sched_setattr_nocheck usage
+  $ cd /users/szhong/kSTEP && grep -rn "sched_setattr_nocheck" kmod/ --include="*.c" --include="*.h"
+   | head -10
+  └ 9 lines...
+
+● Check version guards
+  $ cd /users/szhong/kSTEP && grep -n "LINUX_VERSION" kmod/drivers/sched_change_assert.c | head -5
+  └ 2 lines...
+
+● Check version guards in uclamp drivers
+  $ cd /users/szhong/kSTEP && grep -n "LINUX_VERSION\|#if\|#else\|#endif" kmod/drivers/uclamp_oob.c
+  | head -10 && echo "---" && grep -n "LINUX_VERSION\|#if\|#else\|#endif"
+  kmod/drivers/uclamp_inversion.c | head -10
+  └ 10 lines...
+
+● Check if symbol exists in kernel
+  $ cd /users/szhong/kSTEP && grep -rn "sched_setattr_nocheck"
+  linux/migration_requeue_buggy/kernel/sched/ --include="*.c" --include="*.h" | head -5
+  └ 5 lines...
+
+● Check KSYM imports
+  $ cd /users/szhong/kSTEP && grep -rn "KSYM_IMPORT\|sched_setattr_nocheck" kmod/ --include="*.c"
+  --include="*.h" | grep -v drivers/ | head -10
+  └ 11 lines...
+
+● Check uclamp_oob usage
+  $ cd /users/szhong/kSTEP && grep -rn "sched_setattr_nocheck" kmod/drivers/uclamp_oob.c | head -5
+  └ 3 lines...
+
+● Check task.c for sched attr functions
+  $ cd /users/szhong/kSTEP && grep -n "sched_setattr\|task_fifo\|task_set_prio" kmod/task.c | head
+  -20
+  └ 3 lines...
+
+● Read task_fifo implementation
+  $ cd /users/szhong/kSTEP && sed -n '79,100p' kmod/task.c
+  └ 23 lines...
+
+● Read kmod Makefile
+  $ cd /users/szhong/kSTEP && cat kmod/Makefile
+  └ 2 lines...
+
+● Find build files
+  $ cd /users/szhong/kSTEP && find kmod -name "Makefile" -o -name "Kbuild" | head -5
+  └ 2 lines...
+
+● Read Kbuild
+  $ cd /users/szhong/kSTEP && cat kmod/Kbuild
+  └ 4 lines...
+
+● Check symbol exports
+  $ cd /users/szhong/kSTEP && grep -n "sched_setattr" kmod/sym.c 2>/dev/null && grep -n
+  "EXPORT_SYMBOL" linux/migration_requeue_buggy/kernel/sched/core.c | grep "setattr" | head -5
+  └ 1 line...
+
+● Check export mechanism
+  $ cd /users/szhong/kSTEP && grep -rn "EXPORT_SYMBOL" kmod/ --include="*.c" --include="*.h" | head
+  -5 && echo "---" && cat Makefile | head -30
+  └ 31 lines...
+
+● Check linux target in Makefile
+  $ cd /users/szhong/kSTEP && cat Makefile | grep -A5 "linux:"
+  └ 6 lines...
+
+● Check linux-patch target
+  $ cd /users/szhong/kSTEP && cat Makefile | grep -A20 "linux-patch"
+  └ 31 lines...
+
+● Check cov.c for export patterns
+  $ cd /users/szhong/kSTEP && head -20 linux/cov.c
+  └ 13 lines...
+
+● Check uclamp_inversion version guard
+  $ cd /users/szhong/kSTEP && grep -n "LINUX_VERSION" kmod/drivers/uclamp_inversion.c | head -5
+  └ 3 lines...
+
+● Read kmod/drivers/uclamp_oob.c
+  └ 73 lines read
+
+● Edit kmod/drivers/uclamp_oob.c (+6 -1)
+
+● Rebuild kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=migration_requeue_buggy 2>&1 | tail -15
+  └ 16 lines...
+
+Build succeeded. Let me run the driver:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py migration_cpu_stop_requeue --linux_name
+  migration_requeue_buggy --num_cpus 3 2>&1 | tail -20
+  └ 21 lines...
+
+● Check log output
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log 2>/dev/null | head -80
+  └ 1 line...
+
+● Check latest log
+  $ cd /users/szhong/kSTEP && cat data/latest.log 2>/dev/null | head -80
+  └ 81 lines...
+
+● Check key log messages
+  $ cd /users/szhong/kSTEP && cat data/latest.log 2>/dev/null | grep -i
+  "kstep\|TRACE\|migration\|victim\|fail\|pass\|panic\|BUG\|NULL\|oops\|warn\|requeue" | head -30
+  └ 20 lines...
+
+● Check tick_clock.c
+  $ cd /users/szhong/kSTEP && cat kmod/tick_clock.c
+  └ 74 lines...
+
+● Check if paravirt_set_sched_clock exists
+  $ cd /users/szhong/kSTEP && grep -r "paravirt_set_sched_clock"
+  linux/migration_requeue_buggy/arch/x86/ 2>/dev/null | head -5
+  └ 1 line...
+
+● Edit kmod/tick_clock.c (+1 -1)
+
+● Rebuild kstep after fix
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=migration_requeue_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py migration_cpu_stop_requeue --linux_name
+  migration_requeue_buggy --num_cpus 3 2>&1 | tail -5
+  └ 6 lines...
+
+● Check key log messages
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -i "kstep\|TRACE\|victim\|fail\|pass\|panic
+  \|BUG\|NULL\|oops\|warn\|requeue\|migration\|pending\|stopper" | head -30
+  └ 19 lines...
+
+● Check JSON output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 32 lines...
+
+Bug triggers on the buggy kernel (status: fail). Now let me verify the fix:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 8a6edb5257e2 migration_requeue_fixed 2>&1 | tail
+  -5
+  └ 1 line...
+
+● read_bash
+  └ 1 line...
+
+● read_bash
+  └ 6 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=migration_requeue_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=migration_requeue_fixed 2>&1 | tail -10
+  └ 11 lines...
+
+● Run driver on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py migration_cpu_stop_requeue --linux_name
+  migration_requeue_fixed --num_cpus 3 2>&1 | tail -5
+  └ 6 lines...
+
+● Check fixed kernel results
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -i
+  "victim\|fail\|pass\|requeue\|pending\|migration_cpu" | head -10
+  └ 11 lines...
+
+● Check final status
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl | tail -3
+  └ 4 lines...
+
+Bug confirmed:
+- **Buggy kernel**: `fail` - requeue with uninitialized `pending->arg`
+- **Fixed kernel**: `pass` - correctly ignores pending
+
+Now let me update TODO.md, add to reproduce.py, and commit:
+
+● Find bug in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n "8a6edb5257e2" TODO.md
+  └ 2 lines...
+
+● Find total counter
+  $ cd /users/szhong/kSTEP && grep -n "Total:.*reproduced" TODO.md | head -3
+  └ 2 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+Now add to reproduce.py:
+
+● Check end of reproduce.py
+  $ cd /users/szhong/kSTEP && tail -30 reproduce.py
+  └ 31 lines...
+
+● Find last Bug entry
+  $ cd /users/szhong/kSTEP && grep -n "Bug(" reproduce.py | tail -5
+  └ 6 lines...
+
+● Check last Bug entry
+  $ cd /users/szhong/kSTEP && sed -n '448,465p' reproduce.py
+  └ 19 lines...
+
+● Edit reproduce.py (+7)
+
+● Check git status
+  $ cd /users/szhong/kSTEP && git add -A && git status --short
+  └ 11 lines...
+
+● Stage only relevant files
+  $ cd /users/szhong/kSTEP && git reset HEAD && git add TODO.md
+  kmod/drivers/migration_cpu_stop_requeue.c kmod/drivers/uclamp_oob.c kmod/tick_clock.c reproduce.py
+   && git status --short
+  └ 19 lines...
+
+● Git commit
+  $ cd /users/szhong/kSTEP && git commit -m "reproduce: migration_cpu_stop_requeue (8a6edb5257e2)
+
+  Reproduce the bug where affine_move_task() never initializes
+  pending->arg, causing migration_cpu_stop() to requeue with a NULL
+  task pointer when the target task migrates before the stopper runs....
+  └ 10 lines...
+
+● Git push
+  $ cd /users/szhong/kSTEP && git push 2>&1 | tail -5
+  └ 3 lines...
+
+Bug successfully reproduced and committed. Summary:
+
+- **Driver**: `migration_cpu_stop_requeue` — simulates the race where a task migrates before the stopper runs
+- **Buggy kernel**: `migration_cpu_stop()` enters the requeue path with uninitialized `pending->arg` (detected via `stop_work.fn != NULL`) → **fail**
+- **Fixed kernel**: new `if (pending && !arg->pending)` check ignores `migration_pending` for non-affine_move_task callers → **pass**
+- Also fixed two pre-existing build issues for kernel 5.12-rc2 (`tick_clock.c` pv_ops fallback, `uclamp_oob.c` symbol lookup)
+
+
+Total usage est:        6 Premium requests
+API time spent:         13m 36s
+Total session time:     26m 53s
+Total code changes:     +152 -4
+Breakdown by AI model:
+ claude-opus-4.6-1m      5.7m in, 40.9k out, 5.6m cached (Est. 6 Premium requests)
