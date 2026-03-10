@@ -7,6 +7,8 @@
 #include "driver.h"
 #include "internal.h"
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 13, 0)
+
 static struct task_struct *task;
 
 static void set_task_uclamp(struct task_struct *p, unsigned int min,
@@ -78,3 +80,14 @@ KSTEP_DRIVER_DEFINE{
     .on_tick_begin = on_tick_begin,
     .step_interval_us = 1000,
 };
+
+#else
+static void setup(void) {}
+static void run(void) { kstep_pass("kernel version not applicable"); }
+KSTEP_DRIVER_DEFINE{
+    .name = "uclamp_inversion",
+    .setup = setup,
+    .run = run,
+    .step_interval_us = 1000,
+};
+#endif

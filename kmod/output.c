@@ -1,4 +1,5 @@
 #include "internal.h"
+#include <linux/io.h>
 
 static struct file *output_file;
 
@@ -78,6 +79,15 @@ void kstep_json_end(struct kstep_json *json) {
   kstep_json_append_char(json, '}');
   kstep_json_append_char(json, '\n');
   ssize_t ret = kernel_write(output_file, json->buf, json->len, NULL);
+  if (ret == -EINVAL && output_file->f_op->write && !output_file->f_op->write_iter) {
+    // Fallback for older kernels where kernel_write doesn't support .write fops
+    for (size_t i = 0; i < json->len; i++) {
+      while (!(inb(0x2f8 + 5) & 0x20))
+        cpu_relax();
+      outb(json->buf[i], 0x2f8);
+    }
+    ret = json->len;
+  }
   if (ret < 0)
     panic("write to output file failed: %ld", ret);
 }

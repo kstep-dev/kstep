@@ -75,13 +75,12 @@ static void run(void) {
   int ret = stop_one_cpu_fn(1, mcs, &arg);
   TRACE_INFO("migration_cpu_stop returned %d", ret);
 
-  // Check if WARN fired by looking for the warning flag
-  // On buggy kernel: WARN fires (visible in dmesg)
-  // On fixed kernel: no WARN
-  if (victim->on_rq)
-    kstep_pass("migration_cpu_stop completed, check dmesg for WARN");
+  // WARN_ON_ONCE taints the kernel with TAINT_WARN
+  if (test_taint(TAINT_WARN))
+    kstep_fail("WARN_ON_ONCE fired in migration_cpu_stop: "
+               "is_cpu_allowed used wrong cpu_of(rq)");
   else
-    kstep_pass("migration_cpu_stop completed, task not on rq");
+    kstep_pass("no WARN fired: task_cpu(p) in cpus_mask checked correctly");
 }
 
 KSTEP_DRIVER_DEFINE{

@@ -2,8 +2,10 @@
 #include <linux/dcache.h>
 #include <linux/freezer.h>
 #include <linux/fs.h>
+#include <linux/kernfs.h>
 #include <linux/namei.h>
 #include <linux/percpu-rwsem.h>
+#include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 
@@ -16,6 +18,40 @@
 #define MAX_PATH_LENGTH 64
 #define MAX_DATA_LENGTH 64
 
+// Direct write for kernfs-backed files where kernel_write doesn't work
+// (kernfs uses .write which calls copy_from_user, failing with kernel bufs)
+static ssize_t kstep_kernfs_write(struct file *file, const char *buf,
+                                  size_t count) {
+  struct seq_file *sf = file->private_data;
+  struct kernfs_open_file *of = sf->private;
+  const struct kernfs_ops *ops = of->kn->attr.ops;
+  ssize_t len;
+
+  if (!ops || !ops->write)
+    return -EINVAL;
+
+  if (of->atomic_write_len) {
+    len = count;
+    if (len > of->atomic_write_len)
+      return -E2BIG;
+  } else {
+    len = min_t(size_t, count, PAGE_SIZE);
+  }
+
+  char *kbuf = kmalloc(len + 1, GFP_KERNEL);
+  if (!kbuf)
+    return -ENOMEM;
+  memcpy(kbuf, buf, len);
+  kbuf[len] = '\0';
+
+  mutex_lock(&of->mutex);
+  len = ops->write(of, kbuf, len, 0);
+  mutex_unlock(&of->mutex);
+
+  kfree(kbuf);
+  return len;
+}
+
 void kstep_write(const char *path, const char *buf, size_t size) {
   TRACE_INFO("Writing %s: %s", path, buf);
   struct file *file = filp_open(path, O_WRONLY, 0);
@@ -23,7 +59,12 @@ void kstep_write(const char *path, const char *buf, size_t size) {
     panic("open %s failed: %ld", path, PTR_ERR(file));
 
   loff_t pos = 0;
-  ssize_t ret = kernel_write(file, buf, size, &pos);
+  ssize_t ret;
+  // kernel_write needs write_iter without write; use direct kernfs path otherwise
+  if (file->f_op->write_iter && !file->f_op->write)
+    ret = kernel_write(file, buf, size, &pos);
+  else
+    ret = kstep_kernfs_write(file, buf, size);
   if (ret < 0)
     panic("write %s failed with return value %ld", path, ret);
 
