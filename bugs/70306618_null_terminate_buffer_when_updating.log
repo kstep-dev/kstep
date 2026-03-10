@@ -39,3 +39,38 @@
   tail -5
   └ 2 lines...
 
+● Find kernel version tags
+  $ cd /users/szhong/kSTEP && git -C linux/current tag --contains 703066188f63~1 --no-contains
+  703066188f63 2>/dev/null | head -5; echo "---"; git -C linux/current tag --contains 703066188f63 |
+   head -5
+  └ 7 lines...
+
+● Read checkout script
+  $ cd /users/szhong/kSTEP && cat checkout_linux.py
+  └ 123 lines...
+
+● Check write implementation details
+  $ cd /users/szhong/kSTEP && grep -n "kstep_write\|kernel_write\|set_fs\|KERNEL_DS" kmod/kernel.c
+  └ 7 lines...
+
+● Check kernel version at buggy commit
+  $ cd /users/szhong/kSTEP && git -C linux/current show 703066188f63~1:Makefile | head -10
+  └ 11 lines...
+
+● Full kernel.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kernel.c | head -100
+  └ 101 lines...
+
+● Check userspace helper
+  $ cd /users/szhong/kSTEP && ls user/ && cat user/*.c 2>/dev/null | head -50
+  └ 52 lines...
+
+● Check user task helper
+  $ cd /users/szhong/kSTEP && cat user/task.c
+  └ 67 lines...
+
+● Check for usermode helper usage
+  $ cd /users/szhong/kSTEP && grep -n "call_usermodehelper\|UMH_\|usermode" kmod/*.c kmod/*.h
+  2>/dev/null
+  └ 3 lines...
+

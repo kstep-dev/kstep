@@ -39,7 +39,7 @@
 - [-] `6080fb211672` sched/debug: Fix updating of ppos on server write ops — [`6080fb21_updating_ppos_server_write_ops.md`](bugs/6080fb21_updating_ppos_server_write_ops.md) <!-- skipped:vfs-level-ppos-bug-requires-userspace-file-writes-not-reproducible-via-kstep attempts:1 -->
 - [-] `6c125b85f3c8` sched: Export hidden tracepoints to modules — [`6c125b85_export_hidden_tracepoints_modules.md`](bugs/6c125b85_export_hidden_tracepoints_modules.md) <!-- skipped:compile-time-symbol-export-issue-not-runtime-scheduler-bug attempts:1 -->
 - [ ] `6d2f8909a5fa` sched: Fix out-of-bound access in uclamp — [`6d2f8909_outofbound_access_uclamp.md`](bugs/6d2f8909_outofbound_access_uclamp.md)
-- [ ] `6d337eab041d` sched: Fix migrate_disable() vs set_cpus_allowed_ptr() — [`6d337eab_migrate_disable_set_cpus_allowed_ptr.md`](bugs/6d337eab_migrate_disable_set_cpus_allowed_ptr.md)
+- [-] `6d337eab041d` sched: Fix migrate_disable() vs set_cpus_allowed_ptr() — [`6d337eab_migrate_disable_set_cpus_allowed_ptr.md`](bugs/6d337eab_migrate_disable_set_cpus_allowed_ptr.md) <!-- skipped:requires CONFIG_PREEMPT_RT which depends on ARCH_SUPPORTS_RT not available for x86 at v5.10-rc1 attempts:1 -->
 - [ ] `703066188f63` sched/fair: Null terminate buffer when updating tunable_scaling — [`70306618_null_terminate_buffer_when_updating.md`](bugs/70306618_null_terminate_buffer_when_updating.md)
 - [ ] `70ee7947a290` sched: fix warning in sched_setaffinity — [`70ee7947_fix_warning_in_schedsetaffinity.md`](bugs/70ee7947_fix_warning_in_schedsetaffinity.md)
 - [ ] `76f970ce51c8` Revert "sched/core: Reduce cost of sched_move_task when config autogroup" — [`76f970ce_schedcore_reduce_cost_of_schedmovetask.md`](bugs/76f970ce_schedcore_reduce_cost_of_schedmovetask.md)

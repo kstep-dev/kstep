@@ -96,3 +96,30 @@ Now let me check the kernel version and internal.h:
    | head -20
   └ 11 lines...
 
+● List config files
+  $ cd /users/szhong/kSTEP && ls build/configs/
+  └ 2 lines...
+
+● Check uclamp config
+  $ cd /users/szhong/kSTEP && grep "CONFIG_UCLAMP\|UCLAMP_BUCKETS" build/configs/*.config
+  2>/dev/null | head -10
+  └ 1 line...
+
+● Check Makefile for config
+  $ cd /users/szhong/kSTEP && cat Makefile | grep -A5 "linux\|config" | head -40
+  └ 41 lines...
+
+● Find config files
+  $ cd /users/szhong/kSTEP && find build/ -name "*.config" -o -name "defconfig" -o -name "kconfig"
+  2>/dev/null | head -10
+  └ 1 line...
+
+● Check uclamp config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | grep -i "uclamp\|UCLAMP"
+  └ 3 lines...
+
+● Check UCLAMP_BUCKETS default
+  $ cd /users/szhong/kSTEP && git -C linux/current show 6d2f8909a5fa~1:init/Kconfig 2>/dev/null |
+  grep -B5 -A15 "UCLAMP_BUCKETS"
+  └ 29 lines...
+
