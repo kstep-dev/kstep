@@ -321,3 +321,43 @@ Now add to reproduce.py:
 
 ● Edit reproduce.py (+7)
 
+● Check staged changes
+  $ cd /users/szhong/kSTEP && git add -A && git --no-pager diff --cached --stat
+  └ 12 lines...
+
+● Unstage unrelated changes
+  $ cd /users/szhong/kSTEP && git reset HEAD -- bugs/5b6547ed_forceidle_balancing.log
+  bugs/5bc78502_exit_mm_membarrier_v4.log kmod/drivers/forceidle_balancing.c kmod/tick_clock.c
+  └ 6 lines...
+
+● Verify staged files
+  $ cd /users/szhong/kSTEP && git --no-pager diff --cached --stat
+  └ 8 lines...
+
+● Commit changes
+  $ cd /users/szhong/kSTEP && git commit -m "reproduce: task_state_cmp (5aec788aeb8e)
+
+  Bug: ___wait_is_interruptible(TASK_INTERRUPTIBLE|TASK_FREEZABLE) returns
+  false due to equality comparison, causing wait_event_freezable() to
+  ignore signals and spin forever....
+  └ 11 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1 | tail -10
+  └ 3 lines...
+
+Successfully reproduced bug `5aec788aeb8e` (sched: Fix TASK_state comparisons):
+
+- **Driver**: `kmod/drivers/task_state_cmp.c`
+- **Bug**: `___wait_is_interruptible(TASK_INTERRUPTIBLE|TASK_FREEZABLE)` uses equality (`==`) instead of bitmask (`&`), returning false. This causes `wait_event_freezable()` to ignore signals and spin indefinitely.
+- **Buggy kernel**: `fail` — kthread stuck in TASK_RUNNING (busy-loop)
+- **Fixed kernel**: `pass` — kthread correctly exits wait on signal
+- **Committed & pushed** ✅
+
+
+Total usage est:        6 Premium requests
+API time spent:         14m 24s
+Total session time:     21m 27s
+Total code changes:     +127 -5
+Breakdown by AI model:
+ claude-opus-4.6-1m      4.8m in, 49.5k out, 4.7m cached (Est. 6 Premium requests)

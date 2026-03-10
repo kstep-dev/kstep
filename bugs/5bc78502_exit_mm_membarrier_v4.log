@@ -288,3 +288,29 @@ Now add the bug to reproduce.py:
 
 ● Edit reproduce.py (+7)
 
+● Commit changes
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: exit_mm_membarrier
+  (5bc78502322a)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>&1
+  └ 3 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced bug `5bc78502322a` (exit_mm vs membarrier).
+
+**Summary:**
+- **Bug**: `exit_mm()` clears `current->mm` to NULL without updating `rq->membarrier_state`, leaving it stale. This causes membarrier to skip IPIs, violating memory ordering guarantees.
+- **Driver**: `exit_mm_membarrier` — creates a task with membarrier-registered mm on CPU 1, triggers exit, then checks `rq->membarrier_state`.
+- **Buggy kernel**: `rq[1].membarrier_state=0xc` after exit (stale)
+- **Fixed kernel**: `rq[1].membarrier_state=0x0` after exit (correctly cleared by `membarrier_update_current_mm`)
+
+
+Total usage est:        6 Premium requests
+API time spent:         6m 22s
+Total session time:     11m 0s
+Total code changes:     +115 -2
+Breakdown by AI model:
+ claude-opus-4.6-1m      3.2m in, 20.1k out, 3.1m cached (Est. 6 Premium requests)
