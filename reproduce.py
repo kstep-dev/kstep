@@ -634,6 +634,13 @@ bugs = [
             Linux(name="fixed", version="df14b7f9efcd"),
         ],
     ),
+    Bug(
+        driver=Driver(name="ptrace_freeze", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="d136122f58458479fd8926020ba2937de61d7f65~1"),
+            Linux(name="fixed", version="d136122f58458479fd8926020ba2937de61d7f65"),
+        ],
+    ),
 ]
 
 
