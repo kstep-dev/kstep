@@ -9,22 +9,23 @@
 // ttwu_do_activate() (for non-migrated wakeups) and after select_task_rq()
 // (for migrated wakeups), ensuring proper ordering.
 //
-// Test: Directly call ttwu_do_activate() on a deactivated task with
-// in_iowait=1 and check whether nr_iowait is decremented.
-// On the buggy kernel, ttwu_do_activate has no iowait handling (the
-// decrement lives in ttwu instead), so nr_iowait stays unchanged.
-// On the fixed kernel, ttwu_do_activate decrements nr_iowait for
-// non-migrated wakeups, so nr_iowait drops by 1.
+// Test: Simulate the race window by deactivating a task with in_iowait=1,
+// keeping on_cpu=1 (as if schedule() hasn't finished), then calling
+// wake_up_process(). With on_cpu=1, ttwu takes the ttwu_queue_wakelist()
+// path (deferred wakeup via IPI). On the buggy kernel, nr_iowait is
+// decremented immediately (before the wakelist path), so we observe the
+// decrement right after wake_up_process returns. On the fixed kernel, the
+// decrement is deferred to ttwu_do_activate (when the wakelist is processed),
+// so nr_iowait is unchanged after wake_up_process returns.
 
 #include "internal.h"
 #include <linux/version.h>
 
 #if LINUX_VERSION_CODE == KERNEL_VERSION(5, 9, 0)
 
-typedef void (*ttwu_do_activate_fn_t)(struct rq *, struct task_struct *, int,
-                                      struct rq_flags *);
 typedef void (*deactivate_fn_t)(struct rq *, struct task_struct *, int);
 typedef void (*update_rq_clock_fn_t)(struct rq *);
+typedef void (*sched_ttwu_pending_fn_t)(void *);
 
 static struct task_struct *task;
 
@@ -37,14 +38,14 @@ static void run(void) {
   struct rq *rq = cpu_rq(1);
   struct rq_flags rf;
 
-  ttwu_do_activate_fn_t ttwu_activate =
-      (ttwu_do_activate_fn_t)kstep_ksym_lookup("ttwu_do_activate");
   deactivate_fn_t deact =
       (deactivate_fn_t)kstep_ksym_lookup("deactivate_task");
   update_rq_clock_fn_t upd_clock =
       (update_rq_clock_fn_t)kstep_ksym_lookup("update_rq_clock");
+  sched_ttwu_pending_fn_t ttwu_pending =
+      (sched_ttwu_pending_fn_t)kstep_ksym_lookup("sched_ttwu_pending");
 
-  if (!ttwu_activate || !deact || !upd_clock) {
+  if (!deact || !upd_clock || !ttwu_pending) {
     kstep_fail("cannot find required symbols");
     return;
   }
@@ -63,53 +64,64 @@ static void run(void) {
   rq_lock(rq, &rf);
   upd_clock(rq);
   task->state = TASK_UNINTERRUPTIBLE;
+  task->sched_contributes_to_load = 0;
   deact(rq, task, DEQUEUE_SLEEP | DEQUEUE_NOCLOCK);
   rq_unlock(rq, &rf);
 
-  // Step 2: Set in_iowait to simulate IO wait state
+  TRACE_INFO("after deactivate: on_rq=%d on_cpu=%d", task->on_rq, task->on_cpu);
+
+  // Step 2: Set up the race scenario
   task->in_iowait = 1;
-  // Prevent sched_contributes_to_load from affecting nr_uninterruptible
-  task->sched_contributes_to_load = 0;
+  task->on_cpu = 1; // Simulate task still in middle of schedule()
 
   // Step 3: Set nr_iowait to a known value
   atomic_set(&rq->nr_iowait, 5);
-  TRACE_INFO("nr_iowait set to %d before ttwu_do_activate",
-             atomic_read(&rq->nr_iowait));
+  int nr_iowait_before = atomic_read(&rq->nr_iowait);
+  TRACE_INFO("nr_iowait before wake_up_process: %d", nr_iowait_before);
 
-  // Step 4: Call ttwu_do_activate with wake_flags=0 (no WF_MIGRATED)
-  // On buggy kernel: no iowait handling → nr_iowait stays 5
-  // On fixed kernel: decrements nr_iowait → nr_iowait becomes 4
-  rq_lock(rq, &rf);
-  upd_clock(rq);
-  ttwu_activate(rq, task, 0, &rf);
-  rq_unlock(rq, &rf);
+  // Step 4: Call wake_up_process from CPU 0
+  // ttwu will see: on_rq=0, in_iowait=1, on_cpu=1
+  // Path taken: skip ttwu_runnable → [BUGGY: dec nr_iowait] →
+  //   smp_acquire → on_cpu=1 → ttwu_queue_wakelist → goto unlock
+  // The task is queued in CPU 1's wakelist for deferred processing
+  wake_up_process(task);
 
+  // Step 5: Check nr_iowait IMMEDIATELY after wake_up_process returns
+  // The wakelist hasn't been processed yet (no tick on CPU 1)
   int nr_iowait_after = atomic_read(&rq->nr_iowait);
-  TRACE_INFO("nr_iowait after ttwu_do_activate: %d", nr_iowait_after);
+  TRACE_INFO("nr_iowait after wake_up_process: %d", nr_iowait_after);
+
+  int delta = nr_iowait_after - nr_iowait_before;
+  TRACE_INFO("delta = %d", delta);
 
   // On BUGGY kernel:
-  //   ttwu_do_activate has no in_iowait handling.
-  //   nr_iowait stays at 5. The decrement would normally happen too early
-  //   in try_to_wake_up(), creating a race with schedule()'s increment.
+  //   try_to_wake_up() decrements nr_iowait early, BEFORE the wakelist path.
+  //   → delta = -1 (nr_iowait went from 5 to 4)
   //
   // On FIXED kernel:
-  //   ttwu_do_activate properly decrements nr_iowait for non-migrated tasks.
-  //   nr_iowait becomes 4. The decrement now happens at the right time.
+  //   try_to_wake_up() does NOT decrement nr_iowait.
+  //   The decrement is deferred to ttwu_do_activate() in the wakelist handler.
+  //   → delta = 0 (nr_iowait stays at 5)
 
-  if (nr_iowait_after == 5) {
-    kstep_fail("ttwu_do_activate did not handle iowait (nr_iowait=%d): "
-               "decrement is misplaced in ttwu, race with schedule possible",
-               nr_iowait_after);
-  } else if (nr_iowait_after == 4) {
-    kstep_pass("ttwu_do_activate properly decrements nr_iowait (%d)",
-               nr_iowait_after);
+  if (delta == -1) {
+    kstep_fail("nr_iowait decremented early in ttwu (delta=%d): "
+               "race with schedule possible",
+               delta);
+  } else if (delta == 0) {
+    kstep_pass("nr_iowait not prematurely decremented (delta=%d): "
+               "decrement properly deferred to activation",
+               delta);
   } else {
-    kstep_fail("unexpected nr_iowait=%d", nr_iowait_after);
+    kstep_fail("unexpected nr_iowait delta=%d", delta);
   }
 
-  // Clean up
+  // Clean up: allow wakelist to be processed
+  task->on_cpu = 0;
   task->in_iowait = 0;
   atomic_set(&rq->nr_iowait, 0);
+
+  // Process pending wakeups on CPU 1
+  ttwu_pending(rq);
   kstep_tick_repeat(5);
 }
 

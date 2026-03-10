@@ -4,3 +4,4 @@
 #include <linux/export.h>
 
 atomic_t __weak kstep_migrate_disable_pi_locked = ATOMIC_INIT(-1);
+int __weak kstep_sd_doflags_offset_count;
