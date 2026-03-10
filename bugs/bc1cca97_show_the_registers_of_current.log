@@ -54,3 +54,20 @@ Let me skip this and update TODO.md:
 
 ● Edit TODO.md (+1 -1)
 
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: bc1cca97e6da - diagnostic output
+  quality bug on non-NMI archs, not reproducible on x86
+
+  The bug improves dump_cpu_task() to use get_irq_regs() for better register
+  display during RCU stall detection. On x86 (kSTEP's platform), NMIs are...
+  └ 20 lines...
+
+**Skipped `bc1cca97e6da`** — This is a diagnostic output quality improvement for `dump_cpu_task()` on non-NMI architectures (ARM64, RISC-V). On x86 (kSTEP's platform), NMIs work correctly so `trigger_single_cpu_backtrace()` already shows proper registers. The bug also requires real hardirq context during RCU stall detection, which kSTEP's controlled tick mechanism doesn't provide. Committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         2m 39s
+Total session time:     2m 55s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      388.4k in, 7.8k out, 360.9k cached (Est. 6 Premium requests)

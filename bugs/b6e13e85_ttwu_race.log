@@ -48,3 +48,35 @@ Let me look at existing driver examples and understand the kernel version.
   linux/current/Makefile
   └ 8 lines...
 
+● Check KSYM_IMPORT definition
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | grep -A2 "KSYM_IMPORT"
+  └ 12 lines...
+
+● Get kernel version at buggy commit
+  $ cd /users/szhong/kSTEP && git -C linux/current show b6e13e85829f~1:Makefile | head -6
+  └ 2 lines...
+
+● Find ksym lookup functions
+  $ cd /users/szhong/kSTEP && grep -l "KSYM_IMPORT\|kstep_ksym_lookup" kmod/*.h kmod/*.c 2>/dev/null
+   | head -5
+  └ 6 lines...
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py b6e13e85829f~1 ttwu_race_buggy 2>&1 | tail -5
+  └ 1 line...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 30 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 60 seconds for command output
+  └ 1 line...
+
+● Read shell output: Waiting up to 120 seconds for command output
+  └ 1 line...
+
