@@ -144,3 +144,59 @@ Let me try enabling CONFIG_SCHED_CORE and building. This bug requires core sched
   linux/config.kstep && grep SCHED_CORE linux/config.kstep
   └ 2 lines...
 
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 5b6547ed97f4~1 forceidle_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+Good, checkout done. Now let me write the driver while the kernel builds.
+
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=forceidle_buggy 2>&1 | tail -5
+  └ 1 line...
+
+● Find queue_core_balance implementation
+  $ cd /users/szhong/kSTEP && grep -A20 "void queue_core_balance"
+  linux/forceidle_buggy/kernel/sched/core.c 2>/dev/null
+  └ 21 lines...
+
+● Search for core balance functions
+  $ cd /users/szhong/kSTEP && grep -n "queue_core_balance\|sched_core_balance\|core_balance"
+  linux/forceidle_buggy/kernel/sched/core.c 2>/dev/null
+  └ 5 lines...
+
+● Read core_balance code
+  $ cd /users/szhong/kSTEP && sed -n '6040,6085p' linux/forceidle_buggy/kernel/sched/core.c
+  └ 47 lines...
+
+● Find queue_balance_callback
+  $ cd /users/szhong/kSTEP && grep -n "queue_balance_callback"
+  linux/forceidle_buggy/kernel/sched/core.c | head -5
+  └ 2 lines...
+
+● Find queue_balance_callback definition
+  $ cd /users/szhong/kSTEP && grep -n "queue_balance_callback\|static.*queue_balance_callback\|void
+  queue_balance_callback" linux/forceidle_buggy/kernel/sched/sched.h | head -5
+  └ 2 lines...
+
+● read_bash
+  └ 6 lines...
+
+Good, kernel built. Now let me check the locking details and write the driver.
+
+● Read queue_balance_callback
+  $ cd /users/szhong/kSTEP && sed -n '1685,1710p' linux/forceidle_buggy/kernel/sched/sched.h
+  └ 26 lines...
+
+● Check rq_pin_lock and balance callbacks
+  $ cd /users/szhong/kSTEP && grep -n "rq_pin_lock\|balance_callback\|SCHED_WARN_ON.*balance"
+  linux/forceidle_buggy/kernel/sched/sched.h | head -20
+  └ 12 lines...
+
+● Read rq_pin_lock
+  $ cd /users/szhong/kSTEP && sed -n '1520,1540p' linux/forceidle_buggy/kernel/sched/sched.h
+  └ 22 lines...
+

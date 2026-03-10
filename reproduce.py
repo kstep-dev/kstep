@@ -312,6 +312,13 @@ bugs = [
             Linux(name="fixed", version="5324953c06bd"),
         ],
     ),
+    Bug(
+        driver=Driver(name="exit_mm_membarrier", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="5bc78502322a~1"),
+            Linux(name="fixed", version="5bc78502322a"),
+        ],
+    ),
 ]
 
 

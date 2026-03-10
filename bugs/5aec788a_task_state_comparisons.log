@@ -124,3 +124,65 @@ Now let me understand the code paths better. Let me look at `state_filter_match`
 
 ● Response was interrupted due to a server error. Retrying...
 
+● Find wait_event_freezable definition
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5aec788aeb8e~1:include/linux/wait.h
+  2>/dev/null | grep -n -A10 'wait_event_freezable\b' | head -30
+  └ 31 lines...
+
+● Check TASK_FREEZABLE usage in wait.h
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5aec788aeb8e~1:include/linux/wait.h
+  2>/dev/null | grep -n 'TASK_FREEZABLE\|TASK_INTERRUPTIBLE' | head -20
+  └ 21 lines...
+
+● Read ___wait_event macro
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5aec788aeb8e~1:include/linux/wait.h
+  2>/dev/null | sed -n '290,340p'
+  └ 52 lines...
+
+● Check which drivers use version guards
+  $ cd /users/szhong/kSTEP && grep -l 'LINUX_VERSION_CODE\|KERNEL_VERSION' kmod/drivers/*.c | head
+  -5
+  └ 6 lines...
+
+● Check a driver with version guard
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/rq_qos_wakeup.c | head -20
+  └ 21 lines...
+
+● Check version guards in existing drivers
+  $ cd /users/szhong/kSTEP && head -3 kmod/drivers/freeze.c kmod/drivers/sync_wakeup.c
+  kmod/drivers/vruntime_overflow.c
+  └ 15 lines...
+
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -50
+  └ 51 lines...
+
+● Check KSYM_IMPORT macro
+  $ cd /users/szhong/kSTEP && grep -rn 'KSYM_IMPORT\|KSYM_' kmod/internal.h | head -20
+  └ 11 lines...
+
+● Find symbol resolution mechanism
+  $ cd /users/szhong/kSTEP && grep -n 'KSYM_IMPORT_RAW\|resolve_sym\|kallsyms' kmod/internal.h
+  kmod/main.c 2>/dev/null | head -20
+  └ 4 lines...
+
+● Read __schedule for TASK_FREEZABLE handling
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5aec788aeb8e~1:kernel/sched/core.c
+  2>/dev/null | grep -n -A30 'static void __sched notrace __schedule' | head -80
+  └ 32 lines...
+
+● Read __schedule TASK_FREEZABLE handling
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5aec788aeb8e~1:kernel/sched/core.c
+  2>/dev/null | sed -n '6400,6470p'
+  └ 72 lines...
+
+● Find TASK_FREEZABLE handling in core.c
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5aec788aeb8e~1:kernel/sched/core.c
+  2>/dev/null | grep -n 'TASK_FREEZABLE\|TASK_FROZEN\|frozen\|freezable' | head -30
+  └ 8 lines...
+
+● Read freezer.c
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5aec788aeb8e~1:kernel/freezer.c 2>/dev/null
+  | cat
+  └ 236 lines...
+

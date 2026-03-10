@@ -121,3 +121,20 @@ The bug requires `CONFIG_TRACE_IRQFLAGS` (enabled via `CONFIG_LOCKDEP`) to be ob
 
 ● Edit TODO.md (+1 -1)
 
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 58c644ba512c (sched/idle tracing
+  vs RCU - needs CONFIG_LOCKDEP)
+
+  Bug requires CONFIG_TRACE_IRQFLAGS (via CONFIG_LOCKDEP) to manifest.
+  Without it, local_irq_enable() == raw_local_irq_enable() on x86....
+  └ 20 lines...
+
+Done. Skipped `58c644ba512c` — the bug requires `CONFIG_TRACE_IRQFLAGS` (enabled via `CONFIG_LOCKDEP`) to manifest. Without it, `local_irq_enable()` compiles to the same code as `raw_local_irq_enable()` on x86, making the bug invisible. This is a tracing/RCU state ordering issue, not a scheduler logic bug testable through kSTEP. Committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         4m 24s
+Total session time:     5m 52s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      905.1k in, 14.2k out, 850.7k cached (Est. 6 Premium requests)

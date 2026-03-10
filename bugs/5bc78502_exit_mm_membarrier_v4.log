@@ -136,3 +136,155 @@ Now let me checkout the buggy kernel and build:
   $ cd /users/szhong/kSTEP && cat checkout_linux.py
   └ 123 lines...
 
+● Check toolchain versions
+  $ cd /users/szhong/kSTEP && as --version | head -1 && gcc --version | head -1
+  └ 3 lines...
+
+● List all build directories
+  $ cd /users/szhong/kSTEP && ls build/ | sort | head -40
+  └ 41 lines...
+
+● Read install deps script
+  $ cd /users/szhong/kSTEP && cat install_deps.sh
+  └ 26 lines...
+
+✗ Check kernel versions of built kernels
+  $ cd /users/szhong/kSTEP && for d in build/*/; do v=$(cat "linux/$(basename $d)/Makefile"
+  2>/dev/null | head -5 | grep "^VERSION\|^PATCHLEVEL\|^SUBLEVEL" | awk '{print $3}' | tr '\n' '.' |
+   sed 's/\.$//'); echo "$(basename $d): $v"; done 2>/dev/null | sort -t: -k2 | head -20
+  Command blocked: contains dangerous shell expansion patterns (e.g., parameter transformation,
+  indirect expansion, or nested command substitution) that could enable arbitrary code
+  execution. Please rewrite the command without these expansion patterns.
+
+● Check freeze_buggy kernel version
+  $ cd /users/szhong/kSTEP && head -5 linux/freeze_buggy/Makefile 2>/dev/null
+  └ 6 lines...
+
+● Read kstep config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep
+  └ 98 lines...
+
+● Read arch-specific config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep.x86_64 2>/dev/null
+  └ 6 lines...
+
+● Check objtool config options
+  $ cd /users/szhong/kSTEP && grep -r "STACK_VALIDATION\|OBJTOOL"
+  linux/exit_mm_membarrier_buggy/arch/x86/Kconfig 2>/dev/null | head -10
+  └ 6 lines...
+
+● Check current stack validation setting
+  $ cd /users/szhong/kSTEP && grep "STACK_VALIDATION" linux/exit_mm_membarrier_buggy/.config
+  2>/dev/null
+  └ 3 lines...
+
+● Check retpoline setting
+  $ cd /users/szhong/kSTEP && grep -r "RETPOLINE" linux/exit_mm_membarrier_buggy/.config 2>/dev/null
+  └ 2 lines...
+
+● Disable stack validation
+  $ cd /users/szhong/kSTEP/linux/exit_mm_membarrier_buggy && sed -i 's/CONFIG_STACK_VALIDATION=y/#
+  CONFIG_STACK_VALIDATION is not set/' .config && sed -i 's/CONFIG_HAVE_STATIC_CALL_INLINE=y/#
+  CONFIG_HAVE_STATIC_CALL_INLINE is not set/' .config && make olddefconfig 2>&1 | tail -5
+  └ 6 lines...
+
+● Verify stack validation disabled
+  $ cd /users/szhong/kSTEP/linux/exit_mm_membarrier_buggy && grep "STACK_VALIDATION" .config
+  └ 3 lines...
+
+● Check static call config
+  $ cd /users/szhong/kSTEP/linux/exit_mm_membarrier_buggy && grep "STATIC_CALL" .config
+  └ 4 lines...
+
+● Check thunk_64 makefile entry
+  $ cd /users/szhong/kSTEP/linux/exit_mm_membarrier_buggy && grep -r "thunk_64"
+  arch/x86/entry/Makefile
+  └ 1 line...
+
+● Read entry Makefile
+  $ cd /users/szhong/kSTEP/linux/exit_mm_membarrier_buggy && cat arch/x86/entry/Makefile
+  └ 32 lines...
+
+● Skip objtool for thunk_64
+  $ cd /users/szhong/kSTEP/linux/exit_mm_membarrier_buggy && echo
+  "OBJECT_FILES_NON_STANDARD_thunk_64.o := y" >> arch/x86/entry/Makefile
+  └ 1 line...
+
+● Rebuild buggy kernel
+  $ cd /users/szhong/kSTEP && rm -f linux/exit_mm_membarrier_buggy/arch/x86/entry/thunk_64.o && make
+   linux LINUX_NAME=exit_mm_membarrier_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+Kernel built. Now build kstep:
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=exit_mm_membarrier_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Now let me run it:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py exit_mm_membarrier --linux_name exit_mm_membarrier_buggy 2>&1
+   | tail -20
+  └ 21 lines...
+
+● Check log output
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log
+  └ 2 lines...
+
+● Check correct log path
+  $ cd /users/szhong/kSTEP && cat data/latest.log
+  └ 222 lines...
+
+● Check jsonl output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+The bug is triggered on the buggy kernel. Now let me verify the fix by building and running on the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 5bc78502322a exit_mm_membarrier_fixed 2>&1 | tail
+  -5
+  └ 6 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && echo "OBJECT_FILES_NON_STANDARD_thunk_64.o := y" >>
+  linux/exit_mm_membarrier_fixed/arch/x86/entry/Makefile && make linux
+  LINUX_NAME=exit_mm_membarrier_fixed 2>&1 | tail -10
+  └ 11 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=exit_mm_membarrier_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run driver on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py exit_mm_membarrier --linux_name exit_mm_membarrier_fixed 2>&1
+   | tail -15
+  └ 16 lines...
+
+● Check fixed kernel output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug confirmed:
+- **Buggy**: `rq[1].membarrier_state=0xc` after exit_mm (stale!)
+- **Fixed**: `rq[1].membarrier_state=0x0` after exit_mm (correctly cleared)
+
+Now let me update TODO.md, add to reproduce.py, and commit:
+
+● Find bug in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n "5bc78502322a" TODO.md
+  └ 2 lines...
+
+● Read TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+Now add the bug to reproduce.py:
+
+● Edit reproduce.py (+7)
+
