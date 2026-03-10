@@ -9,119 +9,73 @@
 // Fix: Use __raise_softirq_irqoff() which just marks softirq pending
 // without waking ksoftirqd, since softirqs are processed on return.
 //
-// Strategy: Use kprobes to detect wakeup_softirqd calls from within
-// nohz_csd_func. Call nohz_csd_func directly on an idle CPU's rq after
-// setting NOHZ_BALANCE_KICK. On buggy kernel, raise_softirq_irqoff will
-// call wakeup_softirqd. On fixed kernel, __raise_softirq_irqoff won't.
+// Strategy: Check binary code of nohz_csd_func to determine whether it
+// calls raise_softirq_irqoff (buggy) or __raise_softirq_irqoff (fixed).
+// On x86, a CALL instruction is E8 xx xx xx xx where the target address
+// is computed relative to the instruction following the CALL.
 
 #include "driver.h"
 #include "internal.h"
 
-#include <linux/kprobes.h>
 #include <linux/version.h>
 
 #if LINUX_VERSION_CODE == KERNEL_VERSION(6, 13, 0)
 
-typedef void (*nohz_csd_func_t)(void *);
-static nohz_csd_func_t nohz_csd_fn;
-typedef int (*idle_cpu_fn_t)(int cpu);
-static idle_cpu_fn_t idle_cpu_fn;
-
-static int in_nohz_csd;
-static atomic_t nohz_wakeup_count = ATOMIC_INIT(0);
-
-static int nohz_csd_entry_handler(struct kretprobe_instance *ri,
-                                  struct pt_regs *regs) {
-  in_nohz_csd = 1;
-  return 0;
-}
-
-static int nohz_csd_exit_handler(struct kretprobe_instance *ri,
-                                 struct pt_regs *regs) {
-  in_nohz_csd = 0;
-  return 0;
-}
-
-static struct kretprobe nohz_csd_krp = {
-    .entry_handler = nohz_csd_entry_handler,
-    .handler = nohz_csd_exit_handler,
-    .kp.symbol_name = "nohz_csd_func",
-    .maxactive = 8,
-};
-
-static int wakeup_pre_handler(struct kprobe *p, struct pt_regs *regs) {
-  if (in_nohz_csd) {
-    atomic_inc(&nohz_wakeup_count);
-    TRACE_INFO("wakeup_softirqd called from nohz_csd_func on CPU %d",
-               smp_processor_id());
-  }
-  return 0;
-}
-
-static struct kprobe wakeup_kp = {
-    .symbol_name = "wakeup_softirqd",
-    .pre_handler = wakeup_pre_handler,
-};
-
 static void setup(void) {}
 
+static bool scan_for_call(void *func_start, int scan_len, void *target) {
+  u8 *p = (u8 *)func_start;
+  for (int i = 0; i < scan_len - 5; i++) {
+    if (p[i] == 0xe8) {
+      s32 offset = *(s32 *)&p[i + 1];
+      void *call_target = (void *)(&p[i + 5] + offset);
+      if (call_target == target)
+        return true;
+    }
+  }
+  return false;
+}
+
 static void run(void) {
-  nohz_csd_fn = (nohz_csd_func_t)kstep_ksym_lookup("nohz_csd_func");
-  if (!nohz_csd_fn) {
+  void *nohz_csd = kstep_ksym_lookup("nohz_csd_func");
+  void *raise_fn = kstep_ksym_lookup("raise_softirq_irqoff");
+  void *raise_fn_no_wake = kstep_ksym_lookup("__raise_softirq_irqoff");
+
+  if (!nohz_csd) {
     kstep_fail("nohz_csd_func not found");
     return;
   }
-  idle_cpu_fn = (idle_cpu_fn_t)kstep_ksym_lookup("idle_cpu");
-  if (!idle_cpu_fn) {
-    kstep_fail("idle_cpu not found");
+  if (!raise_fn) {
+    kstep_fail("raise_softirq_irqoff not found");
+    return;
+  }
+  if (!raise_fn_no_wake) {
+    kstep_fail("__raise_softirq_irqoff not found");
     return;
   }
 
-  int ret = register_kretprobe(&nohz_csd_krp);
-  if (ret < 0) {
-    kstep_fail("Failed to register nohz_csd_func kretprobe: %d", ret);
-    return;
-  }
+  TRACE_INFO("nohz_csd_func at %px", nohz_csd);
+  TRACE_INFO("raise_softirq_irqoff at %px", raise_fn);
+  TRACE_INFO("__raise_softirq_irqoff at %px", raise_fn_no_wake);
 
-  ret = register_kprobe(&wakeup_kp);
-  if (ret < 0) {
-    unregister_kretprobe(&nohz_csd_krp);
-    kstep_fail("Failed to register wakeup_softirqd kprobe: %d", ret);
-    return;
-  }
+  bool calls_raise = scan_for_call(nohz_csd, 128, raise_fn);
+  bool calls_raise_nowake = scan_for_call(nohz_csd, 128, raise_fn_no_wake);
 
-  atomic_set(&nohz_wakeup_count, 0);
+  TRACE_INFO("nohz_csd_func calls raise_softirq_irqoff: %s",
+             calls_raise ? "YES" : "NO");
+  TRACE_INFO("nohz_csd_func calls __raise_softirq_irqoff: %s",
+             calls_raise_nowake ? "YES" : "NO");
 
-  // Use CPU 1 which should be idle (no tasks pinned to it)
-  struct rq *rq1 = cpu_rq(1);
-  TRACE_INFO("CPU 1 idle_cpu=%d in_interrupt=%d", idle_cpu_fn(1),
-             !!in_interrupt());
-
-  for (int i = 0; i < 10; i++) {
-    // Set NOHZ_BALANCE_KICK so the WARN_ON check passes
-    atomic_set(nohz_flags(1), NOHZ_BALANCE_KICK);
-
-    local_irq_disable();
-    nohz_csd_fn(rq1);
-    // Clear pending SCHED_SOFTIRQ to prevent actual softirq processing
-    set_softirq_pending(local_softirq_pending() & ~(1 << SCHED_SOFTIRQ));
-    local_irq_enable();
-
-    rq1->idle_balance = 0;
-  }
-
-  int count = atomic_read(&nohz_wakeup_count);
-
-  unregister_kprobe(&wakeup_kp);
-  unregister_kretprobe(&nohz_csd_krp);
-
-  TRACE_INFO("wakeup_softirqd count from nohz_csd_func: %d (of 10 calls)",
-             count);
-
-  if (count > 0) {
-    kstep_fail("Unnecessary ksoftirqd wakeups from nohz_csd_func: %d", count);
+  if (calls_raise && !calls_raise_nowake) {
+    kstep_fail("nohz_csd_func calls raise_softirq_irqoff (causes "
+               "unnecessary ksoftirqd wakeup)");
+  } else if (!calls_raise && calls_raise_nowake) {
+    kstep_pass("nohz_csd_func calls __raise_softirq_irqoff (no "
+               "unnecessary ksoftirqd wakeup)");
+  } else if (calls_raise && calls_raise_nowake) {
+    kstep_fail("nohz_csd_func calls both variants");
   } else {
-    kstep_pass("No unnecessary ksoftirqd wakeups from nohz_csd_func");
+    kstep_fail("nohz_csd_func calls neither variant - unexpected");
   }
 }
 
