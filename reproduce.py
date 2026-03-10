@@ -372,6 +372,13 @@ bugs = [
             ),
         ],
     ),
+    Bug(
+        driver=Driver(name="null_term_scaling", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="703066188f63~1"),
+            Linux(name="fixed", version="703066188f63"),
+        ],
+    ),
 ]
 
 
