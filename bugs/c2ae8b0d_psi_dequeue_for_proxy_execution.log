@@ -1,0 +1,62 @@
+● Read bugs/c2ae8b0d_psi_dequeue_for_proxy_execution.md
+  └ 25 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 c2ae8b0df2d1 2>/dev/null | head -200
+  └ 131 lines...
+
+● Check kernel version at buggy commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -1 c2ae8b0df2d1~1 2>/dev/null |
+  head -5
+  └ 2 lines...
+
+● Check stats.h at buggy version
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/stats.h
+  2>/dev/null | head -20
+  └ 20 lines...
+
+● Get kernel version details
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline c2ae8b0df2d1~1 --format="%H %s" -1
+  && git -C linux/current describe --tags c2ae8b0df2d1~1 2>/dev/null || echo "no tag"
+  └ 3 lines...
+
+● Search for proxy execution config
+  $ cd /users/szhong/kSTEP && git -C linux/current grep -r "CONFIG_SCHED_PROXY" c2ae8b0df2d1~1 --
+  kernel/sched/ 2>/dev/null | head -10
+  └ 6 lines...
+
+● Check for proxy execution config
+  $ cd /users/szhong/kSTEP && git -C linux/current grep -l "SCHED_PROXY" c2ae8b0df2d1~1 -- Kconfig\*
+   kernel/sched/Makefile 2>/dev/null | head -10
+  └ 1 line...
+
+● Search for proxy execution code
+  $ cd /users/szhong/kSTEP && git -C linux/current grep -r "find_proxy_task\|proxy_exec\|PROXY_EXEC"
+   c2ae8b0df2d1~1 -- kernel/sched/ 2>/dev/null | head -20
+  └ 21 lines...
+
+● List build directory
+  $ cd /users/szhong/kSTEP && ls build/ 2>/dev/null
+  └ 50 lines...
+
+● Check build config for proxy
+  $ cd /users/szhong/kSTEP && cat build/linux_config 2>/dev/null | grep -i proxy
+  └ 1 line...
+
+● Find proxy exec Kconfig
+  $ cd /users/szhong/kSTEP && git -C linux/current grep -r "SCHED_PROXY_EXEC" c2ae8b0df2d1~1 --
+  kernel/sched/Kconfig 2>/dev/null
+  └ 1 line...
+
+● Check Makefile for linux config
+  $ cd /users/szhong/kSTEP && cat Makefile | head -80
+  └ 80 lines...
+
+● Check Kconfig for proxy exec
+  $ cd /users/szhong/kSTEP && git -C linux/current show c2ae8b0df2d1~1:kernel/sched/Kconfig
+  2>/dev/null | grep -A 10 -i proxy
+  └ 1 line...
+

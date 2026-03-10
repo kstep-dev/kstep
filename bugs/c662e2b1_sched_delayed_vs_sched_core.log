@@ -1,0 +1,59 @@
+● Read bugs/c662e2b1_sched_delayed_vs_sched_core.md
+  └ 40 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 c662e2b1e8cf 2>/dev/null | head -300
+  └ 98 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -30
+  └ 31 lines...
+
+● Find drivers using core scheduling
+  $ cd /users/szhong/kSTEP && grep -rl "core_cookie\|sched_core\|core_node" kmod/drivers/
+  2>/dev/null | head -10
+  └ 4 lines...
+
+● Find drivers using sched_delayed
+  $ cd /users/szhong/kSTEP && grep -rl "sched_delayed" kmod/drivers/ 2>/dev/null | head -10
+  └ 2 lines...
+
+● Find core cookie references in kmod
+  $ cd /users/szhong/kSTEP && grep -rl "core_cookie\|sched_core" kmod/ 2>/dev/null | head -10
+  └ 4 lines...
+
+● Read kmod/drivers/core_enqueue.c
+  └ 156 lines read
+
+● Read kmod/drivers/h_nr_runnable.c
+  └ 76 lines read
+
+● Find sched_delayed usage in kmod
+  $ cd /users/szhong/kSTEP && grep -rl "sched_delayed\|DEQUEUE_DELAYED" kmod/ 2>/dev/null | head -10
+  └ 2 lines...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current show c662e2b1e8cf~1:Makefile 2>/dev/null | head
+  -5
+  └ 6 lines...
+
+● Get parent commit info
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -1 c662e2b1e8cf~1 2>/dev/null
+  └ 2 lines...
+
+● Check internal.h header
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -50
+  └ 51 lines...
+
+● Check symbol import macros
+  $ cd /users/szhong/kSTEP && grep -n "KSYM_IMPORT\|ksym_lookup\|kstep_ksym" kmod/internal.h
+  2>/dev/null | head -20
+  └ 8 lines...
+
+● Full internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+

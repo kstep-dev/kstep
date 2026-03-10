@@ -1,0 +1,37 @@
+● Read bugs/bf2c59fc_illegal_rcu_from_offline_cpus.md
+  └ 25 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the commit patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 bf2c59fce407 2>/dev/null | head -300
+  └ 301 lines...
+
+● Read reproduce.py lines 1-50
+  └ 50 lines read
+
+● Check core.c changes
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 bf2c59fce407 -- kernel/sched/core.c
+  2>/dev/null | head -200
+  └ 132 lines...
+
+● Check cpu.c changes
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 bf2c59fce407 -- kernel/cpu.c
+  2>/dev/null | tail -200
+  └ 201 lines...
+
+This bug requires actual CPU hotplug operations (taking a CPU offline) which kSTEP doesn't support. The bug occurs in the `idle_task_exit()` → `mmdrop()` path during CPU offline, after RCU has stopped monitoring the dying CPU. This cannot be triggered through kSTEP's task/tick control interface.
+
+Let me skip this and update TODO.md.
+
+● Find the bug line in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n 'bf2c59fce407' TODO.md
+  └ 2 lines...
+
+● Check TODO.md header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+
