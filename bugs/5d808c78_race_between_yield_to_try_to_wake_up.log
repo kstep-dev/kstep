@@ -21,3 +21,63 @@
   --include='*.h' | head -30
   └ 4 lines...
 
+● Read reproduce.py format
+  $ cd /users/szhong/kSTEP && head -80 reproduce.py
+  └ 81 lines...
+
+● Read another driver for reference
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/migrate_swap_hotplug.c
+  └ 108 lines...
+
+● Read sync_wakeup driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/sync_wakeup.c
+  └ 64 lines...
+
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+
+● Check ksym imports
+  $ cd /users/szhong/kSTEP && cat kmod/ksym.c | head -60
+  └ 2 lines...
+
+● Read rest of patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5d808c78d972 | tail -100
+  └ 101 lines...
+
+● Read sym.c for symbol imports
+  $ cd /users/szhong/kSTEP && cat kmod/sym.c
+  └ 71 lines...
+
+● Check set_next_buddy in fair.c
+  $ cd /users/szhong/kSTEP && grep -r "SCHED_WARN\|set_next_buddy" linux/current/kernel/sched/fair.c
+   2>/dev/null | head -20
+  └ 21 lines...
+
+● Find yield_to_task_fair and set_next_buddy
+  $ cd /users/szhong/kSTEP && grep -n "yield_to_task_fair\|set_next_buddy"
+  linux/current/kernel/sched/fair.c 2>/dev/null | head -20
+  └ 9 lines...
+
+● Read set_next_buddy
+  $ cd /users/szhong/kSTEP && sed -n '8085,8105p' linux/current/kernel/sched/fair.c
+  └ 21 lines...
+
+● Read yield_to_task_fair
+  $ cd /users/szhong/kSTEP && sed -n '8410,8430p' linux/current/kernel/sched/fair.c
+  └ 22 lines...
+
+● Read run.py to understand execution
+  $ cd /users/szhong/kSTEP && cat run.py | head -80
+  └ 81 lines...
+
+● Check SCHED_DEBUG config
+  $ cd /users/szhong/kSTEP && grep -r "CONFIG_SCHED_DEBUG" linux/current/.config 2>/dev/null || echo
+   "no .config"; grep -r "SCHED_WARN_ON" linux/current/kernel/sched/sched.h 2>/dev/null | head -5
+  └ 2 lines...
+
+● Check kernel version for commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 5d808c78d972 -1 2>/dev/null && git
+  -C linux/current describe --tags 5d808c78d972~1 2>/dev/null
+  └ 3 lines...
+

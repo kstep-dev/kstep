@@ -20,3 +20,171 @@
   $ cd /users/szhong/kSTEP && grep -r "RQCF" linux/current/kernel/sched/ 2>/dev/null | head -30
   └ 22 lines...
 
+● Find warning in rq_clock_start_loop_update
+  $ cd /users/szhong/kSTEP && grep -n
+  "rq_clock_start_loop_update\|clock_update_flags.*WARN\|SCHED_WARN_ON.*clock"
+  linux/current/kernel/sched/sched.h | head -20
+  └ 2 lines...
+
+● Find rq_clock_start_loop_update
+  $ cd /users/szhong/kSTEP && grep -n "rq_clock_start_loop_update"
+  linux/current/kernel/sched/sched.h
+  └ 1 line...
+
+● Check an example driver for reference
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/freeze.c
+  └ 39 lines...
+
+● Check RQCF usage in sched.h
+  $ cd /users/szhong/kSTEP && grep -n "RQCF_ACT_SKIP\|clock_update_flags"
+  linux/current/kernel/sched/sched.h | head -30
+  └ 18 lines...
+
+● Check long_balance driver for cgroup example
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/long_balance.c
+  └ 59 lines...
+
+● Find cgroup destroy paths
+  $ cd /users/szhong/kSTEP && grep -n
+  "cgroup_destroy\|rmdir\|destroy_cfs_bandwidth\|cfsb_csd_unthrottle\|unregister_fair_sched_group"
+  linux/current/kernel/sched/ -r | head -20
+  └ 14 lines...
+
+● Check commit history near bug
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -5 5ebde09d9170~1 2>/dev/null
+  └ 6 lines...
+
+● Find __cfsb_csd_unthrottle
+  $ cd /users/szhong/kSTEP && grep -n "rq_clock_start_loop_update\|__cfsb_csd_unthrottle"
+  linux/current/kernel/sched/fair.c | head -10
+  └ 1 line...
+
+● Find rq_clock_start_loop_update
+  $ cd /users/szhong/kSTEP && grep -n "rq_clock_start_loop_update"
+  linux/current/kernel/sched/sched.h
+  └ 1 line...
+
+Let me checkout the buggy kernel and look at the relevant code.
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 5ebde09d9170~1 rqcf_act_skip_leak_buggy 2>&1 |
+  tail -5
+  └ 6 lines...
+
+Now let me look at the buggy `__schedule()` and related code:
+
+● Find clock_update_flags in sched.h
+  $ cd /users/szhong/kSTEP && grep -n "clock_update_flags" linux/current/kernel/sched/sched.h | head
+   -30
+  └ 22 lines...
+
+● Find clock_update_flags in buggy core.c
+  $ cd /users/szhong/kSTEP && grep -n "clock_update_flags" linux/current/kernel/sched/core.c | head
+  -20
+  └ 7 lines...
+
+● Check version guard usage
+  $ cd /users/szhong/kSTEP && grep -n "LINUX_VERSION_CODE\|KERNEL_VERSION" kmod/drivers/freeze.c
+  2>/dev/null; grep -n "LINUX_VERSION_CODE" kmod/drivers/*.c | head -5
+  └ 6 lines...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && head -5 linux/current/Makefile | grep VERSION
+  └ 3 lines...
+
+● Check rq_clock_start_loop_update
+  $ cd /users/szhong/kSTEP && sed -n '1540,1560p' linux/current/kernel/sched/sched.h
+  └ 22 lines...
+
+● Find rq_clock_skip_update calls in fair.c
+  $ cd /users/szhong/kSTEP && grep -n "rq_clock_skip_update" linux/current/kernel/sched/fair.c
+  └ 2 lines...
+
+● Find where REQ_SKIP is set
+  $ cd /users/szhong/kSTEP && grep -n "rq_clock_skip_update\|RQCF_REQ_SKIP"
+  linux/current/kernel/sched/*.c | head -20
+  └ 6 lines...
+
+● See rq_clock_skip_update context in fair.c
+  $ cd /users/szhong/kSTEP && sed -n '8400,8420p' linux/current/kernel/sched/fair.c
+  └ 21 lines...
+
+● See rq_clock_skip_update context in core.c
+  $ cd /users/szhong/kSTEP && sed -n '2220,2235p' linux/current/kernel/sched/core.c
+  └ 16 lines...
+
+● Find __cfsb_csd_unthrottle
+  $ cd /users/szhong/kSTEP && grep -n "__cfsb_csd_unthrottle" linux/current/kernel/sched/fair.c
+  └ 4 lines...
+
+● Read __cfsb_csd_unthrottle
+  $ cd /users/szhong/kSTEP && sed -n '5430,5470p' linux/current/kernel/sched/fair.c
+  └ 42 lines...
+
+● Read __cfsb_csd_unthrottle code
+  $ cd /users/szhong/kSTEP && sed -n '5771,5820p' linux/current/kernel/sched/fair.c
+  └ 51 lines...
+
+● Find destroy_cfs_bandwidth
+  $ cd /users/szhong/kSTEP && grep -n "destroy_cfs_bandwidth" linux/current/kernel/sched/fair.c
+  └ 4 lines...
+
+● Read destroy_cfs_bandwidth
+  $ cd /users/szhong/kSTEP && sed -n '6269,6320p' linux/current/kernel/sched/fair.c
+  └ 52 lines...
+
+● Read destroy_cfs_bandwidth cont
+  $ cd /users/szhong/kSTEP && sed -n '6290,6320p' linux/current/kernel/sched/fair.c
+  └ 32 lines...
+
+● Find exact destroy_cfs_bandwidth line
+  $ cd /users/szhong/kSTEP && grep -n "^static void destroy_cfs_bandwidth"
+  linux/current/kernel/sched/fair.c
+  └ 2 lines...
+
+● Read destroy_cfs_bandwidth function
+  $ cd /users/szhong/kSTEP && sed -n '6524,6570p' linux/current/kernel/sched/fair.c
+  └ 48 lines...
+
+● Check internal.h for rq access
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -80
+  └ 80 lines...
+
+● Check kmod usage of clock_update_flags
+  $ cd /users/szhong/kSTEP && grep -rn "clock_update_flags\|RQCF" kmod/ --include="*.c"
+  --include="*.h" | grep -v "linux/" | head -20
+  └ 1 line...
+
+● Find existing clock_update_flags usage
+  $ cd /users/szhong/kSTEP && grep -rn "clock_update_flags\|RQCF\|cpu_rq" kmod/drivers/*.c | head
+  -20
+  └ 17 lines...
+
+● Find cgroup-related driver examples
+  $ cd /users/szhong/kSTEP && grep -rn "kstep_cgroup\|kstep_write\|cgroup" kmod/drivers/*.c | head
+  -20
+  └ 21 lines...
+
+● Check default driver for reference
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/default.c
+  └ 58 lines...
+
+● Read kernel.c for cgroup implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kernel.c | head -100
+  └ 101 lines...
+
+● Find cgroup bandwidth limit APIs
+  $ cd /users/szhong/kSTEP && grep -n
+  "kstep_cgroup_write\|cgroup_write\|cpu.max\|cpu.cfs_quota\|cpu.cfs_period" kmod/ -r
+  --include="*.c" --include="*.h" | head -20
+  └ 13 lines...
+
+● Read cgroup create/init functions
+  $ cd /users/szhong/kSTEP && cat kmod/kernel.c | grep -A 40
+  "kstep_cgroup_init\|kstep_cgroup_create"
+  └ 56 lines...
+
+● Read throttled_limbo_list driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/throttled_limbo_list.c
+  └ 71 lines...
+
