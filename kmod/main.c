@@ -7,6 +7,9 @@
 
 struct kstep_driver *kstep_driver = NULL;
 
+// Stub for balance_push_splice driver (kernel-side counter)
+atomic_t kstep_bp_splice_count = ATOMIC_INIT(0);
+
 static char driver_name[DRIVER_NAME_LEN] = "default";
 module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
 

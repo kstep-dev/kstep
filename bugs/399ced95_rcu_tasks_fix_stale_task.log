@@ -70,3 +70,20 @@ Let me skip this and update TODO.md.
 
 Now commit and push:
 
+● Commit and push
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 399ced9594df - memory ordering
+  bug not reproducible on x86 TSO
+
+  The bug is a store-buffering race in cpu_curr_snapshot() that only
+  manifests on weakly-ordered architectures (ARM/POWER). On x86 TSO,...
+  └ 16 lines...
+
+Done. **Skipped** `399ced9594df` — this is a memory ordering bug (store-buffering litmus test) in `cpu_curr_snapshot()` that only manifests on weakly-ordered architectures (ARM/POWER). On x86 TSO, `smp_mb()` ensures the store buffer is flushed before the `rq->curr` read, so the new task will always see the pre-GP update. The problematic "both reads see old values" outcome is architecturally forbidden on x86.
+
+
+Total usage est:        6 Premium requests
+API time spent:         2m 27s
+Total session time:     2m 42s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      395.6k in, 7.1k out, 359.8k cached (Est. 6 Premium requests)

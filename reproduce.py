@@ -262,6 +262,13 @@ bugs = [
             Linux(name="fixed", version="2cab4bd024d2"),
         ],
     ),
+    Bug(
+        driver=Driver(name="nr_running_wakelist", num_cpus=2),
+        linux=[
+            Linux(name="buggy", version="28156108fecb~1"),
+            Linux(name="fixed", version="28156108fecb"),
+        ],
+    ),
 ]
 
 
