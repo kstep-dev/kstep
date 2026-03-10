@@ -1,6 +1,6 @@
 # kSTEP Bug Reproduction TODO
 
-**Total: 25/400 reproduced**
+**Total: 26/400 reproduced**
 
 ---
 
@@ -44,7 +44,7 @@
 - [ ] `70ee7947a290` sched: fix warning in sched_setaffinity — [`70ee7947_fix_warning_in_schedsetaffinity.md`](bugs/70ee7947_fix_warning_in_schedsetaffinity.md)
 - [ ] `76f970ce51c8` Revert "sched/core: Reduce cost of sched_move_task when config autogroup" — [`76f970ce_schedcore_reduce_cost_of_schedmovetask.md`](bugs/76f970ce_schedcore_reduce_cost_of_schedmovetask.md)
 - [-] `771fac5e26c1` Revert "cpufreq: CPPC: Add support for frequency invariance" — [`771fac5e_cpufreq_cppc_add_support_for.md`](bugs/771fac5e_cpufreq_cppc_add_support_for.md) <!-- skipped:bug is in cpufreq/cppc driver not scheduler; scheduler change is only EXPORT_SYMBOL removal attempts:1 -->
-- [ ] `77d7dc8bef48` sched/mmcid: Revert the complex CID management — [`77d7dc8b_the_complex_cid_management.md`](bugs/77d7dc8b_the_complex_cid_management.md)
+- [x] `77d7dc8bef48` sched/mmcid: Revert the complex CID management — [`77d7dc8b_the_complex_cid_management.md`](bugs/77d7dc8b_the_complex_cid_management.md) <!-- driver:mmcid_compact attempts:1 -->
 - [ ] `7e406d1ff39b` sched: Avoid double preemption in __cond_resched_*lock*() — [`7e406d1f_avoid_double_preemption_in_condreschedlock.md`](bugs/7e406d1f_avoid_double_preemption_in_condreschedlock.md)
 - [ ] `7fb3ff22ad87` sched/core: Fix arch_scale_freq_tick() on tickless systems — [`7fb3ff22_archscalefreqtick_on_tickless_systems.md`](bugs/7fb3ff22_archscalefreqtick_on_tickless_systems.md)
 - [ ] `8039e96fcc1d` Fix forced idle sibling starvation corner case — [`8039e96f_forced_idle_sibling_starvation_corner.md`](bugs/8039e96f_forced_idle_sibling_starvation_corner.md)

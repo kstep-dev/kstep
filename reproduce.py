@@ -379,6 +379,13 @@ bugs = [
             Linux(name="fixed", version="703066188f63"),
         ],
     ),
+    Bug(
+        driver=Driver(name="mmcid_compact", num_cpus=3),
+        linux=[
+            Linux(name="buggy", version="77d7dc8bef48~1"),
+            Linux(name="fixed", version="77d7dc8bef48"),
+        ],
+    ),
 ]
 
 

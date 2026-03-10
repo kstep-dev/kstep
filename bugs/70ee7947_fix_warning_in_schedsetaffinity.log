@@ -53,3 +53,48 @@
   kmod/*.c kmod/*.h 2>/dev/null | head -20
   └ 21 lines...
 
+● Read kthread implementation
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Read kernel.c for cgroup helpers
+  $ cd /users/szhong/kSTEP && cat kmod/kernel.c
+  └ 241 lines...
+
+● Read buggy sched_setaffinity code
+  $ cd /users/szhong/kSTEP && git -C linux/current show 70ee7947a290~1:kernel/sched/syscalls.c |
+  head -1220 | tail -100
+  └ 101 lines...
+
+● Find SCA_CHECK handling
+  $ cd /users/szhong/kSTEP && grep -n "SCA_CHECK\|__set_cpus_allowed_ptr_locked\|SCA_USER"
+  linux/current/kernel/sched/core.c 2>/dev/null | head -20
+  └ 11 lines...
+
+● Read tick implementation
+  $ cd /users/szhong/kSTEP && cat kmod/tick.c
+  └ 165 lines...
+
+● Read internal header
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+
+● Check CPU configuration
+  $ cd /users/szhong/kSTEP && grep -n "num_cpus\|qemu.*smp\|CPUS" run.py | head -20
+  └ 5 lines...
+
+● Check QEMU SMP settings
+  $ cd /users/szhong/kSTEP && grep -n "num_cpus\|smp" scripts/*.py scripts/*.sh 2>/dev/null | head
+  -20
+  └ 1 line...
+
+● Read run.py structure
+  $ cd /users/szhong/kSTEP && head -50 run.py
+  └ 51 lines...
+
+● Read task.c implementation
+  $ cd /users/szhong/kSTEP && cat kmod/task.c
+  └ 113 lines...
+
+● Request failed due to a transient API error. Retrying...
+

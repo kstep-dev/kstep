@@ -35,3 +35,20 @@ The patch only removes `EXPORT_SYMBOL_GPL(sched_setattr_nocheck)` from `kernel/s
 
 ● Edit TODO.md (+1 -1)
 
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 771fac5e26c1 - cpufreq driver
+  bug, not scheduler
+
+  Bug is entirely in drivers/cpufreq/cppc_cpufreq.c (kthread_work/irq_work
+  race on policy exit). The only scheduler change is removing...
+  └ 19 lines...
+
+**Skipped** `771fac5e26c1`. The bug is entirely in `drivers/cpufreq/cppc_cpufreq.c` — a race in the CPPC frequency invariance driver's kthread_work/irq_work cleanup on policy exit. The only scheduler change is removing one `EXPORT_SYMBOL_GPL(sched_setattr_nocheck)` line. Not reproducible with kSTEP. Committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         54s
+Total session time:     1m 6s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      300.0k in, 2.5k out, 267.1k cached (Est. 6 Premium requests)

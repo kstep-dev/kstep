@@ -44,3 +44,74 @@
   kmod/drivers/balance_push_splice.c 2>/dev/null
   └ 77 lines...
 
+● Read reproduce.py pattern
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -60
+  └ 61 lines...
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && python3 ./checkout_linux.py 76f970ce51c8~1 sched_move_buggy 2>&1 |
+  tail -5
+  └ 6 lines...
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline -3
+  └ 4 lines...
+
+● Check buggy sched_move_task
+  $ cd /users/szhong/kSTEP && grep -n "sched_move_task\|sched_get_task_group\|sched_change_group"
+  linux/current/kernel/sched/core.c | head -20
+  └ 9 lines...
+
+● Check autogroup config
+  $ cd /users/szhong/kSTEP && grep "CONFIG_SCHED_AUTOGROUP" linux/current/kernel/sched/Makefile
+  build/current/.config 2>/dev/null | head -10
+  └ 1 line...
+
+● Read buggy sched_move_task
+  $ cd /users/szhong/kSTEP && sed -n '9050,9095p' linux/current/kernel/sched/core.c
+  └ 47 lines...
+
+● Find autogroup config
+  $ cd /users/szhong/kSTEP && grep "CONFIG_SCHED_AUTOGROUP" build/sched_move_buggy/.config
+  2>/dev/null; grep "CONFIG_SCHED_AUTOGROUP" scripts/linux_config 2>/dev/null; grep -r "autogroup"
+  scripts/ 2>/dev/null | head -10
+  └ 1 line...
+
+● Read Makefile
+  $ cd /users/szhong/kSTEP && cat Makefile | head -80
+  └ 80 lines...
+
+● Find kernel config
+  $ cd /users/szhong/kSTEP && find scripts/ -name "*config*" -o -name "*.config" | head -10 && ls
+  scripts/
+  └ 5 lines...
+
+● Read linux-config target
+  $ cd /users/szhong/kSTEP && grep -A5 "linux-config" Makefile | head -20
+  └ 15 lines...
+
+● Find kstep config location
+  $ cd /users/szhong/kSTEP && grep "KSTEP_CONFIG" Makefile
+  └ 3 lines...
+
+● Check autogroup in kstep config
+  $ cd /users/szhong/kSTEP && grep -i "autogroup\|CGROUP_SCHED\|FAIR_GROUP" linux/config.kstep
+  linux/config.kstep.x86_64 2>/dev/null
+  └ 3 lines...
+
+● Read util_avg driver for reference
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/util_avg.c 2>/dev/null
+  └ 53 lines...
+
+● Read user.h
+  $ cd /users/szhong/kSTEP && cat kmod/user.h
+  └ 18 lines...
+
+● Check autogroup code
+  $ cd /users/szhong/kSTEP && grep -n
+  "sched_autogroup_exit_task\|sched_move_task\|detach_task_cfs_rq"
+  linux/current/kernel/sched/autogroup.c 2>/dev/null | head -20
+  └ 8 lines...
+
+● Request failed due to a transient API error. Retrying...
+
