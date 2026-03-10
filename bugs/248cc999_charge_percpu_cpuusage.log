@@ -451,3 +451,32 @@ Now commit and push:
 
 Good, the config change was already part of another commit. Now let me commit my changes:
 
+● Git commit
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: charge_percpu_cpuusage
+  (248cc9993d1c)
+
+  Demonstrates cpuacct_charge() bug where __this_cpu_add() charges CPU time
+  to the executing CPU instead of the task's actual CPU. During load_balance(),...
+  └ 10 lines...
+
+● Git push
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced and committed. Here's a summary:
+
+**Bug**: `cpuacct_charge()` uses `__this_cpu_add()` which charges CPU time to the executing CPU, not the task's CPU. During `load_balance()`, this causes per-CPU accounting to be incorrect.
+
+**Driver**: `charge_percpu_cpuusage` — calls `cpuacct_charge` from CPU 2 (via `on_sched_balance_selected` callback) for a task pinned to CPU 1, then checks which CPU's cpuacct counter increased.
+
+**Results**:
+- **Buggy kernel**: 16ms wrongly charged to CPU 2 → FAIL ✓
+- **Fixed kernel**: All charges correctly go to CPU 1, CPU 2 delta=0 → PASS ✓
+
+
+Total usage est:        6 Premium requests
+API time spent:         15m 10s
+Total session time:     26m 22s
+Total code changes:     +198 -78
+Breakdown by AI model:
+ claude-opus-4.6-1m      6.9m in, 49.6k out, 6.8m cached (Est. 6 Premium requests)
