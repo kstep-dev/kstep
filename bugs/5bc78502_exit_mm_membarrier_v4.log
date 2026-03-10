@@ -1,0 +1,138 @@
+● Read bugs/5bc78502_exit_mm_membarrier_v4.md
+  └ 37 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5bc78502322a 2>/dev/null | head -300
+  └ 280 lines...
+
+● Request failed due to a transient API error. Retrying...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Read rest of patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5bc78502322a 2>/dev/null | tail -300
+  └ 280 lines...
+
+● Read existing driver for patterns
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/mm_cid_perf.c
+  └ 101 lines...
+
+● Read reproduce.py
+  $ cd /users/szhong/kSTEP && cat reproduce.py
+  └ 388 lines...
+
+● Read membarrier_global_expedited
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U64 5bc78502322a --
+  kernel/sched/membarrier.c 2>/dev/null | grep -A 100 "membarrier_global_expedited"
+  └ 65 lines...
+
+● Read internal.h for rq access
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+
+● Get kernel versions
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 5bc78502322a -1 && git -C
+  linux/current log --oneline 5bc78502322a~1 -1
+  └ 3 lines...
+
+● Get kernel version tag
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags 5bc78502322a~1 2>/dev/null || git
+   -C linux/current log --format="%H %s" 5bc78502322a~1 -1
+  └ 2 lines...
+
+● Read task.c for task creation details
+  $ cd /users/szhong/kSTEP && cat kmod/task.c
+  └ 113 lines...
+
+● Read kthread.c
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Read user.h for signal codes
+  $ cd /users/szhong/kSTEP && cat kmod/user.h
+  └ 18 lines...
+
+● Read user-space task code
+  $ cd /users/szhong/kSTEP && cat user/task.c 2>/dev/null || ls user/
+  └ 67 lines...
+
+● Check context switch membarrier handling
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5bc78502322a~1:kernel/sched/core.c | grep -n
+   "membarrier" | head -20
+  └ 9 lines...
+
+● Find all callers of membarrier_update_current_mm
+  $ cd /users/szhong/kSTEP && git -C linux/current grep -n "membarrier_update_current_mm"
+  5bc78502322a -- | head -20
+  └ 5 lines...
+
+● Check membarrier_switch_mm implementation
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5bc78502322a~1:kernel/sched/core.c | grep
+  -B5 -A30 "membarrier_switch_mm"
+  └ 40 lines...
+
+● Read membarrier_switch_mm
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5bc78502322a~1:kernel/sched/sched.h | grep
+  -A20 "membarrier_switch_mm"
+  └ 38 lines...
+
+● Get kernel version from Makefile
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5bc78502322a~1:Makefile | head -5
+  └ 6 lines...
+
+● Check MEMBARRIER_STATE defines
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5bc78502322a~1:include/linux/sched/mm.h |
+  grep -n "MEMBARRIER_STATE" | head -20
+  └ 10 lines...
+
+● Check rq membarrier_state field
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5bc78502322a~1:kernel/sched/sched.h | grep
+  -n "membarrier_state" | head -10
+  └ 8 lines...
+
+Good. Now I have all the information I need. Let me write the driver.
+
+● Create kmod/drivers/exit_mm_membarrier.c (+106)
+
+Now let me checkout the buggy kernel and build:
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 5bc78502322a~1 exit_mm_membarrier_buggy 2>&1 |
+  tail -5
+  └ 6 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=exit_mm_membarrier_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● Check build errors
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=exit_mm_membarrier_buggy 2>&1 | grep -i "error"
+  | head -20
+  └ 6 lines...
+
+● Check thunk_64 error details
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=exit_mm_membarrier_buggy 2>&1 | grep -B5
+  "thunk_64" | head -20
+  └ 10 lines...
+
+● Read Makefile for build config
+  $ cd /users/szhong/kSTEP && cat Makefile | head -80
+  └ 80 lines...
+
+● List built kernels
+  $ cd /users/szhong/kSTEP && ls build/ | head -20
+  └ 21 lines...
+
+● Read linux-config target
+  $ cd /users/szhong/kSTEP && cat Makefile | grep -A30 "linux-config"
+  └ 31 lines...
+
+● Read checkout_linux.py
+  $ cd /users/szhong/kSTEP && cat checkout_linux.py
+  └ 123 lines...
+

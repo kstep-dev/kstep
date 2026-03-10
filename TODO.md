@@ -30,7 +30,7 @@
 - [x] `5324953c06bd` Fix wakeup_preempt's next_class tracking — [`5324953c_fix_wakeup_preempts_next_class.md`](bugs/5324953c_fix_wakeup_preempts_next_class.md) <!-- driver:wakeup_next_class attempts:1 -->
 - [x] `565790d28b1e` sched: Fix balance_callback() — [`565790d2_fix_balance_callback.md`](bugs/565790d2_fix_balance_callback.md) <!-- driver:fix_balance_callback attempts:1 -->
 - [-] `5657c1167835` sched/core: Fix NULL pointer access fault in sched_setaffinity() with non-SMP configs — [`5657c116_fix_null_pointer_access_fault.md`](bugs/5657c116_fix_null_pointer_access_fault.md) <!-- skipped:bug requires non-SMP kernel (CONFIG_SMP=n) which is incompatible with kSTEP's SMP requirement attempts:1 -->
-- [ ] `58c644ba512c` sched/idle: Fix arch_cpu_idle() vs tracing — [`58c644ba_schedidle_fix_arch_cpu_idle_tracing.md`](bugs/58c644ba_schedidle_fix_arch_cpu_idle_tracing.md)
+- [-] `58c644ba512c` sched/idle: Fix arch_cpu_idle() vs tracing — [`58c644ba_schedidle_fix_arch_cpu_idle_tracing.md`](bugs/58c644ba_schedidle_fix_arch_cpu_idle_tracing.md) <!-- skipped:requires CONFIG_TRACE_IRQFLAGS/LOCKDEP to manifest; tracing infra bug not scheduler logic attempts:1 -->
 - [ ] `5aec788aeb8e` sched: Fix TASK_state comparisons — [`5aec788a_task_state_comparisons.md`](bugs/5aec788a_task_state_comparisons.md)
 - [ ] `5b6547ed97f4` sched/core: Fix forceidle balancing — [`5b6547ed_forceidle_balancing.md`](bugs/5b6547ed_forceidle_balancing.md)
 - [ ] `5bc78502322a` sched: fix exit_mm vs membarrier (v4) — [`5bc78502_exit_mm_membarrier_v4.md`](bugs/5bc78502_exit_mm_membarrier_v4.md)

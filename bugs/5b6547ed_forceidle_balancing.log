@@ -1,0 +1,146 @@
+● Read bugs/5b6547ed_forceidle_balancing.md
+  └ 25 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5b6547ed97f4 2>/dev/null | head -300
+  └ 301 lines...
+
+● Request failed due to a transient API error. Retrying...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/*.c | head -20
+  └ 21 lines...
+
+● Read idle.c and sched.h changes
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5b6547ed97f4 -- kernel/sched/idle.c
+  kernel/sched/sched.h 2>/dev/null | head -200
+  └ 201 lines...
+
+● Find drivers using core scheduling
+  $ cd /users/szhong/kSTEP && grep -l "core_cookie\|core_sched\|sched_core\|core_balance\|forceidle"
+   kmod/drivers/*.c 2>/dev/null
+  └ 1 line...
+
+● Check core scheduling support
+  $ cd /users/szhong/kSTEP && grep -r "SCHED_CORE\|CONFIG_SCHED_CORE\|core_sched\|core_cookie" kmod/
+   --include="*.c" --include="*.h" -l 2>/dev/null | head -10
+  └ 1 line...
+
+● Search for core balance in kmod
+  $ cd /users/szhong/kSTEP && grep -r
+  "queue_core_balance\|balance_callback\|sched_core_balance\|core_balance" kmod/ --include="*.c"
+  --include="*.h" -l 2>/dev/null | head -10
+  └ 3 lines...
+
+● Check kernel config
+  $ cd /users/szhong/kSTEP && cat scripts/linux_config 2>/dev/null | grep -i
+  "SCHED_CORE\|SMP\|SMT\|NR_CPUS" | head -20
+  └ 1 line...
+
+● Read kmod/drivers/fix_balance_callback.c
+  └ 116 lines read
+
+● Find kernel config files
+  $ cd /users/szhong/kSTEP && find scripts/ -name "*config*" -o -name "*.cfg" | head -10 && ls
+  scripts/
+  └ 5 lines...
+
+● Read Makefile
+  $ cd /users/szhong/kSTEP && cat Makefile | head -80
+  └ 80 lines...
+
+● Find kernel config
+  $ cd /users/szhong/kSTEP && find . -name ".config" -o -name "defconfig" -o -name "kstep_config"
+  2>/dev/null | head -10
+  └ 11 lines...
+
+● Check linux-config target
+  $ cd /users/szhong/kSTEP && grep -A5 "linux-config" Makefile | head -20
+  └ 15 lines...
+
+● Check if SCHED_CORE enabled
+  $ cd /users/szhong/kSTEP && grep "SCHED_CORE\|CONFIG_SCHED_CORE"
+  linux/fix_sched_delayed_vs_cfs_bandwidth_buggy/.config 2>/dev/null
+  └ 2 lines...
+
+● Find KSTEP_CONFIG var
+  $ cd /users/szhong/kSTEP && grep "KSTEP_CONFIG" Makefile | head -5
+  └ 3 lines...
+
+● Find kSTEP config files
+  $ cd /users/szhong/kSTEP && ls kmod/*.config* kmod/config* 2>/dev/null; find . -maxdepth 2 -name
+  "kstep*config*" -o -name "*.config" 2>/dev/null | grep -v linux/ | head -10
+  └ 1 line...
+
+● Read kSTEP config
+  $ cd /users/szhong/kSTEP && ls linux/config.kstep* 2>/dev/null && cat linux/config.kstep
+  2>/dev/null | head -30
+  └ 32 lines...
+
+● Read full kSTEP config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep
+  └ 98 lines...
+
+● Check scheduler configs
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | grep -i
+  "SCHED_CORE\|SMT\|SMP\|NR_CPUS\|SCHED_MC\|SCHED_SMT"
+  └ 6 lines...
+
+● Read run.py
+  $ cd /users/szhong/kSTEP && cat run.py | head -80
+  └ 81 lines...
+
+● Check kernel version of commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 5b6547ed97f4 -1 2>/dev/null && git
+  -C linux/current describe --tags 5b6547ed97f4 2>/dev/null || echo "commit not in current tree"
+  └ 3 lines...
+
+● Check QEMU boot args
+  $ cd /users/szhong/kSTEP && cat run.py | grep -A10 "boot_args" | head -30
+  └ 31 lines...
+
+● Check task_set_prio implementation
+  $ cd /users/szhong/kSTEP && grep -r "kstep_task_set_prio\|rt_mutex_setprio\|sched_setattr" kmod/
+  --include="*.c" --include="*.h" | head -20
+  └ 13 lines...
+
+● Check task_set_prio implementation
+  $ cd /users/szhong/kSTEP && cat kmod/task.c | grep -A20 "kstep_task_set_prio"
+  └ 5 lines...
+
+● Check SMP topology in QEMU
+  $ cd /users/szhong/kSTEP && grep "smp\|threads\|cores\|sockets" run.py
+  └ 2 lines...
+
+● Check QEMU SMP config
+  $ cd /users/szhong/kSTEP && grep -A40 "def run_qemu" run.py | grep -A5 "smp"
+  └ 1 line...
+
+● Read topo.c for SMT setup
+  $ cd /users/szhong/kSTEP && cat kmod/topo.c
+  └ 242 lines...
+
+● Check SCHED_CORE in config and headers
+  $ cd /users/szhong/kSTEP && grep -c "CONFIG_SCHED_CORE" linux/config.kstep && echo "---" && grep
+  "queue_core_balance" linux/current/kernel/sched/sched.h 2>/dev/null | head -5
+  └ 3 lines...
+
+● Check TODO for core sched bugs
+  $ cd /users/szhong/kSTEP && grep -i "core_sched\|forceidle\|SCHED_CORE\|core scheduling" TODO.md |
+   head -10
+  └ 11 lines...
+
+● Check skipped core sched bugs
+  $ cd /users/szhong/kSTEP && grep "\- \[-\].*core" TODO.md | head -10
+  └ 2 lines...
+
+Let me try enabling CONFIG_SCHED_CORE and building. This bug requires core scheduling which is currently disabled.
+
+● Enable CONFIG_SCHED_CORE
+  $ cd /users/szhong/kSTEP && sed -i 's/# CONFIG_SCHED_CORE is not set/CONFIG_SCHED_CORE=y/'
+  linux/config.kstep && grep SCHED_CORE linux/config.kstep
+  └ 2 lines...
+
