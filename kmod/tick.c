@@ -1,58 +1,6 @@
 #include <linux/delay.h>
-#include <linux/kprobes.h>
 
 #include "internal.h"
-
-// General rq invariant infrastructure
-#define MAX_CPUS 16
-#define MAX_INVARIANTS 8
-static s64 prev_invariant_values[MAX_INVARIANTS][MAX_CPUS];
-
-static void rq_invariants_save(void) {
-  struct kstep_invariant **invariants = kstep_driver->invariants;
-  if (!invariants)
-    return;
-
-  for (int i = 0; invariants[i] && i < MAX_INVARIANTS; i++) {
-    switch (invariants[i]->type) {
-    case TEMPORAL_DELTA:
-      for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++)
-        prev_invariant_values[i][cpu] = invariants[i]->get_value(cpu_rq(cpu));
-      break;
-    default:
-      panic("Unsupported invariant type %d", invariants[i]->type);
-    }
-  }
-}
-
-static void check_temporal_delta(int i, struct kstep_invariant *inv) {
-  for (int cpu = 1; cpu < num_online_cpus() && cpu < MAX_CPUS; cpu++) {
-    s64 delta = inv->get_value(cpu_rq(cpu)) - prev_invariant_values[i][cpu];
-
-    if (abs(delta) > inv->max_delta) {
-      pr_warn("INVARIANT %d: %s on CPU %d: delta %lld, max %lld\n", i,
-              inv->name, cpu, delta, inv->max_delta);
-      kstep_fail("INVARIANT %d: %s on CPU %d: delta %lld, max %lld", i,
-                 inv->name, cpu, delta, inv->max_delta);
-    }
-  }
-}
-
-static void rq_invariants_check(void) {
-  struct kstep_invariant **invariants = kstep_driver->invariants;
-  if (!invariants)
-    return;
-
-  for (int i = 0; invariants[i] && i < MAX_INVARIANTS; i++) {
-    switch (invariants[i]->type) {
-    case TEMPORAL_DELTA:
-      check_temporal_delta(i, invariants[i]);
-      break;
-    default:
-      panic("Unsupported invariant type %d", invariants[i]->type);
-    }
-  }
-}
 
 static void kstep_disable_sched_timer(void) {
   KSYM_IMPORT(tick_get_tick_sched);
@@ -70,6 +18,7 @@ static void (*sched_tick_fn)(void);
 static void (*sched_softirq_fn)(void);
 
 void kstep_tick_init(void) {
+  kstep_invariants_init();
   kstep_disable_sched_timer();
 
   sched_tick_fn =
@@ -121,14 +70,12 @@ static void kstep_cfs_bandwidth_tick(void) {
 void kstep_tick(void) {
   if (kstep_driver->on_tick_begin)
     kstep_driver->on_tick_begin();
-  rq_invariants_save();
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
   for (int cpu = 1; cpu < num_online_cpus(); cpu++)
     smp_call_function_single(cpu, kstep_do_sched_tick, NULL, 1);
   kstep_sleep();
   kstep_cfs_bandwidth_tick();
-  rq_invariants_check();
   if (kstep_driver->on_tick_end)
     kstep_driver->on_tick_end();
 }

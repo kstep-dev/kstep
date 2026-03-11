@@ -54,10 +54,13 @@ static void run(void) {
   kstep_tick_repeat(10);
 }
 
+static struct kstep_invariant *invariants[] = { &invariant_sync_wakeup, NULL };
+
 KSTEP_DRIVER_DEFINE{
     .name = "sync_wakeup",
     .setup = setup,
     .run = run,
     .on_tick_begin = kstep_output_curr_task,
     .step_interval_us = 1000,
+    .invariants = invariants,
 };

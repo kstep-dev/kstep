@@ -2,7 +2,6 @@
 
 #include "driver.h"
 #include "internal.h"
-#include "invariant.h"
 
 static struct task_struct *tasks[2];
 
@@ -40,13 +39,10 @@ static void on_tick_begin(void) {
   kstep_json_print_2kv("type", "avg_util", "val", "%llu", avg_util);
 }
 
-static struct kstep_invariant *invariants[] = { &invariant_util_avg, NULL };
-
 KSTEP_DRIVER_DEFINE{
     .name = "util_avg",
     .setup = setup,
     .run = run,
     .on_tick_begin = on_tick_begin,
     .step_interval_us = 1000,
-    .invariants = invariants,
 };

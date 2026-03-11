@@ -2,7 +2,7 @@
 #include <linux/kthread.h>
 #include <linux/wait.h>
 
-#include "internal.h"
+#include "driver.h"
 
 struct kstep_kthread {
   struct task_struct     *task;

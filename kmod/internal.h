@@ -22,6 +22,10 @@ extern struct kstep_driver *kstep_driver;
 // tick.c
 void kstep_tick_init(void);
 
+// inv.c
+void kstep_invariants_init(void);
+void kstep_invariants_exit(void);
+
 // tick_clock.c
 void kstep_sched_clock_init(void);
 void kstep_sched_clock_tick(void);
