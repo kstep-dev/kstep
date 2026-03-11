@@ -27,8 +27,6 @@ struct kstep_invariant {
 // struct kstep_invariant_timeseries {
 // }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
 extern struct kstep_invariant invariant_sync_wakeup;
-#endif
 
 #endif

@@ -4,6 +4,9 @@
 #include "internal.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
+// TODO: old kernel does not support function graph tracer
+// we need to implement the invariant for the old kernel using other methods
+
 void kstep_invariants_init(void) {}
 void kstep_invariants_exit(void) {}
 #else

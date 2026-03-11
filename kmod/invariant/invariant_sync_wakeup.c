@@ -12,11 +12,20 @@
 
 #include <linux/version.h>
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
-
 #include <asm/ptrace.h>
 #include <linux/ftrace.h>
 #include "internal.h"
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
+struct kstep_invariant invariant_sync_wakeup = {
+  .name      = "sync_wakeup_locality",
+  .func_name = "try_to_wake_up",
+  .per_cpu   = false,
+  .capture   = NULL,
+  .verify    = NULL,
+};
+
+#else
 
 // try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 #define TTWU_WAKEE(fregs)      ((struct task_struct *) ftrace_regs_get_argument(fregs, 0))
