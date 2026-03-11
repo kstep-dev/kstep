@@ -1,0 +1,73 @@
+● Read AGENTS.md
+  └ 43 lines read
+
+● Read bugs/f912d051_remove_redundant_on_rq_status_change.md
+  └ 25 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 f912d051619d 2>/dev/null | head -200
+  └ 87 lines...
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Check LKML discussion
+  $ cd /users/szhong/kSTEP && curl -sL
+  'https://lore.kernel.org/lkml/20210721091109.1406043-1-john.wanghui@huawei.com/t.mbox.gz' | gunzip
+   2>/dev/null | head -100
+  └ 101 lines...
+
+Now let me verify the `deactivate_task()` and `activate_task()` implementations in the buggy kernel to confirm this is a pure code cleanup:
+
+● Check deactivate_task implementation
+  $ cd /users/szhong/kSTEP && git -C linux/current show f912d051619d~1:kernel/sched/core.c | grep
+  -A5 'void deactivate_task' | head -10
+  └ 7 lines...
+
+● Check activate_task implementation
+  $ cd /users/szhong/kSTEP && git -C linux/current show f912d051619d~1:kernel/sched/core.c | grep
+  -A5 'void activate_task' | head -10
+  └ 7 lines...
+
+This confirms my analysis. The patch is a **pure code cleanup** with no behavioral difference:
+
+1. `deactivate_task(src, p, 0)` already sets `p->on_rq = TASK_ON_RQ_MIGRATING` (flags=0, so `!(flags & DEQUEUE_SLEEP)`)
+2. `activate_task(dst, p, 0)` already sets `p->on_rq = TASK_ON_RQ_QUEUED`
+
+The removed manual assignments set the **exact same values** — there's no observable state difference between buggy and fixed kernels. This cannot be reproduced.
+
+● Find bug entry in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n 'f912d051619d' TODO.md
+  └ 2 lines...
+
+● Check TODO.md header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Read TODO.md lines 93-93
+  └ 1 line read
+
+● Edit TODO.md (+1 -1)
+
+● Commit and push
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: f912d051619d - pure code cleanup,
+   no behavioral difference
+
+  The removed on_rq assignments are redundant: deactivate_task() already sets
+  TASK_ON_RQ_MIGRATING and activate_task() already sets TASK_ON_RQ_QUEUED....
+  └ 15 lines...
+
+**Skipped `f912d051619d`** — this is a pure code cleanup with no behavioral difference. The removed `on_rq` assignments are redundant because:
+
+- `deactivate_task(src, p, 0)` internally sets `p->on_rq = TASK_ON_RQ_MIGRATING` (same value as the removed manual assignment)
+- `activate_task(dst, p, 0)` internally sets `p->on_rq = TASK_ON_RQ_QUEUED` (same value as the removed manual assignment)
+
+Since both kernels produce identical state transitions, there is no observable bug to reproduce. Committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         1m 46s
+Total session time:     1m 58s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      293.1k in, 6.3k out, 264.5k cached (Est. 6 Premium requests)

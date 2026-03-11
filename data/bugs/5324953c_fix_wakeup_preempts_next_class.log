@@ -1,0 +1,32 @@
+● Read bugs/5324953c_fix_wakeup_preempts_next_class.md
+  └ 36 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5324953c06bd 2>/dev/null | head -200
+  └ 201 lines...
+
+● Read reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -80
+  └ 81 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Read rest of patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5324953c06bd 2>/dev/null | tail -200
+  └ 201 lines...
+
+● Check commit history
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 5324953c06bd~3..5324953c06bd
+  2>/dev/null
+  └ 4 lines...
+
+● Read parent commit for wakeup_preempt
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 704069649b5b -- kernel/sched/core.c
+  2>/dev/null | head -150
+  └ 151 lines...
+

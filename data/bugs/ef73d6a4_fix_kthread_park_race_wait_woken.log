@@ -1,0 +1,214 @@
+● Read bugs/ef73d6a4_fix_kthread_park_race_wait_woken.md
+  └ 36 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 ef73d6a4ef0b 2>&1 | head -200
+  └ 201 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Check kthread.c in kmod
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c 2>/dev/null | head -80
+  └ 81 lines...
+
+● Read rest of patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 ef73d6a4ef0b 2>&1 | tail -80
+  └ 81 lines...
+
+● Read full kmod/kthread.c
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c
+  └ 157 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | tail -30
+  └ 31 lines...
+
+● Find relevant existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | grep -i 'park\|kthread\|wait\|woken'
+  └ 2 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && head -80 reproduce.py
+  └ 81 lines...
+
+● Read similar kthread race driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/pf_kthread_race.c
+  └ 76 lines...
+
+● Get parent commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline ef73d6a4ef0b~1..ef73d6a4ef0b~1 -1
+  2>&1
+  └ 1 line...
+
+● Check internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h | head -40
+  └ 41 lines...
+
+● Check commit version
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline ef73d6a4ef0b -1 2>&1
+  └ 2 lines...
+
+● Get kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags ef73d6a4ef0b~1 2>&1
+  └ 2 lines...
+
+● Full internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h
+  └ 90 lines...
+
+● Check ksym_lookup API
+  $ cd /users/szhong/kSTEP && grep -r "kstep_ksym_lookup\|ksym" kmod/ --include="*.h"
+  --include="*.c" | head -20
+  └ 21 lines...
+
+● Check kthread internals at buggy version
+  $ cd /users/szhong/kSTEP && git -C linux/current show ef73d6a4ef0b~1:kernel/kthread.c | head -80
+  └ 81 lines...
+
+● Find kthread struct access pattern
+  $ cd /users/szhong/kSTEP && git -C linux/current show ef73d6a4ef0b~1:kernel/kthread.c | grep -n
+  "to_kthread\|KTHREAD_SHOULD_PARK\|KTHREAD_SHOULD_STOP\|KTHREAD_IS\|set_child_tid\|worker_private\|
+  struct kthread " | head -30
+  └ 31 lines...
+
+Now I understand the bug. When `kthread_park()` is called while a kthread is in `wait_woken()`, the buggy kernel only checks `kthread_should_stop()` (not `kthread_should_park()`), so the kthread re-enters `schedule_timeout()` instead of waking up. Let me write the driver.
+
+● Check task_struct fields
+  $ cd /users/szhong/kSTEP && git -C linux/current show ef73d6a4ef0b~1:include/linux/sched.h | grep
+  -n "worker_private\|__state" | head -10
+  └ 11 lines...
+
+● Verify buggy wait_woken code
+  $ cd /users/szhong/kSTEP && git -C linux/current show ef73d6a4ef0b~1:kernel/sched/wait.c | grep -n
+   "is_kthread_should_stop\|wait_woken\|WQ_FLAG_WOKEN\|schedule_timeout" | head -20
+  └ 14 lines...
+
+Good, `__state` at line 747 and `worker_private` at line 1013. Now let me create the driver:
+
+● Create kmod/drivers/kthread_park_wait_woken.c (+133)
+
+Now let me checkout the buggy kernel and build:
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py ef73d6a4ef0b~1 kthread_park_wait_woken_buggy 2>&1
+  └ 10 lines...
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=kthread_park_wait_woken_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Build kstep module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=kthread_park_wait_woken_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Build succeeded. Let me run the driver:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py kthread_park_wait_woken --linux_name
+  kthread_park_wait_woken_buggy 2>&1 | tail -30
+  └ 31 lines...
+
+The bug is triggering - victim stuck at woken_count=1 with state=1 (TASK_INTERRUPTIBLE). Let me check the JSON output:
+
+● Check JSON output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug reproduced on buggy kernel. Now let me verify the fix:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py ef73d6a4ef0b kthread_park_wait_woken_fixed 2>&1
+  └ 10 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=kthread_park_wait_woken_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kstep for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=kthread_park_wait_woken_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run driver on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py kthread_park_wait_woken --linux_name
+  kthread_park_wait_woken_fixed 2>&1 | tail -20
+  └ 21 lines...
+
+● Check fixed kernel output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug confirmed:
+- **Buggy kernel**: `woken_count 1→1`, victim stuck sleeping (state=1/TASK_INTERRUPTIBLE) → **FAIL**
+- **Fixed kernel**: `woken_count 0→5,116,455`, victim busy-looping (state=0/TASK_RUNNING) → **PASS**
+
+Now let me update TODO.md, add to reproduce.py, and commit:
+
+● Find bug line in TODO
+  $ cd /users/szhong/kSTEP && grep -n 'ef73d6a4ef0b' TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Count reproduced bugs
+  $ cd /users/szhong/kSTEP && grep -c '\- \[x\]' TODO.md
+  └ 2 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+Now add to reproduce.py:
+
+● Find bugs list in reproduce.py
+  $ cd /users/szhong/kSTEP && grep -n "^bugs = \[" reproduce.py
+  └ 2 lines...
+
+● Check end of bugs list
+  $ cd /users/szhong/kSTEP && tail -40 reproduce.py | head -20
+  └ 21 lines...
+
+● Find end of bugs list
+  $ cd /users/szhong/kSTEP && grep -n "^]" reproduce.py | head -5
+  └ 2 lines...
+
+● Read reproduce.py lines 665-673
+  └ 9 lines read
+
+● Edit reproduce.py (+7)
+
+● Git commit
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: kthread_park_wait_woken
+  (ef73d6a4ef0b)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>&1
+  └ 8 lines...
+
+● Git push
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced and committed. Here's a summary:
+
+**Bug**: `ef73d6a4ef0b` — `wait_woken()` only checked `kthread_should_stop()` but not `kthread_should_park()`, causing kthreads to re-enter `schedule_timeout()` indefinitely when parked during a `wait_woken()` loop.
+
+**Reproduction**: Created a kthread using the `wait_woken()` pattern with an unsatisfiable condition, then set `KTHREAD_SHOULD_PARK` and woke it.
+
+| Kernel | woken_count | Task State | Result |
+|--------|------------|------------|--------|
+| Buggy  | 1→1       | INTERRUPTIBLE (sleeping) | **FAIL** — stuck in `schedule_timeout()` |
+| Fixed  | 0→5,116,455 | RUNNING (busy-looping) | **PASS** — `kthread_should_stop_or_park()` works |
+
+
+Total usage est:        6 Premium requests
+API time spent:         9m 28s
+Total session time:     13m 59s
+Total code changes:     +142 -2
+Breakdown by AI model:
+ claude-opus-4.6-1m      1.8m in, 32.8k out, 1.7m cached (Est. 6 Premium requests)

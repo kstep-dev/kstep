@@ -1,0 +1,180 @@
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read bugs/87ca4f9e_fix_useafterfree_bug_dup_user.md
+  └ 25 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 87ca4f9efbd7 2>/dev/null | head -200
+  └ 151 lines...
+
+Let me examine the existing drivers and kSTEP internals to understand available patterns.
+
+● Read task.c for fork implementation
+  $ cd /users/szhong/kSTEP && cat kmod/task.c 2>/dev/null | head -100
+  └ 101 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -30
+  └ 31 lines...
+
+● Read kthread.c for kthread API
+  $ cd /users/szhong/kSTEP && cat kmod/kthread.c 2>/dev/null
+  └ 157 lines...
+
+● Read user-space task code
+  $ cd /users/szhong/kSTEP && cat user/task.c 2>/dev/null
+  └ 67 lines...
+
+● Read affinity-related driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/reject_affinity.c 2>/dev/null
+  └ 98 lines...
+
+● Read race condition driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/pf_kthread_race.c 2>/dev/null
+  └ 76 lines...
+
+● Read internal.h
+  $ cd /users/szhong/kSTEP && cat kmod/internal.h 2>/dev/null
+  └ 90 lines...
+
+● Find ksym_lookup
+  $ cd /users/szhong/kSTEP && grep -n "kstep_ksym_lookup" kmod/*.c kmod/*.h 2>/dev/null | head -20
+  └ 12 lines...
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 87ca4f9efbd7~1 dup_uaf_buggy 2>&1 | tail -5
+  └ 6 lines...
+
+● See reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | tail -30
+  └ 31 lines...
+
+● Check kernel version
+  $ cd /users/szhong/kSTEP && head -5 linux/current/Makefile
+  └ 6 lines...
+
+● Find relevant functions in buggy kernel
+  $ cd /users/szhong/kSTEP && grep -n 'dup_user_cpus_ptr\|do_set_cpus_allowed\|user_cpus_ptr'
+  linux/current/kernel/sched/core.c | head -30
+  └ 29 lines...
+
+● Read reproduce.py structure
+  $ cd /users/szhong/kSTEP && head -40 reproduce.py
+  └ 41 lines...
+
+● Read buggy dup_user_cpus_ptr
+  $ cd /users/szhong/kSTEP && sed -n '2612,2630p' linux/current/kernel/sched/core.c
+  └ 19 lines...
+
+● Read more of reproduce.py
+  $ cd /users/szhong/kSTEP && sed -n '40,200p' reproduce.py
+  └ 162 lines...
+
+Now I understand the bug. In the buggy `dup_user_cpus_ptr`, when `src->user_cpus_ptr` is NULL (freed by concurrent `do_set_cpus_allowed`), the function returns 0 **without clearing `dst->user_cpus_ptr`** — which still holds the stale pointer from `dup_task_struct`. The fix adds `dst->user_cpus_ptr = NULL` at the start.
+
+I'll demonstrate this by setting up the race state and calling `dup_user_cpus_ptr` directly.
+
+● Create kmod/drivers/dup_user_cpus_uaf.c (+111)
+
+Now let me build the buggy kernel and kSTEP:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=dup_uaf_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Build kSTEP module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=dup_uaf_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Build succeeded. Now let's run the driver on the buggy kernel:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py dup_user_cpus_uaf --linux_name dup_uaf_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+The bug triggers! `dst->user_cpus_ptr` retains the stale pointer. Let me verify the status message:
+
+● Check pass/fail status
+  $ cd /users/szhong/kSTEP && grep -E "status|fail|pass" data/latest.log
+  └ 3 lines...
+
+● Check JSON output
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug reproduced - status is "fail" on the buggy kernel. Now let me test on the fixed kernel:
+
+● Checkout fixed kernel
+  $ cd /users/szhong/kSTEP && ./checkout_linux.py 87ca4f9efbd7 dup_uaf_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build fixed kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=dup_uaf_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Build kSTEP for fixed kernel
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=dup_uaf_fixed 2>&1 | tail -5
+  └ 6 lines...
+
+● Run driver on fixed kernel
+  $ cd /users/szhong/kSTEP && ./run.py dup_user_cpus_uaf --linux_name dup_uaf_fixed 2>&1 | tail -15
+  └ 16 lines...
+
+● Check fixed kernel result
+  $ cd /users/szhong/kSTEP && cat data/latest.jsonl
+  └ 2 lines...
+
+Bug confirmed: **fail** on buggy kernel (stale pointer retained), **pass** on fixed kernel (correctly cleared to NULL). Now let me update TODO.md, add to reproduce.py, and commit.
+
+● Find bug line in TODO
+  $ cd /users/szhong/kSTEP && grep -n '87ca4f9efbd7' TODO.md
+  └ 2 lines...
+
+● Read TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Edit TODO.md (+1 -1)
+
+Now add the bug to reproduce.py. Let me find the right place to insert:
+
+● Find end of bugs list
+  $ cd /users/szhong/kSTEP && grep -n "^]" reproduce.py | head -5
+  └ 2 lines...
+
+● Read reproduce.py lines 420-427
+  └ 8 lines read
+
+● Edit reproduce.py (+7)
+
+Now commit and push:
+
+● Commit changes
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "reproduce: dup_user_cpus_uaf
+  (87ca4f9efbd7)
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" 2>&1
+  └ 4 lines...
+
+● Push changes
+  $ cd /users/szhong/kSTEP && git push 2>&1
+  └ 10 lines...
+
+Successfully reproduced bug `87ca4f9efbd7` (use-after-free in `dup_user_cpus_ptr()`).
+
+**Summary:**
+- **Driver**: `dup_user_cpus_uaf` — simulates the race where `do_set_cpus_allowed()` NULLs `src->user_cpus_ptr` between `dup_task_struct` and `dup_user_cpus_ptr` during fork
+- **Buggy kernel**: `dst->user_cpus_ptr` retains stale pointer → use-after-free/double-free risk (**fail**)
+- **Fixed kernel**: `dst->user_cpus_ptr` correctly cleared to NULL upfront (**pass**)
+- TODO.md updated (31/400), reproduce.py updated, committed and pushed
+
+
+Total usage est:        6 Premium requests
+API time spent:         6m 3s
+Total session time:     9m 42s
+Total code changes:     +120 -2
+Breakdown by AI model:
+ claude-opus-4.6-1m      1.4m in, 19.8k out, 1.4m cached (Est. 6 Premium requests)

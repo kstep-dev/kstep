@@ -27,7 +27,7 @@ from pathlib import Path
 
 PROJ_DIR = Path(__file__).resolve().parent.parent
 TODO_FILE = PROJ_DIR / "TODO.md"
-BUGS_DIR = PROJ_DIR / "bugs"
+BUGS_DIR = PROJ_DIR / "data" / "bugs"
 
 DEFAULT_TIME_BUDGET = 10
 DEFAULT_MAX_ITERS = 400

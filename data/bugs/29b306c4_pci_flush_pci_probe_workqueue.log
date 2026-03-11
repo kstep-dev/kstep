@@ -1,0 +1,63 @@
+● Read bugs/29b306c4_pci_flush_pci_probe_workqueue.md
+  └ 37 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 29b306c44eb5 2>/dev/null | head -300
+  └ 301 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Read rest of patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 29b306c44eb5 2>/dev/null | tail -200
+  └ 201 lines...
+
+● Read isolation.c changes
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 29b306c44eb5 --
+  kernel/sched/isolation.c 2>/dev/null
+  └ 81 lines...
+
+● stop_bash
+  └ 1 line...
+
+● List all existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | sort
+  └ 28 lines...
+
+● Check reproduce.py format
+  $ cd /users/szhong/kSTEP && cat reproduce.py | head -60
+  └ 61 lines...
+
+This bug involves PCI probe workqueue flushing during CPU isolation changes — it requires triggering actual PCI device probing concurrent with housekeeping mask updates. kSTEP doesn't have PCI probe APIs and the bug's code path (`pci_call_probe` → `schedule_work_on`) can't be triggered from a kSTEP driver. Skipping.
+
+● Find bug in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n '29b306c44eb5' TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 29b306c44eb5 - PCI probe
+  workqueue flush requires PCI subsystem
+
+  Bug requires triggering PCI device probing (pci_call_probe/schedule_work_on)
+  concurrent with housekeeping_update(). kSTEP cannot trigger PCI probe work...
+  └ 20 lines...
+
+Skipped `29b306c44eb5` — bug requires PCI device probing (`pci_call_probe`/`schedule_work_on`) concurrent with `housekeeping_update()`. kSTEP can't trigger PCI probe work paths; the bug is in PCI/workqueue subsystem interaction, not scheduler internals. TODO.md updated, committed, and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         1m 49s
+Total session time:     2m 31s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      316.2k in, 5.4k out, 284.6k cached (Est. 6 Premium requests)

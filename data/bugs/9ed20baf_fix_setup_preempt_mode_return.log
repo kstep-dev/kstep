@@ -1,0 +1,43 @@
+● Read bugs/9ed20baf_fix_setup_preempt_mode_return.md
+  └ 38 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 9ed20bafc858 2>/dev/null | head -200
+  └ 92 lines...
+
+This bug is a boot-time parameter parsing issue where `setup_preempt_mode()` returns inverted success/failure codes for `__setup()` callbacks. The bug file itself states: "This bug cannot be reproduced through runtime kSTEP execution since it occurs during kernel boot parameter processing."
+
+The actual preemption mode IS applied correctly (the function calls `sched_dynamic_update(mode)` before returning) — only the return value to the boot parameter handler is wrong. This means there's no observable scheduling behavior difference at runtime.
+
+Let me skip this and update TODO.md.
+
+● Find the bug line in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n '9ed20bafc858' TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 9ed20bafc858 - boot-time-only
+  __setup() return value bug
+
+  The bug is in setup_preempt_mode() returning inverted success/failure
+  codes for __setup() callbacks. This only affects boot parameter handling,...
+  └ 15 lines...
+
+**Skipped** `9ed20bafc858` — this is a boot-time-only bug where `setup_preempt_mode()` returns inverted `__setup()` callback return values (0 on success, 1 on failure). The actual preemption mode is still applied correctly via `sched_dynamic_update()` before the return, so there's no observable runtime scheduling difference. Cannot be reproduced with kSTEP drivers. Committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         48s
+Total session time:     57s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      162.7k in, 2.0k out, 142.4k cached (Est. 6 Premium requests)

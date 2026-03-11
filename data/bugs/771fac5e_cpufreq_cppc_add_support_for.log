@@ -1,0 +1,54 @@
+● Read AGENTS.md
+  └ 43 lines read
+
+● Read bugs/771fac5e_cpufreq_cppc_add_support_for.md
+  └ 39 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read reproduce.py
+  └ 454 lines read
+
+● Check patch stats
+  $ cd /users/szhong/kSTEP && git -C linux/current show --stat 771fac5e26c1 2>/dev/null | head -20
+  └ 20 lines...
+
+● View the scheduler patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 771fac5e26c1 -- kernel/sched/core.c
+  2>/dev/null | head -80
+  └ 81 lines...
+
+● See full file stats
+  $ cd /users/szhong/kSTEP && git -C linux/current show --stat 771fac5e26c1 2>/dev/null
+  └ 26 lines...
+
+The patch only removes `EXPORT_SYMBOL_GPL(sched_setattr_nocheck)` from `kernel/sched/core.c` — the actual bug is entirely in `drivers/cpufreq/cppc_cpufreq.c` (a cpufreq driver race, not a scheduler bug). This cannot be reproduced with kSTEP.
+
+● Find the TODO entry
+  $ cd /users/szhong/kSTEP && grep -n '771fac5e26c1' TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 771fac5e26c1 - cpufreq driver
+  bug, not scheduler
+
+  Bug is entirely in drivers/cpufreq/cppc_cpufreq.c (kthread_work/irq_work
+  race on policy exit). The only scheduler change is removing...
+  └ 19 lines...
+
+**Skipped** `771fac5e26c1`. The bug is entirely in `drivers/cpufreq/cppc_cpufreq.c` — a race in the CPPC frequency invariance driver's kthread_work/irq_work cleanup on policy exit. The only scheduler change is removing one `EXPORT_SYMBOL_GPL(sched_setattr_nocheck)` line. Not reproducible with kSTEP. Committed and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         54s
+Total session time:     1m 6s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      300.0k in, 2.5k out, 267.1k cached (Est. 6 Premium requests)

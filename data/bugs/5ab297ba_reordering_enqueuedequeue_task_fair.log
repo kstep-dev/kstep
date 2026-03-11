@@ -1,0 +1,336 @@
+● Read bugs/5ab297ba_reordering_enqueuedequeue_task_fair.md
+  └ 39 lines read
+
+● Read kmod/driver.h
+  └ 111 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5ab297bab984 2>/dev/null | head -300
+  └ 190 lines...
+
+● List existing drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | head -20
+  └ 21 lines...
+
+● Check driver build system
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/Makefile 2>/dev/null || echo "No Makefile in drivers"
+  └ 2 lines...
+
+● Check for throttle-related drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | grep -i throttl
+  └ 2 lines...
+
+● Check for cgroup-related drivers
+  $ cd /users/szhong/kSTEP && ls kmod/drivers/ | grep -i cgroup
+  └ 1 line...
+
+● Read kmod/drivers/throttled_limbo_list.c
+  └ 70 lines read
+
+● Find drivers using cgroup APIs
+  $ cd /users/szhong/kSTEP && grep -l "kstep_cgroup" kmod/drivers/*.c | head -5
+  └ 6 lines...
+
+● Read kmod/drivers/h_nr_runnable.c
+  └ 76 lines read
+
+✗ Read kmod/drivers/internal.h
+  Path does not exist
+
+● Find internal.h
+  $ find /users/szhong/kSTEP/kmod -name "internal.h" -type f 2>/dev/null
+  └ 2 lines...
+
+● Check kernel version near commit
+  $ cd /users/szhong/kSTEP && git -C linux/current log --oneline 5ab297bab984~3..5ab297bab984
+  2>/dev/null | head -5
+  └ 4 lines...
+
+● Read kmod/internal.h
+  └ 89 lines read
+
+● Find kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current describe --tags --abbrev=0 5ab297bab984~1
+  2>/dev/null || git -C linux/current log --oneline -1 5ab297bab984~1 2>/dev/null
+  └ 2 lines...
+
+● Read kmod/drivers/sched_move.c
+  └ 129 lines read
+
+● Get exact kernel version
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5ab297bab984~1:Makefile | head -5
+  └ 6 lines...
+
+● Check build directory
+  $ cd /users/szhong/kSTEP && ls build/ 2>/dev/null
+  └ 66 lines...
+
+● Check CFS_BANDWIDTH config
+  $ cd /users/szhong/kSTEP && grep -r "CFS_BANDWIDTH" build/ linux/ --include="*.config" 2>/dev/null
+   | head -5 || grep -r "CFS_BANDWIDTH" scripts/ --include="*.py" --include="*.sh" 2>/dev/null |
+  head -5
+  └ 6 lines...
+
+Good, CFS_BANDWIDTH is enabled. Now let me look at a few more things to write the driver properly.
+
+● Look at cgroup quota driver
+  $ cd /users/szhong/kSTEP && cat kmod/drivers/charge_percpu_cpuusage.c
+  └ 112 lines...
+
+● Check h_nr_running in buggy kernel
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5ab297bab984~1:kernel/sched/fair.c | grep -n
+   'h_nr_running' | head -20
+  └ 21 lines...
+
+● View buggy enqueue_task_fair
+  $ cd /users/szhong/kSTEP && git -C linux/current show 5ab297bab984~1:kernel/sched/fair.c | sed -n
+  '5425,5500p'
+  └ 77 lines...
+
+Now I have a clear understanding. Let me checkout the buggy kernel and write the driver.
+
+● Checkout buggy kernel
+  $ cd /users/szhong/kSTEP && python3 checkout_linux.py 5ab297bab984~1 enq_deq_reorder_buggy 2>&1 |
+  tail -5
+  └ 6 lines...
+
+Now let me write the driver. I need to check if `task_group` has a `parent` field in this kernel version:
+
+● Find task_group struct
+  $ cd /users/szhong/kSTEP && grep -n 'struct task_group {'
+  linux/enq_deq_reorder_buggy/kernel/sched/sched.h | head -3
+  └ 2 lines...
+
+● View task_group struct
+  $ cd /users/szhong/kSTEP && sed -n '354,420p' linux/enq_deq_reorder_buggy/kernel/sched/sched.h
+  └ 68 lines...
+
+Good, `task_group` has `parent` and `cfs_rq` and `se` fields. Now let me also check the `cfs_rq` struct to see `h_nr_running` and `throttled`:
+
+● Check h_nr_running and throttled in sched.h
+  $ cd /users/szhong/kSTEP && grep -n 'h_nr_running\|throttled'
+  linux/enq_deq_reorder_buggy/kernel/sched/sched.h | head -20
+  └ 13 lines...
+
+Now let me also check the `cfs_rq_throttled` macro:
+
+● Check cfs_rq_throttled definition
+  $ cd /users/szhong/kSTEP && grep -n 'cfs_rq_throttled'
+  linux/enq_deq_reorder_buggy/kernel/sched/sched.h | head -10
+  └ 1 line...
+
+● Find cfs_rq_throttled
+  $ cd /users/szhong/kSTEP && grep -rn 'cfs_rq_throttled' linux/enq_deq_reorder_buggy/kernel/sched/
+  | head -20
+  └ 14 lines...
+
+Good. Now let me write the driver:
+
+● Create kmod/drivers/enq_deq_reorder.c (+141)
+
+Now let me build the buggy kernel and the kSTEP module:
+
+● Build buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=enq_deq_reorder_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+● Find build errors
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=enq_deq_reorder_buggy 2>&1 | grep -i error |
+  head -20
+  └ 6 lines...
+
+● Debug build error
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=enq_deq_reorder_buggy 2>&1 | grep -B5 'Error 1'
+  | head -20
+  └ 7 lines...
+
+● Check for existing v5.x builds
+  $ cd /users/szhong/kSTEP && ls build/ | grep -i '5\.' | head -10
+  └ 1 line...
+
+● Check Makefile for build flags
+  $ cd /users/szhong/kSTEP && cat Makefile | head -80
+  └ 80 lines...
+
+● Check linux-patch target
+  $ cd /users/szhong/kSTEP && grep -A30 'linux-patch' Makefile | head -40
+  └ 31 lines...
+
+● Check checkout script
+  $ cd /users/szhong/kSTEP && cat checkout_linux.py
+  └ 123 lines...
+
+● Check kernel config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep | head -30
+  └ 31 lines...
+
+● Check toolchain versions
+  $ cd /users/szhong/kSTEP && objtool --version 2>/dev/null; ld --version 2>/dev/null | head -1; as
+  --version 2>/dev/null | head -1
+  └ 3 lines...
+
+✗ Check which kernels built successfully
+  $ cd /users/szhong/kSTEP && for d in build/*/; do [ -f "$d/image" ] && echo "$d $(file "$d/image"
+  | head -c 80)"; done 2>/dev/null | head -10
+  Command blocked: contains dangerous shell expansion patterns (e.g., parameter transformation,
+  indirect expansion, or nested command substitution) that could enable arbitrary code
+  execution. Please rewrite the command without these expansion patterns.
+
+● Check which kernels have image files
+  $ cd /users/szhong/kSTEP && ls build/*/image 2>/dev/null | head -10
+  └ 11 lines...
+
+● Check old kernel versions built
+  $ cd /users/szhong/kSTEP && for img in build/charge_percpu_cpuusage_buggy/image
+  build/loadavg_race_buggy/image; do echo "$img"; done && ls -la
+  build/charge_percpu_cpuusage_buggy/image 2>/dev/null && head -1
+  linux/charge_percpu_cpuusage_buggy/Makefile 2>/dev/null
+  └ 4 lines...
+
+● Check charge_percpu version
+  $ cd /users/szhong/kSTEP && head -5 linux/charge_percpu_cpuusage_buggy/Makefile 2>/dev/null ||
+  echo "not found" && git -C linux/master log --oneline -1 248cc9993d1c 2>/dev/null
+  └ 3 lines...
+
+● Check kernel version for cpuacct bug
+  $ cd /users/szhong/kSTEP && git -C linux/master show 248cc9993d1c~1:Makefile 2>/dev/null | head -5
+  └ 6 lines...
+
+● Check objtool/stack validation config
+  $ cd /users/szhong/kSTEP && grep -i 'STACK_VALIDATION\|OBJTOOL\|UNWINDER' linux/config.kstep
+  linux/config.kstep.x86_64 2>/dev/null
+  └ 1 line...
+
+● Check arch-specific config
+  $ cd /users/szhong/kSTEP && cat linux/config.kstep.x86_64 2>/dev/null
+  └ 7 lines...
+
+● Check enabled config
+  $ cd /users/szhong/kSTEP && grep 'STACK_VALIDATION\|CONFIG_OBJTOOL'
+  linux/enq_deq_reorder_buggy/.config 2>/dev/null
+  └ 3 lines...
+
+● Disable stack validation
+  $ cd /users/szhong/kSTEP && echo "CONFIG_STACK_VALIDATION=n" >>
+  linux/enq_deq_reorder_buggy/.config && cd linux/enq_deq_reorder_buggy && make olddefconfig 2>&1 |
+  tail -5
+  └ 6 lines...
+
+● Rebuild buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=enq_deq_reorder_buggy 2>&1 | tail -10
+  └ 11 lines...
+
+● Verify stack validation disabled
+  $ cd /users/szhong/kSTEP && grep 'STACK_VALIDATION' linux/enq_deq_reorder_buggy/.config
+  └ 3 lines...
+
+● Check entry Makefile
+  $ cd /users/szhong/kSTEP && grep -n 'OBJECT_FILES_NON_STANDARD\|thunk'
+  linux/enq_deq_reorder_buggy/arch/x86/entry/Makefile
+  └ 3 lines...
+
+● Skip objtool for thunk_64.o
+  $ cd /users/szhong/kSTEP && echo "OBJECT_FILES_NON_STANDARD_thunk_64.o := y" >>
+  linux/enq_deq_reorder_buggy/arch/x86/entry/Makefile
+  └ 1 line...
+
+● Rebuild buggy kernel
+  $ cd /users/szhong/kSTEP && make linux LINUX_NAME=enq_deq_reorder_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Kernel built successfully. Now build kSTEP module:
+
+● Build kSTEP module
+  $ cd /users/szhong/kSTEP && make kstep LINUX_NAME=enq_deq_reorder_buggy 2>&1 | tail -20
+  └ 21 lines...
+
+Built successfully. Now let's run the driver:
+
+● Run driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py enq_deq_reorder --linux_name enq_deq_reorder_buggy 2>&1 |
+  tail -30
+  └ 31 lines...
+
+● Find trace callback code
+  $ cd /users/szhong/kSTEP && grep -n 'on_sched_group_alloc' kmod/trace.c
+  └ 5 lines...
+
+● View trace callback code
+  $ cd /users/szhong/kSTEP && sed -n '80,110p' kmod/trace.c
+  └ 29 lines...
+
+● Check init_tg_cfs_entry in v5.6
+  $ cd /users/szhong/kSTEP && grep -n 'init_tg_cfs_entry'
+  linux/enq_deq_reorder_buggy/kernel/sched/fair.c | head -5
+  └ 3 lines...
+
+It exists. The crash is at offset 0x68, and the function is trying to access `tg` parameter. Looking at the crash more carefully: RDI=0xffffffff8107f434 which looks like a valid kernel address. But 0x68 offset from something... Let me check the logs more carefully:
+
+● Read full logs
+  $ cd /users/szhong/kSTEP && cat data/logs/latest.log | head -80
+  └ 2 lines...
+
+● Read logs from correct path
+  $ cd /users/szhong/kSTEP && cat data/latest.log | head -80
+  └ 81 lines...
+
+● Search for crash details
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  'kmod|kstep|BUG|panic|NULL|CR2|on_sched_group' | head -30
+  └ 12 lines...
+
+● Check data directory
+  $ cd /users/szhong/kSTEP && ls -la data/latest.log && ls data/logs/ 2>/dev/null | tail -5
+  └ 7 lines...
+
+● Check correct log file
+  $ cd /users/szhong/kSTEP && cat data/logs/log-20260310_182328.log | grep -E
+  'driver=enq|kstep|BUG|panic|on_sched_group|CR2|NULL|cgroup' | head -30
+  └ 7 lines...
+
+● Check run.py
+  $ cd /users/szhong/kSTEP && head -80 run.py
+  └ 81 lines...
+
+● Rerun driver on buggy kernel
+  $ cd /users/szhong/kSTEP && ./run.py enq_deq_reorder --linux_name enq_deq_reorder_buggy 2>&1
+  └ 6 lines...
+
+● Check new log output
+  $ cd /users/szhong/kSTEP && cat data/latest.log | grep -E
+  'driver=|kstep|panic|BUG|CR2|NULL|on_sched|cgroup|h_nr|throttl|PASS|FAIL|fail|pass' | head -30
+  └ 21 lines...
+
+● Check ftrace regs handling
+  $ cd /users/szhong/kSTEP && grep -n 'KSTEP_FTRACE_REGS\|regs_get_kernel_argument' kmod/trace.c
+  kmod/sym.c kmod/*.h 2>/dev/null | head -20
+  └ 13 lines...
+
+● View trace.c header
+  $ cd /users/szhong/kSTEP && sed -n '1,20p' kmod/trace.c
+  └ 21 lines...
+
+● View KSTEP_TRACE_FUNC macro
+  $ cd /users/szhong/kSTEP && sed -n '19,40p' kmod/trace.c
+  └ 23 lines...
+
+● Check ftrace config
+  $ cd /users/szhong/kSTEP && grep -i 'DYNAMIC_FTRACE\|HAVE_DYNAMIC_FTRACE_WITH_REGS\|FTRACE'
+  linux/enq_deq_reorder_buggy/.config | head -20
+  └ 14 lines...
+
+● Check regs_get_kernel_argument
+  $ cd /users/szhong/kSTEP && grep -n 'regs_get_kernel_argument'
+  linux/enq_deq_reorder_buggy/arch/x86/include/asm/ptrace.h
+  └ 3 lines...
+
+● View regs_get_kernel_argument
+  $ cd /users/szhong/kSTEP && sed -n '309,350p'
+  linux/enq_deq_reorder_buggy/arch/x86/include/asm/ptrace.h
+  └ 43 lines...
+
+● Check init_tg_cfs_entry definition
+  $ cd /users/szhong/kSTEP && grep -B2 'init_tg_cfs_entry'
+  linux/enq_deq_reorder_buggy/kernel/sched/fair.c | head -10
+  └ 7 lines...
+

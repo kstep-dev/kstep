@@ -1,0 +1,38 @@
+● Read bugs/5657c116_fix_null_pointer_access_fault.md
+  └ 38 lines read
+
+● Read kmod/driver.h
+  └ 110 lines read
+
+● Read the patch
+  $ cd /users/szhong/kSTEP && git -C linux/current show -U32 5657c1167835 2>/dev/null | head -200
+  └ 108 lines...
+
+This bug only occurs in non-SMP kernel configs, but kSTEP requires SMP (CPU 0 reserved for driver). This is fundamentally incompatible — I'll skip it.
+
+● Find bug line in TODO.md
+  $ cd /users/szhong/kSTEP && grep -n '5657c1167835' TODO.md
+  └ 2 lines...
+
+● Check TODO header
+  $ cd /users/szhong/kSTEP && head -5 TODO.md
+  └ 6 lines...
+
+● Edit TODO.md (+1 -1)
+
+● Commit and push skip
+  $ cd /users/szhong/kSTEP && git add -A && git commit -m "skip: 5657c1167835 — requires non-SMP
+  kernel, incompatible with kSTEP
+
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>" && git push
+  └ 16 lines...
+
+**Skipped** `5657c1167835` — this bug requires a non-SMP kernel (`CONFIG_SMP=n`) to trigger, as `alloc_user_cpus_ptr()` only returns NULL in that configuration. kSTEP requires SMP (CPU 0 reserved for driver), making reproduction impossible. Updated TODO.md, committed, and pushed.
+
+
+Total usage est:        6 Premium requests
+API time spent:         29s
+Total session time:     38s
+Total code changes:     +1 -1
+Breakdown by AI model:
+ claude-opus-4.6-1m      161.1k in, 1.4k out, 141.3k cached (Est. 6 Premium requests)
