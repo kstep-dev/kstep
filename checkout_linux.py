@@ -54,6 +54,7 @@ def set_current_linux(linux_name: str):
     logging.info(f"{fmt_path(LINUX_CURR_DIR)} now points to {fmt_path(linux_dir)}")
 
     build_dir = BUILD_DIR / linux_name
+    build_dir.mkdir(parents=True, exist_ok=True)
     BUILD_CURR_DIR.unlink(missing_ok=True)
     BUILD_CURR_DIR.symlink_to(build_dir)
     logging.info(f"{fmt_path(BUILD_CURR_DIR)} now points to {fmt_path(build_dir)}")
