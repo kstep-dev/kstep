@@ -1,6 +1,12 @@
 #include <linux/ftrace.h>
 #include <linux/string.h>
+#include <linux/version.h>
 #include "internal.h"
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 13, 0)
+void kstep_invariants_init(void) {}
+void kstep_invariants_exit(void) {}
+#else
 
 #define MAX_INVARIANTS 64
 
@@ -85,3 +91,5 @@ void kstep_invariants_exit(void) {
     KSYM_unregister_ftrace_graph(&probes[i].fgops);
   n_probes = 0;
 }
+
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) */

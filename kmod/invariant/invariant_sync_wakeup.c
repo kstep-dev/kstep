@@ -10,8 +10,12 @@
 //   If precondition was met, waker's CPU must have at least one runnable task
 //   (nr_running >= 1).
 
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+
 #include <asm/ptrace.h>
-#include <linux/ftrace_regs.h>
+#include <linux/ftrace.h>
 #include "internal.h"
 
 // try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
@@ -62,3 +66,5 @@ struct kstep_invariant invariant_sync_wakeup = {
   .capture   = capture,
   .verify    = verify,
 };
+
+#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0) */

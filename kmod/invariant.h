@@ -2,6 +2,7 @@
 #define KSTEP_INVARIANT_H
 
 #include <linux/types.h>
+#include <linux/version.h>
 
 struct ftrace_regs;
 struct kstep_inv_ctx {
@@ -26,6 +27,8 @@ struct kstep_invariant {
 // struct kstep_invariant_timeseries {
 // }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
 extern struct kstep_invariant invariant_sync_wakeup;
+#endif
 
 #endif
