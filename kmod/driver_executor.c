@@ -40,7 +40,7 @@ static void parse_console_input(char *buf) {
   if (fields[0] < OP_TASK_CREATE || fields[0] >= OP_TYPE_NR)
     return;
 
-  TRACE_INFO("EXECOP %d %d %d %d\n", fields[0], fields[1], fields[2], fields[3]);
+  // TRACE_INFO("EXECOP %d %d %d %d\n", fields[0], fields[1], fields[2], fields[3]);
   kstep_execute_op(fields[0], fields[1], fields[2], fields[3]);
 }
 

@@ -9,7 +9,7 @@ from run import (
     make_linux,
     run_qemu,
 )
-from scripts import GLOBAL_SIGNAL_CORPUS, LOGS_DIR, cov_parse, generate_input
+from scripts import GLOBAL_SIGNAL_CORPUS, LOGS_DIR, cov_parse, generate_input, input_seq_from_log
 
 
 def assert_exec_matches_generated(log_file, seq):
@@ -70,7 +70,8 @@ def run_test(
         input_file=input_file,
     )
 
-    assert_exec_matches_generated(log_file, seq)
+    # assert_exec_matches_generated(log_file, seq)
+    seq = input_seq_from_log(log_file)
 
     # Parse the signal file and get the signal records and list
     signal_records = cov_parse(cov_file)
@@ -102,7 +103,7 @@ def run_test(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--linux_version", type=str, default="v6.18")
-    parser.add_argument("--num_cpus", type=int, default=10)
+    parser.add_argument("--num_cpus", type=int, default=3)
     parser.add_argument("--steps", type=int, default=80)
     parser.add_argument("--max_tasks", type=int, default=10)
     parser.add_argument("--max_cgroups", type=int, default=10)

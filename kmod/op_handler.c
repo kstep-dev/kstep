@@ -11,11 +11,22 @@
 #define MAX_CGROUPS 1024
 #define MAX_CGROUP_NAME_LEN 256
 
-static struct task_struct *kstep_tasks[MAX_TASKS];
 static int cgroup_parent_id[MAX_CGROUPS];
 static bool cgroup_exists[MAX_CGROUPS];
 static int cgroup_lineage[MAX_CGROUPS];
-static int cgroup_tasks[MAX_TASKS];
+
+#define TASK_OP_QUEUE_SIZE 64
+
+struct queued_op { enum kstep_op_type type; int a, b, c; u64 seq; };
+
+struct kstep_task {
+  struct task_struct *p;
+  int cgroup_id;
+  struct queued_op ring[TASK_OP_QUEUE_SIZE];
+  int head, tail;
+};
+
+static struct kstep_task kstep_tasks[MAX_TASKS];
 
 static bool is_valid_task_id(int id) { return id >= 0 && id < MAX_TASKS; }
 static bool is_valid_cgroup_id(int id) { return id >= 0 && id < MAX_CGROUPS; }
@@ -43,7 +54,7 @@ static bool build_cgroup_name(int id, char *buf) {
 
 static bool pid_known(pid_t pid) {
   for (int i = 0; i < MAX_TASKS; i++) {
-    if (kstep_tasks[i] && kstep_tasks[i]->pid == pid)
+    if (kstep_tasks[i].p && kstep_tasks[i].p->pid == pid)
       return true;
   }
   return false;
@@ -59,101 +70,106 @@ static struct task_struct *find_new_child(struct task_struct *parent) {
     }
     kstep_sleep();
   }
-  return NULL;
+  panic("No new child found for parent %d", parent->pid);
 }
 
 static bool op_task_create(int a, int b, int c) {
   (void)b;
   (void)c;
-  if (!is_valid_task_id(a) || kstep_tasks[a])
+  if (!is_valid_task_id(a) || kstep_tasks[a].p)
     panic("Invalid task id");
-  kstep_tasks[a] = kstep_task_create();
-  cgroup_tasks[a] = -1;
+  kstep_tasks[a].p = kstep_task_create();
+  kstep_tasks[a].cgroup_id = -1;
   return true;
-}
-
-static struct task_struct *waker_task;
-static void *waker_on_cpu(void) {
-  if (waker_task && waker_task->on_cpu)
-    return waker_task;
-  return NULL;
 }
 
 static bool op_task_fork(int a, int b, int c) {
   struct task_struct *p;
   (void)c;
-  
+
   if (!is_valid_task_id(a) || !is_valid_task_id(b))
     return false;
-  if (!kstep_tasks[a] || kstep_tasks[b])
+  if (!kstep_tasks[a].p || kstep_tasks[b].p)
     return false;
 
-  waker_task = kstep_tasks[a];
-  kstep_tick_until(waker_on_cpu);
-  
-  kstep_task_fork(waker_task, 1);
-  p = find_new_child(kstep_tasks[a]);
+  if (kstep_tasks[a].p->on_cpu == false)
+    panic("Task %d is not on CPU when forking", a);
+  kstep_task_fork(kstep_tasks[a].p, 1);
+  p = find_new_child(kstep_tasks[a].p);
   if (!p)
     return false;
 
-  kstep_tasks[b] = p;
+  kstep_tasks[b].p = p;
+  kstep_tasks[b].cgroup_id = kstep_tasks[a].cgroup_id;
   return true;
 }
 
 static bool op_task_pin(int a, int b, int c) {
-  if (!is_valid_task_id(a) || !kstep_tasks[a])
+  if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  kstep_task_pin(kstep_tasks[a], b, c);
+  if (kstep_tasks[a].p->on_cpu == false)
+    panic("Task %d is not on CPU when pinning", a);
+  kstep_task_pin(kstep_tasks[a].p, b, c);
   return true;
 }
 
 static bool op_task_fifo(int a, int b, int c) {
   (void)b;
   (void)c;
-  if (!is_valid_task_id(a) || !kstep_tasks[a])
+  if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
 
+  if (kstep_tasks[a].p->on_cpu == false)
+    panic("Task %d is not on CPU when setting FIFO", a);
   // Move the task back to the root cgroup, otherwise the set_schedprio will fail
-  kstep_cgroup_add_task("", kstep_tasks[a]->pid);
-  cgroup_tasks[a] = -1;
-  kstep_task_fifo(kstep_tasks[a]);
+  kstep_cgroup_add_task("", kstep_tasks[a].p->pid);
+  kstep_tasks[a].cgroup_id = -1;
+  kstep_task_fifo(kstep_tasks[a].p);
   return true;
 }
 
 static bool op_task_cfs(int a, int b, int c) {
   (void)b;
   (void)c;
-  if (!is_valid_task_id(a) || !kstep_tasks[a])
+  if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  kstep_task_cfs(kstep_tasks[a]);
+  if (kstep_tasks[a].p->on_cpu == false)
+    panic("Task %d is not on CPU when setting CFS", a);
+  kstep_task_cfs(kstep_tasks[a].p);
   return true;
 }
 
 static bool op_task_pause(int a, int b, int c) {
   (void)b;
   (void)c;
-  if (!is_valid_task_id(a) || !kstep_tasks[a])
+  if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  kstep_task_pause(kstep_tasks[a]);
+  if (kstep_tasks[a].p->on_cpu == false)
+    panic("Task %d is not on CPU when pausing", a);
+  kstep_task_pause(kstep_tasks[a].p);
   return true;
 }
 
 static bool op_task_wakeup(int a, int b, int c) {
   (void)b;
   (void)c;
-  if (!is_valid_task_id(a) || !kstep_tasks[a])
+  if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  kstep_task_wakeup(kstep_tasks[a]);
+  if (kstep_tasks[a].p->on_cpu == true)
+    panic("Task %d is already on CPU when waking up", a);
+  kstep_task_wakeup(kstep_tasks[a].p);
   return true;
 }
 
 static bool op_task_set_prio(int a, int b, int c) {
   (void)c;
-  if (!is_valid_task_id(a) || !kstep_tasks[a])
+  if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
+  if (kstep_tasks[a].p->on_cpu == false)
+    panic("Task %d is not on CPU when setting priority", a);
   if (b < -20 || b > 19)
     return false;
-  kstep_task_set_prio(kstep_tasks[a], b);
+  kstep_task_set_prio(kstep_tasks[a].p, b);
   return true;
 }
 
@@ -192,9 +208,9 @@ static bool op_cgroup_create(int a, int b, int c) {
 
   // Move the task back to the root cgroup: only the leaf cgroup has tasks in cgroupv2
   for (int i = 0; i < MAX_TASKS; i++) {
-    if (parent_id != -1 && kstep_tasks[i] && cgroup_tasks[i] == parent_id) {
-      kstep_cgroup_add_task("", kstep_tasks[i]->pid);
-      cgroup_tasks[i] = -1;
+    if (parent_id != -1 && kstep_tasks[i].p && kstep_tasks[i].cgroup_id == parent_id) {
+      kstep_cgroup_add_task("", kstep_tasks[i].p->pid);
+      kstep_tasks[i].cgroup_id = -1;
     }
   }
 
@@ -243,12 +259,12 @@ static bool op_cgroup_add_task(int a, int b, int c) {
     return false;
   if (!build_cgroup_name(a, name))
     return false;
-  if (!is_valid_task_id(b) || !kstep_tasks[b])
+  if (!is_valid_task_id(b) || !kstep_tasks[b].p)
     return false;
 
-  kstep_cgroup_add_task(name, kstep_tasks[b]->pid);
+  kstep_cgroup_add_task(name, kstep_tasks[b].p->pid);
 
-  cgroup_tasks[b] = a;
+  kstep_tasks[b].cgroup_id = a;
   return true;
 }
 
@@ -292,6 +308,80 @@ static const char op_strs[OP_TYPE_NR][30] = {
   [OP_CPU_SET_CAPACITY] = "CPU_SET_CAPACITY",
 };
 
+
+/* Returns true if task p is in the state required to receive op type. */
+static bool op_task_state_ready(enum kstep_op_type type, struct task_struct *p) {
+  if (type == OP_TASK_WAKEUP)
+    return !task_is_runnable(p);           /* task must be blocked/dequeued */
+  return p->on_cpu;             /* all other signal ops need on-cpu */
+}
+
+static bool is_task_signal_op(enum kstep_op_type type) {
+  switch (type) {
+  case OP_TASK_FORK: case OP_TASK_PIN:  case OP_TASK_FIFO:
+  case OP_TASK_CFS:  case OP_TASK_PAUSE: case OP_TASK_WAKEUP:
+  case OP_TASK_SET_PRIO: return true;
+  default: return false;
+  }
+}
+
+/*
+ * Enqueue a signal op for task @id.  Must only be called when the queue
+ * is non-empty OR the task is not in the required state.
+ */
+static u64 op_seq_counter;
+
+static void enqueue_op(int task_id, enum kstep_op_type type, int a, int b, int c) {
+  struct kstep_task *t = &kstep_tasks[task_id];
+  int next = (t->tail + 1) % TASK_OP_QUEUE_SIZE;
+  if (next == t->head)
+    panic("task op queue overflow for task %d", task_id);
+  t->ring[t->tail] = (struct queued_op){type, a, b, c, op_seq_counter++};
+  t->tail = next;
+}
+
+
+static void task_queues_drain(void);
+
+/*
+ * Try to send the head queued op for task @id if its required state is met.
+ * Sends at most one op per call.
+ */
+static void execute_one_op(enum kstep_op_type type, int a, int b, int c) {
+  kstep_cov_enable();
+  pr_info("EXECOP: {\"op\": %d, \"a\": %d, \"b\": %d, \"c\": %d}\n", type, a, b, c);
+  if (!op_handlers[type](a, b, c))
+    panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
+  kstep_cov_disable();
+  kstep_cov_dump();
+  kstep_cov_cmd_id_inc();
+  task_queues_drain();
+}
+
+static void task_queues_drain(void) {
+  int best = -1;
+  u64 best_seq = U64_MAX;
+
+  TRACE_INFO("Draining task queues");
+
+  for (int i = 0; i < MAX_TASKS; i++) {
+    struct kstep_task *t = &kstep_tasks[i];
+    if (!t->p || t->head == t->tail) continue;
+    if (!op_task_state_ready(t->ring[t->head].type, t->p)) continue;
+    if (t->ring[t->head].seq < best_seq) {
+      best_seq = t->ring[t->head].seq;
+      best = i;
+    }
+  }
+
+  if (best == -1) return;
+
+  struct kstep_task *t = &kstep_tasks[best];
+  struct queued_op op = t->ring[t->head];
+  t->head = (t->head + 1) % TASK_OP_QUEUE_SIZE;
+  execute_one_op(op.type, op.a, op.b, op.c);
+}
+
 void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
   if (type < 0 || type >= OP_TYPE_NR)
     panic("Operation failed: %d %d %d %d\n", type, a, b, c);
@@ -302,13 +392,25 @@ void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
 
   if (type == OP_TICK_REPEAT) {
     op_handlers[type](a, b, c);
-  } else {
-    kstep_cov_enable();
-    if (!op_handlers[type](a, b, c))
-      panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
-    
-    kstep_cov_disable();
-    kstep_cov_dump();
-    kstep_cov_cmd_id_inc();
+    return;
   }
+
+  /*
+   * Signal ops are serialised through the per-task queue.
+   * Rule: enqueue if the queue is already non-empty (another op is waiting)
+   *       OR the task is not yet in the required state.
+   *       Send directly only when queue is empty AND state is ready.
+   */
+  if (is_task_signal_op(type)) {
+    if (!is_valid_task_id(a) || !kstep_tasks[a].p)
+      panic("Task %d not found", a);
+    struct kstep_task *t = &kstep_tasks[a];
+    bool queue_busy = (t->head != t->tail);
+    if (queue_busy || !op_task_state_ready(type, t->p)) {
+      enqueue_op(a, type, a, b, c);
+      return;
+    }
+  }
+
+  execute_one_op(type, a, b, c);
 }
