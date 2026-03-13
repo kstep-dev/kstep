@@ -47,7 +47,7 @@ void kstep_mkdir(const char *dir) {
   struct inode *inode = d_inode(path.dentry);
 
 // https://github.com/torvalds/linux/commit/e12d203b8c880061c0bf0339cad51e5851a33442
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
   struct dentry *result = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755, NULL);
   int err = IS_ERR(result) ? PTR_ERR(result) : 0;
 // https://github.com/torvalds/linux/commit/c54b386969a58151765a9ffaaa0438e7b580283f
@@ -57,11 +57,8 @@ void kstep_mkdir(const char *dir) {
 // https://github.com/torvalds/linux/commit/abf08576afe31506b812c8c1be9714f78613f300
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
   int err = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
-// https://github.com/torvalds/linux/commit/6521f8917082928a4cb637eb64b77b5f2f5b30fc
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
-  int err = vfs_mkdir(&init_user_ns, inode, dentry, 0755);
 #else
-  int err = vfs_mkdir(inode, dentry, 0755);
+  int err = vfs_mkdir(&init_user_ns, inode, dentry, 0755);
 #endif
 
   if (err)

@@ -45,7 +45,8 @@ static void kstep_reset_runqueue(struct rq *rq) {
 
   // reset cfs rq
 // https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+// Landed in v6.18-rc3 but LINUX_VERSION_CODE stays 6.18.0
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
   rq->cfs.zero_vruntime = INIT_TIME_NS;
 #else
   rq->cfs.min_vruntime = INIT_TIME_NS;
@@ -54,7 +55,8 @@ static void kstep_reset_runqueue(struct rq *rq) {
 // https://github.com/torvalds/linux/commit/af4cf40470c22efa3987200fd19478199e08e103
 // https://github.com/torvalds/linux/commit/dcbc9d3f0e594223275a18f7016001889ad35eff (avg_vruntime -> sum_w_vruntime)
 // https://github.com/torvalds/linux/commit/4ff674fa986c27ec8a0542479258c92d361a2566 (avg_load -> sum_weight)
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(7, 0, 0)
+// The rename landed after v6.19-rc6 on a topic branch, so use 6.20 as threshold.
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 20, 0)
   rq->cfs.sum_w_vruntime = 0;
   rq->cfs.sum_weight = 0;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
@@ -87,9 +89,9 @@ void kstep_reset_runqueues(void) {
 }
 
 void kstep_reset_cpumask(void) {
-  KSYM_IMPORT_TYPED(int, distribute_cpu_mask_prev);
 // https://github.com/torvalds/linux/commit/46a87b3851f0d6eb05e6d83d5c5a30df0eca8f76
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
+  KSYM_IMPORT_TYPED(int, distribute_cpu_mask_prev);
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     int *ptr = per_cpu_ptr(KSYM_distribute_cpu_mask_prev, cpu);
     *ptr = 0;
