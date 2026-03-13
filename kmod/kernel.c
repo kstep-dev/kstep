@@ -35,7 +35,7 @@ void kstep_mkdir(const char *dir) {
   int flags = LOOKUP_DIRECTORY;
 
 // https://github.com/torvalds/linux/commit/3d18f80ce181ba27f37d0ec1c550b22acb01dd49
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
   struct dentry *dentry = start_creating_path(AT_FDCWD, dir, &path, flags);
 #else
   struct dentry *dentry = kern_path_create(AT_FDCWD, dir, &path, flags);
@@ -47,16 +47,17 @@ void kstep_mkdir(const char *dir) {
   struct inode *inode = d_inode(path.dentry);
 
 // https://github.com/torvalds/linux/commit/e12d203b8c880061c0bf0339cad51e5851a33442
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
   struct dentry *result = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755, NULL);
-  int err = IS_ERR(result) ? PTR_ERR(result) : 0;
-// https://github.com/torvalds/linux/commit/c54b386969a58151765a9ffaaa0438e7b580283f
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 15, 0)
-  struct dentry *result = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
   int err = IS_ERR(result) ? PTR_ERR(result) : 0;
 // https://github.com/torvalds/linux/commit/abf08576afe31506b812c8c1be9714f78613f300
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
-  int err = vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
+  // vfs_mkdir returns struct dentry * since 6.15, int before that.
+  typeof(vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755)) __mret =
+      vfs_mkdir(&nop_mnt_idmap, inode, dentry, 0755);
+  int err = __builtin_types_compatible_p(typeof(__mret), int)
+                ? (int)(long)__mret
+                : (IS_ERR((void *)(long)__mret) ? PTR_ERR((void *)(long)__mret) : 0);
 #else
   int err = vfs_mkdir(&init_user_ns, inode, dentry, 0755);
 #endif
@@ -65,7 +66,7 @@ void kstep_mkdir(const char *dir) {
     panic("mkdir %s failed: %d", dir, err);
 
 // https://github.com/torvalds/linux/commit/3d18f80ce181ba27f37d0ec1c550b22acb01dd49
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
   end_creating_path(&path, dentry);
 #else
   done_path_create(&path, dentry);
