@@ -2,6 +2,7 @@
 
 import argparse
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List
 
 from checkout_linux import Linux, checkout_linux
@@ -11,158 +12,72 @@ from scripts import LINUX_ROOT_DIR, PROJ_DIR, RESULTS_DIR, system
 
 @dataclass(frozen=True)
 class Bug:
-    driver: Driver
-    linux: List[Linux]
+    name: str
+    # Commit-based: buggy = fix~1, fixed = fix
+    fix: str | None = None
+    # Patch-based: buggy = version, fixed = version + patch
+    version: str | None = None
+    patch: str | None = None
+    # Extra kernel config fragment to merge
+    config: Path | None = None
+    # Driver options
+    num_cpus: int = 2
+    mem_mb: int = 512
     plot_format: str | None = None
 
+    @property
+    def driver(self) -> Driver:
+        return Driver(name=self.name, num_cpus=self.num_cpus, mem_mb=self.mem_mb)
 
-bugs = [
-    Bug(
-        driver=Driver(name="sync_wakeup", num_cpus=3),
-        linux=[
-            Linux(name="buggy", version="v6.14"),
-            Linux(
-                name="fixed",
-                version="v6.14",
-                patch=LINUX_ROOT_DIR / "sync_wakeup.patch",
-            ),
-        ],
-        plot_format="curr_task",
-    ),
-    Bug(
-        driver=Driver(name="freeze", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="cd9626e9ebc77edec33023fe95dab4b04ffc819d~1"),
-            Linux(name="fixed", version="cd9626e9ebc77edec33023fe95dab4b04ffc819d"),
-        ],
-        plot_format="curr_task",
-    ),
-    Bug(
-        driver=Driver(name="vruntime_overflow", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="bbce3de72be56e4b5f68924b7da9630cc89aa1a8~1"),
-            Linux(name="fixed", version="bbce3de72be56e4b5f68924b7da9630cc89aa1a8"),
-        ],
-        plot_format="curr_task",
-    ),
-    Bug(
-        driver=Driver(name="long_balance", num_cpus=3, mem_mb=4096),
-        linux=[
-            Linux(name="buggy", version="2feab2492deb2f14f9675dd6388e9e2bf669c27a~1"),
-            Linux(name="fixed", version="2feab2492deb2f14f9675dd6388e9e2bf669c27a"),
-        ],
-        plot_format="rebalance",
-    ),
-    Bug(
-        driver=Driver(name="util_avg", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="17e3e88ed0b6318fde0d1c14df1a804711cab1b5~1"),
-            Linux(name="fixed", version="17e3e88ed0b6318fde0d1c14df1a804711cab1b5"),
-        ],
-        plot_format="val",
-    ),
-    Bug(
-        driver=Driver(name="lag_vruntime", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="5068d84054b766efe7c6202fc71b2350d1c326f1~1"),
-            Linux(name="fixed", version="5068d84054b766efe7c6202fc71b2350d1c326f1"),
-        ],
-        plot_format="min_vruntime",
-    ),
-    Bug(
-        driver=Driver(name="even_idle_cpu", num_cpus=5),
-        linux=[
-            Linux(name="buggy", version="v6.17"),
-            Linux(
-                name="fixed",
-                version="v6.17",
-                patch=LINUX_ROOT_DIR / "even_idle_cpu.patch",
-            ),
-        ],
-        plot_format="lb_nr_running",
-    ),
-    Bug(
-        driver=Driver(name="extra_balance", num_cpus=5),
-        linux=[
-            Linux(name="buggy", version="6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3~1"),
-            Linux(name="fixed", version="6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3"),
-        ],
-        plot_format="lb_nr_running",
-    ),
-    Bug(
-        driver=Driver(name="rt_runtime_toggle", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="9b58e976b3b391c0cf02e038d53dd0478ed3013c~1"),
-            Linux(name="fixed", version="9b58e976b3b391c0cf02e038d53dd0478ed3013c"),
-        ],
-        plot_format="curr_task",
-    ),
-    Bug(
-        driver=Driver(name="uclamp_inversion", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="0213b7083e81f4acd69db32cb72eb4e5f220329a~1"),
-            Linux(name="fixed", version="0213b7083e81f4acd69db32cb72eb4e5f220329a"),
-        ],
-        plot_format="val",
-    ),
-    Bug(
-        driver=Driver(name="h_nr_runnable", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734~1"),
-            Linux(name="fixed", version="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734"),
-        ],
-        plot_format="val",
-    ),
-    Bug(
-        driver=Driver(name="vlag_overflow", num_cpus=3),
-        linux=[
-            Linux(name="buggy", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe~1"),
-            Linux(name="fixed", version="1560d1f6eb6b398bddd80c16676776c0325fe5fe"),
-        ],
-    ),
-    Bug(
-        driver=Driver(name="throttled_limbo_list", num_cpus=3),
-        linux=[
-            Linux(name="buggy", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad~1"),
-            Linux(name="fixed", version="956dfda6a70885f18c0f8236a461aa2bc4f556ad"),
-        ],
-    ),
-    Bug(
-        driver=Driver(name="over_schedule", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="d4ac164bde7a12ec0a238a7ead5aa26819bbb1c1~1"),
-            Linux(name="fixed", version="d4ac164bde7a12ec0a238a7ead5aa26819bbb1c1"),
-        ],
-    ),
-    Bug(
-        driver=Driver(name="slice_update", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="2f2fc17bab0011430ceb6f2dc1959e7d1f981444~1"),
-            Linux(name="fixed", version="2f2fc17bab0011430ceb6f2dc1959e7d1f981444"),
-        ],
-    ),
-    Bug(
-        driver=Driver(name="avg_vruntime_ceil", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="650cad561cce04b62a8c8e0446b685ef171bc3bb~1"),
-            Linux(name="fixed", version="650cad561cce04b62a8c8e0446b685ef171bc3bb"),
-        ],
-    ),
-    Bug(
-        driver=Driver(name="min_deadline", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c~1"),
-            Linux(name="fixed", version="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c"),
-        ],
-    ),
-    Bug(
-        driver=Driver(name="zero_vruntime", num_cpus=2),
-        linux=[
-            Linux(name="buggy", version="b3d99f43c72b56cf7a104a364e7fb34b0702828b~1"),
-            Linux(name="fixed", version="b3d99f43c72b56cf7a104a364e7fb34b0702828b"),
-        ],
-    ),
+    @property
+    def linux(self) -> list[Linux]:
+        if self.fix:
+            return [
+                Linux(name="buggy", version=f"{self.fix}~1", config=self.config),
+                Linux(name="fixed", version=self.fix, config=self.config),
+            ]
+        elif self.version and self.patch:
+            patch_path = LINUX_ROOT_DIR / self.patch
+            return [
+                Linux(name="buggy", version=self.version, config=self.config),
+                Linux(
+                    name="fixed",
+                    version=self.version,
+                    patch=patch_path,
+                    config=self.config,
+                ),
+            ]
+        else:
+            raise ValueError(
+                f"Bug '{self.name}': specify either 'fix' or 'version'+'patch'"
+            )
+
+
+# fmt: off
+BUGS = [
+    Bug("sync_wakeup", version="v6.14", patch="sync_wakeup.patch", num_cpus=3, plot_format="curr_task"),
+    Bug("freeze", fix="cd9626e9ebc77edec33023fe95dab4b04ffc819d", plot_format="curr_task"),
+    Bug("vruntime_overflow", fix="bbce3de72be56e4b5f68924b7da9630cc89aa1a8", plot_format="curr_task"),
+    Bug("long_balance", fix="2feab2492deb2f14f9675dd6388e9e2bf669c27a", num_cpus=3, mem_mb=4096, plot_format="rebalance"),
+    Bug("util_avg", fix="17e3e88ed0b6318fde0d1c14df1a804711cab1b5", plot_format="val"),
+    Bug("lag_vruntime", fix="5068d84054b766efe7c6202fc71b2350d1c326f1", plot_format="min_vruntime"),
+    Bug("even_idle_cpu", version="v6.17", patch="even_idle_cpu.patch", num_cpus=5, plot_format="lb_nr_running"),
+    Bug("extra_balance", fix="6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3", num_cpus=5, plot_format="lb_nr_running"),
+    Bug("rt_runtime_toggle", fix="9b58e976b3b391c0cf02e038d53dd0478ed3013c", plot_format="curr_task"),
+    Bug("uclamp_inversion", fix="0213b7083e81f4acd69db32cb72eb4e5f220329a", plot_format="val"),
+    Bug("h_nr_runnable", fix="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734", plot_format="val"),
+    Bug("vlag_overflow", fix="1560d1f6eb6b398bddd80c16676776c0325fe5fe", num_cpus=3),
+    Bug("throttled_limbo_list", fix="956dfda6a70885f18c0f8236a461aa2bc4f556ad", num_cpus=3),
+    Bug("over_schedule", fix="d4ac164bde7a12ec0a238a7ead5aa26819bbb1c1"),
+    Bug("slice_update", fix="2f2fc17bab0011430ceb6f2dc1959e7d1f981444"),
+    Bug("avg_vruntime_ceil", fix="650cad561cce04b62a8c8e0446b685ef171bc3bb"),
+    Bug("min_deadline", fix="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c"),
+    Bug("zero_vruntime", fix="b3d99f43c72b56cf7a104a364e7fb34b0702828b"),
 ]
+BUGS_EXTRA = [
+
+]
+# fmt: on
 
 
 def plot_data(python_script: str, driver: str):
@@ -175,7 +90,7 @@ def reproduce(linux: Linux, driver: Driver, skip_build: bool):
         linux.version, linux_name=linux_name, patch=linux.patch, tarball=True
     )
     if not skip_build:
-        make_linux(linux_name=linux_name)
+        make_linux(linux_name=linux_name, config=linux.config)
     make_kstep(linux_name=linux_name)
     log_file = RESULTS_DIR / f"{linux_name}.log"
     run_qemu(linux_name=linux_name, driver=driver, log_file=log_file)
@@ -201,8 +116,8 @@ if __name__ == "__main__":
         "name",
         type=str,
         default="all",
-        choices=["all", *[bug.driver.name for bug in bugs]],
-        help="The name of the bug to reproduce, or 'all' to reproduce all bugs.",
+        choices=["all", *[bug.driver.name for bug in BUGS + BUGS_EXTRA]],
+        help="The name of the bug to reproduce, or 'all' to reproduce all BUGS.",
     )
     parser.add_argument(
         "--run",
@@ -219,10 +134,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.name == "all":
-        for bug in bugs:
+        for bug in BUGS:
             main(bug=bug, run=args.run, skip_build=args.skip_build)
     else:
-        bug = next((bug for bug in bugs if bug.driver.name == args.name), None)
+        bug = next((bug for bug in BUGS + BUGS_EXTRA if bug.driver.name == args.name), None)
         if not bug:
             raise ValueError(f"Bug '{args.name}' not found.")
         main(bug=bug, run=args.run, skip_build=args.skip_build)

@@ -12,16 +12,17 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 
 #### Development Stage
 
-- Create a driver in `kmod/driver_[driver_name].c` that triggers the bug.
-- Initially, you may directly manipulate internal scheduler state to trigger the bug.
+- Create a driver in `kmod/drivers_generated/[driver_name].c` that triggers the bug.
+- Guard the driver with `#if LINUX_VERSION_CODE` to the compatible kernel version.
+- Try not to directly manipulate internal scheduler state.
 - Add detailed logging in your driver for all relevant fields to aid debugging. If necessary, add kernel-side logging with `printk()`.
 - Build and execute the driver on the buggy kernel with:
-  `./checkout_linux.py [hash]~1 [name]_buggy && make linux LINUX_NAME=[name]_buggy && make kstep LINUX_NAME=[name]_buggy && ./run.py [driver_name] --linux_name [name]_buggy`
+  `./checkout_linux.py [hash]~1 [name]_buggy && make linux LINUX_NAME=[name]_buggy && ./run.py [driver_name] --linux_name [name]_buggy`
 - Determine whether the bug is reproduced by examining the output logs:
   `cat data/logs/latest.log`
 - If you do not observe the bug, refine your implementation and repeat the process.
 - After confirming that your driver triggers the bug, rerun the same driver on the fixed kernel:
-  `./checkout_linux.py [hash] [name]_fixed && make linux LINUX_NAME=[name]_fixed && make kstep LINUX_NAME=[name]_fixed && ./run.py [driver_name] --linux_name [name]_fixed`
+  `./checkout_linux.py [hash] [name]_fixed && make linux LINUX_NAME=[name]_fixed && ./run.py [driver_name] --linux_name [name]_fixed`
 - Review the logs to ensure the bug no longer occurs. In rare cases where the issue persists despite the fix, provide clear documentation and report your findings.
 
 #### Refinement Stage
@@ -29,7 +30,7 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 - If you manually altered internal scheduler state to trigger the bug during the triggering stage, refine your driver to reproduce the bug using only public kernel APIs or kSTEP interfaces (`kmod/driver.h`). If needed, consider extending kSTEP to provide the required functionality.
 - Make sure that the driver is deterministic, and produce the same trace on the same kernel. If not, investigate the root cause of the non-determinism.
 - After confirming your driver can trigger the bug, clearly demonstrate its impact through externally observable behavior, such as changes in task scheduling, rather than relying solely on kernel-internal state.
-- Once complete, add your driver to `reproduce.py` to enable automated testing.
+- Once complete, add your driver to BUGS_EXTRA in `reproduce.py` to enable automated testing.
 
 ## Coding Style
 
