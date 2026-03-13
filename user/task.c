@@ -1,11 +1,8 @@
 #define _GNU_SOURCE
 
-#include <signal.h>       // signal
-#include <stdbool.h>      // bool
-#include <stdlib.h>       // atoi
+#include <signal.h>       // sigaction
 #include <sys/prctl.h>    // PR_SET_NAME
-#include <sys/resource.h> // setpriority
-#include <unistd.h>       // sleep, exit, pause
+#include <unistd.h>       // fork, usleep, pause, _exit
 
 #include "../kmod/user.h"
 #include "utils.h"
@@ -13,7 +10,7 @@
 static void handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
   int val = info->si_int;
-  int val2 = info->si_pid;
+  // int val2 = info->si_pid;
   // int val3 = info->si_uid;
   if (code == SIGCODE_WAKEUP) {
     return; // do nothing
@@ -31,19 +28,6 @@ static void handler(int signum, siginfo_t *info, void *context) {
     _exit(0);
   } else if (code == SIGCODE_PAUSE) {
     pause();
-  } else if (code == SIGCODE_SET_PRIO) {
-    if (setpriority(PRIO_PROCESS, 0, val) < 0)
-      panic("setpriority failed");
-  } else if (code == SIGCODE_PIN) {
-    set_proc_affinity(val, val2);
-  } else if (code == SIGCODE_FIFO) {
-    struct sched_param sp = {.sched_priority = 80};
-    if (sched_setscheduler(0, SCHED_FIFO, &sp) != 0)
-      panic("sched_setscheduler failed");
-  } else if (code == SIGCODE_CFS) {
-    struct sched_param sp = {.sched_priority = 0};
-    if (sched_setscheduler(0, SCHED_OTHER, &sp) != 0)
-      panic("sched_setscheduler failed");
   } else {
     panic("Unknown signal code: %d\n", code);
   }

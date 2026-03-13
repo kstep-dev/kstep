@@ -96,7 +96,8 @@ void kstep_task_usleep(struct task_struct *p, int us) {
 
 void kstep_task_set_prio(struct task_struct *p, int prio) {
   set_user_nice(p, prio);
-  TRACE_INFO("Set priority of task %d to %d (kernel)", p->pid, prio);
+  TRACE_INFO("Set priority of task %d to %d", p->pid, prio);
+  kstep_sleep();
 }
 
 void kstep_task_fifo(struct task_struct *p) {
@@ -105,7 +106,8 @@ void kstep_task_fifo(struct task_struct *p) {
       .sched_priority = 80,
   };
   sched_setattr_nocheck(p, &attr);
-  TRACE_INFO("Set task %d to FIFO (kernel)", p->pid);
+  TRACE_INFO("Set task %d to FIFO", p->pid);
+  kstep_sleep();
 }
 
 void kstep_task_cfs(struct task_struct *p) {
@@ -114,7 +116,8 @@ void kstep_task_cfs(struct task_struct *p) {
       .sched_nice = 0,
   };
   sched_setattr_nocheck(p, &attr);
-  TRACE_INFO("Set task %d to CFS (kernel)", p->pid);
+  TRACE_INFO("Set task %d to CFS", p->pid);
+  kstep_sleep();
 }
 
 void kstep_task_pin(struct task_struct *p, int begin, int end) {
@@ -123,7 +126,8 @@ void kstep_task_pin(struct task_struct *p, int begin, int end) {
   for (int i = begin; i <= end; i++)
     cpumask_set_cpu(i, &mask);
   set_cpus_allowed_ptr(p, &mask);
-  TRACE_INFO("Pinned task %d to CPUs %d-%d (kernel)", p->pid, begin, end);
+  TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
+  kstep_sleep();
 }
 
 void kstep_task_kernel_pause(struct task_struct *p) {
@@ -148,8 +152,3 @@ void kstep_task_kernel_wakeup(struct task_struct *p) {
   wake_up_process(p);
   TRACE_INFO("Waked up task %d (kernel)", p->pid);
 }
-
-// Not possible as kernel counterparts:
-// - kstep_task_kernel_fork: forking requires userspace fork() syscall
-// - kstep_task_kernel_usleep: requires task to call usleep() in userspace
-
