@@ -65,14 +65,14 @@ void *kstep_sleep_until(void *(*fn)(void));
 
 // task.c
 struct task_struct *kstep_task_create(void);
+void kstep_task_pin(struct task_struct *p, int begin, int end);
 void kstep_task_fork(struct task_struct *p, int n);
-void kstep_task_usleep(struct task_struct *p, int us);
-void kstep_task_pause(struct task_struct *p);
-void kstep_task_wakeup(struct task_struct *p);
-void kstep_task_set_prio(struct task_struct *p, int prio);
 void kstep_task_fifo(struct task_struct *p);
 void kstep_task_cfs(struct task_struct *p);
-void kstep_task_pin(struct task_struct *p, int begin, int end);
+void kstep_task_pause(struct task_struct *p);
+void kstep_task_wakeup(struct task_struct *p);
+void kstep_task_usleep(struct task_struct *p, int us);
+void kstep_task_set_prio(struct task_struct *p, int prio);
 void kstep_task_kernel_pause(struct task_struct *p);
 void kstep_task_kernel_wakeup(struct task_struct *p);
 
