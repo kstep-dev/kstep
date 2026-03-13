@@ -71,7 +71,7 @@ void kstep_task_fifo(struct task_struct *p);
 void kstep_task_cfs(struct task_struct *p);
 void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
-void kstep_task_usleep(struct task_struct *p, int us);
+void kstep_task_block(struct task_struct *p);
 void kstep_task_set_prio(struct task_struct *p, int prio);
 void kstep_task_kernel_pause(struct task_struct *p);
 void kstep_task_kernel_wakeup(struct task_struct *p);

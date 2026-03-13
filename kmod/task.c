@@ -61,11 +61,9 @@ struct task_struct *kstep_task_create(void) {
 }
 
 static void kstep_task_signal(struct task_struct *p, enum sigcode code,
-                              int val1, int val2, int val3) {
+                              int val) {
   struct kernel_siginfo info = {
-      .si_signo = SIGUSR1,
-      .si_code = code,
-      ._sifields = {._rt = {._sigval = {val1}, ._pid = val2, ._uid = val3}}};
+      .si_signo = SIGUSR1, .si_code = code, .si_int = val};
   kstep_cov_enable_controller();
   send_sig_info(SIGUSR1, &info, p);
   kstep_cov_disable_controller();
@@ -73,26 +71,27 @@ static void kstep_task_signal(struct task_struct *p, enum sigcode code,
 }
 
 void kstep_task_fork(struct task_struct *p, int n) {
-  kstep_task_signal(p, SIGCODE_FORK, n, 0, 0);
+  kstep_task_signal(p, SIGCODE_FORK, n);
   TRACE_INFO("Forked task %d %d times", p->pid, n);
 }
 
-
 void kstep_task_pause(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_PAUSE, 0, 0, 0);
+  kstep_task_signal(p, SIGCODE_PAUSE, 0);
   TRACE_INFO("Paused task %d", p->pid);
 }
 
 void kstep_task_wakeup(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_WAKEUP, 0, 0, 0);
+  kstep_task_signal(p, SIGCODE_WAKEUP, 0);
   TRACE_INFO("Waked up task %d", p->pid);
 }
 
-void kstep_task_usleep(struct task_struct *p, int us) {
-  kstep_task_signal(p, SIGCODE_USLEEP, us, 0, 0);
-  TRACE_INFO("Put task %d to sleep for %d us", p->pid, us);
+// Block task via nanosleep, which enters do_nanosleep() and sets
+// TASK_INTERRUPTIBLE | TASK_FREEZABLE. Unlike kstep_task_pause (which uses
+// pause() and only sets TASK_INTERRUPTIBLE), this makes the task freezable.
+void kstep_task_block(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_BLOCK, 0);
+  TRACE_INFO("Blocked task %d", p->pid);
 }
-
 
 void kstep_task_set_prio(struct task_struct *p, int prio) {
   set_user_nice(p, prio);
