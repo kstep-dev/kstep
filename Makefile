@@ -79,10 +79,11 @@ linux: linux-config linux-patch
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
 
 KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
+KSTEP_EXTRA_CONFIG ?=
 
 .PHONY: linux-config
 linux-config: $(LINUX_DIR)/.config
-$(LINUX_DIR)/.config: $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH)
+$(LINUX_DIR)/.config: $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH) $(KSTEP_EXTRA_CONFIG)
 	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $^ && touch $@
 
 .PHONY: linux-patch
