@@ -57,14 +57,10 @@ static void run(void) {
   kstep_task_wakeup(helper);
   kstep_tick_repeat(120);
 }
-#else
-static void setup(void) { panic("unsupported kernel version"); }
-static void run(void) {}
-#endif
-
 KSTEP_DRIVER_DEFINE{
     .name = "throttled_limbo_list",
     .setup = setup,
     .run = run,
     .step_interval_us = 1000,
 };
+#endif

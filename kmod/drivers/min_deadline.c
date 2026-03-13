@@ -125,14 +125,10 @@ static void run(void)
     kstep_pass("min_deadline heap intact");
 }
 
-#else
-static void setup(void) { panic("unsupported kernel version"); }
-static void run(void) {}
-#endif
-
 KSTEP_DRIVER_DEFINE{
     .name = "min_deadline",
     .setup = setup,
     .run = run,
     .step_interval_us = 1000,
 };
+#endif

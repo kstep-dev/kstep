@@ -89,16 +89,11 @@ static void run(void) {
   kstep_tick_repeat(10);
 }
 
-#else
-static void setup(void) { panic("unsupported kernel version"); }
-static void run(void) {}
-static void on_tick(void) {}
-#endif
-
 KSTEP_DRIVER_DEFINE{
     .name = "zero_vruntime",
     .setup = setup,
     .run = run,
     .on_tick_begin = on_tick,
-    .step_interval_us = 10000,
+    .step_interval_us = 1000,
 };
+#endif

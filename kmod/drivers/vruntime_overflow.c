@@ -55,15 +55,11 @@ static void run(void) {
   kstep_tick_repeat(18);
 }
 
-#else
-static void setup(void) { panic("unsupported kernel version"); }
-static void run(void) {}
-#endif
-
 KSTEP_DRIVER_DEFINE{
     .name = "vruntime_overflow",
     .setup = setup,
     .run = run,
     .on_tick_begin = kstep_output_curr_task,
-    .step_interval_us = 10000,
+    .step_interval_us = 1000,
 };
+#endif
