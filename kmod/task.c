@@ -88,9 +88,12 @@ void kstep_task_wakeup(struct task_struct *p) {
   TRACE_INFO("Waked up task %d", p->pid);
 }
 
-void kstep_task_usleep(struct task_struct *p, int us) {
-  kstep_task_signal(p, SIGCODE_USLEEP, us, 0, 0);
-  TRACE_INFO("Put task %d to sleep for %d us", p->pid, us);
+// Block task via nanosleep, which enters do_nanosleep() and sets
+// TASK_INTERRUPTIBLE | TASK_FREEZABLE. Unlike kstep_task_pause (which uses
+// pause() and only sets TASK_INTERRUPTIBLE), this makes the task freezable.
+void kstep_task_block(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_BLOCK, 0, 0, 0);
+  TRACE_INFO("Blocked task %d", p->pid);
 }
 
 

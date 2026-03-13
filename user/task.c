@@ -2,7 +2,8 @@
 
 #include <signal.h>       // sigaction
 #include <sys/prctl.h>    // PR_SET_NAME
-#include <unistd.h>       // fork, usleep, pause, _exit
+#include <time.h>         // nanosleep, struct timespec
+#include <unistd.h>       // fork, pause, _exit
 
 #include "../kmod/user.h"
 #include "utils.h"
@@ -22,12 +23,13 @@ static void handler(int signum, siginfo_t *info, void *context) {
       if (pid == 0) // child process
         return;
     }
-  } else if (code == SIGCODE_USLEEP) {
-    usleep(val);
   } else if (code == SIGCODE_EXIT) {
     _exit(0);
   } else if (code == SIGCODE_PAUSE) {
     pause();
+  } else if (code == SIGCODE_BLOCK) {
+    struct timespec ts = {.tv_sec = __INT_MAX__};
+    nanosleep(&ts, NULL);
   } else {
     panic("Unknown signal code: %d\n", code);
   }

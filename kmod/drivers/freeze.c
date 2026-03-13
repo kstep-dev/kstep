@@ -21,8 +21,8 @@ static void run(void) {
     kstep_task_wakeup(tasks[i]);
 
   struct task_struct *p = kstep_tick_until(is_ineligible);
-  kstep_task_usleep(p, 20000); // step_interval_us * 2
 
+  kstep_task_block(p);
   kstep_freeze_task(p);
   kstep_task_wakeup(p);
 
@@ -34,5 +34,5 @@ KSTEP_DRIVER_DEFINE{
     .setup = setup,
     .run = run,
     .on_tick_begin = kstep_output_curr_task,
-    .step_interval_us = 10000,
+    .step_interval_us = 100,
 };
