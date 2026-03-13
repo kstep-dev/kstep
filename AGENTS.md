@@ -4,8 +4,8 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 
 #### Planning Stage
 - Check out the Linux source code just before the fix: `./checkout_linux.py [hash]~1 [name]_buggy`.
-- Read the commit message and patch carefully: `git -C linux/current show -U32 [hash]`.
-- Carefully analyze the changes introduced in the patch, focusing on modifications in `linux/current/kernel/sched`. Trace the call chain that leads to the bug, ensuring you understand the purpose of each function and how they interact. Clearly identify the conditions and system state required to trigger the bug.
+- Read the commit message and patch carefully: `git -C linux/master show -U32 [hash]`.
+- Carefully analyze the changes introduced in the patch, focusing on modifications in `linux/master/kernel/sched`. Trace the call chain that leads to the bug, ensuring you understand the purpose of each function and how they interact. Clearly identify the conditions and system state required to trigger the bug.
 - If the commit message contains links, carefully review the content of ALL links as they may provide the additional information about the bug (especially the reproduction conditions). For LKML links (e.g., `lore.kernel.org`, `lkml.kernel.org`, `patch.msgid.link`), extract the email ID and retrieve the message with:  
   `curl -sL https://lore.kernel.org/lkml/<email_id>/t.mbox.gz | gunzip`
 - Thoughtfully analyze the conditions and mechanisms that trigger the bug, and plan an effective method to reproduce it within the kernel.
@@ -13,7 +13,8 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 #### Development Stage
 
 - Create a driver in `kmod/drivers_generated/[driver_name].c` that triggers the bug.
-- Guard the driver with `#if LINUX_VERSION_CODE` to the compatible kernel version.
+- Do not leave the driver broken. There could be other agents running with you.
+- Guard the driver with `#if LINUX_VERSION_CODE` to the compatible kernel version. if unsure, just to the current version you are using.
 - Try not to directly manipulate internal scheduler state.
 - Add detailed logging in your driver for all relevant fields to aid debugging. If necessary, add kernel-side logging with `printk()`.
 - Build and execute the driver on the buggy kernel with:

@@ -34,7 +34,7 @@ $(USER_OUT_DIR):
 # ========= kmod =========
 
 KMOD_SRC_DIR := $(PROJ_DIR)/kmod
-KMOD_SRC_FILES := $(wildcard $(KMOD_SRC_DIR)/*.c $(KMOD_SRC_DIR)/*.h $(KMOD_SRC_DIR)/drivers/*.c $(KMOD_SRC_DIR)/invariant/*.c)
+KMOD_SRC_FILES := $(shell find $(KMOD_SRC_DIR) -name '*.c' -o -name '*.h')
 KMOD_OUT_DIR := $(BUILD_DIR)/kmod
 KMOD_OUT_FILE := $(KMOD_OUT_DIR)/kmod.ko
 
