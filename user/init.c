@@ -49,7 +49,7 @@ static void set_tty_raw_output(const char *path) {
 
   struct termios termios;
   if (tcgetattr(fd, &termios) < 0)
-    panic("Failed to tcgetattr %s", path);
+    return;
 
   cfmakeraw(&termios);
   if (tcsetattr(fd, TCSANOW, &termios) < 0)

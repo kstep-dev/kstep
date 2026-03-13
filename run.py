@@ -130,12 +130,15 @@ def start_qemu(
         # cov file
         f"-chardev file,id=char2,path={cov_file}",
         serial_device("char2"),
-        # interactive generator communication: QEMU listens, Python connects
-        f"-chardev socket,id=char3,path={sock_file},server=on,wait=on",
-        serial_device("char3"),
         # acceleration
         f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]
+
+    if sock_file is not None:
+        cmd += [
+            f"-chardev socket,id=char3,path={sock_file},server=on,wait=on",
+            serial_device("char3"),
+        ]
 
     if ARCH == "aarch64":
         cmd += ["-machine virt", "-cpu cortex-a57"]
@@ -154,20 +157,7 @@ def run_qemu(
     sock_file: Optional[Path] = None,
     debug: bool = False,
 ):
-    import socket
-    import time
-
     proc = start_qemu(driver, linux_name, log_file, sock_file, debug)
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    for _ in range(60):
-        try:
-            sock.connect(str(sock_file))
-            break
-        except (FileNotFoundError, ConnectionRefusedError):
-            time.sleep(0.1)
-    else:
-        raise RuntimeError(f"Timed out connecting to {sock_file}")
-
     proc.wait()
 
 def print_run_results(
