@@ -9,7 +9,7 @@ from run import (
     Driver,
     make_kstep,
     make_linux,
-    run_qemu,
+    start_qemu,
 )
 from scripts import LOGS_DIR, GLOBAL_SIGNAL_CORPUS, cov_parse, input_seq_from_log
 from scripts.gen_input_core import init_genstate, generate_next_command
@@ -53,7 +53,7 @@ def run_test(
     log_file = LOGS_DIR / f"{linux_name}.log"
     cov_file = log_file.with_suffix(".cov")
     sock_file = log_file.with_suffix(".sock")
-    proc = run_qemu(
+    proc = start_qemu(
         linux_name=linux_name,
         driver=driver,
         log_file=log_file,

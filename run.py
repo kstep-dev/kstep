@@ -54,7 +54,7 @@ def get_qemu_path() -> Path:
     raise RuntimeError(f"QEMU executable not found: {name}")
 
 
-def run_qemu(
+def start_qemu(
     driver: Driver,
     linux_name: str,
     log_file: Optional[Path] = None,
@@ -147,6 +147,28 @@ def run_qemu(
     logging.info(f"Starting QEMU: {cmd_str}")
     return subprocess.Popen(cmd_str, shell=True)
 
+def run_qemu(
+    driver: Driver,
+    linux_name: str,
+    log_file: Optional[Path] = None,
+    sock_file: Optional[Path] = None,
+    debug: bool = False,
+):
+    import socket
+    import time
+
+    proc = start_qemu(driver, linux_name, log_file, sock_file, debug)
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    for _ in range(60):
+        try:
+            sock.connect(str(sock_file))
+            break
+        except (FileNotFoundError, ConnectionRefusedError):
+            time.sleep(0.1)
+    else:
+        raise RuntimeError(f"Timed out connecting to {sock_file}")
+
+    proc.wait()
 
 def print_run_results(
     linux_name: str,
