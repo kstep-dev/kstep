@@ -32,7 +32,7 @@ static void run(void) {
   // Wake the task. try_to_wake_up() -> enqueue_entity() -> place_entity()
   // is called synchronously. On the fixed kernel, place_entity() updates
   // se->slice = sysctl_sched_base_slice. On the buggy kernel, it doesn't.
-  kstep_task_wakeup(task);
+  kstep_task_kernel_wakeup(task);
 
   // Read slice immediately (no ticks have occurred, so update_deadline()
   // has not had a chance to update the slice).

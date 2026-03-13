@@ -47,7 +47,7 @@ static void run(void) {
 
   // Phase 1: Run a single task alone on CPU 1 for many ticks.
   // zero_vruntime should track vruntime, but won't on the buggy kernel.
-  kstep_task_wakeup(solo_task);
+  kstep_task_kernel_wakeup(solo_task);
   kstep_tick_repeat(5);
 
   s64 key_before = (s64)(solo_task->se.vruntime - cfs_rq->zero_vruntime);
@@ -64,7 +64,7 @@ static void run(void) {
 
   // Phase 2: Wake a second task. On buggy kernel, entity_key() is huge,
   // so the key*weight product in sum_w_vruntime will be way off.
-  kstep_task_wakeup(new_task);
+  kstep_task_kernel_wakeup(new_task);
   kstep_tick();
 
   s64 key_new = (s64)(new_task->se.vruntime - cfs_rq->zero_vruntime);

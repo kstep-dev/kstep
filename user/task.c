@@ -61,6 +61,5 @@ int main(int argc, char **argv) {
   set_proc_affinity(1, sysconf(_SC_NPROCESSORS_ONLN) - 1);
   prctl(PR_SET_NAME, TASK_READY_COMM);
 
-  pause();
   loop();
 }

@@ -24,10 +24,10 @@ static void run(void) {
 
   // A: nice 1 (weight 820), B: nice 0 (weight 1024).
   // Different weights ensure avg/load is not evenly divisible.
-  kstep_task_set_prio(task_a, 1);
+  kstep_task_kernel_set_prio(task_a, 1);
 
-  kstep_task_wakeup(task_a);
-  kstep_task_wakeup(task_b);
+  kstep_task_kernel_wakeup(task_a);
+  kstep_task_kernel_wakeup(task_b);
 
   // Run so both tasks accumulate vruntime.
   // B (higher weight) gets more CPU but its vruntime grows slower,
@@ -42,7 +42,7 @@ static void run(void) {
   }
 
   // Pause B. The scheduler saves B's vlag via update_entity_lag().
-  kstep_task_pause(task_b);
+  kstep_task_kernel_pause(task_b);
 
   // Tick so B processes the PAUSE signal and gets dequeued
   kstep_tick_repeat(2);
@@ -54,7 +54,7 @@ static void run(void) {
 
   // Wake B. place_entity() uses vlag to set B's vruntime.
   // With positive vlag, B is placed below min_vruntime (negative key).
-  kstep_task_wakeup(task_b);
+  kstep_task_kernel_wakeup(task_b);
 
   s64 key_b = (s64)(task_b->se.vruntime - cfs_rq->min_vruntime);
   TRACE_INFO("B: vruntime=%llu key=%lld min_vruntime=%llu",
@@ -88,7 +88,7 @@ static void run(void) {
              key_v * load, invariant ? "PASS" : "FAIL (BUG)");
 
   // Wake C (vlag=0) -> placed at avg_vruntime() by place_entity()
-  kstep_task_wakeup(task_c);
+  kstep_task_kernel_wakeup(task_c);
 
   s64 key_c = (s64)(task_c->se.vruntime - cfs_rq->min_vruntime);
   int c_eligible = kstep_eligible(&task_c->se);

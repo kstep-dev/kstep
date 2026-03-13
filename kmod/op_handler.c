@@ -91,7 +91,7 @@ static bool op_task_fork(int a, int b, int c) {
   waker_task = kstep_tasks[a];
   kstep_tick_until(waker_on_cpu);
   
-  kstep_task_fork(waker_task, 1);
+  kstep_task_signal_fork(waker_task, 1);
   p = find_new_child(kstep_tasks[a]);
   if (!p)
     return false;
@@ -103,7 +103,7 @@ static bool op_task_fork(int a, int b, int c) {
 static bool op_task_pin(int a, int b, int c) {
   if (!is_valid_task_id(a) || !kstep_tasks[a])
     return false;
-  kstep_task_pin(kstep_tasks[a], b, c);
+  kstep_task_kernel_pin(kstep_tasks[a], b, c);
   return true;
 }
 
@@ -116,7 +116,7 @@ static bool op_task_fifo(int a, int b, int c) {
   // Move the task back to the root cgroup, otherwise the set_schedprio will fail
   kstep_cgroup_add_task("", kstep_tasks[a]->pid);
   cgroup_tasks[a] = -1;
-  kstep_task_fifo(kstep_tasks[a]);
+  kstep_task_kernel_fifo(kstep_tasks[a]);
   return true;
 }
 
@@ -125,7 +125,7 @@ static bool op_task_cfs(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a])
     return false;
-  kstep_task_cfs(kstep_tasks[a]);
+  kstep_task_kernel_cfs(kstep_tasks[a]);
   return true;
 }
 
@@ -134,7 +134,7 @@ static bool op_task_pause(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a])
     return false;
-  kstep_task_pause(kstep_tasks[a]);
+  kstep_task_kernel_pause(kstep_tasks[a]);
   return true;
 }
 
@@ -143,7 +143,7 @@ static bool op_task_wakeup(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a])
     return false;
-  kstep_task_wakeup(kstep_tasks[a]);
+  kstep_task_kernel_wakeup(kstep_tasks[a]);
   return true;
 }
 
@@ -153,7 +153,7 @@ static bool op_task_set_prio(int a, int b, int c) {
     return false;
   if (b < -20 || b > 19)
     return false;
-  kstep_task_set_prio(kstep_tasks[a], b);
+  kstep_task_kernel_set_prio(kstep_tasks[a], b);
   return true;
 }
 

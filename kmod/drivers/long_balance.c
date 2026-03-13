@@ -42,8 +42,9 @@ static void *fork_finished(void) {
 }
 
 static void run(void) {
-  kstep_task_pin(busy_task, 1, 1);
-  kstep_task_fork(busy_task, NUM_TASKS);
+  kstep_task_kernel_pin(busy_task, 1, 1);
+  kstep_task_kernel_wakeup(busy_task);
+  kstep_task_signal_fork(busy_task, NUM_TASKS);
   kstep_sleep_until(fork_finished);
   kstep_tick_repeat(2000);
 }

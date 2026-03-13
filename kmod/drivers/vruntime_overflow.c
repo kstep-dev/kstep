@@ -31,14 +31,14 @@ static void *ineligible_group_with_eligible_tasks(void) {
 }
 
 static void run(void) {
-  kstep_task_wakeup(special_task);
-  kstep_task_wakeup(other_task);
+  kstep_task_kernel_wakeup(special_task);
+  kstep_task_kernel_wakeup(other_task);
 
   kstep_tick_repeat(10);
   kstep_tick_until(ineligible_group_with_eligible_tasks);
 
   // Pause ineligible task
-  kstep_task_pause(special_task);
+  kstep_task_kernel_pause(special_task);
 
   // Dequeue ineligible group
   struct sched_entity *group_se = special_task->se.parent;
@@ -50,7 +50,7 @@ static void run(void) {
   // Reweight the group
   kstep_cgroup_set_weight("g0", 16);
 
-  kstep_task_wakeup(starved_task);
+  kstep_task_kernel_wakeup(starved_task);
 
   kstep_tick_repeat(18);
 }

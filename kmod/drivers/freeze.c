@@ -18,13 +18,13 @@ static void *is_ineligible(void) {
 
 static void run(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    kstep_task_wakeup(tasks[i]);
+    kstep_task_kernel_wakeup(tasks[i]);
 
   struct task_struct *p = kstep_tick_until(is_ineligible);
-  kstep_task_usleep(p, 20000); // step_interval_us * 2
+  kstep_task_signal_usleep(p, 20000); // step_interval_us * 2
 
   kstep_freeze_task(p);
-  kstep_task_wakeup(p);
+  kstep_task_signal_wakeup(p);
 
   kstep_tick_repeat(30);
 }

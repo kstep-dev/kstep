@@ -42,7 +42,7 @@ static bool is_uclamp_active(struct task_struct *p) {
 }
 
 static void run(void) {
-  kstep_task_wakeup(task);
+  kstep_task_kernel_wakeup(task);
 
   if (!is_uclamp_active(task))
     panic("uclamp did not become active for pid %d", task->pid);
