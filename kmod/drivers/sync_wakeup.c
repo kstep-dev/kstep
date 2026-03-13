@@ -37,8 +37,8 @@ static void *is_ineligible(void) {
 }
 
 static void run(void) {
-  kstep_task_kernel_pin(other_task, 1, 1);
-  kstep_task_kernel_wakeup(other_task);
+  kstep_task_pin(other_task, 1, 1);
+  kstep_task_wakeup(other_task);
 
   kstep_tick_repeat(20);
 
@@ -49,7 +49,7 @@ static void run(void) {
   kstep_kthread_syncwake(waker_task, wakee_task);
 
   // Pause the ineligible task
-  kstep_task_kernel_pause(other_task);
+  kstep_task_pause(other_task);
 
   // tick to show the impact
   kstep_tick_repeat(10);

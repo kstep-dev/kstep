@@ -53,10 +53,8 @@ struct task_struct *kstep_task_create(void) {
   // Wait for the task to start
   for (int i = 0; i < 100; i++) {
     kstep_sleep();
-    if (strcmp(p->comm, TASK_READY_COMM) == 0) {
-      kstep_task_kernel_pause(p);
+    if (strcmp(p->comm, TASK_READY_COMM) == 0)
       return p;
-    }
     TRACE_INFO("Waiting for task %d to start", p->pid);
   }
   panic("Task %d did not start", p->pid);
@@ -74,52 +72,34 @@ static void kstep_task_signal(struct task_struct *p, enum sigcode code,
   kstep_sleep();
 }
 
-void kstep_task_signal_fork(struct task_struct *p, int n) {
+void kstep_task_fork(struct task_struct *p, int n) {
   kstep_task_signal(p, SIGCODE_FORK, n, 0, 0);
   TRACE_INFO("Forked task %d %d times", p->pid, n);
 }
 
-void kstep_task_signal_fifo(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_FIFO, 0, 0, 0);
-  TRACE_INFO("Set task %d to FIFO", p->pid);
-}
 
-void kstep_task_signal_cfs(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_CFS, 0, 0, 0);
-  TRACE_INFO("Set task %d to CFS", p->pid);
-}
-
-void kstep_task_signal_pin(struct task_struct *p, int begin, int end) {
-  kstep_task_signal(p, SIGCODE_PIN, begin, end, 0);
-  TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
-}
-
-void kstep_task_signal_pause(struct task_struct *p) {
+void kstep_task_pause(struct task_struct *p) {
   kstep_task_signal(p, SIGCODE_PAUSE, 0, 0, 0);
   TRACE_INFO("Paused task %d", p->pid);
 }
 
-void kstep_task_signal_wakeup(struct task_struct *p) {
+void kstep_task_wakeup(struct task_struct *p) {
   kstep_task_signal(p, SIGCODE_WAKEUP, 0, 0, 0);
   TRACE_INFO("Waked up task %d", p->pid);
 }
 
-void kstep_task_signal_usleep(struct task_struct *p, int us) {
+void kstep_task_usleep(struct task_struct *p, int us) {
   kstep_task_signal(p, SIGCODE_USLEEP, us, 0, 0);
   TRACE_INFO("Put task %d to sleep for %d us", p->pid, us);
 }
 
-void kstep_task_signal_set_prio(struct task_struct *p, int prio) {
-  kstep_task_signal(p, SIGCODE_SET_PRIO, prio, 0, 0);
-  TRACE_INFO("Set priority of task %d to %d", p->pid, prio);
-}
 
-void kstep_task_kernel_set_prio(struct task_struct *p, int prio) {
+void kstep_task_set_prio(struct task_struct *p, int prio) {
   set_user_nice(p, prio);
   TRACE_INFO("Set priority of task %d to %d (kernel)", p->pid, prio);
 }
 
-void kstep_task_kernel_fifo(struct task_struct *p) {
+void kstep_task_fifo(struct task_struct *p) {
   struct sched_attr attr = {
       .sched_policy = SCHED_FIFO,
       .sched_priority = 80,
@@ -128,7 +108,7 @@ void kstep_task_kernel_fifo(struct task_struct *p) {
   TRACE_INFO("Set task %d to FIFO (kernel)", p->pid);
 }
 
-void kstep_task_kernel_cfs(struct task_struct *p) {
+void kstep_task_cfs(struct task_struct *p) {
   struct sched_attr attr = {
       .sched_policy = SCHED_NORMAL,
       .sched_nice = 0,
@@ -137,7 +117,7 @@ void kstep_task_kernel_cfs(struct task_struct *p) {
   TRACE_INFO("Set task %d to CFS (kernel)", p->pid);
 }
 
-void kstep_task_kernel_pin(struct task_struct *p, int begin, int end) {
+void kstep_task_pin(struct task_struct *p, int begin, int end) {
   struct cpumask mask;
   cpumask_clear(&mask);
   for (int i = begin; i <= end; i++)
@@ -147,15 +127,16 @@ void kstep_task_kernel_pin(struct task_struct *p, int begin, int end) {
 }
 
 void kstep_task_kernel_pause(struct task_struct *p) {
-  // Set the task to TASK_UNINTERRUPTIBLE so that when __schedule() runs on
-  // the task's CPU, it will take the blocking path and properly dequeue
-  // the task locally. Using TASK_UNINTERRUPTIBLE avoids the signal_pending
-  // check in try_to_block_task() that would abort the block.
-  WRITE_ONCE(p->__state, TASK_UNINTERRUPTIBLE);
+  // Set TASK_INTERRUPTIBLE so that both signal_wakeup (sends SIGUSR1, which
+  // wakes TASK_INTERRUPTIBLE) and kernel_wakeup (wake_up_process, which wakes
+  // any sleeping state) can wake the task. try_to_block_task() will check
+  // signal_pending() and abort the block if signals are pending, but since
+  // kSTEP controls signal delivery there are no stray signals at pause time.
+  WRITE_ONCE(p->__state, TASK_INTERRUPTIBLE);
 
   // Trigger a reschedule on the task's CPU. When returning to userspace,
-  // exit_to_user_mode_loop() calls schedule() (non-preempt), which will see
-  // the non-RUNNING state and dequeue the task.
+  // exit_to_user_mode_loop() calls schedule(), which will see the
+  // non-RUNNING state and dequeue the task via the normal blocking path.
   set_tsk_thread_flag(p, TIF_NEED_RESCHED);
   kick_process(p);
 

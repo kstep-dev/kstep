@@ -26,11 +26,11 @@ static void setup(void) {
 
 static void run(void) {
   for (int i = 0; i < NUM_TASKS; i++) {
-    kstep_task_kernel_pin(tasks[i], 1, 1);
+    kstep_task_pin(tasks[i], 1, 1);
     kstep_cgroup_add_task("A/B/C", tasks[i]->pid);
-    kstep_task_kernel_wakeup(tasks[i]);
+    kstep_task_wakeup(tasks[i]);
   }
-  kstep_task_kernel_pin(helper, 2, 2);
+  kstep_task_pin(helper, 2, 2);
   kstep_cgroup_add_task("A/B/C", helper->pid);
 
   // A: 5ms quota, 100ms period. C: 100ms quota, 100ms period.
@@ -54,7 +54,7 @@ static void run(void) {
   // Wake helper on CPU 2 to consume C's 1ms pool, then tick until
   // A's period timer fires (every 100 ticks), triggering unthrottle.
   // On buggy kernel: tg_unthrottle_up(C) → throttle → WARN.
-  kstep_task_kernel_wakeup(helper);
+  kstep_task_wakeup(helper);
   kstep_tick_repeat(120);
 }
 #else

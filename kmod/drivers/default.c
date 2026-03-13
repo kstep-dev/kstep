@@ -15,7 +15,7 @@ static void run(void) {
     tasks[i] = kstep_task_create();
 
   for (int i = 0; i < ARRAY_SIZE(tasks); i++) {
-    kstep_task_kernel_wakeup(tasks[i]);
+    kstep_task_wakeup(tasks[i]);
     kstep_cov_dump();
     kstep_cov_cmd_id_inc();
     pr_info("EXECOP: {\"op\": %d, \"a\": %d, \"b\": %d, \"c\": %d}\n", OP_TASK_WAKEUP, tasks[i]->pid, 0, 0);
@@ -48,10 +48,15 @@ static void run(void) {
   kstep_cov_dump();
 }
 
+static void on_tick_begin(void) {
+  kstep_output_curr_task();
+  kstep_print_sched_debug();
+}
+
 KSTEP_DRIVER_DEFINE{
     .name = "default",
     .setup = setup,
     .run = run,
     .step_interval_us = 1000,
-    .on_tick_begin = kstep_output_curr_task,
+    .on_tick_begin = on_tick_begin,
 };

@@ -31,13 +31,13 @@ static void *group_ineligible(void) {
 }
 
 static void run(void) {
-  kstep_task_kernel_wakeup(target_task);
-  kstep_task_kernel_wakeup(other_task);
+  kstep_task_wakeup(target_task);
+  kstep_task_wakeup(other_task);
 
   kstep_tick_repeat(5);
 
   kstep_tick_until(group_ineligible);
-  kstep_task_kernel_pause(target_task);
+  kstep_task_pause(target_task);
 
   struct cfs_rq *cfs_rq = &cpu_rq(1)->cfs;
 

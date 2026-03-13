@@ -39,7 +39,7 @@ static void setup(void) {
     kstep_cgroup_set_weight(names[i], 10000);
     tasks[i] = kstep_task_create();
     kstep_cgroup_add_task(names[i], tasks[i]->pid);
-    kstep_task_kernel_pin(tasks[i], 1, 1);
+    kstep_task_pin(tasks[i], 1, 1);
   }
 }
 
@@ -52,7 +52,7 @@ static int find_running(void) {
 
 static void run(void) {
   for (int i = 0; i < NUM_GROUPS; i++)
-    kstep_task_kernel_wakeup(tasks[i]);
+    kstep_task_wakeup(tasks[i]);
 
   // Each tick simulates 10000 seconds. After 20 ticks the scheduler
   // has cycled through all entities, roughly equalising vruntimes.

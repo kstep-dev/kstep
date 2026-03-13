@@ -20,16 +20,16 @@ static void setup(void) {
 
 static void run(void) {
   // making the nr_running on cpu 1-4 to [1, 0, 2, 1]
-  kstep_task_kernel_pin(tasks[0], 1, 1);
-  kstep_task_kernel_pin(tasks[1], 3, 3);
-  kstep_task_kernel_pin(tasks[2], 3, 3);
-  kstep_task_kernel_pin(tasks[3], 4, 4);
+  kstep_task_pin(tasks[0], 1, 1);
+  kstep_task_pin(tasks[1], 3, 3);
+  kstep_task_pin(tasks[2], 3, 3);
+  kstep_task_pin(tasks[3], 4, 4);
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
-    kstep_task_kernel_wakeup(tasks[i]);
+    kstep_task_wakeup(tasks[i]);
 
   kstep_tick_repeat(50);
-  kstep_task_kernel_pin(tasks[1], 2, 3);
-  kstep_task_kernel_pin(tasks[2], 2, 3);
+  kstep_task_pin(tasks[1], 2, 3);
+  kstep_task_pin(tasks[2], 2, 3);
   kstep_tick_repeat(250);
 }
 
