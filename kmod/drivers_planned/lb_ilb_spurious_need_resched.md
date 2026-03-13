@@ -123,94 +123,76 @@ In QEMU environments, the idle mechanism depends on the emulated CPU features. W
 
 ## Reproduce Strategy (kSTEP)
 
-This bug can be reproduced with kSTEP using a multi-pronged approach. The core challenge is ensuring that the ILB CPU has `TIF_NEED_RESCHED` set (from the IPI optimization) when `_nohz_idle_balance()` runs. There are two viable strategies, and the recommended approach combines elements of both for reliability.
+This bug can be reproduced entirely through natural kernel behavior by using the `idle=poll` boot parameter to force `TIF_POLLING_NRFLAG` on all idle CPUs, creating a load imbalance to trigger the idle load balancer (ILB), and then observing (read-only) whether the ILB completes its work or aborts spuriously. No writes to internal scheduler state (such as `TIF_NEED_RESCHED`, nohz flags, or runqueue fields) are needed — the kernel's own IPI optimization path sets `TIF_NEED_RESCHED` naturally when it kicks an idle polling CPU for load balancing.
 
-### Strategy A: Natural Reproduction via `idle=poll`
+### Configuration
 
-The most natural approach relies on enabling the `idle=poll` kernel boot parameter, which forces all idle CPUs to use `cpu_idle_poll()`. This function sets `TIF_POLLING_NRFLAG`, enabling the IPI optimization path. kSTEP would need a minor extension to support adding kernel-level boot parameters (before the `--` separator in `run.py`). The change to `run.py` would be small: add an optional `kernel_params` field to the `Driver` dataclass and prepend them to `boot_args` before the `--` separator.
+The driver should be configured with `num_cpus = 4` (CPU 0 reserved for the kSTEP driver, CPUs 1–3 for the test workload) and `params = ["idle=poll"]`. The `idle=poll` boot parameter forces all CPUs to use `cpu_idle_poll()` as their idle routine. This function sets `TIF_POLLING_NRFLAG` on the idle task's `thread_info`, which is the prerequisite for the IPI optimization in `send_call_function_single_ipi()`. kSTEP's default boot arguments already include `isolcpus=nohz,managed_irq,1-3` and `nohz_full=1-3`, which put CPUs 1–3 into nohz_full mode. When these CPUs go idle, they are added to `nohz.idle_cpus_mask`, enabling the ILB mechanism. Combined with `idle=poll`, this creates exactly the conditions under which the bug manifests on real hardware: idle CPUs polling with `TIF_POLLING_NRFLAG`, nohz mode active, and the IPI optimization overloading `TIF_NEED_RESCHED` for CSD delivery.
 
-With `idle=poll` active:
+### Topology and Task Setup
 
-1. **Topology**: Configure at least 4 CPUs (CPU 0 for the driver, CPUs 1-3 for the test). Use `kstep_topo_init()` and `kstep_topo_apply()` to set up a simple scheduling domain (one MC group).
+In `setup()`, initialize a simple scheduling domain topology using `kstep_topo_init()` and `kstep_topo_apply()`. A single MC (machine-clear) group spanning CPUs 1–3 is sufficient — this ensures all test CPUs share a scheduling domain so the load balancer considers them for task migration. No complex NUMA or SMT topology is needed. Create three CFS tasks with `kstep_task_create()`. These tasks will serve as the workload that creates load imbalance on one CPU while leaving others idle.
 
-2. **Create load imbalance**: Create 2-3 CFS tasks with `kstep_task_create()` and pin them all to CPU 1 using `kstep_task_pin(p, 1, 2)`. This creates a heavily loaded CPU 1 and idle CPUs 2-3.
+### Creating Natural Load Imbalance
 
-3. **Trigger ILB naturally**: The scheduler's `trigger_load_balance()` function, called on every timer tick, will detect the imbalance and attempt to kick an idle CPU for load balancing. With NOHZ, it queues `nohz_csd_func()` on the chosen ILB CPU. Since the idle CPUs are in `TIF_POLLING_NRFLAG` mode (from `idle=poll`), the IPI optimization sets `TIF_NEED_RESCHED`.
+In `run()`, pin all three tasks to CPU 1 using `kstep_task_pin(p, 1, 2)` (affinity restricted to CPU 1 only), then wake them all with `kstep_task_wakeup(p)`. Advance 10–20 ticks with `kstep_tick_repeat(20)` to let the tasks settle on CPU 1 and establish their PELT load signals. At this point, CPU 1 has `nr_running == 3` while CPUs 2–3 are completely idle. This is verified by reading `cpu_rq(cpu)->nr_running` for each CPU (read-only). Next, widen each task's CPU affinity to span CPUs 1–3 by calling `kstep_task_pin(p, 1, 4)` for each task. This makes them eligible for migration by the load balancer — the tasks are still running on CPU 1, but their `cpus_mask` now permits CPUs 2 and 3. The scheduler will not spontaneously move them; only the load balancer (triggered via ILB or newidle balance) can pull them to idle CPUs.
 
-4. **Advance ticks**: Use `kstep_tick_repeat(n)` to advance several ticks, allowing the timer-based ILB trigger and the load balancing softirq to execute.
+### Natural ILB Trigger Path
 
-5. **Observe**: After sufficient ticks, check which CPUs the tasks are running on using `task_cpu(p)` or `kstep_output_curr_task()`. On the **buggy kernel**, the ILB aborts immediately due to the spurious `need_resched()`, and tasks remain pinned to CPU 1 (or take much longer to migrate). On the **fixed kernel**, the ILB completes normally, and tasks are migrated to CPUs 2-3.
+After expanding affinity, advance ticks with `kstep_tick_repeat(200)`. On each tick on CPU 1 (which has tasks running), `trigger_load_balance()` is called. This function detects that nohz idle CPUs exist (CPUs 2–3 are in `nohz.idle_cpus_mask`) and that the system has a load imbalance. It selects one of the idle CPUs as the ILB CPU and queues `nohz_csd_func()` on it via `smp_call_function_single_async()`. Internally, `send_call_function_single_ipi()` checks whether the target CPU's idle task has `TIF_POLLING_NRFLAG` set. Because `idle=poll` is active, it does — so instead of sending a hardware IPI, the optimization atomically sets `TIF_NEED_RESCHED` on the idle task via `set_nr_if_polling()`. The idle CPU then exits its poll loop, calls `flush_smp_call_function_queue()` (which executes `nohz_csd_func()`), and raises `SCHED_SOFTIRQ`. The softirq handler invokes `_nohz_idle_balance()` — and at this point, `TIF_NEED_RESCHED` is still set because `__schedule()` has not yet run. On the **buggy kernel**, the `need_resched()` check in the ILB loop returns true, causing an immediate `goto abort` that skips all load balancing work. On the **fixed kernel**, the added `!idle_cpu(this_cpu)` guard recognizes that the CPU is still genuinely idle (no tasks woken on it), bypasses the abort, and allows the ILB to iterate over idle CPUs and perform `sched_balance_domains()` to pull tasks from overloaded CPU 1. This entire sequence happens naturally from kernel code paths with no driver intervention beyond creating the initial workload imbalance.
 
-### Strategy B: Direct State Simulation via `on_sched_softirq_begin` Callback
+### Read-Only Observation via Callbacks
 
-For a more deterministic approach that does not depend on `idle=poll` or QEMU's idle implementation, the driver can use the `on_sched_softirq_begin` callback to simulate the IPI optimization's effect by setting `TIF_NEED_RESCHED` on the current task when the CPU is idle. This precisely replicates the condition that exists in the real-world bug path.
+The driver uses two callbacks for passive observation. First, `on_sched_softirq_begin` fires when `SCHED_SOFTIRQ` begins processing on any CPU. In this callback, the driver reads (but never writes) `smp_processor_id()`, `need_resched()`, and `idle_cpu(cpu)` to record the state at ILB entry. A per-driver counter `softirq_on_idle_count` tracks how many times the softirq fires on an idle CPU with `need_resched()` true — this is the exact condition that triggers the bug. This counter serves as proof that the IPI optimization path was exercised and the bug-triggering state was reached naturally. Second, `on_sched_balance_begin(int cpu, struct sched_domain *sd)` fires each time `sched_balance_domains()` is called from within `_nohz_idle_balance()`. Each firing means the ILB successfully processed one CPU in its iteration loop without aborting. A counter `balance_iterations` tracks total firings. On the buggy kernel, the ILB aborts on the first `need_resched()` check, so `balance_iterations` will be zero or very low (at most 1 if the abort check follows the first balance). On the fixed kernel, the ILB completes its full loop, and `balance_iterations` will be substantially higher (proportional to the number of idle CPUs times the number of ILB kicks).
 
-1. **Import required symbols**: Use `KSYM_IMPORT` to access `set_tsk_need_resched` (or directly write to `current->thread_info.flags` via `set_tsk_thread_flag(current, TIF_NEED_RESCHED)`).
+```c
+static int softirq_on_idle_count = 0;
+static int balance_iterations = 0;
 
-2. **Callback implementation**:
-   ```c
-   static int ilb_softirq_count = 0;
-   
-   void on_sched_softirq_begin(void) {
-       int cpu = smp_processor_id();
-       if (cpu != 0 && idle_cpu(cpu)) {
-           /* Simulate the IPI optimization artifact:
-            * Set TIF_NEED_RESCHED as if set_nr_if_polling() was called */
-           set_tsk_need_resched(current);
-           ilb_softirq_count++;
-       }
-   }
-   ```
+void on_sched_softirq_begin(void) {
+    int cpu = smp_processor_id();
+    if (cpu != 0 && idle_cpu(cpu) && need_resched())
+        softirq_on_idle_count++;
+}
 
-3. **Setup**: Create 4 CPUs. Pin 2-3 tasks to CPU 1, leave CPUs 2-3 idle. Use `kstep_tick_repeat()` to advance time.
+void on_sched_balance_begin(int cpu, struct sched_domain *sd) {
+    if (cpu != 0)
+        balance_iterations++;
+}
+```
 
-4. **Detection**: After a fixed number of ticks (e.g., 50-100), check whether any tasks were migrated from CPU 1 to CPUs 2-3. On the **buggy kernel**, `_nohz_idle_balance()` will see `need_resched()` returning true and abort, so tasks remain on CPU 1. On the **fixed kernel**, the `!idle_cpu(this_cpu)` check will recognize the CPU is still idle, skip the abort, and proceed with load balancing, migrating tasks.
+### Task Placement as Primary Signal
 
-5. **Pass/fail criteria**:
-   - If `ilb_softirq_count > 0` (confirming the callback fired) AND tasks remain on CPU 1: **fail** on buggy kernel (bug triggered).
-   - If `ilb_softirq_count > 0` AND tasks are spread across CPUs 1-3: **pass** on fixed kernel.
-   - Use `kstep_pass()` / `kstep_fail()` to report.
+After the 200-tick observation window, the driver checks the final CPU assignment of each task by reading `task_cpu(p)` — a read-only access to `p->cpu`. On the **fixed kernel**, the ILB successfully invokes `sched_balance_domains()` for each idle CPU, detects the imbalance (CPU 1 has 3 tasks, CPUs 2–3 have 0), and pulls tasks to the idle CPUs. After 200 ticks, at least 1–2 of the 3 tasks should have migrated to CPUs 2 or 3, resulting in a roughly balanced distribution (e.g., 1 task per CPU). On the **buggy kernel**, the ILB aborts on every invocation due to the spurious `need_resched()`, so no active load balancing occurs for the idle CPUs. The only remaining migration path is newidle balance (which fires when a CPU's runqueue becomes empty and it searches for work), but since CPUs 2–3 never had tasks to begin with, newidle balance is not triggered on them. The tasks remain stuck on CPU 1.
 
-### Strategy C (Recommended): Hybrid with Direct Observation
+### Additional Read-Only Diagnostics
 
-Combine Strategy B's callback with direct observation of `_nohz_idle_balance()` behavior using additional imported symbols:
+For richer diagnostic output, the driver can use `on_tick_begin` set to `kstep_output_nr_running` to log the per-CPU `nr_running` count on every tick — this produces a time-series showing whether load spreading occurs. The driver can also read `cpu_rq(cpu)->nr_running` directly in `run()` after the observation window to take a snapshot of the final load distribution. Reading the runqueue's `next_balance` field (via `cpu_rq(cpu)->next_balance`) can confirm whether the ILB updated balance timestamps for idle CPUs — on the buggy kernel, `next_balance` for CPUs 2–3 will be stale (never updated by ILB), while on the fixed kernel it will reflect recent balance activity. All of these are read-only accesses to scheduler internals via `cpu_rq()`, which is explicitly permitted.
 
-1. **Import `nohz` structure**: Use `KSYM_IMPORT_TYPED` to access the `struct nohz` global (or its relevant fields like `nohz.has_blocked` and `nohz.needs_update`). These are set to 1 when the ILB aborts early.
+### Pass/Fail Criteria
 
-2. **Use `on_sched_balance_begin` callback**: This fires when `sched_balance_domains()` is called from within `_nohz_idle_balance()`. If the ILB aborts, this callback will NOT fire for the remaining CPUs. Count how many times this callback fires after creating the imbalance — fewer firings means the ILB aborted.
+The driver reports results using `kstep_pass()` and `kstep_fail()` based on two signals. The primary signal is task distribution: count how many of the 3 tasks remain on CPU 1 after the observation window. If all 3 tasks are still on CPU 1 AND `softirq_on_idle_count > 0` (proving the ILB was triggered and the bug condition was reached), report `kstep_fail()` — the ILB was neutralized by the spurious `need_resched()`. If tasks are spread across CPUs 1–3 (at least one task migrated), report `kstep_pass()` — the ILB operated correctly. The secondary signal is `balance_iterations`: a value near zero despite many ticks and ILB kicks confirms the ILB aborted repeatedly, while a value proportional to `(number of idle CPUs) × (number of ILB kicks)` confirms successful iteration. If `softirq_on_idle_count == 0`, it means the IPI optimization path was not exercised (perhaps `idle=poll` was not effective), and the driver should report this as an inconclusive result rather than pass or fail.
 
-3. **Driver flow**:
-   ```
-   setup():
-     - kstep_topo_init() with 4 CPUs
-     - kstep_topo_apply()
-   
-   run():
-     - Create 3 tasks, pin to CPU 1
-     - kstep_tick_repeat(10)   // let tasks settle
-     - Reset counters
-     - kstep_tick_repeat(100)  // allow ILB to fire
-     - Check: how many balance callbacks fired?
-     - Check: are tasks still all on CPU 1?
-     - Report pass/fail
-   ```
+### Driver Definition
 
-4. **Expected results**:
-   - **Buggy kernel**: `on_sched_softirq_begin` fires (ILB triggered), `on_sched_balance_begin` fires 0-1 times (ILB aborts before iterating), tasks stay on CPU 1.
-   - **Fixed kernel**: Both callbacks fire, `on_sched_balance_begin` fires multiple times (once per balanced CPU), tasks distributed.
+```c
+KSTEP_DRIVER_DEFINE{
+    .name = "lb_ilb_spurious_need_resched",
+    .setup = setup,
+    .run = run,
+    .on_tick_begin = kstep_output_nr_running,
+    .on_sched_softirq_begin = on_sched_softirq_begin,
+    .on_sched_balance_begin = on_sched_balance_begin,
+    .step_interval_us = 100,
+};
+```
 
-### kSTEP Extensions Needed
-
-The following minor extensions would strengthen this reproduction:
-
-1. **Kernel boot parameter support**: Add a `kernel_params` field to the `Driver` dataclass in `run.py` to allow drivers to specify kernel-level boot parameters (prepended before `--`). This enables `idle=poll` for Strategy A.
-
-2. **`set_tsk_need_resched()` access**: This is already available through `<linux/sched.h>` included in `driver.h`, or can be accessed via `set_tsk_thread_flag(current, TIF_NEED_RESCHED)`. No new KSYM_IMPORT is needed for this.
-
-3. **No other changes required**: The existing `on_sched_softirq_begin`, `on_sched_balance_begin`, `kstep_task_create`, `kstep_task_pin`, `kstep_tick_repeat`, and `KSYM_IMPORT` facilities are sufficient.
+The driver is invoked with: `python run.py lb_ilb_spurious_need_resched --num_cpus 4 --params idle=poll`
 
 ### Determinism Considerations
 
-Strategy B is more deterministic than Strategy A because it directly controls when `TIF_NEED_RESCHED` is set. Strategy A depends on the natural ILB trigger timing, which may vary between runs. However, even with Strategy A, the bug is systematic (fires on every ILB cycle when `TIF_POLLING_NRFLAG` is set), so it should be highly reproducible after a sufficient number of ticks. Running for 100+ ticks should ensure multiple ILB attempts.
+Unlike strategies that directly write `TIF_NEED_RESCHED` in a callback, this approach relies on the kernel's natural IPI optimization path. However, the bug is **systematic, not racy** — it fires on every single ILB cycle when `TIF_POLLING_NRFLAG` is set on the target CPU. With `idle=poll`, this flag is always set on idle CPUs, so every ILB kick goes through the optimization path and every resulting `_nohz_idle_balance()` invocation encounters the spurious `need_resched()`. Running for 200 ticks provides ample opportunity for multiple ILB kicks (the scheduler triggers ILB roughly once per tick when imbalance exists), making the reproduction highly reliable. The `softirq_on_idle_count` counter provides a built-in liveness check to confirm the bug path was actually reached, eliminating false negatives from environmental issues.
 
-For maximum determinism, Strategy B with direct observation (Strategy C) is recommended. The callback fires deterministically when `SCHED_SOFTIRQ` is processed, and the bug manifests on every invocation of `_nohz_idle_balance()` when `need_resched()` is true.
+### No kSTEP Extensions Required
+
+This strategy uses only existing kSTEP facilities: `kstep_task_create`, `kstep_task_pin`, `kstep_task_wakeup`, `kstep_tick_repeat`, `kstep_pass`/`kstep_fail`, `kstep_output_nr_running`, `on_sched_softirq_begin`, `on_sched_balance_begin`, and read-only access to `cpu_rq()` internals. The `idle=poll` boot parameter is passed via the existing `params` field in the `Driver` dataclass. No new APIs, kernel symbol imports, or framework modifications are needed.
