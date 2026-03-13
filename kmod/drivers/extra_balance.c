@@ -24,6 +24,8 @@ static void run(void) {
   kstep_task_pin(tasks[2], 3, 3);
   kstep_task_pin(tasks[3], 3, 3);
   kstep_task_pin(tasks[4], 4, 4);
+  for (int i = 0; i < ARRAY_SIZE(tasks); i++)
+    kstep_task_wakeup(tasks[i]);
 
   kstep_tick_repeat(500);
   for (int i = 1; i <= 3; i++)

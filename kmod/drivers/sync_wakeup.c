@@ -38,6 +38,7 @@ static void *is_ineligible(void) {
 
 static void run(void) {
   kstep_task_pin(other_task, 1, 1);
+  kstep_task_wakeup(other_task);
 
   kstep_tick_repeat(20);
 

@@ -9,6 +9,7 @@ static void setup(void) { rt = kstep_task_create(); }
 static void run(void) {
   kstep_sysctl_write("kernel.sched_rt_runtime_us", "%d", -1);
   kstep_task_fifo(rt);
+  kstep_task_wakeup(rt);
   kstep_sysctl_write("kernel.sched_rt_runtime_us", "%d", 950000);
   kstep_tick_repeat(1501);
 }

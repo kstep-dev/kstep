@@ -48,10 +48,15 @@ static void run(void) {
   kstep_cov_dump();
 }
 
+static void on_tick_begin(void) {
+  kstep_output_curr_task();
+  kstep_print_sched_debug();
+}
+
 KSTEP_DRIVER_DEFINE{
     .name = "default",
     .setup = setup,
     .run = run,
     .step_interval_us = 1000,
-    .on_tick_begin = kstep_output_curr_task,
+    .on_tick_begin = on_tick_begin,
 };

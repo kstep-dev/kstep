@@ -18,6 +18,7 @@ static void setup(void) {
 
 static void run(void) {
   kstep_task_set_prio(other_task, 19);
+  kstep_task_wakeup(other_task);
 
   kstep_task_wakeup(target_task);
 

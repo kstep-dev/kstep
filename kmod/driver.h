@@ -73,6 +73,8 @@ void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
 void kstep_task_usleep(struct task_struct *p, int us);
 void kstep_task_set_prio(struct task_struct *p, int prio);
+void kstep_task_kernel_pause(struct task_struct *p);
+void kstep_task_kernel_wakeup(struct task_struct *p);
 
 // kernel.c
 void kstep_write(const char *path, const char *buf, size_t size);
