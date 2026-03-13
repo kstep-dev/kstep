@@ -326,24 +326,6 @@ static bool is_task_signal_op(enum kstep_op_type type) {
 }
 
 /*
- * Enqueue a signal op for task @id.  Must only be called when the queue
- * is non-empty OR the task is not in the required state.
- */
-static u64 op_seq_counter;
-
-static void enqueue_op(int task_id, enum kstep_op_type type, int a, int b, int c) {
-  struct kstep_task *t = &kstep_tasks[task_id];
-  int next = (t->tail + 1) % TASK_OP_QUEUE_SIZE;
-  if (next == t->head)
-    panic("task op queue overflow for task %d", task_id);
-  t->ring[t->tail] = (struct queued_op){type, a, b, c, op_seq_counter++};
-  t->tail = next;
-}
-
-
-static void task_queues_drain(void);
-
-/*
  * Try to send the head queued op for task @id if its required state is met.
  * Sends at most one op per call.
  */
@@ -355,31 +337,34 @@ static void execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   kstep_cov_disable();
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
-  task_queues_drain();
 }
 
-static void task_queues_drain(void) {
-  int best = -1;
-  u64 best_seq = U64_MAX;
+static u8 buf[1 + MAX_TASKS * 2 + 1];
 
-  TRACE_INFO("Draining task queues");
+void kstep_write_state(struct file *f) {
+  /* Format: [OP_TYPE_NR] [id] [state] [id] [state] ... ['\n']
+   * OP_TYPE_NR is the marker byte; id and state are each one byte.
+   * 2 = running on CPU, 1 = runnable on runqueue, 0 = blocked. */
+  loff_t pos = 0;
+  int len = 0;
 
+  buf[len++] = OP_TYPE_NR;
   for (int i = 0; i < MAX_TASKS; i++) {
-    struct kstep_task *t = &kstep_tasks[i];
-    if (!t->p || t->head == t->tail) continue;
-    if (!op_task_state_ready(t->ring[t->head].type, t->p)) continue;
-    if (t->ring[t->head].seq < best_seq) {
-      best_seq = t->ring[t->head].seq;
-      best = i;
-    }
+    struct task_struct *p = kstep_tasks[i].p;
+    if (!p)
+      continue;
+    u8 state;
+    if (p->on_cpu)
+      state = 2;
+    else if (p->__state == TASK_RUNNING)
+      state = 1;
+    else
+      state = 0;
+    buf[len++] = (u8)i;
+    buf[len++] = state;
   }
-
-  if (best == -1) return;
-
-  struct kstep_task *t = &kstep_tasks[best];
-  struct queued_op op = t->ring[t->head];
-  t->head = (t->head + 1) % TASK_OP_QUEUE_SIZE;
-  execute_one_op(op.type, op.a, op.b, op.c);
+  buf[len++] = '\n';
+  kernel_write(f, buf, len, &pos);
 }
 
 void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
@@ -402,14 +387,8 @@ void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
    *       Send directly only when queue is empty AND state is ready.
    */
   if (is_task_signal_op(type)) {
-    if (!is_valid_task_id(a) || !kstep_tasks[a].p)
+    if (!is_valid_task_id(a) || !kstep_tasks[a].p || !op_task_state_ready(type, kstep_tasks[a].p))
       panic("Task %d not found", a);
-    struct kstep_task *t = &kstep_tasks[a];
-    bool queue_busy = (t->head != t->tail);
-    if (queue_busy || !op_task_state_ready(type, t->p)) {
-      enqueue_op(a, type, a, b, c);
-      return;
-    }
   }
 
   execute_one_op(type, a, b, c);

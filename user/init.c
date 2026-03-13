@@ -66,6 +66,7 @@ int main(int argc, char *argv[], char *envp[]) {
   mount_fs("/sys/fs/cgroup", "cgroup2");
   set_proc_affinity(0, 0); // Bind to cpu 0
   set_tty_raw_output("/dev/ttyS2"); // For code coverage data
+  set_tty_raw_output("/dev/ttyS3"); // For interactive communication
   load_kmod("kmod.ko", argc, argv, envp);
   panic("Kernel module exited unexpectedly");
 }

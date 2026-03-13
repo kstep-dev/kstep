@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
+import socket
+import time
 
 from checkout_linux import Linux, checkout_linux
 from run import (
@@ -9,7 +11,8 @@ from run import (
     make_linux,
     run_qemu,
 )
-from scripts import GLOBAL_SIGNAL_CORPUS, LOGS_DIR, cov_parse, generate_input, input_seq_from_log
+from scripts import LOGS_DIR, GLOBAL_SIGNAL_CORPUS, cov_parse, input_seq_from_log
+from scripts.gen_input_core import init_genstate, generate_next_command
 
 
 def assert_exec_matches_generated(log_file, seq):
@@ -40,14 +43,6 @@ def run_test(
     checkout_linux(linux.version, linux_name=linux_name, tarball=True)
     make_linux(linux_name=linux_name)
 
-    seq = generate_input(
-        steps=steps,
-        max_tasks=max_tasks,
-        max_cgroups=max_cgroups,
-        cpus=num_cpus,
-        seed=seed,
-    )
-
     driver = Driver(
         name="executor",
         num_cpus=num_cpus,
@@ -57,18 +52,54 @@ def run_test(
 
     log_file = LOGS_DIR / f"{linux_name}.log"
     cov_file = log_file.with_suffix(".cov")
-    input_file = log_file.with_suffix(".input")
-    # Pad with newlines to absorb bytes consumed during UART autoconfig.
-    # The 8250 driver briefly enables IER while probing, causing QEMU to
-    # deliver a few bytes from the input file which are then discarded.
-    input_file.write_text("\n" * 16 + seq.to_payload() + "EXIT\n")
-
-    run_qemu(
+    sock_file = log_file.with_suffix(".sock")
+    proc = run_qemu(
         linux_name=linux_name,
         driver=driver,
         log_file=log_file,
-        input_file=input_file,
+        sock_file=sock_file,
     )
+
+    # Connect to the socket. QEMU blocks (wait=on) until we connect, so retry
+    # until the socket file appears.
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    for _ in range(60):
+        try:
+            sock.connect(str(sock_file))
+            break
+        except (FileNotFoundError, ConnectionRefusedError):
+            time.sleep(0.1)
+    else:
+        raise RuntimeError(f"Timed out connecting to {sock_file}")
+
+    sf = sock.makefile("rb")
+    OP_TYPE_NR = 16  # marker byte written by kstep_write_state
+
+    def read_state() -> list[dict]:
+        """Read lines until a state message arrives, discarding TTY echo.
+        Returns list of {"id": int, "state": int} dicts."""
+        while True:
+            line = sf.readline()  # reads until b'\n'
+            if line and line[0] == OP_TYPE_NR:
+                payload = line[1:-1]  # strip marker and trailing '\n'
+                return [{"id": payload[i], "state": payload[i + 1]}
+                        for i in range(0, len(payload), 2)]
+
+    gen = init_genstate(max_tasks=max_tasks, max_cgroups=max_cgroups, cpus=num_cpus, seed=seed)
+
+    # Wait for the initial STATE from the kmod, signalling it is ready.
+    task_states = read_state()
+    print(f"kmod ready: {task_states}")
+
+    for i in range(steps):
+        op, a, b, c = generate_next_command(gen, task_states)
+        sock.sendall(f"{op},{a},{b},{c}\n".encode())
+        task_states = read_state()
+
+    sock.sendall(b"EXIT\n")
+    sock.close()
+    proc.wait()
+
 
     # assert_exec_matches_generated(log_file, seq)
     seq = input_seq_from_log(log_file)

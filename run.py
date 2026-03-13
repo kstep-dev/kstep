@@ -5,6 +5,7 @@ import dataclasses
 import logging
 import os
 import shutil
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -57,9 +58,10 @@ def run_qemu(
     driver: Driver,
     linux_name: str,
     log_file: Optional[Path] = None,
-    input_file: Optional[Path] = None,
+    sock_file: Optional[Path] = None,
     debug: bool = False,
-):
+) -> subprocess.Popen:
+    """Start QEMU in the background. Returns the process handle."""
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
@@ -123,12 +125,14 @@ def run_qemu(
         "-mon chardev=char0",
         serial_device("char0"),
         # input and output files
-        f"-chardev file,id=char1,path={output_file}"
-        + (f",input-path={input_file}" if input_file else ""),
+        f"-chardev file,id=char1,path={output_file}",
         serial_device("char1"),
         # cov file
         f"-chardev file,id=char2,path={cov_file}",
         serial_device("char2"),
+        # interactive generator communication: QEMU listens, Python connects
+        f"-chardev socket,id=char3,path={sock_file},server=on,wait=on",
+        serial_device("char3"),
         # acceleration
         f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]
@@ -139,7 +143,9 @@ def run_qemu(
     if debug:
         cmd += ["-s", "-S"]
 
-    system(" ".join(cmd))
+    cmd_str = " ".join(cmd)
+    logging.info(f"Starting QEMU: {cmd_str}")
+    return subprocess.Popen(cmd_str, shell=True)
 
 
 def print_run_results(
