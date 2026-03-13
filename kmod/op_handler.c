@@ -312,7 +312,7 @@ static const char op_strs[OP_TYPE_NR][30] = {
 /* Returns true if task p is in the state required to receive op type. */
 static bool op_task_state_ready(enum kstep_op_type type, struct task_struct *p) {
   if (type == OP_TASK_WAKEUP)
-    return !task_is_runnable(p);           /* task must be blocked/dequeued */
+    return p->__state != TASK_RUNNING;           /* task must be blocked/dequeued */
   return p->on_cpu;             /* all other signal ops need on-cpu */
 }
 
