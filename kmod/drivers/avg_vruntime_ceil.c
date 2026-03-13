@@ -107,14 +107,10 @@ static void run(void) {
   kstep_tick_repeat(5);
 }
 
-#else
-static void setup(void) { panic("unsupported kernel version"); }
-static void run(void) {}
-#endif
-
 KSTEP_DRIVER_DEFINE{
     .name = "avg_vruntime_ceil",
     .setup = setup,
     .run = run,
     .step_interval_us = 1000,
 };
+#endif
