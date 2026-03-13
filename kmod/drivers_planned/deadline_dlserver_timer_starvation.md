@@ -94,90 +94,118 @@ The triggering probability depends on the magnitude and duration of IRQ load. In
 
 ## Reproduce Strategy (kSTEP)
 
-The core challenge is reproducing the condition where `start_dl_timer()` fails because the dl_server's deadline has fallen behind `rq_clock`. In a real system this happens due to heavy IRQ load slowing down runtime consumption, but in kSTEP we can trigger the same code path by directly manipulating the dl_server's internal state.
+The fundamental challenge in reproducing this bug is that the triggering condition — the dl_server's deadline lagging far behind `rq_clock` — normally requires sustained heavy IRQ load that slows down `clock_task` relative to the wall clock. The previous strategy relied on directly writing to `dl_se->deadline` and `dl_se->runtime` to simulate this lag, but that violates the constraint against writing to internal scheduler fields. Instead, we exploit a timing-based approach using the kernel's **public debugfs interface** for dl_server configuration: we reconfigure the fair_server's CBS parameters to use the minimum allowed period (100 microseconds), while the kSTEP tick interval advances the clock by a much larger amount (10 milliseconds). This guarantees that by the time the first scheduler tick fires after the dl_server starts with the new parameters, the dl_server's deadline (only 100us into the future) has already been far surpassed by the clock advance (10ms), and the tiny runtime budget (50us) is also fully exhausted in the same tick's `delta_exec`. This deterministically triggers the exact code path where `start_dl_timer()` fails because `dl_next_period()` returns a time that is already in the past — the same failure mode as the original IRQ-induced bug on MediaTek platforms.
+
+### QEMU Configuration
+
+Use at least 2 CPUs: CPU 0 is reserved for the kSTEP driver, CPU 1 hosts the test scenario (the CFS task, the RT task, and the fair_server dl_server). Enable `CONFIG_DEBUG_FS` in the kernel build so that the fair_server debugfs interface is available at `/sys/kernel/debug/sched/fair_server/cpu1/`. The kernel source (in `kernel/sched/debug.c`) creates per-CPU debugfs directories under `/sys/kernel/debug/sched/fair_server/cpu<N>/` with `runtime` and `period` files that accept nanosecond values and go through `sched_server_write_common()`, which properly acquires the rq lock, calls `dl_server_stop()`, applies new parameters via `dl_server_apply_params()`, and calls `dl_server_start()`. No special boot parameters are needed beyond the standard kSTEP setup. Set `tick_interval_ns = 10000000` (10ms) in the driver configuration to guarantee a 100x gap between the dl_server's CBS period (100us) and the clock advance per tick.
 
 ### Step-by-step plan:
 
-1. **QEMU Configuration**: Use at least 2 CPUs (CPU 0 for driver, CPU 1 for the test scenario).
+1. **Create workload tasks in `setup()`**:
+   - Create one CFS task: `cfs_task = kstep_task_create()`. This task's presence on the runqueue activates the dl_server.
+   - Create one SCHED_FIFO task: `rt_task = kstep_task_create()`. This is the RT starvation victim.
 
-2. **Import required symbols**: Use `KSYM_IMPORT` to access internal scheduler structures:
+2. **Activate the dl_server on CPU 1 with default parameters**:
+   Pin the CFS task to CPU 1 using `kstep_task_pin(cfs_task, 1, 1)` and wake it with `kstep_task_wakeup(cfs_task)`. Run `kstep_tick_repeat(5)` to let the dl_server initialize and start servicing the CFS task with the default CBS parameters (`dl_runtime=50ms`, `dl_period=1s`). At this point, the dl_server is actively running on CPU 1's DL runqueue, and the CFS task executes through it.
+
+3. **Reconfigure the fair_server with a very short CBS period via debugfs**:
+   Use `kstep_write()` to write to the debugfs interface. Write runtime first, then period, to avoid the `runtime > period` validation check in `sched_server_write_common()`:
    ```c
-   KSYM_IMPORT(cpu_rq);  // or use cpu_rq() macro from sched.h internals
+   // Set runtime to 50us (50,000 ns). Current period is 1s, so 50us < 1s passes validation.
+   kstep_write("/sys/kernel/debug/sched/fair_server/cpu1/runtime", "50000\n", 6);
+   // Set period to 100us (100,000 ns, the minimum: dl_server_period_min = 100 * NSEC_PER_USEC).
+   // 50us runtime < 100us period passes validation.
+   kstep_write("/sys/kernel/debug/sched/fair_server/cpu1/period", "100000\n", 7);
    ```
-   Access the per-CPU runqueue's `fair_server` (`rq->fair_server`), which is the `struct sched_dl_entity` for the dl_server.
+   Each debugfs write internally calls `dl_server_stop()` → `dl_server_apply_params()` → `dl_server_start()` under the rq lock. After the period write, the dl_server restarts with `dl_runtime=50,000ns`, `dl_period=100,000ns`, `dl_deadline=100,000ns`, and `deadline = rq_clock + 100,000ns` (100us into the future from the current mocked sched_clock). This is a **public kernel configuration interface**, not a direct write to internal scheduler fields.
 
-3. **Create workload tasks**:
-   - Create one CFS task pinned to CPU 1 and wake it up. This ensures the dl_server will be active (there's fair work to service).
-   - Create one SCHED_FIFO task pinned to CPU 1 using `kstep_task_fifo(p)`. This is the RT task that should be running but will be starved.
+4. **Introduce the RT (FIFO) task on CPU 1**:
+   Convert the second task to SCHED_FIFO with `kstep_task_fifo(rt_task)`, pin it to CPU 1 with `kstep_task_pin(rt_task, 1, 1)`, and wake it with `kstep_task_wakeup(rt_task)`. The RT task enters CPU 1's RT runqueue but cannot run yet because the dl_server (DL scheduling class, which has strictly higher priority than RT) is active and serving the CFS task.
 
-4. **Let the system stabilize**: Run `kstep_tick_repeat(10)` to allow the dl_server to start servicing the CFS task and establish normal operation.
+5. **Trigger the bug with a single tick**:
+   Call `kstep_tick()`. This advances the mocked `sched_clock` by `tick_interval_ns` (10ms) and invokes `sched_tick()` on CPU 1 via `smp_call_function_single`. Inside `scheduler_tick()` → `task_tick_fair()` → `update_curr()` → `dl_server_update()` → `update_curr_dl_se()`, the following chain executes:
+   - `update_rq_clock(rq)` sets `rq_clock = old_clock + 10ms`.
+   - `delta_exec = rq_clock_task(rq) - dl_se->exec_start ≈ 10ms`.
+   - `dl_se->runtime = 50us − 10ms = −9,950us` (deeply negative → `dl_runtime_exceeded()` returns true).
+   - **Throttle path entered**: `dl_se->dl_throttled = 1`, then `dequeue_dl_entity(dl_se, 0)`.
+   - `start_dl_timer(dl_se)` computes `act = dl_next_period(dl_se)`. Since `dl_next_period = deadline − dl_deadline + dl_period = deadline` (because `dl_deadline == dl_period == 100us`), and `deadline = old_clock + 100us` while `rq_clock = old_clock + 10ms`, the activation time is 9.9ms in the past. The `ktime_us_delta(act, now) < 0` check fires → `start_dl_timer()` returns 0 (failure).
+   - **Buggy kernel**: `enqueue_dl_entity(dl_se, ENQUEUE_REPLENISH)` is called → `replenish_dl_entity()` tries to advance the deadline in a loop, finds it still behind `rq_clock`, calls `replenish_dl_new_period()` to reset, clears `dl_throttled = 0`, and `__enqueue_dl_entity()` puts the dl_server back on the DL runqueue. The RT task remains starved.
+   - **Fixed kernel**: `replenish_dl_new_period(dl_se, rq)` resets `deadline = rq_clock + dl_deadline` (now in the future), then `start_dl_timer(dl_se)` is called again — this time it succeeds because the activation time is in the future. `dl_throttled` **stays 1** (never cleared). The dl_server remains dequeued. The RT FIFO task gets scheduled.
 
-5. **Manipulate the dl_server's deadline to simulate the lagged condition**:
-   Access the `fair_server` on CPU 1's runqueue:
+6. **Observe the dl_server state (READ ONLY)**:
+   After the critical tick returns, read CPU 1's fair_server fields to detect the bug:
    ```c
    struct rq *rq1 = cpu_rq(1);
    struct sched_dl_entity *dl_se = &rq1->fair_server;
-   ```
-   Set the dl_server's deadline far in the past relative to `rq_clock(rq1)`:
-   ```c
-   // Simulate the condition where multiple CBS periods have elapsed
-   // Set deadline to be several periods behind rq_clock
-   dl_se->deadline = rq_clock(rq1) - 2 * dl_se->dl_period;
-   // Set runtime to a small positive value so it exhausts quickly
-   dl_se->runtime = 1000;  // 1 microsecond of remaining runtime
-   ```
 
-6. **Trigger the throttle path**: Run `kstep_tick()` to cause `update_curr_dl_se()` to be called. The small remaining runtime will be consumed, triggering the `throttle:` path. With the deadline far in the past, `start_dl_timer()` will fail, and the buggy code path will be taken.
-
-7. **Observe the bug**: After the tick, check the dl_server's state:
-   ```c
-   // On buggy kernel: dl_throttled should be 0 (improperly unthrottled)
-   // and the entity should be enqueued on the DL runqueue
-   if (dl_se->dl_throttled == 0 && on_dl_rq(dl_se)) {
-       kstep_fail("dl_server re-enqueued without throttle period");
+   // Primary indicator: is the dl_server properly throttled?
+   if (dl_se->dl_throttled == 0) {
+       kstep_fail("dl_server not throttled after runtime exceeded — RT starvation");
    }
-   ```
 
-8. **Check RT task scheduling**: Run several more ticks and observe which task runs on CPU 1:
-   ```c
-   kstep_tick_repeat(20);
-   // On buggy kernel: the CFS task keeps running via dl_server
-   // On fixed kernel: the RT (FIFO) task should be running
-   struct task_struct *curr = rq1->curr;
-   if (curr->policy == SCHED_FIFO) {
-       kstep_pass("RT task is running after dl_server throttle");
-   } else {
-       kstep_fail("RT task starved: curr policy=%d", curr->policy);
-   }
-   ```
-
-9. **Alternative detection via timer state**: Check whether `dl_timer` is properly armed:
-   ```c
-   // On buggy kernel: timer state is 0 (not armed), entity not throttled
-   // On fixed kernel: timer state is active, entity throttled
+   // Secondary indicator: is the replenishment timer properly armed?
    if (dl_se->dl_throttled == 1 && hrtimer_active(&dl_se->dl_timer)) {
-       kstep_pass("dl_server properly throttled with active timer");
-   } else {
-       kstep_fail("dl_server not properly throttled: throttled=%d timer_active=%d",
-                  dl_se->dl_throttled, hrtimer_active(&dl_se->dl_timer));
+       kstep_pass("dl_server properly throttled with active replenishment timer");
    }
    ```
+   All field reads (`dl_throttled`, `hrtimer_active()`) are purely observational. No internal state is modified.
 
-### Expected behavior:
-- **Buggy kernel**: After manipulating the deadline and triggering the throttle path, the dl_server will be immediately re-enqueued (`dl_throttled = 0`, on the DL runqueue). The RT task will not get to run. The `on_tick_begin` callback will show the CFS task (via dl_server) continuing to run.
-- **Fixed kernel**: The dl_server will remain throttled (`dl_throttled = 1`) with a properly armed timer. The RT (FIFO) task will be scheduled to run on CPU 1 during the throttle interval.
+7. **Verify RT task scheduling over multiple ticks (READ ONLY)**:
+   Run `kstep_tick_repeat(20)` and monitor `rq1->curr->policy` in the `on_tick_end` callback:
+   ```c
+   struct rq *rq1 = cpu_rq(1);
+   struct task_struct *curr = rq1->curr;
+   if (curr->policy == SCHED_FIFO)
+       kstep_pass("RT task running on CPU 1: pid=%d", curr->pid);
+   else
+       kstep_fail("RT task starved: curr pid=%d policy=%d", curr->pid, curr->policy);
+   ```
+   - **Buggy kernel**: `rq1->curr` remains the CFS task on every tick (the dl_server is perpetually re-enqueued without a throttle interval, creating an infinite cycle of runtime-exceeded → timer-fail → re-enqueue).
+   - **Fixed kernel**: `rq1->curr` switches to the RT FIFO task during the dl_server's throttle interval. When the replenishment timer fires on a subsequent tick, the dl_server is re-activated and the CFS task runs briefly, then the cycle repeats normally.
+
+### Why this works without writing to internal scheduler fields
+
+The entire approach uses only public interfaces and read-only internal access:
+- **debugfs** (`/sys/kernel/debug/sched/fair_server/cpu1/{runtime,period}`) is the kernel's official interface for reconfiguring dl_server CBS parameters, exposed to userspace and implemented in `kernel/sched/debug.c`. The write handler properly manages locking, stopping, parameter application, and restarting. This is fundamentally different from directly assigning to `dl_se->deadline` or `dl_se->runtime`.
+- **kstep_write()** is a standard kSTEP API (`driver.h`) for writing to filesystem paths, using `filp_open` + `kernel_write` + `filp_close`.
+- **Task creation, pinning, wakeup, and policy change** (`kstep_task_create`, `kstep_task_pin`, `kstep_task_wakeup`, `kstep_task_fifo`) are standard kSTEP APIs that invoke public kernel scheduling interfaces (`sched_setscheduler`, `set_cpus_allowed_ptr`, `wake_up_process`).
+- **Tick progression** (`kstep_tick`, `kstep_tick_repeat`) is a kSTEP API that invokes `sched_tick()` on remote CPUs.
+- **All reads** of `cpu_rq(1)->fair_server.dl_throttled`, `rq->curr`, `hrtimer_active()`, etc. are purely observational.
+
+The key insight is that by making the CBS period (100us) much shorter than the tick interval (10ms), we deterministically create the condition where the deadline expires before the tick fires. This is functionally equivalent to the IRQ-induced time lag in the original MediaTek bug report: in both cases, the dl_server's runtime takes longer than one CBS period to be consumed (due to IRQ-slowed `clock_task` in the original case, or due to the tick granularity being coarser than the period in our case), causing the deadline to fall behind `rq_clock` by the time `update_curr_dl_se()` triggers the throttle path.
+
+### kSTEP Driver Configuration:
+
+```c
+KSTEP_DRIVER_DEFINE{
+    .name = "dlserver_timer_starvation",
+    .setup = setup,
+    .run = run,
+    .on_tick_end = on_tick_end,      // observe rq->curr and dl_server state each tick
+    .step_interval_us = 1000,        // 1ms real-time sleep between steps
+    .tick_interval_ns = 10000000,    // 10ms virtual clock advance per tick (>> 100us period)
+};
+```
+
+The `tick_interval_ns = 10ms` ensures the dl_server's 100us deadline is 100x behind the clock at the first tick, making the `start_dl_timer()` failure absolute and deterministic regardless of the kernel's HZ configuration. The `on_tick_end` callback runs after `sched_tick()` has executed and `kstep_sleep()` has given time for context switches, providing a reliable observation point.
 
 ### kSTEP Callbacks:
-- Use `on_tick_begin` or `on_tick_end` to inspect `rq->fair_server.dl_throttled`, `rq->curr->policy`, and `hrtimer_active(&rq->fair_server.dl_timer)` on each tick.
-- Log the dl_server's `deadline`, `runtime`, `dl_throttled`, and the current task's comm/pid/policy on CPU 1.
+- Use `on_tick_end` to inspect `cpu_rq(1)->fair_server.dl_throttled`, `cpu_rq(1)->curr->policy`, and `hrtimer_active(&cpu_rq(1)->fair_server.dl_timer)` after each tick.
+- Log the dl_server's `deadline`, `runtime`, `dl_throttled`, and the current task's `comm`/`pid`/`policy` on CPU 1 for diagnostic output.
+
+### Expected behavior:
+- **Buggy kernel (v6.8 – v6.17-rc3)**: After the critical tick, the dl_server is immediately re-enqueued with a fresh budget via `enqueue_dl_entity(ENQUEUE_REPLENISH)`. `dl_throttled == 0`. The `dl_timer` is not armed (`hrtimer_active` returns false). The CFS task continues running through the dl_server indefinitely because on every subsequent tick, the same cycle repeats: runtime exceeded → `start_dl_timer` fails (the short period guarantees the deadline is always behind) → re-enqueue with `ENQUEUE_REPLENISH`. The RT FIFO task is permanently starved. Test reports **FAIL**.
+- **Fixed kernel (v6.17-rc4+)**: After the critical tick, `replenish_dl_new_period()` resets the deadline to `rq_clock + dl_deadline` (now in the future), then `start_dl_timer()` succeeds. `dl_throttled == 1`. The `dl_timer` is armed. The dl_server stays dequeued from the DL runqueue, and the RT FIFO task is scheduled to run on CPU 1 during the throttle interval. When the timer fires on a subsequent tick, the dl_server is replenished and serves the CFS task again briefly. Normal DL/RT cycling is observed. Test reports **PASS**.
 
 ### Potential kSTEP extensions needed:
-- None fundamental. The driver can directly access `rq->fair_server` through `internal.h` / `sched.h` includes, and manipulate the `deadline` and `runtime` fields. The `cpu_rq()` macro and `rq_clock()` are already available through kSTEP's internal access to `kernel/sched/sched.h`.
-- If `hrtimer_active()` is not directly accessible, the driver can check `dl_se->dl_timer.state` directly.
+- None fundamental. The driver reads `rq->fair_server` through kSTEP's internal access to `kernel/sched/sched.h` (via `cpu_rq()` macro). `hrtimer_active()` is a public inline function from `<linux/hrtimer.h>`. The `kstep_write()` API handles writing to debugfs paths.
+- Ensure `CONFIG_DEBUG_FS=y` in the kernel build configuration (this is the default on most kernel configs and is required for the debugfs-based fair_server parameter interface).
 
 ### Guard with version check:
 ```c
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6,8,0)
-// dl_server / fair_server available since v6.8
+// dl_server / fair_server available since v6.8 (63ba8422f876)
+// debugfs interface for fair_server parameters available in kernel/sched/debug.c
 #endif
 ```

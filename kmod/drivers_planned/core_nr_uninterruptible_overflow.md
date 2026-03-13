@@ -79,52 +79,73 @@ For a kSTEP driver, the overflow can be simulated by directly setting `rq->nr_un
 
 ## Reproduce Strategy (kSTEP)
 
-The strategy is to directly set `rq->nr_uninterruptible` to a value exceeding `INT_MAX` on one CPU, then trigger the load average calculation and observe that the result is incorrect on the buggy kernel but correct on the fixed kernel.
+The strategy uses only natural task operations — block, migrate via affinity pin, and wake — to trigger unsigned underflow of `rq->nr_uninterruptible` on a target CPU, then reads internal scheduler state (never writes it) to detect whether the bug is present. The core mechanism exploits the differential-counter design of `nr_uninterruptible`: blocking a task increments the counter on the blocking CPU, while waking the same task decrements it on the waking CPU. By forcing these to occur on different CPUs, we create an unsigned underflow on the waking CPU (0 → UINT_MAX on the buggy kernel, 0 → ULONG_MAX on the fixed kernel). The type difference is detectable by reading back the wrapped value and by checking `sizeof`.
 
 ### Step-by-step plan:
 
-1. **Topology setup:** Configure QEMU with at least 2 CPUs. No special topology is needed — a simple SMP configuration suffices. Call `kstep_topo_init()` if needed for a basic 2-CPU setup.
+1. **Topology and boot setup:** Configure QEMU with at least 3 CPUs (`-smp 3`): CPU 0 is reserved for the kSTEP driver, CPU 1 serves as the "blocking" CPU, and CPU 2 serves as the "waking" CPU. No special topology, NUMA configuration, or boot parameters are needed beyond the CPU count — a flat SMP arrangement suffices. The driver does not call `kstep_topo_init()` since no custom topology is required.
 
-2. **Access internal state:** Use `KSYM_IMPORT` to access the following symbols:
-   - `cpu_rq()` macro (already available via `internal.h`) to get the per-CPU runqueue.
-   - `calc_load_tasks` (an `atomic_long_t` in loadavg.c) to observe the load average input.
-   - `avenrun` (an `unsigned long[3]` in loadavg.c) to observe the computed load averages.
-   - `calc_load_fold_active` function — or alternatively, just set the state and let the periodic timer invoke it.
+2. **Import symbols for read-only observation:** Use `KSYM_IMPORT` to import the following kernel symbols for observation only — no direct writes to any of these:
+   - `calc_load_tasks` (`atomic_long_t` in `kernel/sched/loadavg.c`) — the global load counter fed by `calc_load_fold_active()`.
+   - `avenrun` (`unsigned long[3]` in `kernel/sched/loadavg.c`) — the 1/5/15-minute load averages.
+   - `calc_load_fold_active` (function) — imported so we can call it to observe its return value after the natural state setup. Calling this kernel function is permitted; it reads `rq->nr_uninterruptible` and `rq->nr_running` and updates `rq->calc_load_active` as a side effect through the kernel's own code path, which is distinct from a direct field write by the driver.
 
-3. **Create a baseline:** Before modifying any state, create one or two CFS tasks with `kstep_task_create()` and let them run for a few ticks (`kstep_tick_repeat(100)`) to establish a stable load average baseline. Record the initial values of `avenrun[0]`, `avenrun[1]`, and `avenrun[2]`, and `atomic_long_read(&calc_load_tasks)`.
+   The per-CPU runqueue is accessed via the `cpu_rq()` macro already available through `internal.h`. All field accesses on the runqueue (`nr_uninterruptible`, `nr_running`, `calc_load_active`) are reads only.
 
-4. **Set up the overflow condition:** Directly write to `cpu_rq(1)->nr_uninterruptible` and set it to a value above `INT_MAX`, such as `0x80000010` (2,147,483,664). This simulates the state of a CPU that has had billions of tasks block on it and wake up elsewhere over a long uptime.
+3. **Record baseline state:** Before any task manipulation, record and log:
+   - `cpu_rq(1)->nr_uninterruptible` and `cpu_rq(2)->nr_uninterruptible` (expected to be 0 or near-zero at boot).
+   - `sizeof(cpu_rq(1)->nr_uninterruptible)` — this compile-time constant is the most direct indicator of the bug: **4 bytes** means the field is `unsigned int` (buggy), **8 bytes** means `unsigned long` (fixed). Log this value prominently.
+   - `atomic_long_read(&calc_load_tasks)` and `avenrun[0]` for load average baseline.
 
-5. **Trigger load average recalculation:** Run `kstep_tick_repeat(N)` where N is large enough to trigger at least one `calc_load_fold_active()` invocation. The load average is recalculated every `LOAD_FREQ` (5 * HZ + 1) ticks. So running for at least 5 * HZ ticks (e.g., `kstep_tick_repeat(5 * HZ + 10)`) should trigger at least one recalculation cycle.
+4. **Create and position the test task:** Call `kstep_task_create()` to create a CFS task. Pin it to CPU 1 with `kstep_task_pin(task, 1, 1)`. Run `kstep_tick_repeat(5)` to allow the scheduler to place and run the task on CPU 1. Verify by reading `cpu_rq(1)->nr_running` that the task is on CPU 1. This task will be the vehicle for the block-migrate-wake cycle.
 
-6. **Observe the result:** After the ticks, read `atomic_long_read(&calc_load_tasks)` and `avenrun[0]`.
-   - **On the buggy kernel:** `calc_load_fold_active()` casts `nr_uninterruptible` (which is `unsigned int` = `0x80000010`) via `(int)`, yielding `-2147483632`. This massive negative value is added to `nr_active`, producing a very negative delta that drives `calc_load_tasks` deeply negative. The `avenrun[]` values will drop to zero or be wildly incorrect.
-   - **On the fixed kernel:** `calc_load_fold_active()` casts `nr_uninterruptible` (which is `unsigned long` = `0x80000010`) via `(long)`, yielding `2147483664`. This correct positive value is added to `nr_active`, producing a large positive delta that correctly reflects in `calc_load_tasks`. The `avenrun[]` values will be extremely high (reflecting billions of "active" tasks), which is the correct behavior given the artificial state.
+5. **Execute the block-migrate-wake cycle to trigger underflow:** This is the core of the reproduction. The cycle is performed in three phases, and can be repeated N times (e.g., N = 100) for amplification:
 
-7. **Pass/fail criteria:**
-   - Read `calc_load_tasks` after the tick sequence. If it is negative or zero when `nr_uninterruptible` was set to a large positive value, the bug is present → `kstep_fail("calc_load_tasks is %ld, expected large positive", val)`.
-   - If `calc_load_tasks` is a large positive value (reflecting the artificial nr_uninterruptible), the bug is fixed → `kstep_pass("calc_load_tasks correctly reflects nr_uninterruptible=%lu", nr_unintr)`.
+   **Phase A — Block on CPU 1:** Call `kstep_task_block(task)`. This puts the task into `TASK_UNINTERRUPTIBLE` sleep. The kernel's `__block_task()` function checks `p->sched_contributes_to_load` (which is true for plain `TASK_UNINTERRUPTIBLE`, as opposed to `TASK_UNINTERRUPTIBLE | TASK_NOLOAD`) and increments `cpu_rq(1)->nr_uninterruptible`. The task is dequeued from CPU 1's runqueue. Run `kstep_tick()` to ensure the state transition completes.
 
-8. **Alternative approach — observe via delta:** Instead of reading absolute values, we can focus on the delta returned by `calc_load_fold_active()` directly:
-   - Use `KSYM_IMPORT(calc_load_fold_active)` to import the function.
-   - Set `rq->nr_uninterruptible = 0x80000010` and `rq->calc_load_active = 0` on a target CPU's rq.
-   - Call `calc_load_fold_active(rq, 0)` and check the return value.
-   - On the buggy kernel, the delta will be negative (approximately -2147483632).
-   - On the fixed kernel, the delta will be positive (approximately 2147483664).
-   - This is more precise and doesn't require waiting for periodic timer invocation.
+   **Phase B — Change affinity to CPU 2:** Call `kstep_task_pin(task, 2, 2)` to restrict the task's CPU affinity to only CPU 2. Since the task is currently sleeping (not on any runqueue), this merely updates the task's `cpus_mask` — no migration occurs yet and no runqueue counters are touched.
 
-9. **Kernel version guard:** Guard the driver with `#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)` since the bug was introduced in v5.14-rc1 (commit `e6fe3f422be1`). The driver is valid for all kernels from v5.14 through v6.16-rc6.
+   **Phase C — Wake on CPU 2:** Call `kstep_task_wakeup(task)`. The kernel's `try_to_wake_up()` selects CPU 2 as the target (the only CPU allowed by the affinity mask) and calls `ttwu_do_activate()` on CPU 2's runqueue. This function checks `p->sched_contributes_to_load` and decrements `cpu_rq(2)->nr_uninterruptible`. Since CPU 2's counter was 0 (or already wrapped from previous iterations), this causes an unsigned underflow: **on the buggy kernel**, `(unsigned int)0 - 1 = 0xFFFFFFFF`; **on the fixed kernel**, `(unsigned long)0 - 1 = 0xFFFFFFFFFFFFFFFF`. Run `kstep_tick()` to let the task settle on CPU 2.
 
-10. **Logging:** Add detailed logging:
-    - Print the value of `nr_uninterruptible` before and after setting it.
-    - Print `sizeof(cpu_rq(1)->nr_uninterruptible)` to confirm the type size (4 bytes on buggy, 8 bytes on fixed).
-    - Print the result of the `(int)` vs `(long)` cast to show the truncation.
-    - Print `calc_load_tasks` and `avenrun[0]` before and after triggering the recalculation.
+   **Phase D — Repin to CPU 1 for next iteration:** Call `kstep_task_pin(task, 1, 1)` and `kstep_tick_repeat(3)` to migrate the task back to CPU 1 before the next cycle. This does not affect `nr_uninterruptible` (migration of a running/runnable task does not touch this counter).
+
+6. **Observe the underflow — primary detection:** After completing N block-migrate-wake cycles, read `cpu_rq(2)->nr_uninterruptible` into an `unsigned long` variable. The key observation:
+   - **On the buggy kernel (unsigned int field):** The field is 4 bytes. The value `(unsigned int)(0 - N)` wraps to `UINT_MAX - N + 1`. When read into an `unsigned long`, the compiler zero-extends it, yielding a value ≤ `UINT_MAX` (4,294,967,295). For N = 1, this is exactly `0xFFFFFFFF`.
+   - **On the fixed kernel (unsigned long field):** The field is 8 bytes. The value `(unsigned long)(0 - N)` wraps to `ULONG_MAX - N + 1`, which is far larger than `UINT_MAX`. For N = 1, this is `0xFFFFFFFFFFFFFFFF` (18,446,744,073,709,551,615).
+
+   The runtime test is: if the read-back value is `<= (unsigned long)UINT_MAX`, the field is `unsigned int` and the bug is present. If it exceeds `UINT_MAX`, the field is `unsigned long` and the fix is in place. This cleanly distinguishes buggy from fixed kernels using only a READ of the internal field after natural task operations created the state.
+
+7. **Observe the counterpart — verify differential counter:** Also read `cpu_rq(1)->nr_uninterruptible`, which should equal N (the number of tasks that blocked on CPU 1 and were migrated away). Log both CPUs' values and verify that their unsigned sum equals 0 (mod 2^32 on buggy, mod 2^64 on fixed), confirming the differential counter property: the global sum is correct (no tasks are currently uninterruptible) even though individual per-CPU values have wrapped.
+
+8. **Verify load average impact via calc_load_fold_active:** Import and call `calc_load_fold_active(cpu_rq(2), 0)` to observe the delta it computes for CPU 2. The function reads `cpu_rq(2)->nr_uninterruptible` and casts it via `(int)` (buggy) or `(long)` (fixed):
+   - **For small N (e.g., N = 100):** Both casts produce `-N` (i.e., `-100`), which is mathematically correct. The two's complement representation of small negative values is identical whether the intermediate type is `int` or `long`. This demonstrates that the code path functions correctly for small differential values — the bug is latent.
+   - **Extrapolation to production failure:** Log the computed delta alongside a manual computation of what the `(int)` cast would produce if `cpu_rq(1)->nr_uninterruptible` had reached `0x80000010` (as it would after ~2.15 billion block-migrate cycles on a long-running server): `(int)0x80000010 = -2147483632` versus the correct `(long)0x80000010 = 2147483664`. This demonstrates the silent corruption that occurs in production after days-to-weeks of uptime with migrating I/O-bound workloads.
+
+9. **Trigger periodic load average recalculation:** Run `kstep_tick_repeat(5 * HZ + 10)` to trigger at least one full `LOAD_FREQ` cycle, causing the kernel's periodic timer to call `calc_load_fold_active()` on each CPU and update `calc_load_tasks` and `avenrun[]`. Read these values after the tick sequence and compare to baseline. For the small N used in the test, both buggy and fixed kernels produce correct load averages — but the sizeof and value-range checks already identified the vulnerable type.
+
+10. **Pass/fail criteria — three independent checks:**
+    - **Check 1 (sizeof, compile-time type detection):** `sizeof(cpu_rq(1)->nr_uninterruptible)`. If `== 4` → `unsigned int` → bug present → `kstep_fail("nr_uninterruptible is unsigned int (%zu bytes), vulnerable to overflow", sz)`. If `== 8` → `unsigned long` → bug fixed → `kstep_pass(...)`.
+    - **Check 2 (value-range, runtime underflow detection):** Read `cpu_rq(2)->nr_uninterruptible` after the block-migrate-wake cycles. If the value `<= (unsigned long)UINT_MAX` → wrapping is bounded to 32 bits → bug present → `kstep_fail(...)`. If the value `> (unsigned long)UINT_MAX` → 64-bit wrapping → fixed → `kstep_pass(...)`.
+    - **Check 3 (cast simulation, impact projection):** Manually compute `(int)(unsigned int)nr_unintr_cpu1` and `(long)nr_unintr_cpu1` for CPU 1's accumulated positive value. For the small test values, both casts agree. Log the projected divergence point (`INT_MAX + 1 = 0x80000000`) and the corresponding production time estimate. This is informational rather than a pass/fail gate, since the actual divergence requires infeasible cycle counts in a test.
+
+    The driver should `kstep_fail()` if either Check 1 or Check 2 indicates the buggy type, and `kstep_pass()` if both confirm the fixed type.
+
+11. **Kernel version guard:** Guard the driver with `#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 14, 0)` since the bug was introduced in v5.14-rc1 (commit `e6fe3f422be1`). The driver is valid for all kernels from v5.14 through v6.16-rc6.
+
+12. **Logging:** Output detailed diagnostics at each stage:
+    - `sizeof(rq->nr_uninterruptible)` to show field type size (the single most important output).
+    - CPU 1 and CPU 2's `nr_uninterruptible` values before and after the block-migrate-wake cycles, in both decimal and hexadecimal.
+    - The number of cycles N performed and the resulting per-CPU counter values.
+    - The unsigned sum of both CPUs' `nr_uninterruptible` values (should be 0 modulo the type width, confirming the differential counter invariant).
+    - The return value of `calc_load_fold_active(cpu_rq(2), 0)`.
+    - The `(int)` vs `(long)` cast of a hypothetical `0x80000010` value, showing the production failure mode.
+    - `calc_load_tasks` and `avenrun[0]` before and after the tick sequence.
+    - Extrapolated time to reach `INT_MAX` based on a hypothetical 10,000-blocks/second production workload (~2.5 days).
 
 ### Expected behavior:
 
-- **Buggy kernel (v5.14-rc1 to v6.16-rc6):** `sizeof(rq->nr_uninterruptible) == 4`. Setting it to `0x80000010` and calling `calc_load_fold_active()` returns a negative delta (approximately `-2147483632`). The load average is driven to zero or becomes erratic.
+- **Buggy kernel (v5.14-rc1 to v6.16-rc6):** `sizeof(rq->nr_uninterruptible) == 4` (unsigned int). After N block-on-CPU1/wake-on-CPU2 cycles, CPU 2's `nr_uninterruptible` wraps to `UINT_MAX - N + 1` (bounded ≤ 4,294,967,295). CPU 1's value equals N. The `(int)` cast in `calc_load_fold_active()` produces correct results for the small test values, but the type-size and value-range checks identify the kernel as vulnerable. In production, after ~2.15 billion block-migrate cycles on a single CPU (reachable in days on busy servers), the `(int)` cast of the accumulated positive value would overflow `INT_MAX`, producing a large negative number that corrupts the system load average.
 
-- **Fixed kernel (v6.16-rc7+):** `sizeof(rq->nr_uninterruptible) == 8`. Setting it to `0x80000010` and calling `calc_load_fold_active()` returns a correct large positive delta (approximately `2147483664`). The load average correctly reflects the artificially high uninterruptible count.
+- **Fixed kernel (v6.16-rc7+):** `sizeof(rq->nr_uninterruptible) == 8` (unsigned long). After the same cycles, CPU 2's `nr_uninterruptible` wraps to `ULONG_MAX - N + 1` (far exceeding `UINT_MAX`). The `(long)` cast handles this correctly, and the 64-bit counter cannot practically overflow (would require billions of years of continuous operation). Both type-size and value-range checks confirm the fix.
 
-The simplest and most reliable approach is to use the direct function call method (step 8), as it avoids timing dependencies and directly tests the buggy code path. The type-size check (`sizeof`) can serve as an additional confirmation.
+This approach never writes to any internal scheduler field. All state changes to `nr_uninterruptible` occur through the kernel's own `__block_task()` and `ttwu_do_activate()` code paths, triggered indirectly by kSTEP's task block/wake/pin APIs. The driver only reads internal state for observation and verification.

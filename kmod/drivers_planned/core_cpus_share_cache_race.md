@@ -133,90 +133,138 @@ The probability of hitting this race in any single wakeup+rebuild overlap is ext
 
 ### Overview
 
-This bug is a data race between `cpus_share_cache()` (called during task wakeup) and `update_top_cache_domain()` (called during scheduling domain rebuild). The core challenge for kSTEP reproduction is hitting the extremely narrow race window where `sd_llc_id[X]` changes between two consecutive reads.
+This bug is a data race between `cpus_share_cache()` (called during task wakeup via `try_to_wake_up()`) and `update_top_cache_domain()` (called during scheduling domain rebuild). The race window is extremely narrow — only 1-3 instructions between the two `per_cpu(sd_llc_id, X)` reads in `cpus_share_cache()`. Reproducing this bug requires overlapping a local wakeup (where `smp_processor_id() == task_cpu(wakee)`) with a concurrent domain rebuild that transiently changes the `sd_llc_id` value for the target CPU. This strategy uses only public kernel APIs and kSTEP interfaces to trigger both the wakeup and the domain rebuild, relying on read-only access to internal scheduler state (`sd_llc_id`, `WARN_ON_ONCE` flag) solely for observation and verdict determination. No internal scheduler state is written.
 
-### Strategy 1: Probabilistic Concurrent Stress
+### Strategy 1: Cpuset-Driven Domain Rebuild with Concurrent Kthread Wakeups (Primary)
 
-This approach creates concurrent wakeup traffic on a non-driver CPU while the driver CPU triggers repeated topology rebuilds.
+This approach uses cpuset reconfiguration — the realistic trigger described in the original bug report — to drive scheduling domain rebuilds while kthreads bound to a target CPU perform local wakeups that traverse the `cpus_share_cache()` code path.
 
 **Setup:**
-1. Configure QEMU with at least 3 CPUs (CPU 0 for driver, CPU 1 and CPU 2 for workload).
-2. No special topology beyond the default (all CPUs in one LLC domain initially).
+1. Configure QEMU with 4 CPUs (CPU 0 for the driver, CPUs 1-3 for workload). Use boot parameters `idle=poll` to prevent CPUs from entering deep idle states, which improves timing determinism and keeps CPUs responsive to scheduling events. Optionally add `nosmt` to simplify the topology and make LLC domain changes more pronounced.
+2. Create two cpuset cgroups that will be toggled to trigger domain rebuilds:
+   ```c
+   kstep_cgroup_create("groupA");
+   kstep_cgroup_set_cpuset("groupA", "1-3");
+   kstep_cgroup_create("groupB");
+   kstep_cgroup_set_cpuset("groupB", "1-2");
+   ```
+3. Create 4-6 kthread pairs (waker and wakee), all bound to CPU 1 via `kstep_kthread_bind()` with a CPU 1-only mask. Start them with `kstep_kthread_start()`. The key requirement is that the waker runs on CPU 1 so that `__wake_up_sync()` inside `do_syncwakeup` calls `try_to_wake_up()` from CPU 1's context. Since the wakee was also blocked on CPU 1, `task_cpu(wakee) == 1` and `smp_processor_id() == 1`, producing the critical `cpus_share_cache(1, 1)` call.
+4. Let all kthreads settle with `kstep_tick_repeat(5)`.
 
-**Task Creation:**
-1. Create a pair of kthreads: `waker` and `wakee`, both bound to CPU 1 via `kstep_kthread_bind()`.
-2. Start both kthreads with `kstep_kthread_start()`.
-3. Let them settle with a few `kstep_tick()` calls.
-
-**Execution Loop (repeat many times):**
-1. Block `wakee` with `kstep_kthread_block(wakee)` — this makes `wakee` call `wait_event()` → `schedule()` on CPU 1.
-2. Wait briefly for `wakee` to actually block (a few `kstep_tick()` calls).
-3. Call `kstep_kthread_syncwake(waker, wakee)` — this is non-blocking; it sets `waker`'s action to `do_syncwakeup`, which will call `__wake_up_sync()` from CPU 1's context.
-4. **Immediately** call `kstep_topo_apply()` on the driver (CPU 0). This calls `rebuild_sched_domains()` → `partition_sched_domains_locked()` → `update_top_cache_domain()` for all CPUs, including CPU 1.
-5. The goal: the wakeup on CPU 1 (step 3) and the domain rebuild on CPU 0 (step 4) overlap, hitting the race window in `cpus_share_cache(1, 1)`.
-6. After each iteration, re-create `waker` and `wakee` (since `kstep_kthread_syncwake` causes the waker to exit).
+**Execution Loop (repeat 200+ iterations):**
+1. Block all wakee kthreads with `kstep_kthread_block(wakee_i)` for each pair. This puts them into `TASK_INTERRUPTIBLE` sleep on their internal wait queues on CPU 1.
+2. Wait for the wakees to actually deschedule: `kstep_tick_repeat(3)`.
+3. For each waker/wakee pair, call `kstep_kthread_syncwake(waker_i, wakee_i)`. This is non-blocking from the driver's perspective — it sets the waker's action to `do_syncwakeup` and signals the change. The actual `__wake_up_sync()` call happens asynchronously when the waker kthread is next scheduled on CPU 1.
+4. **Immediately** (without any intervening tick or sleep) toggle the cpuset configuration to trigger a domain rebuild:
+   ```c
+   kstep_cgroup_set_cpuset("groupA", "1-2");  // or toggle back to "1-3"
+   ```
+   This calls `partition_sched_domains_locked()` → `detach_destroy_domains()` → `cpu_attach_domain(NULL, ...)` → `update_top_cache_domain(1)` on CPU 0. During the detach phase, `sd_llc_id[1]` transiently changes from its LLC leader value (e.g., 0 or 1) to `1` (the CPU's own ID). During the subsequent domain rebuild, it may change back to the LLC leader ID. These transient value changes create the race window.
+5. The goal: a waker on CPU 1 executing `__wake_up_sync()` → `try_to_wake_up()` → `ttwu_queue_cond()` → `cpus_share_cache(1, 1)` overlaps with `update_top_cache_domain(1)` writing `per_cpu(sd_llc_id, 1)` between the two reads.
+6. After each iteration, wait for kthreads to settle (`kstep_tick_repeat(3)`) and re-create the waker kthreads (since `kstep_kthread_syncwake` causes the waker to exit after performing the wakeup action). Alternate the cpuset configuration between `"1-3"` and `"1-2"` to ensure a different LLC partition on each iteration, maximizing the chance that `sd_llc_id[1]` actually changes value.
 
 **Detection:**
-- Use `KSYM_IMPORT` to import the `__warned` variable associated with the `WARN_ON_ONCE` in `ttwu_queue_wakelist()`, or check kernel log (`dmesg`) for the warning string.
-- Alternatively, import `sd_llc_id` via `KSYM_IMPORT` and read `per_cpu(sd_llc_id, 1)` in a tight loop on CPU 0 during topology changes to confirm that value changes are observable.
+Import the kernel's `sd_llc_id` per-CPU variable (read-only) via `KSYM_IMPORT(sd_llc_id)` and periodically read `per_cpu(sd_llc_id, 1)` from the driver on CPU 0 to confirm that values are actually changing during cpuset toggles. This read-only observation validates that the race window exists even if the WARN does not fire. For the actual bug signal, check the kernel log for the `WARN_ON_ONCE` in `ttwu_queue_wakelist()`. The `kstep_print_sched_debug()` function can dump relevant scheduler state after each batch of iterations.
 
-**Limitations:** The race window is ~1-3 instructions wide. Even with many iterations, hitting it is probabilistic. This strategy may require thousands of iterations or may not reliably trigger the bug in QEMU (which has lower concurrency resolution than real hardware).
+### Strategy 2: KCSAN-Assisted Data Race Detection
 
-### Strategy 2: Deterministic Verification via sd_llc_id Manipulation
+The Kernel Concurrency Sanitizer (KCSAN) can detect the data race between `cpus_share_cache()` and `update_top_cache_domain()` without requiring the race to produce an observable incorrect result. This transforms the problem from hitting a 1-3 instruction race window to simply having concurrent access — a much wider target.
 
-This approach directly verifies the consequence of the race by manipulating `sd_llc_id` to create the state that the race would produce, then observing the incorrect `cpus_share_cache` behavior.
-
-**Setup:**
-1. Configure QEMU with 2+ CPUs.
-2. Import `sd_llc_id` via `KSYM_IMPORT`:
-   ```c
-   KSYM_IMPORT(sd_llc_id);
-   ```
-
-**Verification Steps:**
-1. Read the initial value of `per_cpu(sd_llc_id, 1)` (e.g., it's 0 if CPU 0 is the LLC group leader).
-2. On the buggy kernel: observe that `cpus_share_cache(1, 1)` reads `sd_llc_id[1]` twice. If we could insert a write between those reads, it would return false.
-3. Since we can't directly control instruction-level timing, instead verify the fix behavior:
-   - On the **fixed kernel**: Call `cpus_share_cache(1, 1)` after modifying `per_cpu(sd_llc_id, 1)` to an arbitrary value. The fix's early return (`this_cpu == that_cpu → true`) ensures it always returns `true` regardless of `sd_llc_id` value.
-   - On the **buggy kernel**: Call `cpus_share_cache(1, 1)` after modifying `per_cpu(sd_llc_id, 1)`. Both reads see the same (wrong) value, so it still returns `true`. This doesn't demonstrate the race, but confirms the code path difference.
-
-**Enhancement — Widening the race window:**
-To make the probabilistic approach more reliable, a minor kSTEP extension could add a wrapper that:
-1. Patches `cpus_share_cache` at runtime (via `KSYM_IMPORT` + `text_poke()` or ftrace) to call a custom function that inserts a `udelay()` or `cpu_relax()` loop between the two `per_cpu` reads.
-2. This widens the race window from ~nanoseconds to ~microseconds, making the concurrent approach (Strategy 1) far more likely to hit the race.
-
-### Strategy 3: Kthread-Driven Concurrent Stress (Recommended)
-
-This is a refined version of Strategy 1 that maximizes the number of race attempts.
-
-**Setup:**
-1. Configure QEMU with 3+ CPUs.
-2. Create 6-8 kthreads bound to CPU 1 (3-4 waker/wakee pairs).
+**Kernel Build Configuration:**
+Build the test kernel with `CONFIG_KCSAN=y` and `CONFIG_KCSAN_REPORT_ONCE_IN_MS=0` (to report every instance, not rate-limited). This enables compiler instrumentation that detects unsynchronized concurrent accesses to the same memory location where at least one is a write.
 
 **Execution:**
-1. Block all wakee kthreads.
-2. For each waker/wakee pair, call `kstep_kthread_syncwake(waker, wakee)` — the wakers will wake their wakees from CPU 1 context.
-3. **Immediately** call `kstep_topo_apply()`.
-4. Sleep briefly (`kstep_sleep()` or a few `kstep_tick()`).
-5. Check for the warning.
-6. Re-create kthreads for the next iteration.
-7. Repeat 100+ times.
+Use the same setup as Strategy 1 — kthread wakeup pairs on CPU 1 with concurrent cpuset-driven domain rebuilds on CPU 0. The key difference is that KCSAN does not require the race to actually corrupt a result; it only requires the two accesses to overlap within KCSAN's sampling window. Since KCSAN uses a watchpoint-based approach (setting a watchpoint on one access and checking if another access hits the same address during a delay window), the detection probability per iteration is significantly higher than the probability of the two `per_cpu` reads in `cpus_share_cache()` being interleaved by a write.
 
-**Pass/Fail Criteria:**
-- On the **buggy kernel**: The `WARN_ON_ONCE` in `ttwu_queue_wakelist()` may fire (probabilistic — if it fires even once, the bug is confirmed). Check via `dmesg` or `printk` detection.
-- On the **fixed kernel**: The `WARN_ON_ONCE` should never fire, because `cpus_share_cache(1, 1)` always returns `true` due to the early exit, regardless of `sd_llc_id` state.
-- Use `kstep_pass()` if the warning fires on the buggy kernel and doesn't fire on the fixed kernel. Use `kstep_fail()` if the behavior is the same on both.
+**Detection:**
+KCSAN reports appear in the kernel log as `BUG: KCSAN: data-race in cpus_share_cache / update_top_cache_domain`. On the **fixed kernel**, `cpus_share_cache(1, 1)` returns before reading `sd_llc_id`, so KCSAN will not report a race for the `this_cpu == that_cpu` case (the reads never happen). On the **buggy kernel**, the reads always occur and can race with the concurrent write. Parse `dmesg` output after each batch of iterations to check for KCSAN reports mentioning `cpus_share_cache`.
+
+**Limitations:**
+KCSAN adds significant overhead (2-5x slowdown), which alters timing. However, since KCSAN detects the potential for a race rather than requiring the race to produce a wrong result, this is acceptable. The KCSAN approach provides a strong differential signal: the buggy kernel will report the race, the fixed kernel will not.
+
+### Strategy 3: Topology API Rapid Rebuild with Maximized Wakeup Traffic
+
+This is an alternative to the cpuset-driven approach that uses `kstep_topo_apply()` directly for domain rebuilds, combined with maximized kthread wakeup traffic.
+
+**Setup:**
+1. Configure QEMU with 4+ CPUs. Boot with `idle=poll`.
+2. Define an initial multi-level topology using `kstep_topo_set_mc()`:
+   ```c
+   const char *mc[] = {"0-1", "0-1", "2-3", "2-3"};
+   kstep_topo_set_mc(mc, 4);
+   kstep_topo_apply();
+   ```
+   This places CPUs 0-1 in one LLC group (`sd_llc_id[0] = sd_llc_id[1] = 0`) and CPUs 2-3 in another (`sd_llc_id[2] = sd_llc_id[3] = 2`).
+3. Create 6-8 kthread pairs bound to CPU 1. Start them and let them settle.
+
+**Execution Loop (repeat 500+ iterations):**
+1. Block all wakees on CPU 1.
+2. Wait briefly: `kstep_tick_repeat(2)`.
+3. Issue `kstep_kthread_syncwake()` for all pairs in rapid succession.
+4. **Immediately** call `kstep_topo_apply()`. This invokes `rebuild_sched_domains()` on CPU 0, which tears down and recreates all scheduling domains. During teardown, `detach_destroy_domains()` sets `sd_llc_id[1] = 1` (breaking the LLC group), and during rebuild, `sd_llc_id[1]` is restored to the LLC leader value (0). Each `kstep_topo_apply()` call thus creates two transient `sd_llc_id` changes for CPU 1.
+5. Alternate the topology between two configurations on successive iterations:
+   ```c
+   // Even iterations: CPUs 0-1 share LLC
+   const char *mc_a[] = {"0-1", "0-1", "2-3", "2-3"};
+   // Odd iterations: Each CPU in its own LLC
+   const char *mc_b[] = {"0", "1", "2", "3"};
+   ```
+   This ensures that `sd_llc_id[1]` changes between 0 and 1 across iterations, in addition to the transient changes during each rebuild.
+6. Re-create waker kthreads after each iteration (they exit after syncwake).
+
+**Rationale for high iteration count:**
+The race window is ~1-3 instructions wide. With 6 kthread pairs generating wakeups concurrently and `kstep_topo_apply()` creating two `sd_llc_id` value transitions per call, each iteration provides approximately 12 "chances" for overlap. At 500 iterations, this yields ~6000 race opportunities. While each individual opportunity has a very low probability of hitting the exact instruction-level timing, the cumulative probability over thousands of attempts may produce a hit, particularly given QEMU's non-deterministic scheduling jitter.
+
+### Strategy 4: Observational Verification of the Race Window
+
+Even if the race is not hit (the WARN_ON_ONCE does not fire), the driver can verify that the preconditions for the race exist by observing internal state changes (read-only).
+
+**Verification Steps:**
+1. Import `sd_llc_id` via `KSYM_IMPORT(sd_llc_id)` (read-only pointer).
+2. Import `cpus_share_cache` via `KSYM_IMPORT(cpus_share_cache)` (read-only pointer to call the function).
+3. Before a domain rebuild, read `per_cpu(sd_llc_id, 1)` and record the value (e.g., 0).
+4. Call `kstep_topo_apply()` to trigger a rebuild.
+5. After the rebuild, read `per_cpu(sd_llc_id, 1)` again.
+6. If the topology was changed between iterations (as in Strategy 3), the value will have changed, confirming that the race window exists — during the rebuild, `sd_llc_id[1]` transiently held a different value.
+7. Call `KSYM_cpus_share_cache(1, 1)` from the driver (on CPU 0, so this doesn't trigger the race itself, but exercises the code path):
+   - On the **fixed kernel**: The early return `if (this_cpu == that_cpu) return true;` fires immediately, returning `true` without reading `sd_llc_id`. This is always correct regardless of `sd_llc_id` state.
+   - On the **buggy kernel**: The function reads `sd_llc_id[1]` twice. Since the driver runs on CPU 0 (single-threaded, no concurrent rebuild at this point), both reads see the same value and the function returns `true`. However, this confirms the code path difference — the buggy kernel performs two reads where the fixed kernel performs zero.
+8. To highlight the difference, call `KSYM_cpus_share_cache(1, 1)` during a topology change (i.e., from a callback or in between topology operations). While the driver on CPU 0 calls `kstep_topo_apply()` synchronously, the rebuild itself may involve per-CPU work that overlaps with the function call.
+
+**This strategy cannot deterministically trigger the bug**, but it provides strong evidence that the race window exists and that the fix eliminates it by bypassing the vulnerable code path entirely.
+
+### Boot Parameters and CONFIG Options
+
+The following boot parameters and kernel configuration options improve reproducibility:
+
+**Boot parameters (via run.py):**
+- `idle=poll`: Prevents CPUs from entering idle states, keeping them in a tight poll loop. This improves timing determinism and ensures CPU 1 responds quickly to scheduling events.
+- `nosmt`: Disables SMT (simultaneous multithreading), simplifying the scheduling domain hierarchy and making LLC domain changes more pronounced.
+- `nohz=off`: Disables tickless mode, ensuring regular timer interrupts on all CPUs. This adds more scheduling activity that could overlap with domain rebuilds.
+
+**CONFIG options:**
+- `CONFIG_KCSAN=y`: Enables the Kernel Concurrency Sanitizer for Strategy 2.
+- `CONFIG_SCHED_DEBUG=y`: Enables `/sys/kernel/debug/sched/` interfaces and additional scheduler debug output, useful for observing domain state during the test.
+- `CONFIG_DEBUG_PREEMPT=y`: Adds preemption debugging, which may widen timing windows slightly.
+- `CONFIG_PROVE_LOCKING=y`: While not directly related, lockdep annotations can detect related domain-rebuild locking issues.
 
 ### kSTEP Changes Needed
 
 No fundamental changes are needed. Minor helpful extensions:
-1. **A non-exiting syncwake action**: Currently `kstep_kthread_syncwake` causes the waker to exit after waking. A variant that returns the waker to spinning state (`do_spin`) instead of exiting would allow reusing kthreads across iterations without recreating them.
-2. **A tight wake/block cycle action**: A kthread action that rapidly blocks and wakes another kthread in a loop would maximize race opportunities without driver intervention each iteration.
-3. **Warning detection helper**: A `kstep_check_warn()` function that reads the kernel log buffer and checks for WARN_ON_ONCE messages matching a pattern.
+1. **A non-exiting syncwake action**: Currently `kstep_kthread_syncwake` causes the waker to exit after performing the wakeup. A variant that returns the waker to spinning state (`do_spin`) instead of exiting would allow reusing kthreads across iterations without recreating them, significantly reducing per-iteration overhead and enabling higher iteration counts.
+2. **A tight wake/block cycle action**: A kthread action that rapidly and repeatedly blocks the wakee and wakes it in a tight loop would maximize the number of `try_to_wake_up()` calls per unit time without requiring driver intervention for each cycle. This could increase race opportunities by orders of magnitude.
+3. **Warning detection helper**: A `kstep_check_warn()` function that reads the kernel log buffer (`printk_ringbuffer`) and checks for `WARN_ON_ONCE` messages matching a pattern (e.g., `"ttwu_queue_wakelist"`) would enable automated pass/fail without external log parsing.
+4. **KCSAN report parser**: For Strategy 2, a helper to parse KCSAN reports from the log buffer and match them against specific function names would automate the KCSAN-based detection.
+
+### Pass/Fail Criteria
+
+- On the **buggy kernel**: The `WARN_ON_ONCE` in `ttwu_queue_wakelist()` may fire (probabilistic — if it fires even once, the bug is confirmed). With `CONFIG_KCSAN=y`, KCSAN should report a data race in `cpus_share_cache` / `update_top_cache_domain`. Use `kstep_pass()` if either signal is detected.
+- On the **fixed kernel**: The `WARN_ON_ONCE` should never fire, because `cpus_share_cache(1, 1)` always returns `true` due to the early exit, regardless of `sd_llc_id` state. KCSAN should not report a race for the `this_cpu == that_cpu` case (the `sd_llc_id` reads are bypassed). Use `kstep_pass()` if no warning/race is detected after all iterations complete.
+- Use `kstep_fail()` if behavior is identical on both kernels (i.e., no WARN on buggy and no WARN on fixed — the race was not hit and KCSAN was not used).
 
 ### Expected Behavior
 
-| Kernel   | cpus_share_cache(X,X) during domain rebuild | WARN_ON_ONCE fires? |
-|----------|---------------------------------------------|---------------------|
-| Buggy    | May return `false` (race-dependent)         | Yes (probabilistic) |
-| Fixed    | Always returns `true` (early exit)          | Never               |
+| Kernel | cpus_share_cache(X,X) during domain rebuild | WARN_ON_ONCE fires? | KCSAN data-race report? |
+|--------|---------------------------------------------|---------------------|-------------------------|
+| Buggy  | May return `false` (race-dependent)         | Yes (probabilistic) | Yes (high probability)  |
+| Fixed  | Always returns `true` (early exit)          | Never               | No (reads bypassed)     |
