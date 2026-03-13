@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 
+#include <limits.h>    // INT_MAX
 #include <signal.h>    // sigaction
 #include <sys/prctl.h> // PR_SET_NAME
 #include <time.h>      // nanosleep, struct timespec
@@ -30,7 +31,7 @@ static void handler(int signum, siginfo_t *info, void *context) {
   else if (code == SIGCODE_PAUSE)
     pause();
   else if (code == SIGCODE_BLOCK)
-    nanosleep(&(struct timespec){.tv_sec = __INT_MAX__}, NULL);
+    nanosleep(&(struct timespec){.tv_sec = INT_MAX}, NULL);
   else
     panic("Unknown signal code: %d\n", code);
 }
