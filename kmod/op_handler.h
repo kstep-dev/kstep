@@ -1,6 +1,7 @@
 #ifndef KSTEP_OP_HANDLER_H
 #define KSTEP_OP_HANDLER_H
 
+#include <linux/fs.h>
 #include <linux/types.h>
 
 enum kstep_op_type {
@@ -24,5 +25,6 @@ enum kstep_op_type {
 };
 
 void kstep_execute_op(enum kstep_op_type type, int a, int b, int c);
+void kstep_write_state(struct file *f);
 
 #endif

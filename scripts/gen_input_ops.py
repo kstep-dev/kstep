@@ -5,7 +5,7 @@ from enum import IntEnum
 from .gen_input_state import (
     GenState,
     TASK_SLEEPING,
-    TASK_RUNNABLE,
+    TASK_ON_CPU,
 )
 
 OP_NAME_TO_TYPE = {
@@ -68,21 +68,18 @@ def op_task_create(m: GenState):
 # Fork and create new tasks;
 # It will only be executed after the target task is actually running on a CPU;
 def op_task_fork(m: GenState):
-    tid = m.choose_task_in_state(TASK_RUNNABLE)
-    # Currently, assume each time fork only 1 task
+    tid = m.choose_task_in_state(TASK_ON_CPU)
     new_tid = m.next_task_id()
     if new_tid is None:
         return None
-    m.add_task(new_tid)
-    m.set_task_state(new_tid, TASK_RUNNABLE)
-    # child will be added to the same cgroup as the parent
+    m.add_task(new_tid)  # kmod will confirm actual state in next update
     if tid in m.task2cgroups:
         m.cgroup_add_task(m.task2cgroups[tid], new_tid)
     return (OP_NAME_TO_TYPE["TASK_FORK"], tid, new_tid, 0)
 
 
 def op_task_pin(m: GenState):
-    tid = m.choose_task_in_state(TASK_RUNNABLE)
+    tid = m.choose_task_in_state(TASK_ON_CPU)
     rng = m.choose_cpuset_task(tid)
     if rng is None:
         return None
@@ -91,29 +88,27 @@ def op_task_pin(m: GenState):
 
 
 def op_task_fifo(m: GenState):
-    tid = m.choose_task_in_state(TASK_RUNNABLE)
+    tid = m.choose_task_in_state(TASK_ON_CPU)
     return (OP_NAME_TO_TYPE["TASK_FIFO"], tid, 0, 0)
 
 
 def op_task_cfs(m: GenState):
-    tid = m.choose_task_in_state(TASK_RUNNABLE)
+    tid = m.choose_task_in_state(TASK_ON_CPU)
     return (OP_NAME_TO_TYPE["TASK_CFS"], tid, 0, 0)
 
 
 def op_task_pause(m: GenState):
-    tid = m.choose_task_in_state(TASK_RUNNABLE)
-    m.set_task_state(tid, TASK_SLEEPING)
+    tid = m.choose_task_in_state(TASK_ON_CPU)
     return (OP_NAME_TO_TYPE["TASK_PAUSE"], tid, 0, 0)
 
 
 def op_task_wakeup(m: GenState):
     tid = m.choose_task_in_state(TASK_SLEEPING)
-    m.set_task_state(tid, TASK_RUNNABLE)
     return (OP_NAME_TO_TYPE["TASK_WAKEUP"], tid, 0, 0)
 
 
 def op_task_set_prio(m: GenState):
-    tid = m.choose_task_in_state(TASK_RUNNABLE)
+    tid = m.choose_task_in_state(TASK_ON_CPU)
     prio = m.rnd.randint(-20, 19)
     return (OP_NAME_TO_TYPE["TASK_SET_PRIO"], tid, prio, 0)
 
@@ -180,7 +175,7 @@ OPS: List[Op] = [
     Op(
         name="TASK_FORK",
         weight=3,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE) and m.next_task_id() is not None,
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU) and m.next_task_id() is not None,
         emit=op_task_fork,
         requires=[RESOURCE_TASK],
         produces=[RESOURCE_TASK],
@@ -189,7 +184,7 @@ OPS: List[Op] = [
     Op(
         name="TASK_PIN",
         weight=3,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE) and m.cpus >= 2,
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU) and m.cpus >= 2,
         emit=op_task_pin,
         requires=[RESOURCE_TASK],
         arg_types=[ARG_TASK, ARG_CPU, ARG_CPU],
@@ -197,7 +192,7 @@ OPS: List[Op] = [
     Op(
         name="TASK_FIFO",
         weight=1,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE),
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
         emit=op_task_fifo,
         requires=[RESOURCE_TASK],
         arg_types=[ARG_TASK, ARG_INT, None],
@@ -205,7 +200,7 @@ OPS: List[Op] = [
     Op(
         name="TASK_CFS",
         weight=2,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE),
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
         emit=op_task_cfs,
         requires=[RESOURCE_TASK],
         arg_types=[ARG_TASK, ARG_INT, None],
@@ -213,7 +208,7 @@ OPS: List[Op] = [
     Op(
         name="TASK_PAUSE",
         weight=4,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE),
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
         emit=op_task_pause,
         requires=[RESOURCE_TASK],
         arg_types=[ARG_TASK, None, None],
@@ -229,20 +224,20 @@ OPS: List[Op] = [
     Op(
         name="TASK_SET_PRIO",
         weight=3,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_RUNNABLE),
+        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
         emit=op_task_set_prio,
         requires=[RESOURCE_TASK],
         arg_types=[ARG_TASK, ARG_INT, None],
     ),
     Op(
         name="TICK",
-        weight=10,
+        weight=0,
         is_applicable=lambda m: True,
         emit=op_tick,
     ),
     Op(
         name="TICK_REPEAT",
-        weight=4,
+        weight=15,
         is_applicable=lambda m: True,
         emit=op_tick_repeat,
         arg_types=[ARG_INT, None, None],
@@ -281,14 +276,14 @@ OPS: List[Op] = [
     ),
     Op(
         name="CPU_SET_FREQ",
-        weight=1,
+        weight=0,
         is_applicable=lambda m: m.cpus >= 2,
         emit=op_cpu_set_freq,
         arg_types=[ARG_CPU, ARG_INT, None],
     ),
     Op(
         name="CPU_SET_CAPACITY",
-        weight=1,
+        weight=0,
         is_applicable=lambda m: m.cpus >= 2,
         emit=op_cpu_set_capacity,
         arg_types=[ARG_CPU, ARG_INT, None],

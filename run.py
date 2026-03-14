@@ -5,6 +5,7 @@ import dataclasses
 import logging
 import os
 import shutil
+import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -53,13 +54,14 @@ def get_qemu_path() -> Path:
     raise RuntimeError(f"QEMU executable not found: {name}")
 
 
-def run_qemu(
+def start_qemu(
     driver: Driver,
     linux_name: str,
     log_file: Optional[Path] = None,
-    input_file: Optional[Path] = None,
+    sock_file: Optional[Path] = None,
     debug: bool = False,
-):
+) -> subprocess.Popen:
+    """Start QEMU in the background. Returns the process handle."""
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
@@ -123,8 +125,7 @@ def run_qemu(
         "-mon chardev=char0",
         serial_device("char0"),
         # input and output files
-        f"-chardev file,id=char1,path={output_file}"
-        + (f",input-path={input_file}" if input_file else ""),
+        f"-chardev file,id=char1,path={output_file}",
         serial_device("char1"),
         # cov file
         f"-chardev file,id=char2,path={cov_file}",
@@ -133,14 +134,31 @@ def run_qemu(
         f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]
 
+    if sock_file is not None:
+        cmd += [
+            f"-chardev socket,id=char3,path={sock_file},server=on,wait=on",
+            serial_device("char3"),
+        ]
+
     if ARCH == "aarch64":
         cmd += ["-machine virt", "-cpu cortex-a57"]
 
     if debug:
         cmd += ["-s", "-S"]
 
-    system(" ".join(cmd))
+    cmd_str = " ".join(cmd)
+    logging.info(f"Starting QEMU: {cmd_str}")
+    return subprocess.Popen(cmd_str, shell=True)
 
+def run_qemu(
+    driver: Driver,
+    linux_name: str,
+    log_file: Optional[Path] = None,
+    sock_file: Optional[Path] = None,
+    debug: bool = False,
+):
+    proc = start_qemu(driver, linux_name, log_file, sock_file, debug)
+    proc.wait()
 
 def print_run_results(
     linux_name: str,
@@ -165,6 +183,8 @@ def print_run_results(
 
         # Parse the input sequence from the log file
         seq = input_seq_from_log(log_file=log_file)
+
+        print(signal_records.keys())
 
         # Analyze the new signals for the test
         new_signals = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(

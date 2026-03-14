@@ -13,6 +13,7 @@ struct console_parse_state {
   size_t line_len;
 };
 static struct file *console;
+static struct file *sock;
 
 static void parse_console_input(char *buf) {
   char *cursor;
@@ -40,8 +41,8 @@ static void parse_console_input(char *buf) {
   if (fields[0] < OP_TASK_CREATE || fields[0] >= OP_TYPE_NR)
     return;
 
-  TRACE_INFO("EXECOP %d %d %d %d\n", fields[0], fields[1], fields[2], fields[3]);
   kstep_execute_op(fields[0], fields[1], fields[2], fields[3]);
+  kstep_write_state(sock);
 }
 
 static bool process_console_chunk(const char *buf, ssize_t nread,
@@ -68,24 +69,30 @@ static bool process_console_chunk(const char *buf, ssize_t nread,
 
 static void setup(void) {
   console = filp_open("/dev/ttyS1", O_RDONLY, 0);
+  sock = filp_open("/dev/ttyS3", O_RDWR, 0);
   kstep_cov_init();
 }
 
 static void run(void) {
   loff_t pos = 0;
   struct console_parse_state state = {};
-  if (IS_ERR(console))
-    panic("Failed to open /dev/console");
+
+  if (IS_ERR(sock))
+    panic("Failed to open /dev/ttyS3");
+
+  /* Signal to Python that the kmod is ready */
+  kstep_write_state(sock);
+
   while (true) {
     char buf[256];
-    ssize_t nread = kernel_read(console, buf, sizeof(buf), &pos);
+    ssize_t nread = kernel_read(sock, buf, sizeof(buf), &pos);
     if (nread <= 0)
       continue;
     if (process_console_chunk(buf, nread, &state))
       break;
   }
 
-  filp_close(console, NULL);
+  filp_close(sock, NULL);
 }
 
 KSTEP_DRIVER_DEFINE {
