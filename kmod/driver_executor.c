@@ -3,7 +3,6 @@
 #include <linux/string.h> // strstr, strchr, strpbrk
 #include <linux/types.h> // ssize_t
 #include <linux/ctype.h> // isdigit or alpha
-#include <linux/tty.h> // file_tty, tty_set_termios
 #include "driver.h"
 #include "internal.h"
 #include "op_handler.h"

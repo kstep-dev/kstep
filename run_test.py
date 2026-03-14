@@ -77,7 +77,7 @@ def run_test(
     print(f"kmod ready: {task_states}")
 
     seq = InputSeq()
-    for i in range(steps):
+    for _ in range(steps):
         op, a, b, c = generate_next_command(gen, task_states)
         if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
             for _ in range(a):

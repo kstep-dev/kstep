@@ -54,7 +54,6 @@ struct task_struct *kstep_task_create(void) {
     kstep_sleep();
     if (strcmp(p->comm, TASK_READY_COMM) == 0 || 
     (task_cpu(p) != 0 && p->__state == TASK_RUNNING && !cpumask_test_cpu(0, p->cpus_ptr))) {
-    // if (strcmp(p->comm, TASK_READY_COMM) == 0) {
       TRACE_INFO("Task %d is runnable on cpu %d", p->pid, task_cpu(p));
       return p;
     }

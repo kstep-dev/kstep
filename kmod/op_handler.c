@@ -22,8 +22,6 @@ struct queued_op { enum kstep_op_type type; int a, b, c; u64 seq; };
 struct kstep_task {
   struct task_struct *p;
   int cgroup_id;
-  struct queued_op ring[TASK_OP_QUEUE_SIZE];
-  int head, tail;
 };
 
 static struct kstep_task kstep_tasks[MAX_TASKS];
