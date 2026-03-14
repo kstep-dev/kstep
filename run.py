@@ -184,6 +184,8 @@ def print_run_results(
         # Parse the input sequence from the log file
         seq = input_seq_from_log(log_file=log_file)
 
+        print(signal_records.keys())
+
         # Analyze the new signals for the test
         new_signals = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
             seq=seq,
