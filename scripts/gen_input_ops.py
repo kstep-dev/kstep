@@ -231,13 +231,13 @@ OPS: List[Op] = [
     ),
     Op(
         name="TICK",
-        weight=10,
+        weight=0,
         is_applicable=lambda m: True,
         emit=op_tick,
     ),
     Op(
         name="TICK_REPEAT",
-        weight=4,
+        weight=15,
         is_applicable=lambda m: True,
         emit=op_tick_repeat,
         arg_types=[ARG_INT, None, None],
@@ -276,14 +276,14 @@ OPS: List[Op] = [
     ),
     Op(
         name="CPU_SET_FREQ",
-        weight=1,
+        weight=0,
         is_applicable=lambda m: m.cpus >= 2,
         emit=op_cpu_set_freq,
         arg_types=[ARG_CPU, ARG_INT, None],
     ),
     Op(
         name="CPU_SET_CAPACITY",
-        weight=1,
+        weight=0,
         is_applicable=lambda m: m.cpus >= 2,
         emit=op_cpu_set_capacity,
         arg_types=[ARG_CPU, ARG_INT, None],

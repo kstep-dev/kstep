@@ -262,6 +262,9 @@ static bool op_cgroup_add_task(int a, int b, int c) {
   if (!is_valid_task_id(b) || !kstep_tasks[b].p)
     return false;
 
+  if (kstep_tasks[b].p->policy != 0)
+    kstep_task_cfs(kstep_tasks[b].p);
+  
   kstep_cgroup_add_task(name, kstep_tasks[b].p->pid);
 
   kstep_tasks[b].cgroup_id = a;

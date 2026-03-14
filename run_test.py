@@ -13,23 +13,8 @@ from run import (
 )
 from scripts import LOGS_DIR, GLOBAL_SIGNAL_CORPUS, cov_parse, input_seq_from_log
 from scripts.gen_input_core import init_genstate, generate_next_command
-
-
-def assert_exec_matches_generated(log_file, seq):
-    i = 0
-    f = open(log_file, "r")
-    for line in f:
-        exec_pos = line.find("EXECOP")
-        if exec_pos == -1:
-            continue
-        line = line[exec_pos + len("EXECOP") :].strip()
-        parts = line.split()
-        if len(parts) != 4 or tuple(int(v) for v in parts[:4]) != seq[i]:
-            raise AssertionError(f"EXECOP sequence mismatch. Expected {seq[i]}, got {parts[:4]}")
-        i += 1
-    f.close()
-    if i != len(seq):
-        raise AssertionError(f"EXECOP sequence mismatch. Expected {len(seq)} ops, got {i} ops.")
+from scripts.input_seq import InputSeq
+from scripts.gen_input_ops import OP_NAME_TO_TYPE
     
 def run_test(
     linux: Linux,
@@ -91,8 +76,14 @@ def run_test(
     task_states = read_state()
     print(f"kmod ready: {task_states}")
 
+    seq = InputSeq()
     for i in range(steps):
         op, a, b, c = generate_next_command(gen, task_states)
+        if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
+            for _ in range(a):
+                seq.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
+        else:
+            seq.append((op, a, b, c))
         sock.sendall(f"{op},{a},{b},{c}\n".encode())
         task_states = read_state()
 
@@ -102,7 +93,9 @@ def run_test(
 
 
     # assert_exec_matches_generated(log_file, seq)
-    seq = input_seq_from_log(log_file)
+    seq2 = input_seq_from_log(log_file)
+    print(len(seq), len(seq2))
+    assert seq == seq2
 
     # Parse the signal file and get the signal records and list
     signal_records = cov_parse(cov_file)
