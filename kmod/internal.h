@@ -78,7 +78,7 @@ struct kstep_driver *kstep_sym_init(const char *driver_name);
 #define KSYM_IMPORT_RAW(type, name) type *KSYM_##name
 void *kstep_ksym_lookup(const char *name);
 
-extern KSYM_IMPORT_RAW(struct rq, runqueues);
+extern KSYM_IMPORT_RAW(struct rq __percpu, runqueues);
 #undef cpu_rq
 #define cpu_rq(cpu) (per_cpu_ptr(KSYM_runqueues, (cpu)))
 #undef this_rq

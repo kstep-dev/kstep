@@ -29,6 +29,9 @@ static void setup(void)
 	target = kstep_task_create();
 	filler = kstep_task_create();
 
+	kstep_task_pin(target, 1, 1);
+	kstep_task_pin(filler, 1, 1);
+
 	kstep_cgroup_add_task("grp", target->pid);
 	kstep_cgroup_add_task("grp", filler->pid);
 }
@@ -73,6 +76,11 @@ static void run(void)
 
 	/* Let tasks accumulate runtime so one becomes ineligible */
 	kstep_tick_repeat(5);
+
+	if (task_cpu(target) != 1) {
+		kstep_fail("target on CPU %d, expected CPU 1", task_cpu(target));
+		return;
+	}
 
 	/* Wait for target to be running and ineligible */
 	struct task_struct *p = kstep_tick_until(target_ineligible);

@@ -6,7 +6,7 @@ import logging
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
@@ -35,9 +35,10 @@ assert ARCH in ("x86_64", "aarch64"), f"Unsupported architecture: {ARCH}"
 @dataclass(frozen=True)
 class Driver:
     name: str = "default"
-    params: Iterable[str] = ()
+    kstep_params: Iterable[str] = ()
     num_cpus: int = 2
     mem_mb: int = 512
+    kernel_params: list[str] = field(default_factory=list)
 
 
 def get_qemu_path() -> Path:
@@ -95,13 +96,16 @@ def start_qemu(
     if ARCH == "x86_64":
         boot_args += ["tsc=nowatchdog"]
 
+    if driver.kernel_params:
+        boot_args += driver.kernel_params
+
     # Everything after the `--` is passed to init
     # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
     boot_args += ["--"]
     boot_args += [f"driver={driver.name}"]
 
-    if driver.params:
-        boot_args.extend(driver.params)
+    if driver.kstep_params:
+        boot_args.extend(driver.kstep_params)
 
     def serial_device(name: str):
         if ARCH == "aarch64":
@@ -253,7 +257,7 @@ def main():
     parser.add_argument("name", type=str, default=None, nargs="?")
     parser.add_argument("--num_cpus", type=int, default=None)
     parser.add_argument("--mem_mb", type=int, default=None)
-    parser.add_argument("--params", type=str, nargs="+", default=None)
+    parser.add_argument("--kstep_params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 
     linux_name = resolve_linux_name(args.linux_name)
@@ -267,7 +271,7 @@ def main():
             **{
                 field.name: value
                 for field in dataclasses.fields(Driver)
-                if (value := getattr(args, field.name)) is not None
+                if (value := getattr(args, field.name, None)) is not None
             }
         )
         run_qemu(

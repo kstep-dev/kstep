@@ -61,22 +61,31 @@ static void run(void) {
   kstep_tick_until(is_ineligible);
 
   struct rq *rq1 = cpu_rq(1);
-  TRACE_INFO("Before syncwake: nr_running=%u, h_nr_queued=%u, h_nr_runnable=%u",
+  TRACE_INFO("Before pause: nr_running=%u, h_nr_queued=%u, h_nr_runnable=%u",
              rq1->nr_running, rq1->cfs.h_nr_queued, rq1->cfs.h_nr_runnable);
 
-  // Set up sync wakeup BEFORE pausing other_task.
-  // The kthread will execute it after other_task sleeps (delayed dequeue).
-  kstep_kthread_syncwake(waker_task, wakee_task);
-
-  // Pause other_task -> task entity delayed dequeue -> nr_running inflated
+  // Pause other_task FIRST -> delayed dequeue inflates nr_running
   kstep_task_pause(other_task);
 
-  // After pause: kthread picks up do_syncwakeup and calls __wake_up_sync.
-  // At that moment, nr_running includes the delayed entity.
+  // Let the delayed-dequeue state stabilize
+  kstep_tick_repeat(3);
+
+  unsigned int delayed = rq1->cfs.h_nr_queued - rq1->cfs.h_nr_runnable;
+  TRACE_INFO("After pause: nr_running=%u, h_nr_queued=%u, h_nr_runnable=%u, delayed=%u",
+             rq1->nr_running, rq1->cfs.h_nr_queued, rq1->cfs.h_nr_runnable, delayed);
+
+  if (delayed == 0) {
+    kstep_fail("no delayed-dequeue state: h_nr_queued=%u h_nr_runnable=%u",
+               rq1->cfs.h_nr_queued, rq1->cfs.h_nr_runnable);
+    return;
+  }
+
+  // NOW set up the sync wakeup with delayed state already established.
   // The kthread stacking check in select_idle_sibling:
   //   this_rq()->nr_running <= 1  (BUGGY: uses raw nr_running)
   // should be:
   //   (this_rq()->nr_running - cfs_h_nr_delayed(this_rq())) <= 1
+  kstep_kthread_syncwake(waker_task, wakee_task);
 
   // Give time for the sync wakeup to execute
   kstep_tick_repeat(5);

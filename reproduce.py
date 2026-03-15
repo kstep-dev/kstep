@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
 
@@ -23,11 +23,17 @@ class Bug:
     # Driver options
     num_cpus: int = 2
     mem_mb: int = 512
+    kernel_params: list[str] = field(default_factory=list)
     plot_format: str | None = None
 
     @property
     def driver(self) -> Driver:
-        return Driver(name=self.name, num_cpus=self.num_cpus, mem_mb=self.mem_mb)
+        return Driver(
+            name=self.name,
+            num_cpus=self.num_cpus,
+            mem_mb=self.mem_mb,
+            kernel_params=self.kernel_params,
+        )
 
     @property
     def linux(self) -> list[Linux]:
@@ -80,12 +86,13 @@ BUGS_EXTRA = [
     Bug("eevdf_reweight_dequeue_avruntime", version="v6.19", patch="eevdf_reweight_dequeue_avruntime.patch"),
     Bug("fair_wake_affine_delayed_dequeue", version="v6.19", patch="fair_wake_affine_delayed_dequeue.patch", num_cpus=3),
     Bug("bandwidth_throttle_runnable_avg", version="v6.19", patch="bandwidth_throttle_runnable_avg.patch"),
-    Bug("core_preempt_dynamic_return_value", version="v6.19", patch="core_preempt_dynamic_return_value.patch"),
+    Bug("core_preempt_dynamic_return_value", version="v6.19", patch="core_preempt_dynamic_return_value.patch",
+        kernel_params=["resched_latency_warn_ms=notanumber"]),
     Bug("eevdf_reweight_vruntime_unadjusted", version="v6.19", patch="eevdf_reweight_vruntime_unadjusted.patch"),
     Bug("lb_avg_load_condition", version="v6.19", patch="lb_avg_load_condition.patch", num_cpus=7),
     Bug("uclamp_fork_reset_rt_boost", version="v6.19", patch="uclamp_fork_reset_rt_boost.patch"),
     Bug("pelt_rt_policy_change_spike", version="v6.19", patch="pelt_rt_policy_change_spike.patch"),
-    Bug("deadline_hrtick_enabled_wrong_check", version="v6.19", patch="deadline_hrtick_enabled_wrong_check.patch"),
+    Bug("deadline_hrtick_enabled_wrong_check", version="v7.0-rc1", patch="deadline_hrtick_enabled_wrong_check.patch"),
 ]
 # fmt: on
 

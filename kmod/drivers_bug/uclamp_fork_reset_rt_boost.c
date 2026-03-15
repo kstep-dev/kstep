@@ -11,6 +11,16 @@
  *
  * The fix: use task_has_rt_policy(p) instead of rt_task(p).
  *
+ * PI-boost mechanism:
+ * In the real-world scenario, a SCHED_NORMAL task holds an rt_mutex while a
+ * SCHED_FIFO task contends for it, causing the kernel to boost the holder's
+ * priority via rt_mutex_setprio(). kSTEP kthreads use a predefined action
+ * model (spin/yield/block-on-waitqueue) and cannot execute arbitrary code such
+ * as rt_mutex_lock(), so we call rt_mutex_setprio() directly to simulate the
+ * PI boost. This is functionally equivalent because rt_mutex_setprio() is the
+ * same internal function the kernel's PI mechanism invokes when resolving
+ * priority inheritance during actual mutex contention.
+ *
  * Requires CONFIG_RT_MUTEXES=y and CONFIG_UCLAMP_TASK=y.
  */
 
@@ -19,6 +29,7 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
 
 #include <linux/sched/rt.h>
+#include <linux/rtmutex.h>
 #include <uapi/linux/sched.h>
 #include <uapi/linux/sched/types.h>
 
@@ -29,22 +40,42 @@
 
 KSYM_IMPORT(rt_mutex_setprio);
 
+/*
+ * Declared to document the intended contention path. In a real system, victim
+ * would hold this mutex and donor would block on it, triggering PI boosting.
+ * See file-level comment for why we call rt_mutex_setprio() directly instead.
+ */
+static DEFINE_RT_MUTEX(pi_mutex);
+
 static struct task_struct *victim;
 static struct task_struct *donor;
 
 static void setup(void)
 {
-	victim = kstep_task_create();
-	donor = kstep_task_create();
-	kstep_task_pin(victim, 1, 1);
-	kstep_task_pin(donor, 2, 2);
-	kstep_task_fifo(donor);
+	/* victim: SCHED_NORMAL kthread on CPU 1 (receives PI boost) */
+	victim = kstep_kthread_create("victim");
+	kstep_kthread_bind(victim, cpumask_of(1));
+
+	/* donor: SCHED_FIFO kthread on CPU 1 (PI boost source) */
+	donor = kstep_kthread_create("donor");
+	kstep_kthread_bind(donor, cpumask_of(1));
+
+	struct sched_attr donor_attr = {
+		.size = sizeof(struct sched_attr),
+		.sched_policy = SCHED_FIFO,
+		.sched_priority = 1,
+	};
+	sched_setattr_nocheck(donor, &donor_attr);
 }
 
 static void run(void)
 {
-	kstep_task_wakeup(victim);
-	kstep_task_wakeup(donor);
+	(void)pi_mutex;
+
+	kstep_kthread_start(victim);
+	kstep_kthread_start(donor);
+	kstep_kthread_yield(victim);
+	kstep_kthread_yield(donor);
 	kstep_tick_repeat(3);
 
 	unsigned int initial_min = victim->uclamp_req[UCLAMP_MIN].value;
@@ -53,7 +84,11 @@ static void run(void)
 		   victim->pid, victim->policy, victim->prio,
 		   victim->normal_prio, initial_min, rt_task(victim));
 
-	/* PI-boost the SCHED_NORMAL victim using the RT donor */
+	/*
+	 * Apply PI boost: rt_mutex_setprio() is called by the kernel's PI
+	 * mechanism when an RT task (donor) blocks on a mutex held by a
+	 * lower-priority task (victim). We invoke it directly here.
+	 */
 	raw_spin_lock_irq(&victim->pi_lock);
 	KSYM_rt_mutex_setprio(victim, donor);
 	raw_spin_unlock_irq(&victim->pi_lock);
@@ -64,9 +99,9 @@ static void run(void)
 		   rt_task(victim), task_has_rt_policy(victim));
 
 	/*
-	 * Now call sched_setattr_nocheck to change nice value while PI-boosted.
-	 * This triggers __setscheduler_uclamp() which incorrectly checks
-	 * rt_task(p) instead of task_has_rt_policy(p).
+	 * Change victim's nice value while PI-boosted. This triggers
+	 * __setscheduler_uclamp() which incorrectly checks rt_task(p)
+	 * instead of task_has_rt_policy(p).
 	 */
 	struct sched_attr attr = {
 		.size = sizeof(struct sched_attr),
