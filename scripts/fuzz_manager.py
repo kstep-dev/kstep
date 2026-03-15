@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import multiprocessing as mp
-import random
+import queue
 import shutil
 import signal
 import time
@@ -45,33 +45,20 @@ def _save_crash(result: WorkResult, fuzz_dir: Path) -> Path:
     if result.log_file and result.log_file.exists():
         shutil.copy2(result.log_file, crash_dir / "worker.log")
 
-    return crash_dir
+    if result.debug_log_file and result.debug_log_file.exists():
+        shutil.copy2(result.debug_log_file, crash_dir / "worker.debug.log")
 
+    return crash_dir
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Work scheduling
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _next_work(
-    pool: SeedPool,
-    rng: random.Random,
     linux_name: str,
     steps: int,
-    fresh_ratio: float,
 ) -> WorkItem:
-    """Fresh random generation or exact replay of an existing seed."""
-    if not pool or rng.random() < fresh_ratio:
-        return WorkItem(mode="fresh", steps=steps, linux_name=linux_name)
-    seed = pool.pick_next()
-    if seed is None:
-        return WorkItem(mode="fresh", steps=steps, linux_name=linux_name)
-    return WorkItem(
-        mode="replay",
-        steps=len(seed.ops),
-        linux_name=linux_name,
-        ops=seed.ops,
-        seed_id=seed.seed_id,
-    )
+    return WorkItem(mode="fresh", steps=steps, linux_name=linux_name)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -84,14 +71,12 @@ def run_manager(
     linux_name: str,
     steps: int,
     fuzz_dir: Path,
-    fresh_ratio: float = 0.5,
 ) -> None:
     task_queue: "mp.Queue[Optional[WorkItem]]" = mp.Queue(maxsize=n_workers * 2)
     result_queue: "mp.Queue[WorkResult]" = mp.Queue()
 
     corpus = SignalCorpus()
     pool   = SeedPool()
-    rng    = random.Random()
 
     t_start           = time.monotonic()
     total_execs       = 0
@@ -112,29 +97,43 @@ def run_manager(
         procs.append(p)
         logging.info(f"Spawned worker {wid} (pid={p.pid})")
 
-    # Pre-fill the queue so no worker idles at startup
-    for _ in range(n_workers):
-        task_queue.put(_next_work(pool, rng, linux_name, steps, fresh_ratio))
-
-    shutdown = False
+    shutdown_event = mp.Event()
 
     def _on_sigint(_sig, _frame):
-        nonlocal shutdown
-        if not shutdown:
+        if not shutdown_event.is_set():
             logging.info("[fuzz] Caught Ctrl-C – shutting down…")
-            shutdown = True
+            shutdown_event.set()
 
-    signal.signal(signal.SIGINT, _on_sigint)
+    def _put_task_interruptibly(item: Optional[WorkItem], *, force: bool = False) -> bool:
+        while force or not shutdown_event.is_set():
+            try:
+                task_queue.put(item, timeout=0.5)
+                return True
+            except queue.Full:
+                if force:
+                    return False
+            except (BrokenPipeError, EOFError, OSError):
+                shutdown_event.set()
+                return False
+        return False
 
-    while not shutdown:
+    prev_handler = signal.signal(signal.SIGINT, _on_sigint)
+
+    # Pre-fill the queue so no worker idles at startup.
+    for _ in range(n_workers):
+        if not _put_task_interruptibly(_next_work(linux_name, steps)):
+            break
+
+    while not shutdown_event.is_set():
         try:
-            result: WorkResult = result_queue.get(timeout=1.0)
+            result: WorkResult = result_queue.get(timeout=0.5)
         except Exception:
-            result = None  # type: ignore[assignment]
+            continue
 
         if result is not None:
             total_execs += 1
 
+            # if result.crashed:
             if result.crashed:
                 total_errors += 1
                 crash_dir = _save_crash(result, fuzz_dir)
@@ -143,8 +142,9 @@ def run_manager(
                     f"ops={len(result.ops)}  saved to {crash_dir}"
                 )
 
-            elif result.error:
+            if result.error:
                 total_errors += 1
+                crash_dir = _save_crash(result, fuzz_dir)
                 logging.warning(f"[error] worker={result.worker_id}  {result.error}")
 
             elif result.cov_file:
@@ -177,7 +177,7 @@ def run_manager(
                     )
 
             # Immediately replace the consumed slot
-            task_queue.put(_next_work(pool, rng, linux_name, steps, fresh_ratio))
+            _put_task_interruptibly(_next_work(linux_name, steps))
 
         # Periodic stats (every 10 s)
         now = time.monotonic()
@@ -195,10 +195,21 @@ def run_manager(
             last_stat_t = now
 
     # Graceful shutdown
+    signal.signal(signal.SIGINT, prev_handler)  # Restore original handler
+    logging.info("[fuzz] Sending poison pills to workers…")
     for _ in procs:
-        task_queue.put(None)
+        _put_task_interruptibly(None, force=True)
     for p in procs:
-        p.join(timeout=30)
+        p.join(timeout=10)
+        if p.is_alive():
+            logging.warning(f"Worker {p.pid} didn't exit, terminating…")
+            p.terminate()
+            p.join(timeout=5)
+
+    task_queue.close()
+    task_queue.cancel_join_thread()
+    result_queue.close()
+    result_queue.cancel_join_thread()
 
     elapsed = time.monotonic() - t_start
     logging.info(

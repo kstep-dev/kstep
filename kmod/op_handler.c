@@ -326,6 +326,16 @@ static bool is_task_signal_op(enum kstep_op_type type) {
   }
 }
 
+
+static void print_state(void) {
+  for (int i = 0; i < MAX_TASKS; i++) {
+    struct task_struct *p = kstep_tasks[i].p;
+    if (!p)
+      continue;
+    pr_info("Task %d %d: on_cpu=%d, state=%d\n", i, p->pid, p->on_cpu, p->__state);
+  }
+}
+
 /*
  * Try to send the head queued op for task @id if its required state is met.
  * Sends at most one op per call.
@@ -338,6 +348,7 @@ static void execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   kstep_cov_disable();
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
+  print_state();
 }
 
 static u8 buf[1 + MAX_TASKS * 2 + 1];

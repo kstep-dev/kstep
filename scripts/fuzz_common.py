@@ -22,7 +22,7 @@ class WorkItem:
     mode: str           # "fresh" | "replay"
     steps: int          # used for "fresh"
     linux_name: str
-    ops: Ops = None     # used for "replay"
+    ops: Optional[Ops] = None     # used for "replay"
     seed_id: Optional[int] = None
 
 
@@ -32,6 +32,7 @@ class WorkResult:
     ops: Ops
     cov_file: Optional[Path]   # None when coverage is empty or on error
     log_file: Optional[Path]   # path to worker console log (for crash triage)
+    debug_log_file: Optional[Path]   # path to worker debug log
     linux_name: str
     exec_time: float
     seed_id: Optional[int] = None
@@ -49,15 +50,6 @@ class SeedPool:
         seed = Seed(ops=ops, n_signals=n_signals, seed_id=self._counter)
         self._seeds.append(seed)
         self._counter += 1
-        return seed
-
-    def pick_next(self) -> Optional[Seed]:
-        """Round-robin over all seeds."""
-        if not self._seeds:
-            return None
-        seed = self._seeds[self._next_idx % len(self._seeds)]
-        self._next_idx += 1
-        seed.times_replayed += 1
         return seed
 
     def __len__(self) -> int:

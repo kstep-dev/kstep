@@ -79,7 +79,6 @@ def main() -> None:
         linux_name=args.linux_name,
         steps=args.steps,
         fuzz_dir=fuzz_dir,
-        fresh_ratio=args.fresh_ratio,
     )
 
 

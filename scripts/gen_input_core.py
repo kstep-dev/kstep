@@ -49,9 +49,25 @@ def _generate_next_command(m: GenState) -> tuple[int, int, int, int]:
                 return prod.emit(m)
     return op.emit(m)
 
+def _op_matches_task_state(op: tuple[int, int, int, int], task_states: list[dict]) -> bool:
+    state_by_tid = {task["id"]: task["state"] for task in task_states}
+    op_type, a, _, _ = op
+
+    if op_type == OP_NAME_TO_TYPE["TASK_WAKEUP"]:
+        return state_by_tid.get(a) == 0
+    if op_type in {
+        OP_NAME_TO_TYPE["TASK_FORK"],
+        OP_NAME_TO_TYPE["TASK_PIN"],
+        OP_NAME_TO_TYPE["TASK_FIFO"],
+        OP_NAME_TO_TYPE["TASK_CFS"],
+        OP_NAME_TO_TYPE["TASK_PAUSE"],
+        OP_NAME_TO_TYPE["TASK_SET_PRIO"],
+    }:
+        return state_by_tid.get(a) == 2
+    return True
+
 def generate_next_command(m: GenState, task_states: list[dict]) -> tuple[int, int, int, int]:
-    m.update_from_kmod(task_states)
     while True:
         op = _generate_next_command(m)
-        if op:
+        if op and _op_matches_task_state(op, task_states):
             return op

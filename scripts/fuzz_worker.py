@@ -67,6 +67,15 @@ def worker_main(
     rng = random.Random(os.getpid() ^ (worker_id * 0x9E3779B9))
     log_file  = fuzz_dir / f"worker_{worker_id}.log"
     sock_file = fuzz_dir / f"worker_{worker_id}.sock"
+    worker_log = fuzz_dir / f"worker_{worker_id}.debug.log"
+
+    # Set up worker-specific file logger
+    logger = logging.getLogger(f"worker_{worker_id}")
+    logger.setLevel(logging.DEBUG)
+    logger.propagate = False  # Don't propagate to root logger (stdout)
+    handler = logging.FileHandler(worker_log, mode="w")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+    logger.addHandler(handler)
 
     while True:
         work: Optional[WorkItem] = task_queue.get()
@@ -82,6 +91,9 @@ def worker_main(
         proc = None
 
         try:
+            handler.stream.seek(0)
+            handler.stream.truncate()
+                
             proc = start_qemu(
                 driver=driver,
                 linux_name=work.linux_name,
@@ -107,28 +119,24 @@ def worker_main(
             sf = sock.makefile("rb")
             task_states = _read_state(sf)   # kmod signals readiness
 
-            if work.mode == "fresh":
-                gen = init_genstate(
-                    max_tasks=10,
-                    max_cgroups=10,
-                    cpus=driver.num_cpus,
-                    seed=rng.randint(0, 2**32 - 1),
-                )
-                for _ in range(work.steps):
-                    op, a, b, c = generate_next_command(gen, task_states)
-                    if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
-                        for _ in range(a):
-                            ops_executed.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
-                    else:
-                        ops_executed.append((op, a, b, c))
-                    sock.sendall(f"{op},{a},{b},{c}\n".encode())
-                    task_states = _read_state(sf)
-
-            else:   # replay exact seed (no mutation)
-                for op, a, b, c in work.ops:
+            gen = init_genstate(
+                max_tasks=10,
+                max_cgroups=10,
+                cpus=driver.num_cpus,
+                seed=rng.randint(0, 2**32 - 1),
+            )
+            for i in range(work.steps):
+                op, a, b, c = generate_next_command(gen, task_states)
+                if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
+                    for _ in range(a):
+                        ops_executed.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
+                else:
                     ops_executed.append((op, a, b, c))
-                    sock.sendall(f"{op},{a},{b},{c}\n".encode())
-                    task_states = _read_state(sf)
+                sock.sendall(f"{op},{a},{b},{c}\n".encode())
+                task_states = _read_state(sf)
+                gen.update_from_kmod(task_states)
+                logger.debug(f"STEP {i}: task_states updated: {gen.task_state}")
+
 
             sock.sendall(b"EXIT\n")
             sock.close()
@@ -151,14 +159,22 @@ def worker_main(
                 except Exception:
                     pass
             crashed = _check_for_crash(log_file)
-            level = logging.ERROR if crashed else logging.WARNING
-            logging.log(level, f"Worker {worker_id}: {'[CRASH] ' if crashed else ''}{exc}")
+            logger.error(f"Worker {worker_id}: {'[CRASH] ' if crashed else ''}{exc}")
+        
+
+        with log_file.open("r", errors="ignore") as lf:
+            log_content = lf.read()
+            if "fail" in log_content or "Fail" in log_content:
+                logger.error(f"Worker {worker_id}: Detected 'fail' or 'Fail' in log file.")
+                error = "fail"
+
 
         result_queue.put(WorkResult(
             worker_id=worker_id,
             ops=ops_executed,
             cov_file=result_cov,
             log_file=log_file if log_file.exists() else None,
+            debug_log_file=worker_log if worker_log.exists() else None,
             linux_name=work.linux_name,
             exec_time=time.monotonic() - t0,
             seed_id=work.seed_id,

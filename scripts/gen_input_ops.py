@@ -61,8 +61,6 @@ def op_task_create(m: GenState):
     tid = m.next_task_id()
     if tid is None:
         return None
-    m.add_task(tid)
-    m.set_task_state(tid, TASK_SLEEPING)
     return (OP_NAME_TO_TYPE["TASK_CREATE"], tid, 0, 0)
 
 # Fork and create new tasks;
@@ -72,7 +70,6 @@ def op_task_fork(m: GenState):
     new_tid = m.next_task_id()
     if new_tid is None:
         return None
-    m.add_task(new_tid)  # kmod will confirm actual state in next update
     if tid in m.task2cgroups:
         m.cgroup_add_task(m.task2cgroups[tid], new_tid)
     return (OP_NAME_TO_TYPE["TASK_FORK"], tid, new_tid, 0)
