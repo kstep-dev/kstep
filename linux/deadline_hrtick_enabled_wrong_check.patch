@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: kSTEP <kstep@example.com>
+Date: Sat, 15 Mar 2026 00:00:00 +0000
+Subject: [PATCH] sched/fair: Add hrtick_enabled_fair() guard in hrtick_start_fair()
+
+hrtick_start_fair() can be called without a prior hrtick_enabled_fair()
+check. Commit 95a0155224a6 ("sched/fair: Limit hrtick work") adds such
+an unguarded call in task_tick_fair's queued path. This is the same
+anti-pattern as the original DL bug fixed by d16b7eb6f523.
+
+Add the hrtick_enabled_fair() check directly inside hrtick_start_fair()
+to prevent the hrtick timer from being armed when HRTICK is disabled.
+
+Fixes: 95a0155224a6 ("sched/fair: Limit hrtick work")
+Signed-off-by: kSTEP <kstep@example.com>
+---
+ kernel/sched/fair.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 3eaeceda71b0..5669b237e759 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -6744,6 +6744,9 @@ static void hrtick_start_fair(struct rq *rq, struct task_struct *p)
+ 
+ WARN_ON_ONCE(task_rq(p) != rq);
+ 
++if (!hrtick_enabled_fair(rq))
++return;
++
+ if (rq->cfs.h_nr_queued > 1) {
+ u64 ran = se->sum_exec_runtime - se->prev_sum_exec_runtime;
+ u64 slice = se->slice;
+-- 
+2.43.0

@@ -1,0 +1,59 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: kSTEP <kstep@kstep.dev>
+Date: Sat, 15 Mar 2026 05:00:00 +0000
+Subject: [PATCH] sched/deadline: Fix PELT sync in switched_to_dl() under
+ CONFIG_SCHED_PROXY_EXEC
+
+switched_to_dl() uses rq->donor to decide whether to call
+update_dl_rq_load_avg().  Under CONFIG_SCHED_PROXY_EXEC, rq->donor
+(scheduling context) can differ from rq->curr (execution context)
+during proxy execution.  When the currently executing task has its
+policy changed to SCHED_DEADLINE and it is not the donor, the PELT
+avg_dl.last_update_time is not synchronised, producing a utilisation
+spike on the subsequent accounting update—the same class of bug fixed
+for RT in commit fecfcbc288e9 ("sched/rt: Fix RT utilization tracking
+during policy change").
+
+Use task_current(rq, p) (checks rq->curr) instead of the donor
+comparison, mirroring the pattern established in switched_to_rt().
+When p is the currently executing task, update PELT and return early;
+otherwise fall through to the push/preempt logic.
+
+Fixes: af0c8b2bf67b ("sched: Rework switched_to_dl()")
+Signed-off-by: kSTEP <kstep@kstep.dev>
+---
+ kernel/sched/deadline.c | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/kernel/sched/deadline.c b/kernel/sched/deadline.c
+index eca76669c..b7e9f3c12 100644
+--- a/kernel/sched/deadline.c
++++ b/kernel/sched/deadline.c
+@@ -3293,16 +3293,17 @@ static void switched_to_dl(struct rq *rq, struct task_struct *p)
+ 		return;
+ 	}
+ 
+-	if (rq->donor != p) {
+-		if (p->nr_cpus_allowed > 1 && rq->dl.overloaded)
+-			deadline_queue_push_tasks(rq);
+-		if (dl_task(rq->donor))
+-			wakeup_preempt_dl(rq, p, 0);
+-		else
+-			resched_curr(rq);
+-	} else {
++	if (task_current(rq, p)) {
+ 		update_dl_rq_load_avg(rq_clock_pelt(rq), rq, 0);
++		return;
+ 	}
++
++	if (p->nr_cpus_allowed > 1 && rq->dl.overloaded)
++		deadline_queue_push_tasks(rq);
++	if (dl_task(rq->donor))
++		wakeup_preempt_dl(rq, p, 0);
++	else
++		resched_curr(rq);
+ }
+ 
+ static u64 get_prio_dl(struct rq *rq, struct task_struct *p)
+-- 
+2.43.0

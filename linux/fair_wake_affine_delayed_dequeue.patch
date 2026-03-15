@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: kSTEP <kstep@fix>
+Date: Sat, 15 Mar 2026 05:00:00 +0000
+Subject: [PATCH] sched/fair: Fix select_idle_sibling kthread stacking vs
+ DELAYED_DEQUEUE
+
+The per-cpu kthread stacking optimization in select_idle_sibling() checks
+this_rq()->nr_running <= 1 without subtracting delayed-dequeued tasks.
+When a per-cpu kthread is the only truly running task but delayed tasks
+inflate nr_running, the check fails and the wakee is not stacked on the
+kthread's CPU, breaking IO completion cache affinity.
+
+Use the same correction applied by commit aa3ee4f0b754 ("sched/fair:
+Fixup wake_up_sync() vs DELAYED_DEQUEUE") for wake_affine_idle():
+subtract cfs_h_nr_delayed() from nr_running before the comparison.
+
+Fixes: 152e11f6df29 ("sched/fair: Implement delayed dequeue")
+Signed-off-by: kSTEP <kstep@fix>
+---
+ kernel/sched/fair.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index b00f16700f9c..a1b2c3d4e5f6 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -7822,7 +7822,8 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
+ 	if (is_per_cpu_kthread(current) &&
+ 	    in_task() &&
+ 	    prev == smp_processor_id() &&
+-	    this_rq()->nr_running <= 1 &&
++	    (this_rq()->nr_running -
++	     cfs_h_nr_delayed(this_rq())) <= 1 &&
+ 	    asym_fits_cpu(task_util, util_min, util_max, prev)) {
+ 		return prev;
+ 	}
+-- 
+2.43.0

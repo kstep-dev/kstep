@@ -1,0 +1,87 @@
+From a37f9e5944a8cc67cf6c29564b7fa00181e10460 Mon Sep 17 00:00:00 2001
+From: ShawnZhong <github@shawnzhong.com>
+Date: Sun, 15 Mar 2026 00:38:39 -0500
+Subject: [PATCH] sched/eevdf: Fix reweight_entity() using wrong V and
+ double-counting curr weight
+
+Commit 6d71a9c61604 ("sched/fair: Fix EEVDF entity placement bug causing
+scheduling lag") replaced the direct reweight_eevdf() vruntime computation
+with update_entity_lag() + place_entity(). This introduced two bugs when
+se == cfs_rq->curr (the currently running entity):
+
+1. avg_vruntime() inside place_entity() uses the NEW weight with the OLD
+   vruntime to compute V, giving a distorted weighted average.
+
+2. place_entity() lag inflation formula double-counts curr weight:
+     load = avg_load + w_curr   (via curr && curr->on_rq check)
+     lag *= (load + w_se) / load
+   Since se == curr, w_se == w_curr, yielding (W + 2w)/(W + w) instead
+   of the correct (W + w)/W.
+
+Together these produce 69% weighted-lag error for equal-weight groups,
+violating the lag preservation invariant.
+
+Fix by capturing avg_vruntime() before the weight change and using it
+directly for the curr case (se->vruntime = V_old - scaled_vlag), which
+is equivalent to the correct formula from the original reweight_eevdf():
+  v' = V - (V - v) * w / w'
+The non-curr path through place_entity() is unaffected and correct.
+
+Fixes: 6d71a9c61604 ("sched/fair: Fix EEVDF entity placement bug causing scheduling lag")
+---
+ kernel/sched/fair.c | 21 +++++++++++++++++++--
+ 1 file changed, 19 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 3eaeceda71b0..d59fe033ec08 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -3755,10 +3755,12 @@ static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
+ 			    unsigned long weight)
+ {
+ 	bool curr = cfs_rq->curr == se;
++	u64 avruntime;
+ 
+ 	if (se->on_rq) {
+ 		/* commit outstanding execution time */
+ 		update_curr(cfs_rq);
++		avruntime = avg_vruntime(cfs_rq);
+ 		update_entity_lag(cfs_rq, se);
+ 		se->deadline -= se->vruntime;
+ 		se->rel_deadline = 1;
+@@ -3787,7 +3789,22 @@ static void reweight_entity(struct cfs_rq *cfs_rq, struct sched_entity *se,
+ 
+ 	enqueue_load_avg(cfs_rq, se);
+ 	if (se->on_rq) {
+-		place_entity(cfs_rq, se, 0);
++		if (curr) {
++			/*
++			 * When se == cfs_rq->curr, place_entity() computes
++			 * avg_vruntime() using the new weight with the old
++			 * vruntime, and its lag inflation double-counts curr
++			 * weight (since se == curr). Use the pre-captured V
++			 * directly to avoid both issues.
++			 */
++			se->vruntime = avruntime - se->vlag;
++			if (se->rel_deadline) {
++				se->deadline += se->vruntime;
++				se->rel_deadline = 0;
++			}
++		} else {
++			place_entity(cfs_rq, se, 0);
++		}
+ 		update_load_add(&cfs_rq->load, se->load.weight);
+ 		if (!curr)
+ 			__enqueue_entity(cfs_rq, se);
+@@ -5176,7 +5193,7 @@ place_entity(struct cfs_rq *cfs_rq, struct sched_entity *se, int flags)
+ 		 *   vl_i = (W + w_i)*vl'_i / W
+ 		 */
+ 		load = cfs_rq->avg_load;
+-		if (curr && curr->on_rq)
++		if (curr && curr->on_rq && curr != se)
+ 			load += scale_load_down(curr->load.weight);
+ 
+ 		lag *= load + scale_load_down(se->load.weight);
+-- 
+2.43.0
+

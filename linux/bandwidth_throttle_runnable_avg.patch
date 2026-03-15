@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: kSTEP <kstep@kernel.org>
+Date: Sat, 15 Mar 2026 05:00:00 +0000
+Subject: [PATCH] sched/fair: Update runnable_weight in set/clear_delayed()
+
+When a task entity is delay-dequeued, set_delayed() walks every
+ancestor cfs_rq and decrements h_nr_runnable. However, it never
+calls se_update_runnable() for the ancestor group entities, leaving
+their runnable_weight stale.
+
+Since dequeue_entities() returns -1 for delayed tasks (skipping the
+second for_each_sched_entity loop that normally calls
+se_update_runnable), and entity_tick() also omits it, the stale
+runnable_weight feeds into PELT via se_runnable() across multiple
+ticks until the next enqueue/dequeue event corrects it.
+
+Fix this by calling se_update_runnable() inside the
+for_each_sched_entity loops in both set_delayed() and
+clear_delayed(). For task entities the call is a no-op; for group
+entities it syncs runnable_weight with the just-modified
+h_nr_runnable.
+
+Fixes: 3429dd57f0de ("sched/fair: Fix inaccurate h_nr_runnable accounting with delayed dequeue")
+Signed-off-by: kSTEP <kstep@kernel.org>
+---
+ kernel/sched/fair.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 8ce56a8d507f..1234567890ab 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -5314,6 +5314,7 @@ static void set_delayed(struct sched_entity *se)
+ 		struct cfs_rq *cfs_rq = cfs_rq_of(se);
+ 
+ 		cfs_rq->h_nr_runnable--;
++		se_update_runnable(se);
+ 	}
+ }
+ 
+@@ -5334,6 +5335,7 @@ static void clear_delayed(struct sched_entity *se)
+ 		struct cfs_rq *cfs_rq = cfs_rq_of(se);
+ 
+ 		cfs_rq->h_nr_runnable++;
++		se_update_runnable(se);
+ 	}
+ }
+ 
+-- 
+2.43.0

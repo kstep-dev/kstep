@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: kSTEP <kstep@kstep.dev>
+Date: Sat, 15 Mar 2026 00:00:00 +0000
+Subject: [PATCH] sched/topology: Fix sched_numa_hop_mask() for CPU-less nodes
+
+sched_numa_find_nth_cpu() was fixed in commit 617f2c38cb5c to handle
+CPU-less NUMA nodes by redirecting to the nearest node with CPUs via
+numa_nearest_node(). However, sched_numa_hop_mask() in the same file
+has the identical bug: it directly returns masks[hops][node] without
+checking if the node has CPUs.
+
+For CPU-less nodes, the entry in sched_domains_numa_masks is NULL
+(never initialized during sched_init_numa()), so the function returns
+NULL instead of ERR_PTR, violating its documented API contract. While
+for_each_numa_hop_mask() handles this with IS_ERR_OR_NULL(), any
+direct caller using only IS_ERR() would get a NULL dereference.
+
+Fix this by adding the same numa_nearest_node() call as was done for
+sched_numa_find_nth_cpu().
+
+Fixes: cd9f54359c90 ("sched: add sched_numa_find_nth_cpu()")
+Signed-off-by: kSTEP <kstep@kstep.dev>
+---
+ kernel/sched/topology.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/kernel/sched/topology.c b/kernel/sched/topology.c
+index cf643a5ddedd..074cab9bdecc 100644
+--- a/kernel/sched/topology.c
++++ b/kernel/sched/topology.c
+@@ -2345,6 +2345,9 @@ const struct cpumask *sched_numa_hop_mask(unsigned int node, unsigned int hops)
+ if (node >= nr_node_ids || hops >= sched_domains_numa_levels)
+ return ERR_PTR(-EINVAL);
+ 
++/* CPU-less node entries are uninitialized in sched_domains_numa_masks */
++node = numa_nearest_node(node, N_CPU);
++
+ masks = rcu_dereference(sched_domains_numa_masks);
+ if (!masks)
+ return ERR_PTR(-EBUSY);
+-- 
+2.43.0

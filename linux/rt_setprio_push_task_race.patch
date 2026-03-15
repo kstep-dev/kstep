@@ -1,0 +1,43 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: kSTEP <kstep@fix.local>
+Date: Sat, 15 Mar 2026 05:00:00 +0000
+Subject: [PATCH] sched/rt: Fix find_lowest_rq() arg mismatch with proxy
+ execution
+
+Commit af0c8b2bf67b ("sched: Split scheduler and execution contexts")
+changed the sched_class guard in push_rt_task()'s migration-disabled path
+from rq->curr to rq->donor, but left the find_lowest_rq() call using
+rq->curr. With CONFIG_SCHED_PROXY_EXEC=y, rq->donor (the scheduling
+context, an RT task) can differ from rq->curr (the execution context,
+a CFS proxy task). This causes find_lowest_rq() to receive a non-RT task,
+leading to undefined behavior in convert_prio() which has no case for CFS
+priorities (101-139).
+
+Additionally, get_push_task() already returns rq->donor, creating a
+mismatch: find_lowest_rq() finds a CPU suitable for rq->curr, but
+push_cpu_stop() migrates rq->donor.
+
+Fix by passing rq->donor to find_lowest_rq(), consistent with the
+guard check and get_push_task().
+
+Fixes: af0c8b2bf67b ("sched: Split scheduler and execution contexts")
+---
+ kernel/sched/rt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
+index 1c57aa26a440..f5b1e5c3a001 100644
+--- a/kernel/sched/rt.c
++++ b/kernel/sched/rt.c
+@@ -1973,7 +1973,7 @@ static int push_rt_task(struct rq *rq, bool pull)
+ 		if (rq->donor->sched_class != &rt_sched_class)
+ 			return 0;
+ 
+-		cpu = find_lowest_rq(rq->curr);
++		cpu = find_lowest_rq(rq->donor);
+ 		if (cpu == -1 || cpu == rq->cpu)
+ 			return 0;
+ 
+-- 
+2.39.5
+

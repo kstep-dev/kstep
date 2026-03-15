@@ -75,7 +75,17 @@ BUGS = [
     Bug("zero_vruntime", fix="b3d99f43c72b56cf7a104a364e7fb34b0702828b"),
 ]
 BUGS_EXTRA = [
-
+    Bug("rt_setprio_push_task_race", version="v6.19", patch="rt_setprio_push_task_race.patch"),
+    Bug("topology_numa_cpuless_node_crash", version="v6.19", patch="topology_numa_cpuless_node_crash.patch"),
+    Bug("eevdf_reweight_dequeue_avruntime", version="v6.19", patch="eevdf_reweight_dequeue_avruntime.patch"),
+    Bug("fair_wake_affine_delayed_dequeue", version="v6.19", patch="fair_wake_affine_delayed_dequeue.patch", num_cpus=3),
+    Bug("bandwidth_throttle_runnable_avg", version="v6.19", patch="bandwidth_throttle_runnable_avg.patch"),
+    Bug("core_preempt_dynamic_return_value", version="v6.19", patch="core_preempt_dynamic_return_value.patch"),
+    Bug("eevdf_reweight_vruntime_unadjusted", version="v6.19", patch="eevdf_reweight_vruntime_unadjusted.patch"),
+    Bug("lb_avg_load_condition", version="v6.19", patch="lb_avg_load_condition.patch", num_cpus=7),
+    Bug("uclamp_fork_reset_rt_boost", version="v6.19", patch="uclamp_fork_reset_rt_boost.patch"),
+    Bug("pelt_rt_policy_change_spike", version="v6.19", patch="pelt_rt_policy_change_spike.patch"),
+    Bug("deadline_hrtick_enabled_wrong_check", version="v6.19", patch="deadline_hrtick_enabled_wrong_check.patch"),
 ]
 # fmt: on
 

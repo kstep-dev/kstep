@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: kSTEP <kstep@kernel.org>
+Date: Sat, 15 Mar 2026 05:00:00 +0000
+Subject: [PATCH] sched/fair: Compute avg_load for group_fully_busy in LB path
+
+update_sg_lb_stats() only computes avg_load for group_overloaded, but
+update_sd_pick_busiest() uses avg_load to compare group_fully_busy
+groups. This makes busiest-group selection arbitrary (always comparing
+0 vs 0) instead of load-aware.
+
+Fix this by also computing avg_load for group_fully_busy, matching the
+pattern already used in update_sg_wakeup_stats() since commit
+6c8116c914b6 ("sched/fair: Fix condition of avg_load calculation").
+
+---
+ kernel/sched/fair.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 8ce56a8d507f..b2e2f3a1c5d0 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -10468,8 +10468,9 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ 
+ 	sgs->group_type = group_classify(env->sd->imbalance_pct, group, sgs);
+ 
+-	/* Computing avg_load makes sense only when group is overloaded */
+-	if (sgs->group_type == group_overloaded)
++	/* Computing avg_load makes sense only when group is fully busy or overloaded */
++	if (sgs->group_type == group_fully_busy ||
++	    sgs->group_type == group_overloaded)
+ 		sgs->avg_load = (sgs->group_load * SCHED_CAPACITY_SCALE) /
+ 				sgs->group_capacity;
+ }
+-- 
+2.43.0

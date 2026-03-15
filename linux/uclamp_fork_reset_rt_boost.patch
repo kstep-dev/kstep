@@ -1,0 +1,37 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: kSTEP <kstep@kstep.dev>
+Date: Sat, 14 Mar 2026 00:00:00 +0000
+Subject: [PATCH] sched/uclamp: Use task_has_rt_policy() in __setscheduler_uclamp()
+
+__setscheduler_uclamp() uses rt_task(p) to decide whether to set
+uclamp.min to the RT default (1024). However, rt_task() checks p->prio
+which reflects PI boosting, not p->policy. When sched_setattr() is
+called on a SCHED_NORMAL task that is PI-boosted to RT priority,
+rt_task(p) returns true and uclamp_req[UCLAMP_MIN] is incorrectly set
+to sysctl_sched_uclamp_util_min_rt_default. After the PI boost is
+removed, the SCHED_NORMAL task is left permanently with a max-boost
+uclamp.min.
+
+Fix this by using task_has_rt_policy(p) which checks p->policy instead
+of p->prio, consistent with the fix in commit eaf5a92ebde5
+("sched/core: Fix reset-on-fork from RT with uclamp").
+
+Fixes: 1a00d999971c ("sched/uclamp: Set default clamps for RT tasks")
+---
+ kernel/sched/syscalls.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/syscalls.c b/kernel/sched/syscalls.c
+--- a/kernel/sched/syscalls.c
++++ b/kernel/sched/syscalls.c
+@@ -362,7 +362,7 @@ static void __setscheduler_uclamp(struct task_struct *p,
+ 		 * RT by default have a 100% boost value that could be modified
+ 		 * at runtime.
+ 		 */
+-		if (unlikely(rt_task(p) && clamp_id == UCLAMP_MIN))
++		if (unlikely(task_has_rt_policy(p) && clamp_id == UCLAMP_MIN))
+ 			value = sysctl_sched_uclamp_util_min_rt_default;
+ 		else
+ 			value = uclamp_none(clamp_id);
+-- 
+2.43.0

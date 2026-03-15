@@ -39,6 +39,11 @@ CONFIG_HOTPLUG_CPU=y
 # Scheduler
 #
 
+# Mutexes / futexes
+CONFIG_RT_MUTEXES=y
+CONFIG_FUTEX=y
+# Proxy execution
+CONFIG_SCHED_PROXY_EXEC=y
 # Sched classes
 CONFIG_FAIR_GROUP_SCHED=y
 CONFIG_CFS_BANDWIDTH=y

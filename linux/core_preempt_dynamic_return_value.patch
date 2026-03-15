@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: kSTEP <kstep@kstep.dev>
+Date: Sat, 15 Mar 2026 05:00:00 +0000
+Subject: [PATCH] sched/core: Fix setup_resched_latency_warn_ms() return value
+
+__setup() callbacks expect 1 for success and 0 for failure.
+setup_resched_latency_warn_ms() returns 1 when kstrtol() fails to
+parse the string, incorrectly telling __setup the parameter was
+handled and suppressing the "Unknown kernel command line parameters"
+warning. Return 0 on parse failure so the kernel properly reports
+the unrecognized parameter.
+
+This is the same anti-pattern that was fixed in setup_preempt_mode()
+by commit 9ed20bafc858 ("preempt/dynamic: Fix setup_preempt_mode()
+return value").
+
+---
+ kernel/sched/core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 8d9b02ded5f1..a1b2c3d4e5f6 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -5494,7 +5494,7 @@ static int __init setup_resched_latency_warn_ms(char *str)
+ 
+ 	if ((kstrtol(str, 0, &val))) {
+ 		pr_warn("Unable to set resched_latency_warn_ms\n");
+-		return 1;
++		return 0;
+ 	}
+ 
+ 	sysctl_resched_latency_warn_ms = val;
+-- 
+2.43.0

@@ -5,7 +5,7 @@
 #include <linux/sched.h>
 
 #define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
-#define DRIVER_NAME_LEN 32    
+#define DRIVER_NAME_LEN 64    
 
 struct sched_domain;
 struct kstep_driver {
