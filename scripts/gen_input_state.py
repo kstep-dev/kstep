@@ -5,9 +5,10 @@ from typing import List, Optional
 # Cgroup constants
 CGROUP_ROOT = "cgroot"
 
-# Task states
-TASK_SLEEPING = "sleeping"
-TASK_RUNNABLE = "runnable"
+# Task states (matching kmod: 0=blocked, 1=runnable-on-runqueue, 2=running-on-CPU)
+TASK_SLEEPING = "sleeping"   # blocked/dequeued; eligible for WAKEUP
+TASK_RUNNABLE = "runnable"   # on runqueue but not on CPU
+TASK_ON_CPU   = "on_cpu"     # currently executing; eligible for signal ops
 
 @dataclass
 class Cgroup:
@@ -65,6 +66,22 @@ class GenState:
     
     def set_task_state(self, tid: int, state: str):
         self.task_state[tid] = state
+
+    _KMOD_STATE_MAP = {0: TASK_SLEEPING, 1: TASK_RUNNABLE, 2: TASK_ON_CPU}
+
+    def update_from_kmod(self, task_states: list[dict]):
+        """Sync task list and states from the kmod's STATE response.
+        task_states is a list of {"id": int, "state": int} dicts where
+        state is 0=blocked, 1=runnable, 2=on_cpu."""
+        kmod = {d["id"]: self._KMOD_STATE_MAP[d["state"]] for d in task_states}
+        for tid, py_state in kmod.items():
+            if tid not in self.tasks:
+                self.tasks.append(tid)
+            self.task_state[tid] = py_state
+        for tid in list(self.tasks):
+            if tid not in kmod:
+                self.tasks.remove(tid)
+                self.task_state.pop(tid, None)
 
     # ======
     # cpuset related functions

@@ -53,9 +53,13 @@ struct task_struct *kstep_task_create(void) {
   // Wait for the task to start
   for (int i = 0; i < 100; i++) {
     kstep_sleep();
-    if (strcmp(p->comm, TASK_READY_COMM) == 0)
+    if (strcmp(p->comm, TASK_READY_COMM) == 0 || 
+    (task_cpu(p) != 0 && p->__state == TASK_RUNNING && !cpumask_test_cpu(0, p->cpus_ptr))) {
+      TRACE_INFO("Task %d is runnable on cpu %d", p->pid, task_cpu(p));
       return p;
-    TRACE_INFO("Waiting for task %d to start", p->pid);
+    }
+    TRACE_INFO("Waiting for task %d to be runnable on cpu 1-N", p->pid);
+
   }
   panic("Task %d did not start", p->pid);
 }

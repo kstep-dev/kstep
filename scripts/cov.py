@@ -14,8 +14,7 @@ def cov_parse(cov_file: Path) -> dict[int, dict[int, list[int]]]:
         raise ValueError(
             f"signal payload size {len(payload)} is not a multiple of {COV_RECORD_SIZE}"
         )
-    records: dict[int, dict[int, list[int]]] = {}
-    records = defaultdict(lambda: defaultdict(list))
+    records: dict[int, dict[int, list[int]]] = defaultdict(lambda: defaultdict(list))
     # Parse the signal records from the payload
     # Each record is 16 bytes: u32 pid + u32 cmd_id + u64 pc
     for i in range(0, len(payload), COV_RECORD_SIZE):

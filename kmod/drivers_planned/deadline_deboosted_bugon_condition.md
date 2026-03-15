@@ -122,81 +122,161 @@ The following conditions must be met to trigger this bug:
 
 ## Reproduce Strategy (kSTEP)
 
-Reproducing this bug with kSTEP requires creating the PI boosting/deboosting scenario using kernel rt_mutex APIs and SCHED_DEADLINE tasks. The approach requires minor kSTEP extensions and careful orchestration of kthread operations.
+This strategy reproduces the BUG_ON by creating genuine rt_mutex contention between a SCHED_DEADLINE kernel thread and a SCHED_NORMAL kernel thread, producing natural PI boosting and deboosting entirely through public kernel APIs. All scheduler state transitions occur through `rt_mutex_lock`, `rt_mutex_unlock`, and `sched_setattr_nocheck` — the driver never writes to internal scheduler fields such as `pi_se`, `dl_throttled`, or `sched_class`. Internal structures are read only for observation and verification.
 
-### Required kSTEP Extensions
+### QEMU and Kernel Configuration
 
-1. **SCHED_DEADLINE task API**: Add a function `kstep_kthread_set_dl(struct task_struct *p, u64 runtime_ns, u64 deadline_ns, u64 period_ns)` that calls `sched_setattr_nocheck()` to set SCHED_DEADLINE parameters on a kthread. This follows the same pattern as `kstep_task_fifo()` for RT tasks. The function should import `sched_setattr_nocheck` via `KSYM_IMPORT`.
+Configure QEMU with at least 3 CPUs: CPU 0 for the kSTEP driver, CPU 1 and CPU 2 for test kernel threads. Set the kernel boot parameters `panic_on_oops=1 panic=5` to ensure the `BUG_ON` crash results in a detectable QEMU exit rather than a hung VM. The kernel must be built with `CONFIG_RT_MUTEXES=y` (required for `is_dl_boosted()` and the PI mechanism), `CONFIG_SCHED_DEADLINE=y`, and `CONFIG_SMP=y`. For maximum trigger probability, build the kernel with `CONFIG_PREEMPT_RT=y` (full PREEMPT_RT), which converts all spinlocks to rt_mutexes and dramatically increases the frequency of PI boosting events during normal kernel operations — this is the configuration under which the bug was originally reported. The target kernel version must be between v5.10-rc5 (when `2279f540ea7d` was merged) and v5.19-rc7 (before `ddfc710395cc` was applied).
 
-2. **rt_mutex kthread actions**: Add kthread actions for rt_mutex lock and unlock. Specifically, `kstep_kthread_rtmutex_lock(struct task_struct *p, struct rt_mutex *lock)` and `kstep_kthread_rtmutex_unlock(struct task_struct *p, struct rt_mutex *lock)` that set the kthread's action to acquire/release the given mutex. These follow the existing action pattern in `kmod/kthread.c`.
+### Driver Architecture: Custom Kthreads with rt_mutex Operations
 
-### Driver Setup
+The driver creates two kernel threads directly using the kernel's standard `kthread_create()` API (available to all kernel modules via `<linux/kthread.h>`), each with a custom thread function body that includes rt_mutex operations. This avoids requiring any kSTEP framework extensions. The rt_mutex lock/unlock functions and `sched_setattr_nocheck` are imported via `KSYM_IMPORT` since they may not be exported to modules. Coordination between the driver and the kthreads uses atomic flags (readable cross-CPU without sleeping). The driver declares these static variables:
 
-1. **Configure QEMU with at least 2 CPUs** (CPU 0 for driver, CPU 1 for DL tasks).
+```c
+static DEFINE_RT_MUTEX(test_mutex);
+static struct task_struct *holder_task;     /* CFS kthread: mutex holder */
+static struct task_struct *contender_task;  /* DL kthread: PI donor */
 
-2. **Create three kthreads**: Task A (CFS, lock holder), Task B (CFS, intermediate), Task D (to be set as SCHED_DEADLINE, PI donor). Pin all to CPU 1.
+static volatile int holder_acquired = 0;   /* Set by holder after lock */
+static volatile int release_holder = 0;    /* Set by driver to signal release */
+static volatile int holder_done = 0;       /* Set by holder after unlock */
 
-3. **Set Task D to SCHED_DEADLINE** with aggressive parameters:
-   - `dl_runtime = 10000` (10 µs)
-   - `dl_deadline = 100000` (100 µs)
-   - `dl_period = 100000` (100 µs)
+KSYM_IMPORT(rt_mutex_lock);
+KSYM_IMPORT(rt_mutex_unlock);
+KSYM_IMPORT(sched_setattr_nocheck);
+```
 
-4. **Declare an `rt_mutex`**: `RT_MUTEX(test_mutex)`, initialized with `rt_mutex_init()`.
+Kthread H (the **holder**, SCHED_NORMAL) has this function body:
 
-### Trigger Sequence
+```c
+static int holder_fn(void *data) {
+    KSYM_rt_mutex_lock(&test_mutex);        /* Acquire the mutex */
+    smp_store_release(&holder_acquired, 1); /* Signal driver */
+    while (!smp_load_acquire(&release_holder))  /* Busy-spin while boosted */
+        cpu_relax();
+    KSYM_rt_mutex_unlock(&test_mutex);      /* Release → triggers deboost */
+    smp_store_release(&holder_done, 1);
+    return 0;
+}
+```
 
-The goal is to create a PI chain where a CFS task gets boosted to DL and then deboosted:
+Kthread C (the **contender**, to be set as SCHED_DEADLINE) has this function body:
 
-1. **Task A acquires `test_mutex`**: Use `kstep_kthread_rtmutex_lock(A, &test_mutex)`. A (CFS) now holds the mutex.
+```c
+static int contender_fn(void *data) {
+    KSYM_rt_mutex_lock(&test_mutex);        /* Blocks → PI boosts holder */
+    KSYM_rt_mutex_unlock(&test_mutex);      /* Immediately release */
+    return 0;
+}
+```
 
-2. **Task D tries to acquire `test_mutex`**: Use `kstep_kthread_rtmutex_lock(D, &test_mutex)`. D (SCHED_DEADLINE) blocks on the mutex. The PI mechanism boosts Task A to deadline class: `rt_mutex_setprio(A, D)` is called, setting `A->dl.pi_se` to D's DL entity, changing A's `sched_class` to `dl_sched_class`, and adding `ENQUEUE_REPLENISH` to the enqueue flags.
+Both thread functions use exclusively public kernel APIs (`rt_mutex_lock`, `rt_mutex_unlock`). No internal scheduler fields are accessed or modified by the kthreads.
 
-3. **Let Task A run as DL**: After boosting, Task A runs with deadline scheduling parameters. Use `kstep_tick_repeat()` to advance time and let Task A consume its DL runtime budget. With the 10 µs runtime, Task A will quickly exhaust its budget, causing `update_curr_dl()` to detect the overrun.
+An alternative approach uses kSTEP's kthread framework: since `kstep_kthread_create()` builds kthreads with an internal `action` function pointer that the thread loops on, define custom action functions (`do_rt_mutex_lock`, `do_rt_mutex_unlock`) in the driver that call `KSYM_rt_mutex_lock` / `KSYM_rt_mutex_unlock`, and set them on the kthread's internal `struct kstep_kthread` via its `action` and `action_arg` fields. This leverages kSTEP's existing kthread management while enabling custom kernel function execution in the kthread's own context.
 
-4. **Task A releases `test_mutex`**: Use `kstep_kthread_rtmutex_unlock(A, &test_mutex)`. This triggers the PI deboost: `rt_mutex_setprio(A, NULL)` is called, which:
-   - Dequeues A (calls `dequeue_task_dl()` → `update_curr_dl()`)
-   - Clears `A->dl.pi_se = &A->dl` (is_dl_boosted becomes false)
-   - Changes A's class back to `fair_sched_class`
-   - Re-enqueues A via `enqueue_task()` → `enqueue_task_fair()`
+### Setup Sequence
 
-   During the dequeue step, `update_curr_dl()` may detect runtime exhaustion and attempt to call `enqueue_task_dl()` directly (bypassing the sched_class callback). The specific path is:
+1. **Create Kthread H** using `kthread_create(holder_fn, NULL, "kstep_holder")`. Bind it to CPU 1 using `kthread_bind()`. Start it with `wake_up_process()`. H immediately acquires `test_mutex` and busy-spins.
+
+2. **Wait for H to acquire the mutex**: Use `kstep_tick_until()` with a predicate that checks `smp_load_acquire(&holder_acquired)`. Once H holds the mutex, it is spinning on CPU 1 as a SCHED_NORMAL task.
+
+3. **Create Kthread C** using `kthread_create(contender_fn, NULL, "kstep_contender")`. Bind it to CPU 1 (same CPU as H, to ensure direct PI contention on the same runqueue). Before starting C, set it to SCHED_DEADLINE using `KSYM_sched_setattr_nocheck()` with aggressive parameters designed to cause rapid runtime exhaustion:
+
    ```c
-   // In update_curr_dl():
-   if (dl_runtime_exceeded(dl_se) || dl_se->dl_yielded) {
-       dl_se->dl_throttled = 1;
-       __dequeue_task_dl(rq, curr, 0);
-       if (unlikely(is_dl_boosted(dl_se) || !start_dl_timer(curr)))
-           enqueue_task_dl(rq, curr, ENQUEUE_REPLENISH);
-   }
+   struct sched_attr attr = {
+       .size           = sizeof(struct sched_attr),
+       .sched_policy   = SCHED_DEADLINE,
+       .sched_runtime  = 5000,    /* 5 µs — very short */
+       .sched_deadline = 50000,   /* 50 µs */
+       .sched_period   = 50000,   /* 50 µs — implicit deadline */
+   };
+   KSYM_sched_setattr_nocheck(contender_task, &attr);
    ```
 
-   If `is_dl_boosted()` is false at this point (which can happen if the pi_se was already cleared in an earlier step of the deboost sequence) and `start_dl_timer()` fails (returns 0, e.g., because the computed deadline is in the past), then `enqueue_task_dl()` is called directly. Inside, the first branch (`is_dl_boosted()`) is skipped, and the else-if (`!dl_prio(p->normal_prio)`) is entered — triggering the BUG_ON.
+   These tight parameters ensure that when H is PI-boosted to DL class, its inherited DL budget (5 µs) runs out almost immediately — well within a single scheduler tick (~1 ms at HZ=1000).
 
-### Alternative Direct Approach
+4. **Start Kthread C** with `wake_up_process()`. C calls `rt_mutex_lock(&test_mutex)`. Since H holds the mutex, C blocks. The kernel's PI mechanism fires automatically: `task_blocks_on_rt_mutex()` → `rt_mutex_adjust_prio_chain()` → `rt_mutex_setprio(H, C)`. This boosts H to SCHED_DEADLINE class with `H->dl.pi_se` pointing to C's DL entity.
 
-If the natural PI chain doesn't reliably trigger the BUG_ON due to timing constraints, a more direct approach can be used during the initial development stage:
+### Trigger Sequence and DL Runtime Exhaustion
 
-1. **Create a kthread and boost it to DL** via rt_mutex PI as described above.
-2. **Manually clear `pi_se`**: After the task is boosted and running as DL, use `KSYM_IMPORT` to access the task's `sched_dl_entity` and set `p->dl.pi_se = &p->dl` directly while holding the rq lock.
-3. **Trigger `enqueue_task_dl()`**: Call `enqueue_task_dl()` directly (via `KSYM_IMPORT`) with the task and `ENQUEUE_REPLENISH` flags.
-4. **Observe the BUG_ON**: On the buggy kernel, this immediately crashes. On the fixed kernel, it prints the warning and continues.
+**Phase 1 — PI Boost Active.** After C blocks on the mutex, H is PI-boosted and continues spinning on CPU 1 as a SCHED_DEADLINE task, inheriting C's DL parameters (5 µs runtime, 50 µs deadline/period). Use `kstep_tick_repeat(200)` to advance approximately 200 scheduler ticks (~200 ms at HZ=1000). During each tick on CPU 1, `scheduler_tick()` → `task_tick_dl()` → `update_curr_dl()` detects that H's DL runtime is exhausted (5 µs runtime is consumed within a fraction of the 1 ms tick interval). The runtime-exceeded path fires: `dl_se->dl_throttled = 1` → `__dequeue_task_dl(rq, curr, 0)` → because `is_dl_boosted(dl_se)` returns TRUE (H is still boosted), the `unlikely(is_dl_boosted(dl_se) || !start_dl_timer(curr))` condition short-circuits and `enqueue_task_dl(rq, curr, ENQUEUE_REPLENISH)` is called directly → inside `enqueue_task_dl`, the first branch (is_dl_boosted TRUE) clears `dl_throttled`, cancels the DL timer via `hrtimer_try_to_cancel()`, and falls through to `enqueue_dl_entity()` with ENQUEUE_REPLENISH → `replenish_dl_entity()` resets `H->dl.deadline = rq_clock + 50µs` and `H->dl.runtime = 5µs`. H is re-enqueued on the DL runqueue and continues spinning. This replenish-on-tick cycle repeats every tick, establishing a steady state of rapid DL runtime exhaustion and replenishment while H remains boosted.
 
-This direct approach guarantees triggering but manipulates internal state. The refinement stage should attempt to trigger the bug through the natural PI chain.
+**Phase 2 — Trigger the Deboost.** After sufficient ticks have elapsed, set `WRITE_ONCE(release_holder, 1)` and advance one or more ticks (`kstep_tick()`). H observes the release flag, exits the spin loop, and calls `rt_mutex_unlock(&test_mutex)`. The unlock path invokes `rt_mutex_slowunlock()` → wakes C as the new mutex owner → calls `rt_mutex_adjust_prio()` → `rt_mutex_setprio(H, NULL)` to remove H's PI boost. Inside `rt_mutex_setprio()`, the deboost executes under the rq lock in this order:
 
-### Detection
+1. `dequeue_task(rq, H, DEQUEUE_SAVE|DEQUEUE_MOVE)` → `dequeue_task_dl()` → `update_curr_dl()`. At this point, `H->dl.pi_se` still points to C's DL entity (`is_dl_boosted` = TRUE). If runtime is exceeded (which it almost certainly is, since the 5 µs budget was consumed between the last tick and now), the boosted replenish path fires one final time: throttle → dequeue → is_dl_boosted TRUE → enqueue with REPLENISH → replenish. Then `__dequeue_task_dl(rq, H, flags)` removes H from the DL runqueue.
 
-- **Buggy kernel**: The `BUG_ON` fires, causing a kernel panic. The QEMU VM will hang or terminate. kSTEP's test harness should detect the VM crash as a test failure.
-- **Fixed kernel**: The `printk_deferred_once` message may appear in `dmesg`/kernel log. The task continues to run normally. The test completes successfully. Check for the warning message: `"sched: DL de-boosted task PID %d: REPLENISH flag missing"` in `data/logs/latest.log`. If no warning appears, the deboost completed cleanly — also a pass.
+2. `H->dl.pi_se = &H->dl` — boost marker cleared. `is_dl_boosted()` now returns FALSE.
 
-### Pass/Fail Criteria
+3. `__setscheduler_prio(H, prio)` — sched_class changed to `fair_sched_class`, prio set to H's normal CFS priority.
 
-- `kstep_fail()`: Kernel panics (BUG_ON triggered on buggy kernel). Detected by VM crash / no response.
-- `kstep_pass()`: Test completes without crash. Optionally verify that the deboosted task's `dl_throttled` flag is properly cleared (should be 0 after the deboost path returns).
+4. `enqueue_task(rq, H, queue_flag)` — dispatches through `enqueue_task_fair()` (class is now fair).
+
+5. `check_class_changed()` → `switched_from_dl(rq, H)` → calls `hrtimer_try_to_cancel(&H->dl.dl_timer)` to cancel any pending DL replenishment timer.
+
+**Phase 3 — BUG_ON Trigger via DL Timer Race.** The BUG_ON fires when `enqueue_task_dl()` is entered for H in a state where `is_dl_boosted()` returns false and `!dl_prio(H->normal_prio)` is true. While the rq-lock-serialized deboost sequence above appears airtight, the actual trigger exploits a race between the DL replenishment timer (`dl_task_timer`) and the deboost path. The critical scenario unfolds as follows:
+
+During the replenish cycle in Phase 1, each tick's `update_curr_dl()` detects exhaustion, dequeues H, and — because `is_dl_boosted()` is TRUE — immediately re-enqueues via `enqueue_task_dl()` without starting the DL timer. However, the replenishment inside `enqueue_dl_entity()` calls `replenish_dl_entity()`, which resets the deadline to `rq_clock + dl_deadline`. At the boundary of a tick, if the replenishment timing aligns such that a `dl_check_constrained_dl()` or `update_dl_entity()` path DOES arm the DL timer (e.g., for constrained deadline handling or an edge case in the CBS accounting), that timer runs asynchronously. If `switched_from_dl()` in step 5 encounters `hrtimer_try_to_cancel()` returning -1 (timer callback is currently executing on another CPU), the timer is NOT cancelled. The `dl_task_timer()` callback acquires the rq lock and checks: `dl_task(H)` → examines `dl_prio(H->prio)`. If the timer fires in the narrow window AFTER `pi_se` is cleared (step 2) but BEFORE `__setscheduler_prio()` changes the prio (step 3), `H->prio` is still a DL priority, so `dl_task(H)` returns true. Next, `is_dl_boosted(dl_se)` returns false (pi_se was cleared). The timer proceeds to call `enqueue_task_dl(rq, H, ENQUEUE_REPLENISH)`. Inside `enqueue_task_dl()`, the first branch (`is_dl_boosted()`) is skipped, the else-if (`!dl_prio(H->normal_prio)`) is entered — and the BUG_ON fires.
+
+On PREEMPT_RT kernels, this race window is wider because the rq lock semantics differ and hrtimer callbacks may run in different contexts. Additionally, on PREEMPT_RT, the many spinlock-to-rtmutex conversions create frequent PI boosting/deboosting events throughout the kernel, meaning the DL timer and deboost paths are exercised far more often. This is consistent with the original bug reports occurring under `stress-ng --cyclic` on PREEMPT_RT systems.
+
+### Maximizing Trigger Probability
+
+The race window within `rt_mutex_setprio()` is narrow under standard kernels (a few instructions between pi_se clearing and prio update, all under a single rq lock). To maximize the chance of triggering the BUG_ON:
+
+1. **Use PREEMPT_RT kernel** (`CONFIG_PREEMPT_RT=y`): This is the configuration under which the bug was originally discovered. On PREEMPT_RT, the kthreads' busy-spin loop, kernel memory allocations, and other operations naturally contend on rt_mutexes, creating additional PI boosting/deboosting events beyond the explicitly created one. The different timer and locking behavior under PREEMPT_RT significantly increases the race window.
+
+2. **Iteration loop**: Wrap the entire trigger sequence (create kthreads → acquire → boost → exhaust → release → deboost) in a loop, repeating for many iterations (e.g., 1000+). Between iterations, reinitialize the mutex, reset the coordination flags, and re-create the kthreads. Each iteration is an independent chance to hit the timing window.
+
+3. **Multiple concurrent contention pairs**: Create several pairs of (CFS holder, DL contender) kthreads, each with their own rt_mutex, running on different CPUs (e.g., pairs on CPU 1 and CPU 2). This multiplies the number of deboost events per iteration and increases timer contention across CPUs.
+
+4. **Vary DL parameters**: Across iterations, vary the runtime/period combinations (e.g., 1µs/10µs, 5µs/50µs, 10µs/100µs, 50µs/500µs) to exercise different timer behaviors, CBS accounting edge cases, and `dl_check_constrained_dl()` paths. Constrained deadline parameters (`sched_deadline < sched_period`) are particularly useful for exercising the `dl_check_constrained_dl()` path, which has its own `start_dl_timer()` call that can arm the replenishment timer.
+
+5. **Use constrained deadline tasks**: Set C's DL parameters with `sched_deadline < sched_period` (e.g., `sched_runtime=5000, sched_deadline=30000, sched_period=50000`). This activates the `dl_check_constrained_dl()` code path in `enqueue_task_dl()`, which independently checks deadline vs. rq_clock and may arm the DL timer via `start_dl_timer()`, creating additional opportunities for the timer race.
+
+6. **Pin to separate CPUs**: Pin H to CPU 1 and the DL timer processing to CPU 2 (if possible via IRQ affinity). Cross-CPU timer firing increases the likelihood of the timer callback and `rt_mutex_setprio()` executing concurrently.
+
+### Observation and Verification (Read-Only)
+
+Use the `on_tick_begin` callback to read (never write) internal scheduler state for tracing the reproduction:
+
+```c
+KSYM_IMPORT(dl_sched_class);
+KSYM_IMPORT(fair_sched_class);
+
+void on_tick_begin(void) {
+    struct rq *rq = cpu_rq(1);
+    struct task_struct *curr = rq->curr;
+    if (curr == holder_task) {
+        /* READ-ONLY observation of internal state */
+        kstep_pass("H: class=%s boosted=%d throttled=%d rt=%lld dl=%lld",
+                   curr->sched_class == KSYM_dl_sched_class ? "DL" :
+                   curr->sched_class == KSYM_fair_sched_class ? "CFS" : "other",
+                   is_dl_boosted(&curr->dl),
+                   curr->dl.dl_throttled,
+                   curr->dl.runtime,
+                   curr->dl.deadline);
+    }
+}
+```
+
+This tracing confirms: H transitions from CFS → DL (boosted) → CFS (deboosted); DL runtime exhaustion occurs during the boost period; `is_dl_boosted` correctly tracks the PI state; and `dl_throttled` cycles as expected during replenishment. Import `is_dl_boosted` via `KSYM_IMPORT` for the read-only observation. All field accesses are reads — no writes.
+
+### Detection and Pass/Fail Criteria
+
+**Buggy kernel (v5.10-rc5 to v5.19-rc7):** If the BUG_ON fires, it triggers a kernel panic: `kernel BUG at kernel/sched/deadline.c:1704! invalid opcode: 0000 [#1] PREEMPT SMP`. With `panic_on_oops=1 panic=5`, the QEMU VM terminates after 5 seconds. The kSTEP test harness detects this as an abnormal VM exit (non-zero exit code or timeout). The `kstep_fail()` call may not execute since the crash preempts the driver.
+
+**Fixed kernel (v5.19-rc8+):** The `BUG_ON` is replaced with `printk_deferred_once("sched: DL de-boosted task PID %d: REPLENISH flag missing\n", ...)`. The deboost completes normally. After `holder_done` is set, verify:
+1. H's scheduling class returned to `fair_sched_class` (read `holder_task->sched_class`).
+2. H's `dl_throttled` is 0 (read `holder_task->dl.dl_throttled`).
+3. Optionally check `data/logs/latest.log` for the printk warning.
+
+If the test completes without crash and H returned to CFS: `kstep_pass("Deboost completed — BUG_ON not triggered")`.
 
 ### Notes
 
-- The 100 µs DL period provides a short enough window for runtime exhaustion. If needed, make the period even shorter or the runtime even smaller (e.g., 1000 ns / 10000 ns) to ensure quick exhaustion.
-- QEMU should be configured with at least 2 CPUs. Pin the driver to CPU 0 and test kthreads to CPU 1.
-- The `on_tick_begin` callback can be used to inspect task state during ticks, logging `p->dl.dl_throttled`, `is_dl_boosted(&p->dl)`, and `p->sched_class` to trace the exact state transitions.
-- Import `enqueue_task_dl`, `start_dl_timer`, `is_dl_boosted`, `dl_prio`, and `rt_mutex_setprio` via `KSYM_IMPORT` for direct inspection and invocation if needed.
-- For reliable detection on the buggy kernel, set `panic_on_oops=1` in the QEMU kernel command line to ensure the BUG_ON results in a detectable crash rather than a hung state.
+- All rt_mutex operations (`rt_mutex_lock`, `rt_mutex_unlock`), scheduling changes (`sched_setattr_nocheck`), and kthread management (`kthread_create`, `wake_up_process`, `kthread_bind`) are public kernel APIs. They induce scheduler state changes through the kernel's intended interfaces. No scheduler-internal fields (`pi_se`, `dl_throttled`, `sched_class`, `normal_prio`) are written directly by the driver.
+- The 5 µs / 50 µs DL parameters are deliberately small. A single scheduler tick (~1 ms at HZ=1000) is 20× the DL period, ensuring runtime exhaustion is detected on every tick while the task is boosted.
+- If `rt_mutex_lock` / `rt_mutex_unlock` are not exported to modules, `KSYM_IMPORT` resolves them via `kallsyms_lookup_name`. Similarly for `sched_setattr_nocheck`.
+- Disable RT bandwidth throttling with `kstep_sysctl_write("kernel/sched_rt_runtime_us", "%d", -1)` to prevent the global RT bandwidth limiter from interfering with DL task execution during the test.
+- QEMU should be configured with at least 3 CPUs. Pin the driver to CPU 0 and test kthreads to CPUs 1-2. The `on_tick_begin` callback provides read-only visibility into the exact state transitions during the boost/deboost cycle.
+- For PREEMPT_RT builds, the bug is significantly easier to trigger because spinlock-to-rtmutex conversion creates frequent PI boosting/deboosting throughout the kernel. The `stress-ng --cyclic` workload that originally exposed the bug creates aggressive SCHED_DEADLINE threads that interact with kernel locking during `exit()`, triggering rapid PI chains.

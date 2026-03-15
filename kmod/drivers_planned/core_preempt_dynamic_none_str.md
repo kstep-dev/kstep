@@ -102,15 +102,25 @@ The minimum topology is a single CPU. No cgroup configuration, task priorities, 
 
 ## Reproduce Strategy (kSTEP)
 
-The bug can be reproduced with a straightforward kSTEP driver that manipulates the `preempt_dynamic_mode` variable and calls `preempt_model_str()` to verify the output. Here is the detailed plan:
+The bug can be reproduced without writing to any internal scheduler state. The previous approach directly assigned `preempt_dynamic_mode = 0`, but this is unnecessary because the kernel provides two fully public mechanisms to set the preemption mode to "none": the `preempt=none` boot parameter and the `/sys/kernel/debug/sched/preempt` debugfs file. The driver uses these public interfaces to reach the desired state, then reads `preempt_dynamic_mode` and calls `preempt_model_str()` purely for observation and verification.
 
 ### Step 1: Kernel Configuration
 
-The kernel must be built with `CONFIG_PREEMPT_DYNAMIC=y`. This is typically enabled on modern kernel configs. If it is not enabled by default in kSTEP's kernel config, it needs to be added. Additionally, `CONFIG_PREEMPT_BUILD=y` must be set (it is a prerequisite for the code path that calls `seq_buf_printf` with the preemption mode string). The `CONFIG_KALLSYMS_ALL=y` option should be enabled (it usually is) to ensure `preempt_dynamic_mode` is accessible via kallsyms.
+The kernel must be built with `CONFIG_PREEMPT_DYNAMIC=y` to enable runtime-selectable preemption modes, which is the prerequisite for the buggy code path inside `preempt_model_str()`. Additionally, `CONFIG_PREEMPT_BUILD=y` must be set (it is required for the `IS_ENABLED(CONFIG_PREEMPT_BUILD)` guard in `preempt_model_str()` to be entered). `CONFIG_DEBUG_FS=y` is needed for the debugfs-based runtime approach (writing to `/sys/kernel/debug/sched/preempt`). `CONFIG_KALLSYMS_ALL=y` should be enabled to ensure that `preempt_dynamic_mode` and `preempt_model_str` are accessible via kallsyms for read-only observation. No special preemption base config is strictly required since the driver will explicitly set the mode to "none" via public interfaces, but `CONFIG_PREEMPT_NONE=y` is an alternative if using the boot-parameter-only approach (see below).
 
-### Step 2: Driver Structure
+### Step 2: Setting the Preemption Mode to "none" via Public Interfaces
 
-The driver needs no tasks, no cgroups, no special topology, and only 1 CPU. It is purely a function-call-and-check test:
+There are two complementary strategies, and the driver should use both for robustness:
+
+**Approach A — Boot parameter (`preempt=none`)**: The `run.py` launcher is invoked with the kernel command line parameter `preempt=none`. This causes `setup_preempt_mode()` (an `__init` function in `kernel/sched/core.c`) to record the requested mode, and then `preempt_dynamic_init()` (called during early boot via `sched_init()` → `preempt_dynamic_init()`) calls `sched_dynamic_update(preempt_dynamic_none)`, which sets `preempt_dynamic_mode = 0` through the kernel's own initialization path. By the time the kSTEP driver's `run()` callback is invoked, `preempt_dynamic_mode` is already 0. This is the simplest approach and requires zero runtime manipulation.
+
+**Approach B — Debugfs write at runtime**: If the kernel was not booted with `preempt=none` (e.g., it booted with `preempt=voluntary` or `preempt=full`), the driver can switch the mode at runtime by writing `"none"` to `/sys/kernel/debug/sched/preempt`. This uses `kstep_write("/sys/kernel/debug/sched/preempt", "none")`, which triggers the kernel's `sched_dynamic_write()` function in `kernel/sched/core.c`. That function parses the string, finds the matching entry in `preempt_modes[]`, and calls `sched_dynamic_update(preempt_dynamic_none)`, which sets `preempt_dynamic_mode = 0` and reconfigures the static keys for preemption. This is a fully public kernel API — writing to debugfs files is a supported user-space interface, not an internal state manipulation. The driver can also use `kstep_write()` to set other modes (like "voluntary" or "full") and verify they work correctly as a control test.
+
+Using approach A as the primary method is preferred because it guarantees the mode is "none" from early boot, meaning the bug would be visible in any `preempt_model_str()` call throughout the entire boot sequence. Approach B is useful for testing mode transitions at runtime and for verifying the bug manifests even when switching dynamically.
+
+### Step 3: Driver Structure
+
+The driver needs no tasks, no cgroups, no special topology, and only 1 CPU (the default CPU 0 where the driver runs). It is purely a function-call-and-check test. The key difference from the previous approach is that `preempt_dynamic_mode` is only read, never written:
 
 ```c
 #include "../driver.h"
@@ -124,13 +134,21 @@ KSYM_IMPORT_TYPED(const char *(*)(void), preempt_model_str);
 
 static void run(void) {
     const char *str;
-    int saved_mode;
 
-    /* Save original mode */
-    saved_mode = preempt_dynamic_mode;
+    /*
+     * Approach A: If booted with preempt=none, the mode is already 0.
+     * Approach B: If not, write to debugfs to switch to "none" at runtime.
+     */
+    if (preempt_dynamic_mode != 0) {
+        kstep_write("/sys/kernel/debug/sched/preempt", "none");
+    }
 
-    /* Set to preempt_dynamic_none (0) to trigger the bug */
-    preempt_dynamic_mode = 0;
+    /* Verify the mode was set correctly (read-only observation) */
+    if (preempt_dynamic_mode != 0) {
+        kstep_fail("Failed to set preempt_dynamic_mode to none (got %d)",
+                   preempt_dynamic_mode);
+        return;
+    }
 
     /* Call the function under test */
     str = preempt_model_str();
@@ -140,9 +158,6 @@ static void run(void) {
         kstep_pass("preempt_model_str() correctly returns '%s' for mode none", str);
     else
         kstep_fail("preempt_model_str() returns '%s' for mode none, expected PREEMPT(none)", str);
-
-    /* Restore original mode */
-    preempt_dynamic_mode = saved_mode;
 }
 
 KSTEP_DRIVER_DEFINE {
@@ -157,45 +172,53 @@ KSTEP_DRIVER_DEFINE {
 #endif
 ```
 
-### Step 3: Variable Access
+### Step 4: Read-only Internal Access
 
-`preempt_dynamic_mode` is a global (non-static) integer variable declared `extern` in `kernel/sched/sched.h` and defined in `kernel/sched/core.c`. It is accessible via `KSYM_IMPORT(preempt_dynamic_mode)`. The `preempt_model_str()` function is also a global non-static function. It can be imported via `KSYM_IMPORT_TYPED` with the appropriate function pointer type.
+`preempt_dynamic_mode` is imported via `KSYM_IMPORT(preempt_dynamic_mode)` and is used **strictly for read-only observation**. It is read in two places: (1) to check whether the boot parameter already set the mode to "none" (and if not, trigger the debugfs write), and (2) to verify that the debugfs write actually took effect before proceeding with the test. Neither read modifies any scheduler state.
 
-### Step 4: Test Operation Sequence
+`preempt_model_str()` is imported via `KSYM_IMPORT_TYPED` and called to obtain the string that is the subject of the bug. Calling this function is a pure observation — it constructs a string in a static buffer and returns it, with no side effects on scheduler state.
 
-1. Save the current value of `preempt_dynamic_mode` (to restore later).
-2. Set `preempt_dynamic_mode = 0` (which is `preempt_dynamic_none`).
-3. Call `preempt_model_str()`.
-4. Examine the returned string using `strstr()`.
-5. On the **buggy kernel**: the string will contain `"undef"` (e.g., `"PREEMPT(undef)"`). Report `kstep_fail`.
-6. On the **fixed kernel**: the string will contain `"none"` (e.g., `"PREEMPT(none)"`). Report `kstep_pass`.
-7. Restore `preempt_dynamic_mode` to its original value.
+No other internal scheduler fields are accessed. The `cpu_rq()`, `cfs_rq`, or any other run-queue internals are not needed for this test since the bug is purely about string formatting, not scheduling behavior.
 
-### Step 5: Topology and Task Setup
+### Step 5: Test Operation Sequence
 
-No special topology is needed. The default single-CPU or 2-CPU QEMU configuration suffices. No tasks need to be created. No cgroups are needed. No ticks or sleeps are required. The entire test runs in a single synchronous function call within the `run()` callback.
+1. The driver's `run()` callback begins. If the kernel was booted with `preempt=none`, `preempt_dynamic_mode` is already 0.
+2. If `preempt_dynamic_mode` is not 0 (e.g., kernel booted with a different default), the driver calls `kstep_write("/sys/kernel/debug/sched/preempt", "none")` to switch the mode via the kernel's own debugfs interface. This triggers `sched_dynamic_write()` → `sched_dynamic_update(preempt_dynamic_none)`, which updates `preempt_dynamic_mode` to 0 and reconfigures the static keys.
+3. The driver reads `preempt_dynamic_mode` to confirm it is 0. If not, the debugfs write failed (unlikely but possible if debugfs is not mounted or the file does not exist), and the driver reports FAIL with a diagnostic message and exits early.
+4. The driver calls `preempt_model_str()` to obtain the preemption model string.
+5. The driver examines the returned string using `strstr()` to check for the expected substring `"none"` and the absence of the buggy substring `"undef"`.
+6. On the **buggy kernel**: the string will contain `"undef"` (e.g., `"PREEMPT(undef)"` or `"PREEMPT_{RT,undef}"`). The driver reports `kstep_fail`.
+7. On the **fixed kernel**: the string will contain `"none"` (e.g., `"PREEMPT(none)"` or `"PREEMPT_{RT,none}"`). The driver reports `kstep_pass`.
 
-### Step 6: Expected Behavior
+### Step 6: Topology and Task Setup
 
-- **Buggy kernel (pre-fix, e.g., `3ebb1b65~1`)**: `preempt_model_str()` returns a string containing `"undef"` when `preempt_dynamic_mode == 0`. The driver reports FAIL.
-- **Fixed kernel (post-fix, commit `3ebb1b65`)**: `preempt_model_str()` returns a string containing `"none"` when `preempt_dynamic_mode == 0`. The driver reports PASS.
+No special topology is needed. The default single-CPU or 2-CPU QEMU configuration suffices. No tasks need to be created. No cgroups are needed. No ticks or sleeps are required. The entire test runs in a single synchronous function call within the `run()` callback. The bug is deterministic and 100% reproducible whenever `preempt_dynamic_mode` is 0 and `preempt_model_str()` is called, so there is no need for timing-sensitive setup or repeated trials.
 
-### Step 7: kSTEP Changes Required
+### Step 7: Expected Behavior
 
-If `CONFIG_PREEMPT_DYNAMIC` is not already enabled in kSTEP's kernel config, it needs to be added. This is a minor configuration change, not a fundamental kSTEP limitation. The driver itself uses only existing kSTEP primitives (`KSYM_IMPORT`, `KSYM_IMPORT_TYPED`, `kstep_pass`, `kstep_fail`).
+- **Buggy kernel (pre-fix, e.g., `3ebb1b65~1`)**: With `preempt_dynamic_mode` set to 0 via boot parameter or debugfs write, `preempt_model_str()` evaluates `preempt_dynamic_mode > 0` which is `0 > 0` → false, so it returns a string containing `"undef"` instead of indexing `preempt_modes[0]` ("none"). The driver detects the `"undef"` substring and reports FAIL.
+- **Fixed kernel (post-fix, commit `3ebb1b65`)**: With the same mode, `preempt_model_str()` evaluates `preempt_dynamic_mode >= 0` which is `0 >= 0` → true, so it correctly indexes `preempt_modes[0]` and returns a string containing `"none"`. The driver detects the `"none"` substring and reports PASS.
 
-### Step 8: Build and Run Commands
+### Step 8: kSTEP Configuration and Changes Required
+
+`CONFIG_PREEMPT_DYNAMIC=y` must be enabled in the kernel config. `CONFIG_DEBUG_FS=y` must be enabled for the debugfs-based runtime approach (this is typically on by default in development configs). If using the boot-parameter approach exclusively, `CONFIG_DEBUG_FS` is not strictly required. The driver uses only existing kSTEP primitives: `KSYM_IMPORT` and `KSYM_IMPORT_TYPED` for read-only symbol access, `kstep_write()` for debugfs writes, and `kstep_pass`/`kstep_fail` for result reporting.
+
+### Step 9: Build and Run Commands
 
 ```bash
-# Build and run on buggy kernel
+# Build and run on buggy kernel (with preempt=none boot parameter)
 ./checkout_linux.py 3ebb1b6522392f64902b4e96954e35927354aa27~1 preempt_none_str_buggy
 make linux LINUX_NAME=preempt_none_str_buggy
-./run.py core_preempt_none_str --linux_name preempt_none_str_buggy
+./run.py core_preempt_none_str --linux_name preempt_none_str_buggy --boot_args "preempt=none"
 cat data/logs/latest.log  # Expect: FAIL
 
-# Build and run on fixed kernel
+# Build and run on fixed kernel (with preempt=none boot parameter)
 ./checkout_linux.py 3ebb1b6522392f64902b4e96954e35927354aa27 preempt_none_str_fixed
 make linux LINUX_NAME=preempt_none_str_fixed
-./run.py core_preempt_none_str --linux_name preempt_none_str_fixed
+./run.py core_preempt_none_str --linux_name preempt_none_str_fixed --boot_args "preempt=none"
 cat data/logs/latest.log  # Expect: PASS
 ```
+
+### Step 10: Why No Internal Writes Are Needed
+
+The previous strategy directly assigned `preempt_dynamic_mode = 0` to force the mode to "none". This is unnecessary because the kernel provides two fully supported public interfaces to achieve the same effect: the `preempt=` boot parameter (processed by `setup_preempt_mode()` during early init) and the `/sys/kernel/debug/sched/preempt` debugfs file (processed by `sched_dynamic_write()`). Both ultimately call `sched_dynamic_update()`, which sets `preempt_dynamic_mode` and reconfigures the preemption static keys in a consistent manner. Using these public interfaces is not only cleaner but also more realistic — it exercises the exact code paths that real users would exercise, and it ensures that all related state (static keys, etc.) is kept consistent, unlike a bare assignment to `preempt_dynamic_mode` which would leave static keys in a potentially inconsistent state.

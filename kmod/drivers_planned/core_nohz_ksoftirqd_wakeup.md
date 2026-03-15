@@ -127,56 +127,80 @@ The bug is deterministic given the above conditions—it triggers every time the
 
 ## Reproduce Strategy (kSTEP)
 
-Reproducing this bug in kSTEP requires several setup steps and one minor framework extension. The core idea is to create a load imbalance, allow the nohz idle load balancer to be triggered, and detect whether ksoftirqd is spuriously woken on the ILB CPU.
+Reproducing this bug in kSTEP requires setting up a nohz idle load balancing scenario where the ILB CPU processes the nohz CSD via the polling path (not hardirq context). The key challenge is establishing the nohz state on the idle CPU without directly writing internal scheduler fields such as `tick_sched.tick_stopped` or `nohz.idle_cpus_mask`. This strategy uses boot parameters (`idle=poll`, `nohz_full=`) and natural kernel idle paths to achieve the required state, with only read-only access to internals for verification.
 
-### kSTEP Extensions Required
+### Boot and Kernel Configuration
 
-1. **Add `idle=poll` kernel boot parameter**: kSTEP must pass `idle=poll` as a kernel command line argument (BEFORE the `--` separator in `run.py`'s `boot_args`). This forces all CPUs to use `cpu_idle_poll()` which sets TIF_POLLING_NRFLAG, ensuring that `send_call_function_single_ipi()` uses the polling path instead of real IPIs. Without this, QEMU CPUs use HLT-based idle and the bug cannot manifest. Implementation: add a `kernel_params` field to the `Driver` dataclass in `run.py`, or simply add `"idle=poll"` to the `boot_args` list.
+Configure the QEMU VM with 3 CPUs (`num_cpus = 3`): CPU 0 for the kSTEP driver, CPU 1 as the busy CPU, and CPU 2 as the sole idle ILB candidate. Pass the following kernel boot parameters via `run.py`:
 
-2. **Fix nohz state initialization**: kSTEP's `kstep_disable_sched_timer()` zeroes the `tick_sched` structure via `memset(ts, 0, sizeof(struct tick_sched))`. This sets `ts->tick_stopped = 0`, which causes `nohz_balance_enter_idle()` to bail out early (it checks `sched_tick_stopped(cpu)`). After zeroing, set `ts->tick_stopped = 1` (or `ts->inidle = 1` as appropriate) so idle CPUs are properly added to `nohz.idle_cpus_mask`. Alternatively, use `KSYM_IMPORT` to access `nohz.idle_cpus_mask` and manually set the bits for idle CPUs.
+- `idle=poll`: Forces all CPUs to use `cpu_idle_poll()`, which sets `TIF_POLLING_NRFLAG` on idle CPUs. This is the critical condition that causes `send_call_function_single_ipi()` to skip the real IPI and instead use `set_nr_if_polling()`. Without this, QEMU CPUs use HLT-based idle, `nohz_csd_func()` runs in hardirq context, and the bug cannot manifest.
+- `nohz_full=2`: Configures CPU 2 as a nohz_full CPU. This ensures that when CPU 2 enters the idle loop, the kernel's own `tick_nohz_idle_enter()` path stops the tick and `nohz_balance_enter_idle()` registers CPU 2 in `nohz.idle_cpus_mask`. This is the proper kernel mechanism for establishing nohz state—no direct writes to internal fields are needed.
 
-### Driver Design
+The kernel must be built with `CONFIG_NO_HZ_FULL=y` (which implies `CONFIG_NO_HZ_COMMON`). This is required for `nohz_full=` to take effect and for the nohz idle load balancer infrastructure to be compiled in.
 
-**CPU configuration**: 3 CPUs (CPU 0 for driver, CPU 1 for overloaded tasks, CPU 2 as the sole idle ILB CPU). Set `num_cpus = 3` in the driver configuration.
+### Setup Phase
 
-**Setup phase**:
-1. Create 2-3 CFS tasks using `kstep_task_create()`.
-2. Pin all tasks to CPU 1 using `kstep_task_pin(p, 1, 2)` to create an overload.
-3. Wake all tasks using `kstep_task_wakeup(p)`.
-4. Ensure CPU 2 has no tasks (it will naturally enter the idle loop).
+Create 2–3 CFS tasks using `kstep_task_create()` and pin all of them to CPU 1 using `kstep_task_pin(p, 1, 2)`. Wake all tasks with `kstep_task_wakeup(p)`. This creates a deliberate overload on CPU 1 while leaving CPU 2 with no runnable tasks. CPU 2 will naturally enter the `do_idle()` loop when kSTEP yields control.
 
-**Tick phase**:
-1. Call `kstep_tick()` repeatedly (e.g., `kstep_tick_repeat(20)`).
-2. During ticks, kSTEP's `kstep_do_sched_tick()` calls `sched_tick_fn()` on each CPU via `smp_call_function_single()`.
-3. On CPU 1 (busy), `trigger_load_balance()` detects the imbalance and `nohz_balancer_kick()` queues a nohz CSD to CPU 2 (the idle CPU).
-4. When kSTEP ticks CPU 2, the `smp_call_function_single()` call wakes CPU 2 from its polling idle. Since CPU 2 has TIF_POLLING_NRFLAG set (from `idle=poll`), no real IPI is sent; instead, TIF_NEED_RESCHED is set.
-5. CPU 2 exits the poll loop. `flush_smp_call_function_queue()` processes the pending nohz CSD (`nohz_csd_func()`) in idle task context (non-hardirq).
-6. On the **buggy kernel**: `raise_softirq_irqoff()` → `!in_interrupt()` is true → `wakeup_softirqd()` places ksoftirqd/2 on CPU 2's runqueue.
-7. On the **fixed kernel**: `__raise_softirq_irqoff()` only marks SCHED_SOFTIRQ pending, no ksoftirqd wakeup.
+Ensure no tasks are placed on CPU 2. Having CPU 2 as the only idle CPU is important for maximal bug impact: `_nohz_idle_balance()` iterates over `nohz.idle_cpus_mask` and, on the buggy kernel, finds zero idle CPUs (since ksoftirqd on the runqueue makes the ILB CPU appear busy via `idle_cpu()` returning false), causing the entire load balancing pass to be skipped.
 
-**Detection phase** (in `on_sched_softirq_begin` callback):
-1. Check `smp_processor_id()` to identify which CPU is running the softirq.
-2. If this CPU is an ILB CPU (check `cpu_rq(smp_processor_id())->nohz_idle_balance != 0`):
-   - Read `idle_cpu(smp_processor_id())` and `cpu_rq(smp_processor_id())->nr_running`.
-   - **Buggy kernel**: `idle_cpu()` returns 0 (false) because ksoftirqd is on the runqueue; `nr_running >= 1`.
-   - **Fixed kernel**: `idle_cpu()` returns 1 (true); `nr_running == 0`.
-3. Use `kstep_pass()` or `kstep_fail()` to report the result.
+### Establishing NOHZ State Naturally
 
-**Alternative detection** (migration-based):
-Instead of checking internal state, observe the outcome:
-1. After ticking for many cycles, check which CPU each task is running on.
-2. **Buggy kernel**: All tasks remain on CPU 1 (ILB failed to balance, so no migration to CPU 2).
-3. **Fixed kernel**: At least one task migrated to CPU 2 (ILB successfully balanced).
-4. This is less precise (depends on whether the ILB actually pulls a task) but is externally observable.
+After the initial task setup, use `kstep_sleep()` (or a small series of `kstep_sleep()` calls) to relinquish control and allow the kernel's natural scheduling and idle paths to execute on all CPUs. During this time:
 
-**Key internal symbols to import**:
-- `KSYM_IMPORT(idle_cpu)` — to check if a CPU appears idle.
-- Access `cpu_rq(cpu)->nohz_idle_balance` — to check if ILB is active (via `internal.h`).
-- Access `cpu_rq(cpu)->nr_running` — to check runqueue occupancy.
+1. CPU 1 runs the pinned tasks normally with its tick active.
+2. CPU 2, having no runnable tasks, enters the `do_idle()` loop. Because `nohz_full=2` was specified at boot, the idle path calls `tick_nohz_idle_enter()` → `tick_nohz_idle_stop_tick()`, which sets `ts->tick_stopped = 1` within the kernel's own code. The function `nohz_balance_enter_idle()` is then called by the idle path, which adds CPU 2 to `nohz.idle_cpus_mask` and sets the per-CPU `nohz_tick_stopped` flag.
+3. Because `idle=poll` is active, CPU 2 enters `cpu_idle_poll()`, which sets `TIF_POLLING_NRFLAG` on its idle thread. This is the flag that `send_call_function_single_ipi()` checks to decide whether to send a real IPI or just set `TIF_NEED_RESCHED`.
 
-**Expected timeline**: The nohz balancer kick should occur within 10-20 ticks after the imbalance is established. The `on_sched_softirq_begin` callback should fire on the ILB CPU once the nohz CSD is processed and SCHED_SOFTIRQ runs.
+Even if kSTEP's initialization temporarily disturbs the `tick_sched` state (e.g., via `kstep_disable_sched_timer()` zeroing the structure), the kernel will re-establish it when CPU 2 naturally re-enters the idle loop. The `nohz_full=2` boot parameter ensures the kernel intends to stop the tick on CPU 2, and the `do_idle()` → `tick_nohz_idle_enter()` code path will restore it. Using `kstep_sleep()` gives the kernel sufficient time for this natural re-initialization to complete.
 
-**Potential complications**:
-- If `nohz.idle_cpus_mask` is not properly populated (due to kSTEP's tick timer disabling), the ILB will never be kicked. Verify this mask is set correctly or manually initialize it.
-- The `smp_call_function_single()` ordering matters: the nohz CSD must be queued BEFORE kSTEP's tick SMP call to CPU 2, so that both are processed in the same `flush_smp_call_function_queue()` call. Since kSTEP ticks CPUs in order (CPU 1 first, then CPU 2), the nohz CSD from CPU 1's tick should be queued before CPU 2's tick call.
-- kSTEP's tick handler drains SCHED_SOFTIRQ on each CPU after calling `sched_tick_fn()`. If the nohz CSD has already set SCHED_SOFTIRQ pending via `nohz_csd_func()`, kSTEP's drain will process it. The ksoftirqd wakeup happens inside `nohz_csd_func()` (before kSTEP's drain), so it's already on the runqueue when the softirq handler runs.
+To verify (read-only) that the nohz state is correctly established before proceeding, import the nohz structure via `KSYM_IMPORT(nohz)` and read `nohz.idle_cpus_mask` to confirm CPU 2's bit is set. Also read `cpu_rq(2)->nr_running` to confirm it is 0. These are purely observational checks with no writes. If CPU 2 is not yet in the nohz mask, call `kstep_sleep()` again to give the kernel more time, or use `kstep_sleep_until(fn)` with a condition function that checks `cpumask_test_cpu(2, nohz.idle_cpus_mask)`.
+
+### Triggering the NOHZ ILB Kick
+
+Once the nohz state is confirmed via read-only checks, use `kstep_sleep()` to let natural ticks continue on CPU 1. On each tick, CPU 1 calls `sched_tick()` → `trigger_load_balance()` → `nohz_balancer_kick()`. Because CPU 1 is overloaded (multiple tasks pinned) and CPU 2 is registered in `nohz.idle_cpus_mask`, the nohz balancer kick will queue the `nohz_csd` to CPU 2 with `NOHZ_BALANCE_KICK` or `NOHZ_STATS_KICK` flags. Alternatively, `kstep_tick_repeat(n)` can be used if more deterministic tick delivery is desired, but `kstep_sleep()` is preferred here because it avoids any interference with the natural `flush_smp_call_function_queue()` context on CPU 2.
+
+When the nohz CSD reaches CPU 2, because `TIF_POLLING_NRFLAG` is set (from `idle=poll`), no real IPI is sent. Instead, `set_nr_if_polling()` sets `TIF_NEED_RESCHED` on CPU 2's idle thread, pulling it out of the poll loop. CPU 2 then calls `flush_smp_call_function_queue()` in the idle task's context (NOT hardirq context). The queued `nohz_csd_func()` executes in this non-interrupt context.
+
+On the **buggy kernel**: `nohz_csd_func()` calls `raise_softirq_irqoff(SCHED_SOFTIRQ)`. Since `in_interrupt()` returns 0 (no `HARDIRQ_OFFSET` in `preempt_count`) and `should_wake_ksoftirqd()` returns true (always true on non-PREEMPT_RT), `wakeup_softirqd()` wakes `ksoftirqd/2`, placing it on CPU 2's runqueue. When `sched_balance_softirq()` subsequently runs and iterates over `nohz.idle_cpus_mask`, `idle_cpu(2)` returns false (because `ksoftirqd/2` is on the runqueue with `nr_running >= 1`), and CPU 2 is skipped for load balancing.
+
+On the **fixed kernel**: `nohz_csd_func()` calls `__raise_softirq_irqoff(SCHED_SOFTIRQ)`, which only marks the softirq as pending without waking ksoftirqd. When `sched_balance_softirq()` runs, `idle_cpu(2)` returns true, and load balancing proceeds normally.
+
+### Detection via on_sched_softirq_begin Callback
+
+Register an `on_sched_softirq_begin` callback in the driver. When this callback fires on CPU 2 (check `smp_processor_id() == 2`), perform read-only observations:
+
+1. Read `cpu_rq(2)->nohz_idle_balance` to confirm this is the ILB CPU processing a nohz balance request (non-zero means ILB flags are set). If zero, this softirq is not an ILB event—skip it.
+2. Read `cpu_rq(2)->nr_running`. **Buggy kernel**: `nr_running >= 1` (ksoftirqd is on the runqueue). **Fixed kernel**: `nr_running == 0`.
+3. Import and call `idle_cpu` via `KSYM_IMPORT(idle_cpu)` and check `idle_cpu(2)`. **Buggy kernel**: returns 0 (not idle). **Fixed kernel**: returns 1 (idle).
+
+If `nr_running > 0` and `idle_cpu(2) == 0` during the ILB softirq, this confirms the spurious ksoftirqd wakeup (buggy behavior). Call `kstep_fail("ksoftirqd spuriously woken: nr_running=%d idle_cpu=%d", nr_running, idle_val)`. If `nr_running == 0` and `idle_cpu(2) == 1`, the fix is working correctly. Call `kstep_pass("no spurious ksoftirqd wakeup: ILB CPU remains idle")`.
+
+### Alternative Detection: Migration-Based Observation
+
+As a complementary detection method that requires no internal state access at all, observe the externally visible consequence of the bug—failed task migration:
+
+1. After pinning 2–3 tasks to CPU 1 and allowing sufficient time for the idle load balancer to act (e.g., multiple `kstep_sleep()` calls), check which CPU each task is running on by reading `task->cpu` or using `task_cpu()`.
+2. **Buggy kernel**: All tasks remain on CPU 1 because the ILB pass was skipped (CPU 2 appeared non-idle due to ksoftirqd).
+3. **Fixed kernel**: At least one task migrated to CPU 2 because the ILB correctly identified CPU 2 as idle and performed load balancing.
+
+This approach detects the consequence of the bug rather than the internal mechanism. It is less precise—migration depends on load balancer heuristics, task weights, cache affinity, and timing—but it is a useful secondary check alongside the callback-based detection.
+
+### Key Internal Symbols (Read-Only)
+
+The following symbols are accessed for observation and verification only—no writes are performed:
+
+- `cpu_rq(cpu)` — read `nr_running`, `nohz_idle_balance`, and `idle_balance` fields to verify ILB state and runqueue occupancy.
+- `KSYM_IMPORT(idle_cpu)` — call to check if CPU appears idle. This is a kernel function call, not a direct write to any structure.
+- `KSYM_IMPORT(nohz)` — read `nohz.idle_cpus_mask` to verify that the nohz state was naturally established by the kernel's idle path.
+- `smp_processor_id()` — identify which CPU is executing the callback.
+
+No writes to `tick_sched`, `nohz_flags`, `nohz.idle_cpus_mask`, or any other internal scheduler structure are required. The `idle=poll` and `nohz_full=2` boot parameters, combined with the kernel's natural idle path, establish all required state through the kernel's own code paths.
+
+### Potential Complications
+
+- **Timing sensitivity**: The nohz state on CPU 2 must be established before the ILB kick from CPU 1. Using `kstep_sleep_until(fn)` with a read-only check on `nohz.idle_cpus_mask` ensures proper ordering without any writes.
+- **kSTEP tick interference**: If kSTEP's tick mechanism dispatches SMP calls to all CPUs (including CPU 2), the flush on CPU 2 might run in a different context than the natural idle flush. Prefer `kstep_sleep()` over `kstep_tick()` for the trigger phase to let the kernel's natural tick and CSD delivery run unperturbed.
+- **ILB CPU selection**: If CPU 0 (the driver CPU) also appears in `nohz.idle_cpus_mask`, the ILB might select CPU 0 instead of CPU 2. CPU 0 is running the driver and should not be truly idle, but verify by checking which CPU the `on_sched_softirq_begin` callback fires on. If needed, keep CPU 0 busy (the driver itself usually suffices).
+- **ksoftirqd false positives**: If `ksoftirqd/2` was woken for another softirq reason before the ILB kick, the detection would see a false positive. Keep the test scenario minimal (no extraneous softirq sources, no network or block I/O on CPU 2) to avoid this.
+- **Expected timeline**: The nohz balancer kick should occur within a few seconds of `kstep_sleep()` after the imbalance is established on CPU 1. The `on_sched_softirq_begin` callback should fire on CPU 2 once the nohz CSD is processed and `SCHED_SOFTIRQ` runs.
