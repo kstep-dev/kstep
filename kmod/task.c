@@ -1,5 +1,6 @@
 #include <linux/umh.h>
 #include <uapi/linux/sched/types.h>
+#include <linux/spinlock.h>
 
 #include "internal.h"
 #include "user.h"
@@ -52,14 +53,17 @@ struct task_struct *kstep_task_create(void) {
 
   // Wait for the task to start
   for (int i = 0; i < 100; i++) {
+    unsigned long flags;
     kstep_sleep();
-    if (strcmp(p->comm, TASK_READY_COMM) == 0 || 
-    (task_cpu(p) != 0 && p->__state == TASK_RUNNING && !cpumask_test_cpu(0, p->cpus_ptr))) {
-      TRACE_INFO("Task %d is runnable on cpu %d", p->pid, task_cpu(p));
+    if (strcmp(p->comm, TASK_READY_COMM) == 0)
+      return p;
+    raw_spin_lock_irqsave(&p->pi_lock, flags);
+    if (task_cpu(p) != 0 && !cpumask_test_cpu(0, & p->cpus_mask) && p->on_rq == TASK_ON_RQ_QUEUED) {
+      raw_spin_unlock_irqrestore(&p->pi_lock, flags);
       return p;
     }
+    raw_spin_unlock_irqrestore(&p->pi_lock, flags);
     TRACE_INFO("Waiting for task %d to be runnable on cpu 1-N", p->pid);
-
   }
   panic("Task %d did not start", p->pid);
 }
