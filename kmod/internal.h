@@ -44,6 +44,7 @@ void kstep_trace_sched_group_alloc(void);
 void kstep_reset_runqueues(void);
 void kstep_reset_cpumask(void);
 void kstep_reset_tasks(void);
+void kstep_reset_task(struct task_struct *p);
 
 // isolation.c
 void kstep_disable_workqueue(void);
