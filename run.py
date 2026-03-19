@@ -83,6 +83,7 @@ def start_qemu(
     boot_args = [
         "rw",
         "nokaslr",
+        "loglevel=7",   # print up to KERN_DEBUG; ensures KERN_WARNING (4) always appears
         "sched_verbose",
         f"isolcpus=nohz,managed_irq,{isol_cpus}",
         "irqaffinity=0",

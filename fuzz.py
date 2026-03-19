@@ -50,9 +50,11 @@ def main() -> None:
                         help="Number of parallel QEMU workers")
     parser.add_argument("--steps", type=int, default=80,
                         help="Ops per test case (fresh mode)")
-    parser.add_argument("--fresh_ratio", type=float, default=0.3,
-                        help="Fraction of iterations using fresh random generation "
-                             "(vs. replaying an existing seed)")
+    parser.add_argument("--fresh_ratio", type=float, default=0.5,
+                        help="Fraction of iterations using fresh random generation")
+    parser.add_argument("--mutate_ratio", type=float, default=0.5,
+                        help="Fraction of iterations applying tick-insertion mutation to a seed "
+                             "(remainder is pure replay)")
     args = parser.parse_args()
 
     fuzz_dir = DATA_DIR / "fuzz"
@@ -71,7 +73,7 @@ def main() -> None:
     logging.info(
         f"kSTEP fuzzer: workers={args.workers}  driver={args.driver}  "
         f"linux={args.linux_name}  steps={args.steps}  "
-        f"fresh_ratio={args.fresh_ratio}"
+        f"fresh_ratio={args.fresh_ratio}  mutate_ratio={args.mutate_ratio}"
     )
     run_manager(
         n_workers=args.workers,
@@ -79,6 +81,8 @@ def main() -> None:
         linux_name=args.linux_name,
         steps=args.steps,
         fuzz_dir=fuzz_dir,
+        fresh_ratio=args.fresh_ratio,
+        mutate_ratio=args.mutate_ratio,
     )
 
 

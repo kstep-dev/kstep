@@ -66,9 +66,9 @@ class WorkResult:
     debug_log_file: Optional[Path]   # path to worker debug log
     linux_name: str
     exec_time: float
+    mode: str = "fresh"        # "fresh" | "replay"
     seed_id: Optional[int] = None
     error: Optional[str] = None
-    crashed: bool = False      # True when kernel panic/BUG/KASAN detected
 
 
 class SeedPool:
@@ -81,6 +81,15 @@ class SeedPool:
         seed = Seed(ops=ops, n_signals=n_signals, seed_id=self._counter)
         self._seeds.append(seed)
         self._counter += 1
+        return seed
+
+    def pick_seed(self) -> "Optional[Seed]":
+        """Round-robin seed selection. Returns None if the pool is empty."""
+        if not self._seeds:
+            return None
+        seed = self._seeds[self._next_idx % len(self._seeds)]
+        self._next_idx += 1
+        seed.times_replayed += 1
         return seed
 
     def __len__(self) -> int:

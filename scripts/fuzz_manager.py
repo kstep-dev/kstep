@@ -7,6 +7,7 @@ import json
 import logging
 import multiprocessing as mp
 import queue
+import random
 import shutil
 import signal
 import time
@@ -19,6 +20,7 @@ from scripts.corpus import SignalCorpus
 from scripts.cov import cov_parse
 from scripts.fuzz_common import SeedPool, WorkItem, WorkResult
 from scripts.fuzz_worker import worker_main
+from scripts.mutate import mutate
 from scripts.input_seq import InputSeq
 
 
@@ -57,8 +59,22 @@ def _save_crash(result: WorkResult, fuzz_dir: Path) -> Path:
 def _next_work(
     linux_name: str,
     steps: int,
+    pool: "SeedPool",
+    fresh_ratio: float,
+    mutate_ratio: float,
+    rng: random.Random,
 ) -> WorkItem:
-    return WorkItem(mode="fresh", steps=steps, linux_name=linux_name)
+    r = rng.random()
+    if len(pool) == 0 or r < fresh_ratio:
+        return WorkItem(mode="fresh", steps=steps, linux_name=linux_name)
+    seed = pool.pick_seed()
+    assert seed is not None  # pool is non-empty (checked above)
+    if r < fresh_ratio + mutate_ratio:
+        mutated_ops = mutate(seed.ops, rng, max_len=steps * 2)
+        return WorkItem(mode="mutate", steps=0, linux_name=linux_name,
+                        ops=mutated_ops, seed_id=seed.seed_id)
+    return WorkItem(mode="replay", steps=0, linux_name=linux_name,
+                    ops=seed.ops, seed_id=seed.seed_id)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -71,15 +87,21 @@ def run_manager(
     linux_name: str,
     steps: int,
     fuzz_dir: Path,
+    fresh_ratio: float,
+    mutate_ratio: float = 0.35,
 ) -> None:
     task_queue: "mp.Queue[Optional[WorkItem]]" = mp.Queue(maxsize=n_workers * 2)
     result_queue: "mp.Queue[WorkResult]" = mp.Queue()
 
     corpus = SignalCorpus()
     pool   = SeedPool()
+    rng    = random.Random()
 
     t_start           = time.monotonic()
     total_execs       = 0
+    total_fresh       = 0
+    total_replay      = 0
+    total_mutate      = 0
     total_errors      = 0
     total_new_signals = 0
     interval_signals  = 0
@@ -121,7 +143,7 @@ def run_manager(
 
     # Pre-fill the queue so no worker idles at startup.
     for _ in range(n_workers):
-        if not _put_task_interruptibly(_next_work(linux_name, steps)):
+        if not _put_task_interruptibly(_next_work(linux_name, steps, pool, fresh_ratio, mutate_ratio, rng)):
             break
 
     while not shutdown_event.is_set():
@@ -132,20 +154,17 @@ def run_manager(
 
         if result is not None:
             total_execs += 1
-
-            # if result.crashed:
-            if result.crashed:
-                total_errors += 1
-                crash_dir = _save_crash(result, fuzz_dir)
-                logging.error(
-                    f"[CRASH] worker={result.worker_id}  seed_id={result.seed_id}  "
-                    f"ops={len(result.ops)}  saved to {crash_dir}"
-                )
+            if result.mode == "replay":
+                total_replay += 1
+            elif result.mode == "mutate":
+                total_mutate += 1
+            else:
+                total_fresh += 1
 
             if result.error:
                 total_errors += 1
                 crash_dir = _save_crash(result, fuzz_dir)
-                logging.warning(f"[error] worker={result.worker_id}  {result.error}")
+                logging.error(f"[error] worker={result.worker_id}  {result.error}  saved to {crash_dir}")
 
             elif result.cov_file:
                 signal_records = cov_parse(result.cov_file)
@@ -177,7 +196,7 @@ def run_manager(
                     )
 
             # Immediately replace the consumed slot
-            _put_task_interruptibly(_next_work(linux_name, steps))
+            _put_task_interruptibly(_next_work(linux_name, steps, pool, fresh_ratio, mutate_ratio, rng))
 
         # Periodic stats (every 10 s)
         now = time.monotonic()
@@ -186,6 +205,7 @@ def run_manager(
             logging.info(
                 f"[{elapsed:6.0f}s]  "
                 f"execs={total_execs} ({total_execs / max(elapsed, 1):.2f}/s)  "
+                f"fresh={total_fresh}  replay={total_replay}  mutate={total_mutate}  "
                 f"signals={len(corpus.seen_signals)} (+{interval_signals} this interval)  "
                 f"new_total={total_new_signals}  "
                 f"corpus={len(pool)}  "
