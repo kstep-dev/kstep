@@ -1,12 +1,43 @@
-"""Shared types for the kSTEP fuzzer (worker ↔ manager IPC)."""
+"""Shared types and utilities for the kSTEP fuzzer."""
 
 from __future__ import annotations
 
+import socket
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 Ops = list[tuple[int, int, int, int]]
+
+# Marker byte written by kstep_write_state
+OP_TYPE_NR = 16
+
+
+def read_kmod_state(sf) -> Optional[list[dict]]:
+    """Read state from kmod socket, discarding TTY echo.
+    Returns list of {"id": int, "state": int} dicts, or None if socket closed."""
+    while True:
+        line = sf.readline()
+        if not line:
+            return None
+        if line[0] == OP_TYPE_NR:
+            payload = line[1:-1]  # strip marker byte and trailing '\n'
+            return [{"id": payload[i], "state": payload[i + 1]}
+                    for i in range(0, len(payload), 2)]
+
+
+def connect_to_kmod(sock_file: Path, timeout: float = 10.0, retries: int = 200) -> socket.socket:
+
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sleep_time = timeout / retries
+    for _ in range(retries):
+        try:
+            sock.connect(str(sock_file))
+            return sock
+        except (FileNotFoundError, ConnectionRefusedError):
+            time.sleep(sleep_time)
+    raise RuntimeError(f"Timed out connecting to {sock_file}")
 
 
 @dataclass

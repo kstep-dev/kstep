@@ -148,8 +148,13 @@ void kstep_cgroup_init(void) {
 }
 
 void kstep_cgroup_create(const char *name) {
+  char cpuset[32];
   kstep_cgroup_mkdir(name);
   kstep_cgroup_write(name, "cgroup.subtree_control", CGROUP_CONTROL);
+  if (scnprintf(cpuset, sizeof(cpuset), "%d-%d", 1, num_online_cpus() - 1) >= sizeof(cpuset))
+    panic("failed to form cpuset for %s", name);
+
+  kstep_cgroup_set_cpuset(name, cpuset);
 }
 
 void kstep_cgroup_set_cpuset(const char *name, const char *cpuset) {

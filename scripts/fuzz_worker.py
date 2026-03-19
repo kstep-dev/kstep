@@ -8,18 +8,15 @@ import multiprocessing as mp
 import os
 import random
 import signal
-import socket as socket_mod
 import subprocess
 import time
 from pathlib import Path
 from typing import Optional
 
 from run import Driver, start_qemu
-from scripts.fuzz_common import Ops, WorkItem, WorkResult
+from scripts.fuzz_common import Ops, WorkItem, WorkResult, connect_to_kmod, read_kmod_state
 from scripts.gen_input_core import generate_next_command, init_genstate
 from scripts.gen_input_ops import OP_NAME_TO_TYPE
-
-_OP_TYPE_NR = 16   # marker byte written by kstep_write_state
 
 _CRASH_MARKERS = [
     b"Kernel panic",
@@ -39,19 +36,6 @@ def _check_for_crash(log_file: Path) -> bool:
         return any(marker in content for marker in _CRASH_MARKERS)
     except Exception:
         return False
-
-
-def _read_state(sf) -> list[dict]:
-    """Block until a kmod state message arrives, discarding any TTY echo.
-    Raises EOFError if the socket is closed (QEMU exited)."""
-    while True:
-        line = sf.readline()
-        if not line:
-            raise EOFError("kmod socket closed (QEMU exited)")
-        if line[0] == _OP_TYPE_NR:
-            payload = line[1:-1]   # strip marker byte and trailing '\n'
-            return [{"id": payload[i], "state": payload[i + 1]}
-                    for i in range(0, len(payload), 2)]
 
 
 def worker_main(
@@ -103,21 +87,15 @@ def worker_main(
             )
 
             # QEMU uses wait=on and blocks until we connect; retry until ready.
-            sock = socket_mod.socket(socket_mod.AF_UNIX, socket_mod.SOCK_STREAM)
-            for _ in range(200):
-                try:
-                    sock.connect(str(sock_file))
-                    break
-                except (FileNotFoundError, ConnectionRefusedError):
-                    time.sleep(0.05)
-            else:
+            try:
+                sock = connect_to_kmod(sock_file, timeout=10.0, retries=200)
+            except RuntimeError:
                 proc.kill()
-                raise RuntimeError("Timed out connecting to kmod socket")
+                raise RuntimeError("Failed to connect to kmod socket")
 
-            # Per-op timeout: if kmod doesn't respond within 30 s, abort.
             sock.settimeout(60.0)
             sf = sock.makefile("rb")
-            task_states = _read_state(sf)   # kmod signals readiness
+            task_states = read_kmod_state(sf)  # kmod signals readiness
 
             gen = init_genstate(
                 max_tasks=10,
@@ -126,14 +104,17 @@ def worker_main(
                 seed=rng.randint(0, 2**32 - 1),
             )
             for i in range(work.steps):
-                op, a, b, c = generate_next_command(gen, task_states)
+                op, a, b, c = generate_next_command(gen)
                 if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
                     for _ in range(a):
                         ops_executed.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
                 else:
                     ops_executed.append((op, a, b, c))
                 sock.sendall(f"{op},{a},{b},{c}\n".encode())
-                task_states = _read_state(sf)
+                task_states = read_kmod_state(sf)
+                if task_states is None:
+                    sock.sendall(f"EXIT\n".encode())
+                    raise RuntimeError("Failed to read task states")
                 gen.update_from_kmod(task_states)
                 logger.debug(f"STEP {i}: task_states updated: {gen.task_state}")
 

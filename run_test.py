@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 
 import argparse
-import socket
-import time
 
 from checkout_linux import Linux, checkout_linux
 from run import (
@@ -12,6 +10,7 @@ from run import (
     start_qemu,
 )
 from scripts import LOGS_DIR, GLOBAL_SIGNAL_CORPUS, cov_parse, input_seq_from_log
+from scripts.fuzz_common import connect_to_kmod, read_kmod_state
 from scripts.gen_input_core import init_genstate, generate_next_command
 from scripts.input_seq import InputSeq
 from scripts.gen_input_ops import OP_NAME_TO_TYPE
@@ -45,49 +44,30 @@ def run_test(
         sock_file=sock_file,
     )
 
-    # Connect to the socket. QEMU blocks (wait=on) until we connect, so retry
-    # until the socket file appears.
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    for _ in range(60):
-        try:
-            sock.connect(str(sock_file))
-            break
-        except (FileNotFoundError, ConnectionRefusedError):
-            time.sleep(0.1)
-    else:
-        raise RuntimeError(f"Timed out connecting to {sock_file}")
-
+    # Connect to the socket. QEMU blocks (wait=on) until we connect.
+    sock = connect_to_kmod(sock_file, timeout=6.0, retries=60)
     sf = sock.makefile("rb")
-    OP_TYPE_NR = 16  # marker byte written by kstep_write_state
-
-    def read_state() -> list[dict]:
-        """Read lines until a state message arrives, discarding TTY echo.
-        Returns list of {"id": int, "state": int} dicts."""
-        while True:
-            line = sf.readline()
-            if not line:
-                raise EOFError("kmod socket closed (QEMU exited)")
-            if line[0] == OP_TYPE_NR:
-                payload = line[1:-1]   # strip marker byte and trailing '\n'
-                return [{"id": payload[i], "state": payload[i + 1]}
-                        for i in range(0, len(payload), 2)]
 
     gen = init_genstate(max_tasks=max_tasks, max_cgroups=max_cgroups, cpus=num_cpus, seed=seed)
 
     # Wait for the initial STATE from the kmod, signalling it is ready.
-    task_states = read_state()
+    task_states = read_kmod_state(sf)
+    if task_states is None:
+        raise EOFError("kmod socket closed before ready signal")
     print(f"kmod ready: {task_states}")
 
     seq = InputSeq()
     for _ in range(steps):
-        op, a, b, c = generate_next_command(gen, task_states)
+        op, a, b, c = generate_next_command(gen)
         if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
             for _ in range(a):
                 seq.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
         else:
             seq.append((op, a, b, c))
         sock.sendall(f"{op},{a},{b},{c}\n".encode())
-        task_states = read_state()
+        task_states = read_kmod_state(sf)
+        if task_states is None:
+            raise EOFError("kmod socket closed unexpectedly")
         gen.update_from_kmod(task_states)
 
     sock.sendall(b"EXIT\n")
