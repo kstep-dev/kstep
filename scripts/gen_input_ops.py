@@ -228,13 +228,13 @@ OPS: List[Op] = [
     ),
     Op(
         name="TICK",
-        weight=0,
+        weight=15,
         is_applicable=lambda m: True,
         emit=op_tick,
     ),
     Op(
         name="TICK_REPEAT",
-        weight=15,
+        weight=0,
         is_applicable=lambda m: True,
         emit=op_tick_repeat,
         arg_types=[ARG_INT, None, None],

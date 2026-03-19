@@ -121,6 +121,7 @@ static bool op_task_fifo(int a, int b, int c) {
     panic("Task %d is not on CPU when setting FIFO", a);
   // Move the task back to the root cgroup, otherwise the set_schedprio will fail
   kstep_cgroup_add_task("", kstep_tasks[a].p->pid);
+  kstep_task_pin(kstep_tasks[a].p, 1, num_online_cpus() - 1);
   kstep_tasks[a].cgroup_id = -1;
   kstep_task_fifo(kstep_tasks[a].p);
   return true;
@@ -208,6 +209,7 @@ static bool op_cgroup_create(int a, int b, int c) {
   for (int i = 0; i < MAX_TASKS; i++) {
     if (parent_id != -1 && kstep_tasks[i].p && kstep_tasks[i].cgroup_id == parent_id) {
       kstep_cgroup_add_task("", kstep_tasks[i].p->pid);
+      kstep_task_pin(kstep_tasks[i].p, 1, num_online_cpus() - 1);
       kstep_tasks[i].cgroup_id = -1;
     }
   }

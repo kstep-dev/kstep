@@ -115,7 +115,7 @@ def worker_main(
                 raise RuntimeError("Timed out connecting to kmod socket")
 
             # Per-op timeout: if kmod doesn't respond within 30 s, abort.
-            sock.settimeout(30.0)
+            sock.settimeout(60.0)
             sf = sock.makefile("rb")
             task_states = _read_state(sf)   # kmod signals readiness
 
@@ -141,7 +141,7 @@ def worker_main(
             sock.sendall(b"EXIT\n")
             sock.close()
             try:
-                proc.wait(timeout=60)
+                proc.wait(timeout=120)
             except subprocess.TimeoutExpired:
                 proc.kill()
                 proc.wait()

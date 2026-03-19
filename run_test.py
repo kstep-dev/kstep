@@ -64,9 +64,11 @@ def run_test(
         """Read lines until a state message arrives, discarding TTY echo.
         Returns list of {"id": int, "state": int} dicts."""
         while True:
-            line = sf.readline()  # reads until b'\n'
-            if line and line[0] == OP_TYPE_NR:
-                payload = line[1:-1]  # strip marker and trailing '\n'
+            line = sf.readline()
+            if not line:
+                raise EOFError("kmod socket closed (QEMU exited)")
+            if line[0] == OP_TYPE_NR:
+                payload = line[1:-1]   # strip marker byte and trailing '\n'
                 return [{"id": payload[i], "state": payload[i + 1]}
                         for i in range(0, len(payload), 2)]
 
@@ -86,6 +88,7 @@ def run_test(
             seq.append((op, a, b, c))
         sock.sendall(f"{op},{a},{b},{c}\n".encode())
         task_states = read_state()
+        gen.update_from_kmod(task_states)
 
     sock.sendall(b"EXIT\n")
     sock.close()
