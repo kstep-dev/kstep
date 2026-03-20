@@ -148,20 +148,28 @@ void kstep_cgroup_init(void) {
 }
 
 void kstep_cgroup_create(const char *name) {
+  char cpuset[32];
   kstep_cgroup_mkdir(name);
   kstep_cgroup_write(name, "cgroup.subtree_control", CGROUP_CONTROL);
+  if (scnprintf(cpuset, sizeof(cpuset), "%d-%d", 1, num_online_cpus() - 1) >= sizeof(cpuset))
+    panic("failed to form cpuset for %s", name);
+
+  kstep_cgroup_set_cpuset(name, cpuset);
 }
 
 void kstep_cgroup_set_cpuset(const char *name, const char *cpuset) {
   kstep_cgroup_write(name, "cpuset.cpus", "%s", cpuset);
+  kstep_sleep();
 }
 
 void kstep_cgroup_set_weight(const char *name, int weight) {
   kstep_cgroup_write(name, "cpu.weight", "%d", weight);
+  kstep_sleep();
 }
 
 void kstep_cgroup_add_task(const char *name, int pid) {
   kstep_cgroup_write(name, "cgroup.procs", "%d", pid);
+  kstep_sleep();
 }
 
 void kstep_freeze_task(struct task_struct *p) {

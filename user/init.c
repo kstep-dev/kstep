@@ -58,6 +58,16 @@ static void set_tty_raw_output(const char *path) {
   close(fd);
 }
 
+
+static void set_proc_affinity(int begin, int end) { // [begin, end]
+  cpu_set_t cpuset;
+  CPU_ZERO(&cpuset);
+  for (int i = begin; i <= end; i++)
+    CPU_SET(i, &cpuset);
+  if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) != 0)
+    panic("Failed to set CPU affinity for task %d to CPUs %d-%d", getpid(), begin, end);
+}
+
 int main(int argc, char *argv[], char *envp[]) {
   mount_fs("/dev", "devtmpfs");
   mount_fs("/proc", "proc");

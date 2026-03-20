@@ -1,5 +1,6 @@
 #include <linux/umh.h>
 #include <uapi/linux/sched/types.h>
+#include <linux/spinlock.h>
 
 #include "internal.h"
 #include "user.h"
@@ -50,16 +51,16 @@ struct task_struct *kstep_task_create(void) {
   if (p == NULL)
     panic("Failed to get task struct");
 
-  // Wait for the task to start
+  // Wait until the helper has completed startup and acknowledged readiness.
   for (int i = 0; i < 100; i++) {
     kstep_sleep();
-    if (strcmp(p->comm, TASK_READY_COMM) == 0 || 
-    (task_cpu(p) != 0 && p->__state == TASK_RUNNING && !cpumask_test_cpu(0, p->cpus_ptr))) {
-      TRACE_INFO("Task %d is runnable on cpu %d", p->pid, task_cpu(p));
+    if (strcmp(p->comm, TASK_READY_COMM) == 0) {
+      TRACE_INFO("Task %d is ready", p->pid);
+      kstep_task_pin(p, 1, num_online_cpus() - 1);
+      kstep_reset_task(p);
       return p;
     }
-    TRACE_INFO("Waiting for task %d to be runnable on cpu 1-N", p->pid);
-
+    TRACE_INFO("Waiting for task %d to become ready", p->pid);
   }
   panic("Task %d did not start", p->pid);
 }
@@ -128,7 +129,8 @@ void kstep_task_pin(struct task_struct *p, int begin, int end) {
   cpumask_clear(&mask);
   for (int i = begin; i <= end; i++)
     cpumask_set_cpu(i, &mask);
-  set_cpus_allowed_ptr(p, &mask);
+  if (set_cpus_allowed_ptr(p, &mask))
+    panic("Failed to set CPU affinity for task %d to CPUs %d-%d", p->pid, begin, end);
   TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
   kstep_sleep();
 }

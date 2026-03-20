@@ -42,6 +42,9 @@ class Op:
     produces: List[str] = field(default_factory=list)
     # list of argument types
     arg_types: List[Optional[str]] = field(default_factory=lambda: [None, None, None])
+    # function that applies GenState side-effects for a replayed op (args already known, no randomness);
+    # None means no side-effects beyond what update_from_kmod handles
+    replay: Optional[Callable] = None
 
 
 # Arguments
@@ -61,8 +64,6 @@ def op_task_create(m: GenState):
     tid = m.next_task_id()
     if tid is None:
         return None
-    m.add_task(tid)
-    m.set_task_state(tid, TASK_SLEEPING)
     return (OP_NAME_TO_TYPE["TASK_CREATE"], tid, 0, 0)
 
 # Fork and create new tasks;
@@ -72,7 +73,6 @@ def op_task_fork(m: GenState):
     new_tid = m.next_task_id()
     if new_tid is None:
         return None
-    m.add_task(new_tid)  # kmod will confirm actual state in next update
     if tid in m.task2cgroups:
         m.cgroup_add_task(m.task2cgroups[tid], new_tid)
     return (OP_NAME_TO_TYPE["TASK_FORK"], tid, new_tid, 0)
@@ -163,6 +163,29 @@ def op_cpu_set_capacity(m: GenState):
     return (OP_NAME_TO_TYPE["CPU_SET_CAPACITY"], cpu, scale, 0)
 
 
+# Replay functions: apply GenState side-effects from a replayed op's known args (a, b, c).
+# Only ops whose emit() mutates state beyond task_state (which update_from_kmod handles) need one.
+
+def replay_task_fork(m: GenState, a: int, b: int, c: int):
+    # a=parent_tid, b=new_tid; propagate cgroup membership
+    if a in m.task2cgroups:
+        m.cgroup_add_task(m.task2cgroups[a], b)
+
+def replay_cgroup_create(m: GenState, a: int, b: int, c: int):
+    # a=parent_id, b=child_id
+    if b not in m.cgroups:
+        m.add_cgroup(a, b)
+
+def replay_cgroup_set_cpuset(m: GenState, a: int, b: int, c: int):
+    # a=cgroup_id, b=begin, c=end
+    if a in m.cgroups:
+        m.cgroups[a].cpuset = (b, c)
+
+def replay_cgroup_add_task(m: GenState, a: int, b: int, c: int):
+    # a=cgroup_id, b=tid
+    m.cgroup_add_task(a, b)
+
+
 OPS: List[Op] = [
     Op(
         name="TASK_CREATE",
@@ -180,6 +203,7 @@ OPS: List[Op] = [
         requires=[RESOURCE_TASK],
         produces=[RESOURCE_TASK],
         arg_types=[ARG_TASK, ARG_INT, None],
+        replay=replay_task_fork,
     ),
     Op(
         name="TASK_PIN",
@@ -231,13 +255,13 @@ OPS: List[Op] = [
     ),
     Op(
         name="TICK",
-        weight=0,
+        weight=15,
         is_applicable=lambda m: True,
         emit=op_tick,
     ),
     Op(
         name="TICK_REPEAT",
-        weight=15,
+        weight=0,
         is_applicable=lambda m: True,
         emit=op_tick_repeat,
         arg_types=[ARG_INT, None, None],
@@ -249,6 +273,7 @@ OPS: List[Op] = [
         emit=op_cgroup_create,
         produces=[RESOURCE_CGROUP],
         arg_types=[ARG_CGROUP, ARG_CGROUP, None],
+        replay=replay_cgroup_create,
     ),
     Op(
         name="CGROUP_SET_CPUSET",
@@ -257,6 +282,7 @@ OPS: List[Op] = [
         emit=op_cgroup_set_cpuset,
         requires=[RESOURCE_CGROUP],
         arg_types=[ARG_CGROUP, ARG_CPU, ARG_CPU],
+        replay=replay_cgroup_set_cpuset,
     ),
     Op(
         name="CGROUP_SET_WEIGHT",
@@ -273,6 +299,7 @@ OPS: List[Op] = [
         emit=op_cgroup_add_task,
         requires=[RESOURCE_CGROUP, RESOURCE_TASK],
         arg_types=[ARG_CGROUP, ARG_TASK, None],
+        replay=replay_cgroup_add_task,
     ),
     Op(
         name="CPU_SET_FREQ",

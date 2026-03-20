@@ -1,6 +1,6 @@
 #include "internal.h"
 
-static void kstep_reset_task(struct task_struct *p) {
+void kstep_reset_task(struct task_struct *p) {
   // reset generic task stats
   p->nivcsw = 0;
   p->nvcsw = 0;

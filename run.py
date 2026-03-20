@@ -60,6 +60,7 @@ def start_qemu(
     log_file: Optional[Path] = None,
     sock_file: Optional[Path] = None,
     debug: bool = False,
+    quiet: bool = False,
 ) -> subprocess.Popen:
     """Start QEMU in the background. Returns the process handle."""
     kvm_path = Path("/dev/kvm")
@@ -82,6 +83,7 @@ def start_qemu(
     boot_args = [
         "rw",
         "nokaslr",
+        "loglevel=7",   # print up to KERN_DEBUG; ensures KERN_WARNING (4) always appears
         "sched_verbose",
         f"isolcpus=nohz,managed_irq,{isol_cpus}",
         "irqaffinity=0",
@@ -148,7 +150,8 @@ def start_qemu(
 
     cmd_str = " ".join(cmd)
     logging.info(f"Starting QEMU: {cmd_str}")
-    return subprocess.Popen(cmd_str, shell=True)
+    devnull = subprocess.DEVNULL if quiet else None
+    return subprocess.Popen(cmd_str, shell=True, stdout=devnull, stderr=devnull)
 
 def run_qemu(
     driver: Driver,
@@ -231,9 +234,8 @@ def make_kstep(linux_name: str):
     system(f"make -C {PROJ_DIR} kstep LINUX_NAME={linux_name}")
 
 
-def make_linux(linux_name: str, config: Optional[Path] = None):
-    extra = f" KSTEP_EXTRA_CONFIG={config}" if config else ""
-    system(f"make -C {PROJ_DIR} linux LINUX_NAME={linux_name}{extra}")
+def make_linux(linux_name: str):
+    system(f"make -C {PROJ_DIR} linux LINUX_NAME={linux_name}")
 
 
 def resolve_linux_name(linux_name: Optional[str] = None) -> str:

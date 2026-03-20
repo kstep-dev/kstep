@@ -90,7 +90,7 @@ def reproduce(linux: Linux, driver: Driver, skip_build: bool):
         linux.version, linux_name=linux_name, patch=linux.patch, tarball=True
     )
     if not skip_build:
-        make_linux(linux_name=linux_name, config=linux.config)
+        make_linux(linux_name=linux_name)
     make_kstep(linux_name=linux_name)
     log_file = RESULTS_DIR / f"{linux_name}.log"
     run_qemu(linux_name=linux_name, driver=driver, log_file=log_file)

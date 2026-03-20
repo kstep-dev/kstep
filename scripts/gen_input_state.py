@@ -27,7 +27,7 @@ class GenState:
 
     # Generator state: changed by operations that produce resources or consume resources
     tasks: List[int] = field(default_factory=list) # list of task ids
-    task_state: dict = field(default_factory=dict) # key: task id, value: state
+    task_state: dict[int, str] = field(default_factory=dict) # key: task id, value: state
     cgroups: dict = field(default_factory=dict) # key: cgroup id, value: Cgroup
     leaf_cgroups: list[int] = field(default_factory=list) # list of leaf cgroup ids
     task2cgroups: dict = field(default_factory=dict) # key: task id, value: list of cgroup ids
@@ -47,7 +47,7 @@ class GenState:
         return self.rnd.choice(self.tasks)
 
     def choose_task_in_state(self, state: str) -> int:
-        choices = [tid for tid in self.tasks if self.task_state.get(tid) == state]
+        choices = [tid for tid in self.tasks if self.task_state[tid] == state]
         return self.rnd.choice(choices)
 
     def next_task_id(self) -> Optional[int]:
@@ -55,17 +55,6 @@ class GenState:
             if i not in self.tasks:
                 return i
         return None
-
-    def add_task(self, tid: int):
-        self.tasks.append(tid)
-        self.task_state[tid] = TASK_SLEEPING
-
-    def remove_task(self, tid: int):
-        self.tasks.remove(tid)
-        del self.task_state[tid]
-    
-    def set_task_state(self, tid: int, state: str):
-        self.task_state[tid] = state
 
     _KMOD_STATE_MAP = {0: TASK_SLEEPING, 1: TASK_RUNNABLE, 2: TASK_ON_CPU}
 

@@ -121,6 +121,7 @@ static bool op_task_fifo(int a, int b, int c) {
     panic("Task %d is not on CPU when setting FIFO", a);
   // Move the task back to the root cgroup, otherwise the set_schedprio will fail
   kstep_cgroup_add_task("", kstep_tasks[a].p->pid);
+  kstep_task_pin(kstep_tasks[a].p, 1, num_online_cpus() - 1);
   kstep_tasks[a].cgroup_id = -1;
   kstep_task_fifo(kstep_tasks[a].p);
   return true;
@@ -208,6 +209,7 @@ static bool op_cgroup_create(int a, int b, int c) {
   for (int i = 0; i < MAX_TASKS; i++) {
     if (parent_id != -1 && kstep_tasks[i].p && kstep_tasks[i].cgroup_id == parent_id) {
       kstep_cgroup_add_task("", kstep_tasks[i].p->pid);
+      kstep_task_pin(kstep_tasks[i].p, 1, num_online_cpus() - 1);
       kstep_tasks[i].cgroup_id = -1;
     }
   }
@@ -326,6 +328,16 @@ static bool is_task_signal_op(enum kstep_op_type type) {
   }
 }
 
+
+static void print_state(void) {
+  for (int i = 0; i < MAX_TASKS; i++) {
+    struct task_struct *p = kstep_tasks[i].p;
+    if (!p)
+      continue;
+    pr_info("Task %d %d: on_cpu=%d, state=%d\n", i, p->pid, p->on_cpu, p->__state);
+  }
+}
+
 /*
  * Try to send the head queued op for task @id if its required state is met.
  * Sends at most one op per call.
@@ -338,6 +350,7 @@ static void execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   kstep_cov_disable();
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
+  print_state();
 }
 
 static u8 buf[1 + MAX_TASKS * 2 + 1];
