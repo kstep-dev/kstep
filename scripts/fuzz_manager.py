@@ -20,7 +20,7 @@ from scripts.corpus import SignalCorpus
 from scripts.cov import cov_parse
 from scripts.fuzz_common import SeedPool, WorkItem, WorkResult
 from scripts.fuzz_worker import worker_main
-from scripts.mutate import mutate
+from scripts.mutate import pick_pivot
 from scripts.input_seq import InputSeq
 
 
@@ -70,9 +70,17 @@ def _next_work(
     seed = pool.pick_seed()
     assert seed is not None  # pool is non-empty (checked above)
     if r < fresh_ratio + mutate_ratio:
-        mutated_ops = mutate(seed.ops, rng, max_len=steps * 2)
-        return WorkItem(mode="mutate", steps=0, linux_name=linux_name,
-                        ops=mutated_ops, seed_id=seed.seed_id)
+        pivot_idx = pick_pivot(seed.productive_cmd_ids, rng)
+        if pivot_idx is not None:
+            return WorkItem(
+                mode="mutate",
+                steps=steps,
+                linux_name=linux_name,
+                ops=seed.ops,
+                seed_id=seed.seed_id,
+                pivot_idx=pivot_idx,
+            )
+        # Seed has no productive commands yet; fall through to replay
     return WorkItem(mode="replay", steps=0, linux_name=linux_name,
                     ops=seed.ops, seed_id=seed.seed_id)
 
@@ -180,16 +188,19 @@ def run_manager(
                     linux_name=result.linux_name,
                 )
                 if new_signals:
-                    corpus.analyze_per_action_signals(
+                    cmd_meta = corpus.analyze_per_action_signals(
                         seq=seq,
                         signal_records=signal_records,
                         new_signals=set(new_signals),
                         linux_name=result.linux_name,
                     )
+                    productive_cmd_ids = [
+                        entry["cmd_id"] for entry in cmd_meta if entry["new_edges"]
+                    ]
                     n_new = len(new_signals)
                     total_new_signals += n_new
                     interval_signals  += n_new
-                    seed = pool.add(result.ops, n_new)
+                    seed = pool.add(result.ops, n_new, productive_cmd_ids)
                     logging.info(
                         f"[+] seed #{seed.seed_id}: +{n_new} new  "
                         f"total={len(corpus.seen_signals)}  corpus={len(pool)}"

@@ -15,7 +15,7 @@ from typing import Optional
 
 from run import Driver, start_qemu
 from scripts.fuzz_common import Ops, WorkItem, WorkResult, connect_to_kmod, read_kmod_state
-from scripts.gen_input_core import generate_next_command, init_genstate, _op_matches_task_state
+from scripts.gen_input_core import generate_next_command, init_genstate, _op_matches_task_state, replay_update_genstate
 from scripts.gen_input_ops import OP_NAME_TO_TYPE, OP_TYPE_TO_NAME
 
 _CRASH_MARKERS = [
@@ -111,10 +111,18 @@ def worker_main(
 
             
 
+            _TICK = OP_NAME_TO_TYPE["TICK"]
+
             if work.mode in ("replay", "mutate"):
                 assert work.ops is not None
-                _TICK = OP_NAME_TO_TYPE["TICK"]
-                for i, (op, a, b, c) in enumerate(work.ops):
+                # For mutate: replay only up to and including the pivot command.
+                # For replay: replay the full sequence.
+                if work.mode == "mutate" and work.pivot_idx is not None:
+                    prefix_len = min(work.pivot_idx + 1, len(work.ops))
+                else:
+                    prefix_len = len(work.ops)
+
+                for i, (op, a, b, c) in enumerate(work.ops[:prefix_len]):
                     if not _op_matches_task_state(gen, (op, a, b, c)):
                         for t in range(50):
                             ops_executed.append((_TICK, 0, 0, 0))
@@ -132,13 +140,26 @@ def worker_main(
                             )
                     ops_executed.append((op, a, b, c))
                     _send_op(sock, sf, gen, op, a, b, c)
+                    replay_update_genstate(gen, op, a, b, c)
                     logger.debug(f"REPLAY {i}: op={op},{a},{b},{c}  task_state={gen.task_state}")
+
+                # After replaying the prefix, interactively generate new commands.
+                if work.mode == "mutate" and work.pivot_idx is not None:
+                    for i in range(work.steps):
+                        op, a, b, c = generate_next_command(gen)
+                        if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
+                            for _ in range(a):
+                                ops_executed.append((_TICK, 0, 0, 0))
+                        else:
+                            ops_executed.append((op, a, b, c))
+                        _send_op(sock, sf, gen, op, a, b, c)
+                        logger.debug(f"MUTATE-GEN {i}: op={op},{a},{b},{c}  task_state={gen.task_state}")
             else:
                 for i in range(work.steps):
                     op, a, b, c = generate_next_command(gen)
                     if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
                         for _ in range(a):
-                            ops_executed.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
+                            ops_executed.append((_TICK, 0, 0, 0))
                     else:
                         ops_executed.append((op, a, b, c))
                     _send_op(sock, sf, gen, op, a, b, c)
@@ -173,15 +194,24 @@ def worker_main(
         
 
         if error is None:
-            if work.mode in ("replay", "mutate"):
+            if work.mode == "replay":
                 assert work.ops is not None
                 expected_ops = len(work.ops)
+                if len(ops_executed) < expected_ops:
+                    error = f"op count mismatch: expected {expected_ops}, got {len(ops_executed)}"
+                    logger.error(f"Worker {worker_id}: {error}")
+            elif work.mode == "mutate":
+                assert work.ops is not None
+                # Minimum: the prefix up to pivot must have been replayed
+                prefix_len = min(work.pivot_idx + 1, len(work.ops)) if work.pivot_idx is not None else len(work.ops)
+                if len(ops_executed) < prefix_len:
+                    error = f"mutate prefix mismatch: expected at least {prefix_len}, got {len(ops_executed)}"
+                    logger.error(f"Worker {worker_id}: {error}")
             else:
                 expected_ops = work.steps
-
-            if len(ops_executed) < expected_ops:
-                error = f"op count mismatch: expected {expected_ops}, got {len(ops_executed)}"
-                logger.error(f"Worker {worker_id}: {error}")
+                if len(ops_executed) < expected_ops:
+                    error = f"op count mismatch: expected {expected_ops}, got {len(ops_executed)}"
+                    logger.error(f"Worker {worker_id}: {error}")
 
         with log_file.open("r", errors="ignore") as lf:
             log_content = lf.read()

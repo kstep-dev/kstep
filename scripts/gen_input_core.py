@@ -31,6 +31,9 @@ def pick_producer(ops, res: str):
 
 OPS = build_ops()
 
+_OP_REPLAY = {OP_NAME_TO_TYPE[op.name]: op.replay for op in OPS if op.replay}
+
+
 def init_genstate(max_tasks: int, max_cgroups: int, cpus: int, seed: int) -> GenState:
     return GenState(max_tasks=max_tasks, max_cgroups=max_cgroups, cpus=cpus, rnd=random.Random(seed))
 
@@ -68,3 +71,16 @@ def generate_next_command(m: GenState) -> tuple[int, int, int, int]:
         op = _generate_next_command(m)
         if op and _op_matches_task_state(m, op):
             return op
+
+
+def replay_update_genstate(m: GenState, op: int, a: int, b: int, c: int) -> None:
+    """Apply the GenState side-effects of a replayed op without calling emit().
+
+    During replay, args come from the seed so emit() is not called.
+    Task states are kept in sync via update_from_kmod(); this function
+    handles the remaining state: cgroups, leaf_cgroups, and task2cgroups.
+    Each op's replay logic lives in its Op.replay field in gen_input_ops.py.
+    """
+    fn = _OP_REPLAY.get(op)
+    if fn:
+        fn(m, a, b, c)
