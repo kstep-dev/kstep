@@ -15,6 +15,7 @@ class Cgroup:
     id: int
     parent_id: int  # -1 means root
     cpuset: tuple[int, int]
+    effective_cpuset: tuple[int, int]
 
 # Generator state
 @dataclass
@@ -92,21 +93,41 @@ class GenState:
         new_begin = self.rnd.randint(begin, end)
         new_end = self.rnd.randint(new_begin, end)
         return new_begin, new_end
+
+    def _parent_effective_cpuset(self, parent_id: int) -> tuple[int, int]:
+        if parent_id == -1:
+            return self.root_cpuset()
+        return self.cgroups[parent_id].effective_cpuset
+
+    def _compute_effective_cpuset(self, cpuset: tuple[int, int],
+                                  parent_effective: tuple[int, int]) -> tuple[int, int]:
+        if cpuset[0] > cpuset[1]:
+            return parent_effective
+        begin = max(cpuset[0], parent_effective[0])
+        end = min(cpuset[1], parent_effective[1])
+        if begin > end:
+            return parent_effective
+        return begin, end
+
+    def _refresh_effective_cpuset(self, cgroup_id: int):
+        cgroup = self.cgroups[cgroup_id]
+        parent_effective = self._parent_effective_cpuset(cgroup.parent_id)
+        cgroup.effective_cpuset = self._compute_effective_cpuset(
+            cgroup.cpuset, parent_effective)
+        for child_id, child in self.cgroups.items():
+            if child.parent_id == cgroup_id:
+                self._refresh_effective_cpuset(child_id)
     
     def choose_cpuset_cgroup(self, cgroup_id: int) -> tuple[int, int]:
-        parent_id = self.cgroups[cgroup_id].parent_id
-        if parent_id == -1:
-            parent_range = self.root_cpuset()
-        else:
-            parent_range = self.cgroups[parent_id].cpuset
-        begin, end = self.choose_cpuset_subset(parent_range[0], parent_range[1])
+        begin, end = self.choose_cpuset_subset(1, self.cpus - 1)
         return begin, end
 
     def choose_cpuset_task(self, task_id: int):
         if task_id not in self.task2cgroups:
             return self.choose_cpuset()
         cgroup_id = self.task2cgroups[task_id]
-        return self.choose_cpuset_subset(self.cgroups[cgroup_id].cpuset[0], self.cgroups[cgroup_id].cpuset[1])
+        effective = self.cgroups[cgroup_id].effective_cpuset
+        return self.choose_cpuset_subset(effective[0], effective[1])
 
     def choose_cpu(self) -> int:
         return self.rnd.randint(1, self.cpus - 1)
@@ -136,19 +157,21 @@ class GenState:
         return self.rnd.choice(choices)
 
     def add_cgroup(self, parent_id: int, child_id: int):
-        if parent_id == -1:
-            cpuset = self.root_cpuset()
-        else:
-            cpuset = self.cgroups[parent_id].cpuset
+        parent_effective = self._parent_effective_cpuset(parent_id)
         self.cgroups[child_id] = Cgroup(
             id=child_id,
             parent_id=parent_id,
-            cpuset=cpuset,
+            cpuset=parent_effective,
+            effective_cpuset=parent_effective,
         )
         if child_id not in self.leaf_cgroups:
             self.leaf_cgroups.append(child_id)
         if parent_id != -1 and parent_id in self.leaf_cgroups:
             self.leaf_cgroups.remove(parent_id)
+
+    def set_cgroup_cpuset(self, cgroup_id: int, cpuset: tuple[int, int]):
+        self.cgroups[cgroup_id].cpuset = cpuset
+        self._refresh_effective_cpuset(cgroup_id)
 
     def cgroup_name(self, cgroup_id: int) -> str:
         parts = [f"cg{cgroup_id}"]

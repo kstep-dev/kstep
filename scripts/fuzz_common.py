@@ -71,6 +71,7 @@ class WorkResult:
     mode: str = "fresh"        # "fresh" | "replay"
     seed_id: Optional[int] = None
     error: Optional[str] = None
+    error_category: Optional[str] = None  # "crash" | "timedout" | "retry_tick" | "op_mismatch" | "fail_log" | "other"
 
 
 class SeedPool:

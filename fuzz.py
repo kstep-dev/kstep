@@ -55,6 +55,8 @@ def main() -> None:
     parser.add_argument("--mutate_ratio", type=float, default=0.5,
                         help="Fraction of iterations applying tick-insertion mutation to a seed "
                              "(remainder is pure replay)")
+    parser.add_argument("--pin_cpus", action="store_true",
+                        help="Pin each QEMU to dedicated host CPUs; run Python on the rest")
     args = parser.parse_args()
 
     fuzz_dir = DATA_DIR / "fuzz"
@@ -83,6 +85,7 @@ def main() -> None:
         fuzz_dir=fuzz_dir,
         fresh_ratio=args.fresh_ratio,
         mutate_ratio=args.mutate_ratio,
+        pin_cpus=args.pin_cpus,
     )
 
 

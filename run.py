@@ -61,6 +61,7 @@ def start_qemu(
     sock_file: Optional[Path] = None,
     debug: bool = False,
     quiet: bool = False,
+    cpu_affinity: Optional[str] = None,
 ) -> subprocess.Popen:
     """Start QEMU in the background. Returns the process handle."""
     kvm_path = Path("/dev/kvm")
@@ -149,6 +150,8 @@ def start_qemu(
         cmd += ["-s", "-S"]
 
     cmd_str = " ".join(cmd)
+    if cpu_affinity is not None:
+        cmd_str = f"taskset -c {cpu_affinity} {cmd_str}"
     logging.info(f"Starting QEMU: {cmd_str}")
     devnull = subprocess.DEVNULL if quiet else None
     return subprocess.Popen(cmd_str, shell=True, stdout=devnull, stderr=devnull)
