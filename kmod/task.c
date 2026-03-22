@@ -129,7 +129,9 @@ void kstep_task_pin(struct task_struct *p, int begin, int end) {
   cpumask_clear(&mask);
   for (int i = begin; i <= end; i++)
     cpumask_set_cpu(i, &mask);
-  if (set_cpus_allowed_ptr(p, &mask))
+  // directly call set_cpus_allowed_ptr is not enough, as it does not update the user_cpus_ptr
+  KSYM_IMPORT(sched_setaffinity);
+  if (KSYM_sched_setaffinity(p->pid, &mask))
     panic("Failed to set CPU affinity for task %d to CPUs %d-%d", p->pid, begin, end);
   TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
   kstep_sleep();
