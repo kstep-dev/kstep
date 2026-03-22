@@ -134,7 +134,7 @@ def op_cgroup_create(m: GenState):
 def op_cgroup_set_cpuset(m: GenState):
     cgroup_id = m.choose_cgroup()
     begin, end = m.choose_cpuset_cgroup(cgroup_id)
-    m.cgroups[cgroup_id].cpuset = (begin, end)
+    m.set_cgroup_cpuset(cgroup_id, (begin, end))
     return (OP_NAME_TO_TYPE["CGROUP_SET_CPUSET"], cgroup_id, begin, end)
 
 
@@ -179,7 +179,7 @@ def replay_cgroup_create(m: GenState, a: int, b: int, c: int):
 def replay_cgroup_set_cpuset(m: GenState, a: int, b: int, c: int):
     # a=cgroup_id, b=begin, c=end
     if a in m.cgroups:
-        m.cgroups[a].cpuset = (b, c)
+        m.set_cgroup_cpuset(a, (b, c))
 
 def replay_cgroup_add_task(m: GenState, a: int, b: int, c: int):
     # a=cgroup_id, b=tid

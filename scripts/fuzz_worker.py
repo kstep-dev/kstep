@@ -29,13 +29,15 @@ _CRASH_MARKERS = [
 ]
 
 
-def _send_op(sock, sf, gen, op: int, a: int, b: int, c: int) -> None:
+def _send_op(logger: logging.Logger, sock, sf, gen, op: int, a: int, b: int, c: int) -> None:
     """Send one op to kmod, read back task state, and update gen. Raises on failure."""
     sock.sendall(f"{op},{a},{b},{c}\n".encode())
+    logger.debug(f"SEND OP: {op},{a},{b},{c}")
     task_states = read_kmod_state(sf)
     if task_states is None:
         sock.sendall(b"EXIT\n")
         raise RuntimeError("Failed to read task states")
+    logger.debug(f"Received task states")
     gen.update_from_kmod(task_states)
 
 
@@ -54,6 +56,7 @@ def worker_main(
     result_queue: "mp.Queue[WorkResult]",
     driver: Driver,
     fuzz_dir: Path,
+    qemu_cpus: Optional[str] = None,
 ) -> None:
     """Worker loop: run QEMU instances and report results to the manager."""
     signal.signal(signal.SIGINT, signal.SIG_IGN)   # manager owns shutdown
@@ -81,26 +84,27 @@ def worker_main(
         ops_executed: Ops = []
         result_cov: Optional[Path] = None
         error: Optional[str] = None
+        error_category: Optional[str] = None
         proc = None
 
         try:
             handler.stream.seek(0)
             handler.stream.truncate()
-                
+
             proc = start_qemu(
                 driver=driver,
                 linux_name=work.linux_name,
                 log_file=log_file,
                 sock_file=sock_file,
                 quiet=True,
+                cpu_affinity=qemu_cpus,
             )
 
             # QEMU uses wait=on and blocks until we connect; retry until ready.
             try:
                 sock = connect_to_kmod(sock_file, timeout=10.0, retries=200)
-            except RuntimeError:
-                proc.kill()
-                raise RuntimeError("Failed to connect to kmod socket")
+            except RuntimeError as e:
+                raise RuntimeError("Failed to connect to kmod socket") from e
 
             sock.settimeout(60.0)
             sf = sock.makefile("rb")
@@ -109,7 +113,6 @@ def worker_main(
             gen_seed = 0 if work.mode in ("replay", "mutate") else rng.randint(0, 2**32 - 1)
             gen = init_genstate(max_tasks=10, max_cgroups=10, cpus=driver.num_cpus, seed=gen_seed)
 
-            
 
             _TICK = OP_NAME_TO_TYPE["TICK"]
 
@@ -126,7 +129,7 @@ def worker_main(
                     if not _op_matches_task_state(gen, (op, a, b, c)):
                         for t in range(50):
                             ops_executed.append((_TICK, 0, 0, 0))
-                            _send_op(sock, sf, gen, _TICK, 0, 0, 0)
+                            _send_op(logger, sock, sf, gen, _TICK, 0, 0, 0)
                             logger.debug(f"REPLAY {i} retry tick {t}: task_state={gen.task_state}")
                             if _op_matches_task_state(gen, (op, a, b, c)):
                                 break
@@ -139,7 +142,7 @@ def worker_main(
                                 f"{op_name}(task={a}) task_state={actual!r}"
                             )
                     ops_executed.append((op, a, b, c))
-                    _send_op(sock, sf, gen, op, a, b, c)
+                    _send_op(logger, sock, sf, gen, op, a, b, c)
                     replay_update_genstate(gen, op, a, b, c)
                     logger.debug(f"REPLAY {i}: op={op},{a},{b},{c}  task_state={gen.task_state}")
 
@@ -152,7 +155,7 @@ def worker_main(
                                 ops_executed.append((_TICK, 0, 0, 0))
                         else:
                             ops_executed.append((op, a, b, c))
-                        _send_op(sock, sf, gen, op, a, b, c)
+                        _send_op(logger, sock, sf, gen, op, a, b, c)
                         logger.debug(f"MUTATE-GEN {i}: op={op},{a},{b},{c}  task_state={gen.task_state}")
             else:
                 for i in range(work.steps):
@@ -162,17 +165,14 @@ def worker_main(
                             ops_executed.append((_TICK, 0, 0, 0))
                     else:
                         ops_executed.append((op, a, b, c))
-                    _send_op(sock, sf, gen, op, a, b, c)
+                    _send_op(logger, sock, sf, gen, op, a, b, c)
                     logger.debug(f"STEP {i}: task_state={gen.task_state}")
 
 
             sock.sendall(b"EXIT\n")
             sock.close()
-            try:
-                proc.wait(timeout=120)
-            except subprocess.TimeoutExpired:
-                proc.kill()
-                proc.wait()
+            
+            proc.wait(timeout=120)
 
             cov_path = log_file.with_suffix(".cov")
             if cov_path.exists() and cov_path.stat().st_size > 0:
@@ -185,40 +185,39 @@ def worker_main(
                     proc.wait()
                 except Exception:
                     pass
-            if _check_for_crash(log_file):
-                error = f"crash: {exc}"
-                logger.error(f"Worker {worker_id}: [CRASH] {exc}")
+            if isinstance(exc, subprocess.TimeoutExpired):
+                error_category = "timedout"
+            elif _check_for_crash(log_file):
+                error_category = "crash"
+            elif "replay mismatch" in str(exc):
+                error_category = "retry_tick"
             else:
-                error = str(exc)
-                logger.error(f"Worker {worker_id}: {exc}")
-        
+                error_category = "other"
+            error = str(exc)
+            logger.error(f"Worker {worker_id}: {exc}")
 
         if error is None:
             if work.mode == "replay":
                 assert work.ops is not None
                 expected_ops = len(work.ops)
-                if len(ops_executed) < expected_ops:
-                    error = f"op count mismatch: expected {expected_ops}, got {len(ops_executed)}"
-                    logger.error(f"Worker {worker_id}: {error}")
             elif work.mode == "mutate":
                 assert work.ops is not None
-                # Minimum: the prefix up to pivot must have been replayed
-                prefix_len = min(work.pivot_idx + 1, len(work.ops)) if work.pivot_idx is not None else len(work.ops)
-                if len(ops_executed) < prefix_len:
-                    error = f"mutate prefix mismatch: expected at least {prefix_len}, got {len(ops_executed)}"
-                    logger.error(f"Worker {worker_id}: {error}")
+                expected_ops = min(work.pivot_idx + 1, len(work.ops)) if work.pivot_idx is not None else len(work.ops)
             else:
                 expected_ops = work.steps
-                if len(ops_executed) < expected_ops:
-                    error = f"op count mismatch: expected {expected_ops}, got {len(ops_executed)}"
-                    logger.error(f"Worker {worker_id}: {error}")
 
-        with log_file.open("r", errors="ignore") as lf:
-            log_content = lf.read()
-            log_content = log_content.lower()
-            if "fail" in log_content or "warn" in log_content:
-                logger.error(f"Worker {worker_id}: Detected 'fail' or 'warn' in log file.")
-                error = "fail"
+            if len(ops_executed) < expected_ops:
+                error = f"op count mismatch: expected {expected_ops}, got {len(ops_executed)}"
+                error_category = "op_mismatch"
+                logger.error(f"Worker {worker_id}: {error}")
+            else:
+                with log_file.open("r", errors="ignore") as lf:
+                    log_content = lf.read()
+                    log_content = log_content.lower()
+                    if "fail" in log_content or "warn" in log_content:
+                        error = "fail_log"
+                        error_category = "fail_log"
+                        logger.error(f"Worker {worker_id}: Detected 'fail' or 'warn' in log file.")
 
         result_queue.put(WorkResult(
             worker_id=worker_id,
@@ -231,4 +230,5 @@ def worker_main(
             mode=work.mode,
             seed_id=work.seed_id,
             error=error,
+            error_category=error_category,
         ))

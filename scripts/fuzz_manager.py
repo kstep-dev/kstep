@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import multiprocessing as mp
+import os
 import queue
 import random
 import shutil
@@ -29,12 +30,13 @@ from scripts.input_seq import InputSeq
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _save_crash(result: WorkResult, fuzz_dir: Path) -> Path:
-    """Persist a crashing input and its console log to data/fuzz/crashes/."""
-    crashes_dir = fuzz_dir / "crashes"
-    crashes_dir.mkdir(exist_ok=True)
+    """Persist a crashing input and its console log, routed by error category."""
+    category = result.error_category or "other"
+    category_dir = fuzz_dir / "crashes" / category
+    category_dir.mkdir(parents=True, exist_ok=True)
 
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    crash_dir = crashes_dir / f"crash_{ts}_w{result.worker_id}"
+    crash_dir = category_dir / f"{category}_{ts}_w{result.worker_id}"
     crash_dir.mkdir()
 
     ops_data = {
@@ -97,6 +99,7 @@ def run_manager(
     fuzz_dir: Path,
     fresh_ratio: float,
     mutate_ratio: float = 0.35,
+    pin_cpus: bool = False,
 ) -> None:
     task_queue: "mp.Queue[Optional[WorkItem]]" = mp.Queue(maxsize=n_workers * 2)
     result_queue: "mp.Queue[WorkResult]" = mp.Queue()
@@ -111,16 +114,36 @@ def run_manager(
     total_replay      = 0
     total_mutate      = 0
     total_errors      = 0
+    errors_by_cat: dict[str, int] = {}
     total_new_signals = 0
     interval_signals  = 0
     last_stat_t       = t_start
+
+    # CPU pinning: assign each QEMU worker_i to CPUs [i*num_cpus, (i+1)*num_cpus-1]
+    # and restrict Python processes to the remaining CPUs.
+    qemu_cpu_lists: list[Optional[str]] = [None] * n_workers
+    if pin_cpus:
+        host_cpus = os.cpu_count() or 1
+        qemu_total = n_workers * driver.num_cpus
+        if qemu_total < host_cpus:
+            for wid in range(n_workers):
+                start = wid * driver.num_cpus
+                end = start + driver.num_cpus - 1
+                qemu_cpu_lists[wid] = f"{start}-{end}"
+            python_cpus = set(range(qemu_total, host_cpus))
+            os.sched_setaffinity(0, python_cpus)  # workers inherit via fork
+            logging.info(
+                f"CPU pinning: QEMU {qemu_cpu_lists}, Python {sorted(python_cpus)}"
+            )
+        else:
+            raise RuntimeError(f"pin_cpus: need {qemu_total} QEMU + 1 Python CPUs, only {host_cpus} available")
 
     # Spawn worker processes
     procs: list[mp.Process] = []
     for wid in range(n_workers):
         p = mp.Process(
             target=worker_main,
-            args=(wid, task_queue, result_queue, driver, fuzz_dir),
+            args=(wid, task_queue, result_queue, driver, fuzz_dir, qemu_cpu_lists[wid]),
             daemon=True,
         )
         p.start()
@@ -171,8 +194,18 @@ def run_manager(
 
             if result.error:
                 total_errors += 1
+                cat = result.error_category or "other"
+                errors_by_cat[cat] = errors_by_cat.get(cat, 0) + 1
                 crash_dir = _save_crash(result, fuzz_dir)
-                logging.error(f"[error] worker={result.worker_id}  {result.error}  saved to {crash_dir}")
+                logging.error(
+                    f"[error] worker={result.worker_id}  "
+                    f"crash={cat == 'crash'}  "
+                    f"timedout={cat == 'timedout'}  "
+                    f"retry_tick={cat == 'retry_tick'}  "
+                    f"category={cat}  "
+                    f"msg={result.error!r}  "
+                    f"saved={crash_dir}"
+                )
 
             elif result.cov_file:
                 signal_records = cov_parse(result.cov_file)
@@ -213,6 +246,7 @@ def run_manager(
         now = time.monotonic()
         if now - last_stat_t >= 10:
             elapsed = now - t_start
+            cat_str = "  ".join(f"{k}={v}" for k, v in sorted(errors_by_cat.items()))
             logging.info(
                 f"[{elapsed:6.0f}s]  "
                 f"execs={total_execs} ({total_execs / max(elapsed, 1):.2f}/s)  "
@@ -221,6 +255,7 @@ def run_manager(
                 f"new_total={total_new_signals}  "
                 f"corpus={len(pool)}  "
                 f"errors={total_errors}"
+                + (f"  [{cat_str}]" if cat_str else "")
             )
             interval_signals = 0
             last_stat_t = now

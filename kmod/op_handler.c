@@ -350,7 +350,6 @@ static void execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   kstep_cov_disable();
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
-  print_state();
 }
 
 static u8 buf[1 + MAX_TASKS * 2 + 1];
@@ -361,6 +360,7 @@ void kstep_write_state(struct file *f) {
    * 2 = running on CPU, 1 = runnable on runqueue, 0 = blocked. */
   loff_t pos = 0;
   int len = 0;
+  print_state();
 
   buf[len++] = OP_TYPE_NR;
   for (int i = 0; i < MAX_TASKS; i++) {
@@ -401,8 +401,14 @@ void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
    *       Send directly only when queue is empty AND state is ready.
    */
   if (is_task_signal_op(type)) {
-    if (!is_valid_task_id(a) || !kstep_tasks[a].p || !op_task_state_ready(type, kstep_tasks[a].p))
+    if (!is_valid_task_id(a) || !kstep_tasks[a].p)
       panic("Task %d not found", a);
+    if (!op_task_state_ready(type, kstep_tasks[a].p)) {
+      // directly return when task is not in the required state
+      // then, the executor will send the latest state to the input generator
+      TRACE_INFO("Task %d is not in the required state for operation %s", a, op_strs[type]);
+      return;
+    }
   }
 
   execute_one_op(type, a, b, c);
