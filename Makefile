@@ -14,6 +14,7 @@ $(info ======= LINUX_NAME: $(LINUX_NAME) =======)
 
 LINUX_DIR := $(PROJ_DIR)/linux/$(LINUX_NAME)
 BUILD_DIR := $(PROJ_DIR)/build/$(LINUX_NAME)
+BUILD_CURR_DIR := $(PROJ_DIR)/build/current
 
 # ========= user =========
 
@@ -23,7 +24,7 @@ USER_OUT_DIR := $(BUILD_DIR)/user
 USER_OUT_FILES := $(USER_OUT_DIR)/init $(USER_OUT_DIR)/task
 
 .PHONY: user
-user: $(USER_OUT_FILES)
+user: build-current $(USER_OUT_FILES)
 
 $(USER_OUT_DIR)/%: $(USER_SRC_FILES) | $(USER_OUT_DIR)
 	gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ $(USER_SRC_DIR)/$*.c
@@ -39,7 +40,7 @@ KMOD_OUT_DIR := $(BUILD_DIR)/kmod
 KMOD_OUT_FILE := $(KMOD_OUT_DIR)/kmod.ko
 
 .PHONY: kmod
-kmod: $(KMOD_OUT_FILE)
+kmod: build-current $(KMOD_OUT_FILE)
 
 $(KMOD_OUT_FILE): $(KMOD_SRC_FILES) | $(KMOD_OUT_DIR)
 	find $(KMOD_OUT_DIR) -type l -delete
@@ -54,7 +55,7 @@ $(KMOD_OUT_DIR):
 ROOTFS_IMG := $(BUILD_DIR)/rootfs.cpio
 
 .PHONY: kstep
-kstep: $(ROOTFS_IMG)
+kstep: build-current $(ROOTFS_IMG)
 
 $(ROOTFS_IMG): $(KMOD_OUT_FILE) $(USER_OUT_FILES)
 	cd $(KMOD_OUT_DIR) && echo kmod.ko | cpio -o --format=newc > $(ROOTFS_IMG)
@@ -72,11 +73,16 @@ else
 endif
 
 .PHONY: linux
-linux: linux-config linux-patch
+linux: build-current linux-config linux-patch
 	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(LINUX_NAME) WERROR=0 HOSTCFLAGS=-Wno-error
 	mkdir -p $(BUILD_DIR)
 	cp $(LINUX_IMAGE) $(BUILD_DIR)/image
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
+
+.PHONY: build-current
+build-current:
+	mkdir -p $(dir $(BUILD_CURR_DIR))
+	ln -sfn $(BUILD_DIR) $(BUILD_CURR_DIR)
 
 KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
 KSTEP_EXTRA_CONFIG ?=
