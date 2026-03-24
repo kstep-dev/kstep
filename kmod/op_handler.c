@@ -58,7 +58,7 @@ static bool pid_known(pid_t pid) {
   return false;
 }
 
-static bool task_running(struct task_struct * p) {
+static bool kstep_task_running(struct task_struct * p) {
 #ifdef TIF_NEED_RESCHED_LAZY
   return p->on_cpu && !test_tsk_thread_flag(p, TIF_NEED_RESCHED_LAZY) && !test_tsk_thread_flag(p, TIF_NEED_RESCHED);
 #else
@@ -100,7 +100,7 @@ static bool op_task_fork(int a, int b, int c) {
   if (!kstep_tasks[a].p || kstep_tasks[b].p)
     return false;
 
-  if (!task_running(kstep_tasks[a].p))
+  if (!kstep_task_running(kstep_tasks[a].p))
       panic("Task %d is not on CPU when forking", a);
   kstep_task_fork(kstep_tasks[a].p, 1);
   p = find_new_child(kstep_tasks[a].p);
@@ -115,7 +115,7 @@ static bool op_task_fork(int a, int b, int c) {
 static bool op_task_pin(int a, int b, int c) {
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  if (!task_running(kstep_tasks[a].p))
+  if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when pinning", a);
   kstep_task_pin(kstep_tasks[a].p, b, c);
   return true;
@@ -127,7 +127,7 @@ static bool op_task_fifo(int a, int b, int c) {
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
 
-  if (!task_running(kstep_tasks[a].p))
+  if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when setting FIFO", a);
   // Move the task back to the root cgroup, otherwise the set_schedprio will fail
   kstep_cgroup_add_task("", kstep_tasks[a].p->pid);
@@ -142,7 +142,7 @@ static bool op_task_cfs(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  if (!task_running(kstep_tasks[a].p))
+  if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when setting CFS", a);
   kstep_task_cfs(kstep_tasks[a].p);
   return true;
@@ -153,7 +153,7 @@ static bool op_task_pause(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  if (!task_running(kstep_tasks[a].p))
+  if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when pausing", a);
   kstep_task_pause(kstep_tasks[a].p);
   return true;
@@ -174,7 +174,7 @@ static bool op_task_set_prio(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  if (!task_running(kstep_tasks[a].p))
+  if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when setting priority", a);
   if (b < -20 || b > 19)
     return false;
@@ -326,7 +326,7 @@ static const char op_strs[OP_TYPE_NR][30] = {
 static bool op_task_state_ready(enum kstep_op_type type, struct task_struct *p) {
   if (type == OP_TASK_WAKEUP)
     return p->__state != TASK_RUNNING;           /* task must be blocked/dequeued */
-  return task_running(p);             /* all other signal ops need on-cpu */
+  return kstep_task_running(p);             /* all other signal ops need on-cpu */
 }
 
 static bool is_task_signal_op(enum kstep_op_type type) {
@@ -344,7 +344,7 @@ static void print_state(void) {
     struct task_struct *p = kstep_tasks[i].p;
     if (!p)
       continue;
-    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d\n", i, p->pid, task_running(p), p->__state, task_cpu(p));
+    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d\n", i, p->pid, kstep_task_running(p), p->__state, task_cpu(p));
   }
 }
 
@@ -382,7 +382,7 @@ void kstep_write_state(struct file *f, bool executed) {
     if (!p)
       continue;
     u8 state;
-    if (task_running(p))
+    if (kstep_task_running(p))
       state = 2;
     else if (p->__state == TASK_RUNNING)
       state = 1;

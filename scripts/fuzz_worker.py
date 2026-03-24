@@ -229,9 +229,9 @@ def worker_main(
                         error_category = "fail_log"
                         logger.error(f"Worker {worker_id}: Detected 'fail' or 'warn' in log file.")
             
-        # if error is None:
-        #     error = "None"
-        #     error_category = "None"
+        if error is None:
+            error = "None"
+            error_category = "None"
 
         result_queue.put(WorkResult(
             worker_id=worker_id,
