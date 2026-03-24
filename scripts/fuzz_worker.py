@@ -29,16 +29,17 @@ _CRASH_MARKERS = [
 ]
 
 
-def _send_op(logger: logging.Logger, sock, sf, gen, op: int, a: int, b: int, c: int) -> None:
+def _send_op(logger: logging.Logger, sock, sf, gen, op: int, a: int, b: int, c: int) -> bool:
     """Send one op to kmod, read back task state, and update gen. Raises on failure."""
     sock.sendall(f"{op},{a},{b},{c}\n".encode())
     logger.debug(f"SEND OP: {op},{a},{b},{c}")
-    task_states = read_kmod_state(sf)
-    if task_states is None:
+    state = read_kmod_state(sf)
+    if state is None:
         sock.sendall(b"EXIT\n")
         raise RuntimeError("Failed to read task states")
     logger.debug(f"Received task states")
-    gen.update_from_kmod(task_states)
+    gen.update_from_kmod(state.task_states)
+    return state.executed
 
 
 def _check_for_crash(log_file: Path) -> bool:
@@ -108,7 +109,9 @@ def worker_main(
 
             sock.settimeout(60.0)
             sf = sock.makefile("rb")
-            read_kmod_state(sf)  # kmod signals readiness; result unused, gen not yet initialized
+            state = read_kmod_state(sf)  # kmod signals readiness; result unused, gen not yet initialized
+            if state is None:
+                raise RuntimeError("kmod socket closed before ready signal")
 
             gen_seed = 0 if work.mode in ("replay", "mutate") else rng.randint(0, 2**32 - 1)
             gen = init_genstate(max_tasks=10, max_cgroups=10, cpus=driver.num_cpus, seed=gen_seed)
@@ -126,47 +129,48 @@ def worker_main(
                     prefix_len = len(work.ops)
 
                 for i, (op, a, b, c) in enumerate(work.ops[:prefix_len]):
-                    if not _op_matches_task_state(gen, (op, a, b, c)):
-                        for t in range(50):
-                            ops_executed.append((_TICK, 0, 0, 0))
-                            _send_op(logger, sock, sf, gen, _TICK, 0, 0, 0)
-                            logger.debug(f"REPLAY {i} retry tick {t}: task_state={gen.task_state}")
-                            if _op_matches_task_state(gen, (op, a, b, c)):
-                                break
-                        else:
-                            op_name = OP_TYPE_TO_NAME.get(op, str(op))
-                            actual = gen.task_state.get(a, "not_found")
-                            sock.sendall(b"EXIT\n")
-                            raise RuntimeError(
-                                f"replay mismatch at step {i} after 50 tick retries: "
-                                f"{op_name}(task={a}) task_state={actual!r}"
+                    for t in range(50):
+                        if _op_matches_task_state(gen, (op, a, b, c)):
+                            executed = _send_op(logger, sock, sf, gen, op, a, b, c)
+                            logger.debug(
+                                f"REPLAY {i}: op={op},{a},{b},{c} executed={executed} task_state={gen.task_state}"
                             )
-                    ops_executed.append((op, a, b, c))
-                    _send_op(logger, sock, sf, gen, op, a, b, c)
-                    replay_update_genstate(gen, op, a, b, c)
-                    logger.debug(f"REPLAY {i}: op={op},{a},{b},{c}  task_state={gen.task_state}")
+                            if executed:
+                                ops_executed.append((op, a, b, c))
+                                replay_update_genstate(gen, op, a, b, c)
+                                break
+
+                        if _send_op(logger, sock, sf, gen, _TICK, 0, 0, 0):
+                            ops_executed.append((_TICK, 0, 0, 0))
+                        logger.debug(f"REPLAY {i} retry tick {t}: task_state={gen.task_state}")
+                    else:
+                        op_name = OP_TYPE_TO_NAME.get(op, str(op))
+                        actual = gen.task_state.get(a, "not_found")
+                        sock.sendall(b"EXIT\n")
+                        raise RuntimeError(
+                            f"replay mismatch at step {i} after 50 tick retries: "
+                            f"{op_name}(task={a}) task_state={actual!r}"
+                        )
 
                 # After replaying the prefix, interactively generate new commands.
                 if work.mode == "mutate" and work.pivot_idx is not None:
                     for i in range(work.steps):
                         op, a, b, c = generate_next_command(gen)
-                        if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
-                            for _ in range(a):
-                                ops_executed.append((_TICK, 0, 0, 0))
-                        else:
+
+                        executed = _send_op(logger, sock, sf, gen, op, a, b, c)
+                        logger.debug(
+                            f"MUTATE-GEN {i}: op={op},{a},{b},{c} executed={executed} task_state={gen.task_state}"
+                        )
+                        if executed:
                             ops_executed.append((op, a, b, c))
-                        _send_op(logger, sock, sf, gen, op, a, b, c)
-                        logger.debug(f"MUTATE-GEN {i}: op={op},{a},{b},{c}  task_state={gen.task_state}")
             else:
                 for i in range(work.steps):
                     op, a, b, c = generate_next_command(gen)
-                    if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
-                        for _ in range(a):
-                            ops_executed.append((_TICK, 0, 0, 0))
-                    else:
+
+                    executed = _send_op(logger, sock, sf, gen, op, a, b, c)
+                    logger.debug(f"STEP {i}: executed={executed} task_state={gen.task_state}")
+                    if executed:
                         ops_executed.append((op, a, b, c))
-                    _send_op(logger, sock, sf, gen, op, a, b, c)
-                    logger.debug(f"STEP {i}: task_state={gen.task_state}")
 
 
             sock.sendall(b"EXIT\n")

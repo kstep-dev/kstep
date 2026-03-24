@@ -63,7 +63,9 @@ static struct task_struct *find_new_child(struct task_struct *parent) {
   for (int attempt = 0; attempt < 100; attempt++) {
     for_each_process(p) {
       if ((p->real_parent == parent || p->parent == parent) &&
-          strcmp(p->comm, TASK_READY_COMM) == 0 && !pid_known(p->pid))
+          // strcmp(p->comm, TASK_READY_COMM) == 0 && 
+          p->pid > parent->pid &&
+          !pid_known(p->pid))
         return p;
     }
     kstep_sleep();
@@ -334,7 +336,7 @@ static void print_state(void) {
     struct task_struct *p = kstep_tasks[i].p;
     if (!p)
       continue;
-    pr_info("Task %d %d: on_cpu=%d, state=%d\n", i, p->pid, p->on_cpu, p->__state);
+    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d\n", i, p->pid, p->on_cpu, p->__state, task_cpu(p));
   }
 }
 
@@ -350,19 +352,21 @@ static void execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   kstep_cov_disable();
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
+  print_state();
 }
 
-static u8 buf[1 + MAX_TASKS * 2 + 1];
+static u8 buf[1 + 1 + MAX_TASKS * 2 + 1];
 
-void kstep_write_state(struct file *f) {
-  /* Format: [OP_TYPE_NR] [id] [state] [id] [state] ... ['\n']
-   * OP_TYPE_NR is the marker byte; id and state are each one byte.
+void kstep_write_state(struct file *f, bool executed) {
+  /* Format: [OP_TYPE_NR] [executed] [id] [state] [id] [state] ... ['\n']
+   * OP_TYPE_NR is the marker byte; executed, id, and state are each one byte.
    * 2 = running on CPU, 1 = runnable on runqueue, 0 = blocked. */
   loff_t pos = 0;
   int len = 0;
-  print_state();
+  
 
   buf[len++] = OP_TYPE_NR;
+  buf[len++] = (u8) executed;
   for (int i = 0; i < MAX_TASKS; i++) {
     struct task_struct *p = kstep_tasks[i].p;
     if (!p)
@@ -381,17 +385,17 @@ void kstep_write_state(struct file *f) {
   kernel_write(f, buf, len, &pos);
 }
 
-void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
+bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
   if (type < 0 || type >= OP_TYPE_NR)
     panic("Operation failed: %d %d %d %d\n", type, a, b, c);
   if (!op_handlers[type]) {
     TRACE_INFO("Operation not implemented: %d\n", type);
-    return;
+    return false;
   }
 
   if (type == OP_TICK_REPEAT) {
     op_handlers[type](a, b, c);
-    return;
+    return true;
   }
 
   /*
@@ -407,9 +411,10 @@ void kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
       // directly return when task is not in the required state
       // then, the executor will send the latest state to the input generator
       TRACE_INFO("Task %d is not in the required state for operation %s", a, op_strs[type]);
-      return;
+      return false;
     }
   }
 
   execute_one_op(type, a, b, c);
+  return true;
 }
