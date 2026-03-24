@@ -132,45 +132,51 @@ def worker_main(
                     for t in range(50):
                         if _op_matches_task_state(gen, (op, a, b, c)):
                             executed = _send_op(logger, sock, sf, gen, op, a, b, c)
-                            logger.debug(
-                                f"REPLAY {i}: op={op},{a},{b},{c} executed={executed} task_state={gen.task_state}"
-                            )
+                            
                             if executed:
+                                logger.debug(
+                                    f"REPLAY {i}: op={op},{a},{b},{c} executed={executed} task_state={gen.task_state}"
+                                )
                                 ops_executed.append((op, a, b, c))
                                 replay_update_genstate(gen, op, a, b, c)
                                 break
-
-                        if _send_op(logger, sock, sf, gen, _TICK, 0, 0, 0):
-                            ops_executed.append((_TICK, 0, 0, 0))
-                        logger.debug(f"REPLAY {i} retry tick {t}: task_state={gen.task_state}")
+                        
+                        logger.debug(f"REPLAY {i} retry {t}: task_state={gen.task_state}")
+                        continue
+                            
                     else:
                         op_name = OP_TYPE_TO_NAME.get(op, str(op))
                         actual = gen.task_state.get(a, "not_found")
                         sock.sendall(b"EXIT\n")
                         raise RuntimeError(
-                            f"replay mismatch at step {i} after 50 tick retries: "
+                            f"replay mismatch at step {i} after 50 retries: "
                             f"{op_name}(task={a}) task_state={actual!r}"
                         )
 
                 # After replaying the prefix, interactively generate new commands.
                 if work.mode == "mutate" and work.pivot_idx is not None:
-                    for i in range(work.steps):
+                    i = 0
+                    while i < work.steps:
                         op, a, b, c = generate_next_command(gen)
 
                         executed = _send_op(logger, sock, sf, gen, op, a, b, c)
-                        logger.debug(
-                            f"MUTATE-GEN {i}: op={op},{a},{b},{c} executed={executed} task_state={gen.task_state}"
-                        )
+                        
                         if executed:
+                            logger.debug(
+                                f"MUTATE-GEN {i}: op={op},{a},{b},{c} executed={executed} task_state={gen.task_state}"
+                            )
                             ops_executed.append((op, a, b, c))
+                            i += 1
             else:
-                for i in range(work.steps):
+                i = 0
+                while i < work.steps:
                     op, a, b, c = generate_next_command(gen)
 
                     executed = _send_op(logger, sock, sf, gen, op, a, b, c)
-                    logger.debug(f"STEP {i}: executed={executed} task_state={gen.task_state}")
                     if executed:
+                        logger.debug(f"STEP {i}: executed={executed} task_state={gen.task_state}")
                         ops_executed.append((op, a, b, c))
+                        i += 1
 
 
             sock.sendall(b"EXIT\n")
@@ -222,6 +228,10 @@ def worker_main(
                         error = "fail_log"
                         error_category = "fail_log"
                         logger.error(f"Worker {worker_id}: Detected 'fail' or 'warn' in log file.")
+            
+        # if error is None:
+        #     error = "None"
+        #     error_category = "None"
 
         result_queue.put(WorkResult(
             worker_id=worker_id,
