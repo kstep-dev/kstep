@@ -51,10 +51,10 @@ def run_test(
     gen = init_genstate(max_tasks=max_tasks, max_cgroups=max_cgroups, cpus=num_cpus, seed=seed)
 
     # Wait for the initial STATE from the kmod, signalling it is ready.
-    task_states = read_kmod_state(sf)
-    if task_states is None:
+    state = read_kmod_state(sf)
+    if state is None:
         raise EOFError("kmod socket closed before ready signal")
-    print(f"kmod ready: {task_states}")
+    print(f"kmod ready: {state.task_states}")
 
     seq = InputSeq()
     for _ in range(steps):
@@ -65,10 +65,10 @@ def run_test(
         else:
             seq.append((op, a, b, c))
         sock.sendall(f"{op},{a},{b},{c}\n".encode())
-        task_states = read_kmod_state(sf)
-        if task_states is None:
+        state = read_kmod_state(sf)
+        if state is None:
             raise EOFError("kmod socket closed unexpectedly")
-        gen.update_from_kmod(task_states)
+        gen.update_from_kmod(state.task_states)
 
     sock.sendall(b"EXIT\n")
     sock.close()
@@ -109,7 +109,7 @@ def run_test(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--linux_version", type=str, default="v6.18")
+    parser.add_argument("--linux_version", type=str, default="master")
     parser.add_argument("--num_cpus", type=int, default=3)
     parser.add_argument("--steps", type=int, default=80)
     parser.add_argument("--max_tasks", type=int, default=10)

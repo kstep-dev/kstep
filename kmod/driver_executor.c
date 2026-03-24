@@ -41,8 +41,8 @@ static void parse_console_input(char *buf) {
   if (fields[0] < OP_TASK_CREATE || fields[0] >= OP_TYPE_NR)
     return;
 
-  kstep_execute_op(fields[0], fields[1], fields[2], fields[3]);
-  kstep_write_state(sock);
+  bool executed = kstep_execute_op(fields[0], fields[1], fields[2], fields[3]);
+  kstep_write_state(sock, executed);
 }
 
 static bool process_console_chunk(const char *buf, ssize_t nread,
@@ -80,8 +80,9 @@ static void run(void) {
   if (IS_ERR(sock))
     panic("Failed to open /dev/ttyS3");
 
-  /* Signal to Python that the kmod is ready */
-  kstep_write_state(sock);
+  /* Signal to Python that the kmod is ready. The executed bit is ignored for
+   * the initial handshake, so keep it non-zero to avoid an all-zero payload. */
+  kstep_write_state(sock, true);
 
   while (true) {
     char buf[256];
@@ -99,5 +100,5 @@ KSTEP_DRIVER_DEFINE {
   .name = "executor",
   .setup = setup,
   .run = run,
-  .step_interval_us = 1000,
+  .step_interval_us = 10000,
 };

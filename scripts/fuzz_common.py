@@ -14,17 +14,41 @@ Ops = list[tuple[int, int, int, int]]
 OP_TYPE_NR = 16
 
 
-def read_kmod_state(sf) -> Optional[list[dict]]:
-    """Read state from kmod socket, discarding TTY echo.
-    Returns list of {"id": int, "state": int} dicts, or None if socket closed."""
+@dataclass
+class KmodState:
+    task_states: list[dict]
+    executed: bool
+
+
+def _read_frame(sf) -> Optional[bytes]:
+    """Read one newline-terminated frame from the kmod stream."""
+    buf = bytearray()
     while True:
-        line = sf.readline()
+        ch = sf.read(1)
+        if not ch:
+            return None
+        buf += ch
+        if ch == b"\n":
+            return bytes(buf)
+
+
+def read_kmod_state(sf) -> Optional[KmodState]:
+    """Read state from kmod socket, discarding TTY echo.
+    Returns task states plus an executed flag, or None if socket closed."""
+    while True:
+        line = _read_frame(sf)
         if not line:
             return None
         if line[0] == OP_TYPE_NR:
-            payload = line[1:-1]  # strip marker byte and trailing '\n'
-            return [{"id": payload[i], "state": payload[i + 1]}
-                    for i in range(0, len(payload), 2)]
+            payload = line[1:-1]
+            if not payload:
+                return KmodState(task_states=[], executed=False)
+            if (len(payload) - 1) % 2 != 0:
+                continue
+            executed = bool(payload[0])
+            task_states = [{"id": payload[i], "state": payload[i + 1]}
+                           for i in range(1, len(payload), 2)]
+            return KmodState(task_states=task_states, executed=executed)
 
 
 def connect_to_kmod(sock_file: Path, timeout: float = 10.0, retries: int = 200) -> socket.socket:

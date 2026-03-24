@@ -24,7 +24,7 @@ enum kstep_op_type {
   OP_TYPE_NR,
 };
 
-void kstep_execute_op(enum kstep_op_type type, int a, int b, int c);
-void kstep_write_state(struct file *f);
+bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c);
+void kstep_write_state(struct file *f, bool executed);
 
 #endif
