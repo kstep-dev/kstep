@@ -5,7 +5,7 @@
 #include "driver.h"
 #include "internal.h"
 #include "op_handler.h"
-#include "user.h"
+#include "linux/sched.h"
 
 #define MAX_TASKS 1024
 #define MAX_CGROUPS 1024
@@ -58,6 +58,14 @@ static bool pid_known(pid_t pid) {
   return false;
 }
 
+static bool kstep_task_running(struct task_struct * p) {
+#ifdef TIF_NEED_RESCHED_LAZY
+  return p->on_cpu && !test_tsk_thread_flag(p, TIF_NEED_RESCHED_LAZY) && !test_tsk_thread_flag(p, TIF_NEED_RESCHED);
+#else
+  return p->on_cpu && !test_tsk_thread_flag(p, TIF_NEED_RESCHED);
+#endif
+}
+
 static struct task_struct *find_new_child(struct task_struct *parent) {
   struct task_struct *p;
   for (int attempt = 0; attempt < 100; attempt++) {
@@ -70,7 +78,7 @@ static struct task_struct *find_new_child(struct task_struct *parent) {
     }
     kstep_sleep();
   }
-  panic("No new child found for parent %d", parent->pid);
+    panic("No new child found for parent %d", parent->pid);
 }
 
 static bool op_task_create(int a, int b, int c) {
@@ -92,8 +100,8 @@ static bool op_task_fork(int a, int b, int c) {
   if (!kstep_tasks[a].p || kstep_tasks[b].p)
     return false;
 
-  if (kstep_tasks[a].p->on_cpu == false)
-    panic("Task %d is not on CPU when forking", a);
+  if (!kstep_task_running(kstep_tasks[a].p))
+      panic("Task %d is not on CPU when forking", a);
   kstep_task_fork(kstep_tasks[a].p, 1);
   p = find_new_child(kstep_tasks[a].p);
   if (!p)
@@ -107,7 +115,7 @@ static bool op_task_fork(int a, int b, int c) {
 static bool op_task_pin(int a, int b, int c) {
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  if (kstep_tasks[a].p->on_cpu == false)
+  if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when pinning", a);
   kstep_task_pin(kstep_tasks[a].p, b, c);
   return true;
@@ -119,7 +127,7 @@ static bool op_task_fifo(int a, int b, int c) {
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
 
-  if (kstep_tasks[a].p->on_cpu == false)
+  if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when setting FIFO", a);
   // Move the task back to the root cgroup, otherwise the set_schedprio will fail
   kstep_cgroup_add_task("", kstep_tasks[a].p->pid);
@@ -134,7 +142,7 @@ static bool op_task_cfs(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  if (kstep_tasks[a].p->on_cpu == false)
+  if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when setting CFS", a);
   kstep_task_cfs(kstep_tasks[a].p);
   return true;
@@ -145,7 +153,7 @@ static bool op_task_pause(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  if (kstep_tasks[a].p->on_cpu == false)
+  if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when pausing", a);
   kstep_task_pause(kstep_tasks[a].p);
   return true;
@@ -156,7 +164,7 @@ static bool op_task_wakeup(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  if (kstep_tasks[a].p->on_cpu == true)
+  if (kstep_tasks[a].p->__state == TASK_RUNNING)
     panic("Task %d is already on CPU when waking up", a);
   kstep_task_wakeup(kstep_tasks[a].p);
   return true;
@@ -166,7 +174,7 @@ static bool op_task_set_prio(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
     return false;
-  if (kstep_tasks[a].p->on_cpu == false)
+  if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when setting priority", a);
   if (b < -20 || b > 19)
     return false;
@@ -318,7 +326,7 @@ static const char op_strs[OP_TYPE_NR][30] = {
 static bool op_task_state_ready(enum kstep_op_type type, struct task_struct *p) {
   if (type == OP_TASK_WAKEUP)
     return p->__state != TASK_RUNNING;           /* task must be blocked/dequeued */
-  return p->on_cpu;             /* all other signal ops need on-cpu */
+  return kstep_task_running(p);             /* all other signal ops need on-cpu */
 }
 
 static bool is_task_signal_op(enum kstep_op_type type) {
@@ -336,7 +344,7 @@ static void print_state(void) {
     struct task_struct *p = kstep_tasks[i].p;
     if (!p)
       continue;
-    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d\n", i, p->pid, p->on_cpu, p->__state, task_cpu(p));
+    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d\n", i, p->pid, kstep_task_running(p), p->__state, task_cpu(p));
   }
 }
 
@@ -344,15 +352,17 @@ static void print_state(void) {
  * Try to send the head queued op for task @id if its required state is met.
  * Sends at most one op per call.
  */
-static void execute_one_op(enum kstep_op_type type, int a, int b, int c) {
+static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   kstep_cov_enable();
   pr_info("EXECOP: {\"op\": %d, \"a\": %d, \"b\": %d, \"c\": %d}\n", type, a, b, c);
   if (!op_handlers[type](a, b, c))
-    panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
+    // panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
+    return false;
   kstep_cov_disable();
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
   print_state();
+  return true;
 }
 
 static u8 buf[1 + 1 + MAX_TASKS * 2 + 1];
@@ -372,7 +382,7 @@ void kstep_write_state(struct file *f, bool executed) {
     if (!p)
       continue;
     u8 state;
-    if (p->on_cpu)
+    if (kstep_task_running(p))
       state = 2;
     else if (p->__state == TASK_RUNNING)
       state = 1;
@@ -415,6 +425,5 @@ bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
     }
   }
 
-  execute_one_op(type, a, b, c);
-  return true;
+  return execute_one_op(type, a, b, c);
 }
