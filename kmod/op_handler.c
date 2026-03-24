@@ -59,7 +59,11 @@ static bool pid_known(pid_t pid) {
 }
 
 static bool task_running(struct task_struct * p) {
+#ifdef TIF_NEED_RESCHED_LAZY
   return p->on_cpu && !test_tsk_thread_flag(p, TIF_NEED_RESCHED_LAZY) && !test_tsk_thread_flag(p, TIF_NEED_RESCHED);
+#else
+  return p->on_cpu && !test_tsk_thread_flag(p, TIF_NEED_RESCHED);
+#endif
 }
 
 static struct task_struct *find_new_child(struct task_struct *parent) {
