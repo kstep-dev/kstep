@@ -40,6 +40,7 @@ static void kstep_reset_runqueue(struct rq *rq) {
   KSYM_update_rq_clock(rq);
   rq->avg_idle = 2 * *KSYM_sysctl_sched_migration_cost;
   rq->max_idle_balance_cost = *KSYM_sysctl_sched_migration_cost;
+  rq->idle_stamp = INIT_TIME_NS;
   rq->nr_switches = 0;
   rq->next_balance = INITIAL_JIFFIES + nsecs_to_jiffies(INIT_TIME_NS);
 
