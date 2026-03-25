@@ -8,12 +8,22 @@
 #include "op_handler.h"
 
 #define MAX_LINE_LENGTH 1024
+#define WORK_CONSERVING_STATUS_PREFIX "WCB,"
 struct console_parse_state {
   char line_buf[MAX_LINE_LENGTH];
   size_t line_len;
 };
 static struct file *console;
 static struct file *sock;
+
+static void write_work_conserving_status(bool broken) {
+  char buf[16];
+  loff_t pos = 0;
+  int len = scnprintf(buf, sizeof(buf), WORK_CONSERVING_STATUS_PREFIX "%d\n",
+                      broken ? 1 : 0);
+
+  kernel_write(sock, buf, len, &pos);
+}
 
 static void parse_console_input(char *buf) {
   char *cursor;
@@ -70,6 +80,18 @@ static bool process_console_chunk(const char *buf, ssize_t nread,
 static void setup(void) {
   console = filp_open("/dev/ttyS1", O_RDONLY, 0);
   sock = filp_open("/dev/ttyS3", O_RDWR, 0);
+
+  kstep_cpu_set_capacity(1, SCHED_CAPACITY_SCALE);
+  kstep_cpu_set_capacity(2, SCHED_CAPACITY_SCALE / 2);
+  kstep_cpu_set_capacity(3, SCHED_CAPACITY_SCALE);
+  kstep_cpu_set_capacity(4, SCHED_CAPACITY_SCALE / 2);
+
+  kstep_topo_init();
+  const char *cls[] = {"0", "1-2", "1-2", "3-4", "3-4"};
+  kstep_topo_set_cls(cls, ARRAY_SIZE(cls));
+  kstep_topo_apply();
+
+  
   kstep_cov_init();
 }
 
@@ -89,8 +111,14 @@ static void run(void) {
     ssize_t nread = kernel_read(sock, buf, sizeof(buf), &pos);
     if (nread <= 0)
       continue;
-    if (process_console_chunk(buf, nread, &state))
+    if (process_console_chunk(buf, nread, &state)) {
+      bool broken;
+
+      kstep_tick_repeat(100);
+      broken = kstep_work_conserving_broken();
+      write_work_conserving_status(broken);
       break;
+    }
   }
 
   filp_close(sock, NULL);
@@ -100,5 +128,6 @@ KSTEP_DRIVER_DEFINE {
   .name = "executor",
   .setup = setup,
   .run = run,
+  .on_tick_end = kstep_output_nr_running,
   .step_interval_us = 10000,
 };

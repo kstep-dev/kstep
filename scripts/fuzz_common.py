@@ -12,6 +12,7 @@ Ops = list[tuple[int, int, int, int]]
 
 # Marker byte written by kstep_write_state
 OP_TYPE_NR = 16
+WORK_CONSERVING_PREFIX = b"WCB,"
 
 
 @dataclass
@@ -49,6 +50,21 @@ def read_kmod_state(sf) -> Optional[KmodState]:
             task_states = [{"id": payload[i], "state": payload[i + 1]}
                            for i in range(1, len(payload), 2)]
             return KmodState(task_states=task_states, executed=executed)
+
+
+def read_work_conserving_status(sf) -> Optional[bool]:
+    """Read the executor's final work-conserving status frame after EXIT."""
+    while True:
+        line = _read_frame(sf)
+        if not line:
+            return None
+        if not line.startswith(WORK_CONSERVING_PREFIX):
+            continue
+        payload = line[len(WORK_CONSERVING_PREFIX):-1].strip()
+        if payload == b"1":
+            return True
+        if payload == b"0":
+            return False
 
 
 def connect_to_kmod(sock_file: Path, timeout: float = 10.0, retries: int = 200) -> socket.socket:
@@ -89,6 +105,7 @@ class WorkResult:
     ops: Ops
     cov_file: Optional[Path]   # None when coverage is empty or on error
     log_file: Optional[Path]   # path to worker console log (for crash triage)
+    output_file: Optional[Path]   # path to json output
     debug_log_file: Optional[Path]   # path to worker debug log
     linux_name: str
     exec_time: float
