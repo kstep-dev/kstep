@@ -14,7 +14,14 @@ from pathlib import Path
 from typing import Optional
 
 from run import Driver, start_qemu
-from scripts.fuzz_common import Ops, WorkItem, WorkResult, connect_to_kmod, read_kmod_state
+from scripts.fuzz_common import (
+    Ops,
+    WorkItem,
+    WorkResult,
+    connect_to_kmod,
+    read_kmod_state,
+    read_work_conserving_status,
+)
 from scripts.gen_input_core import generate_next_command, init_genstate, _op_matches_task_state, replay_update_genstate
 from scripts.gen_input_ops import OP_NAME_TO_TYPE, OP_TYPE_TO_NAME
 
@@ -66,6 +73,7 @@ def worker_main(
     log_file  = fuzz_dir / f"worker_{worker_id}.log"
     sock_file = fuzz_dir / f"worker_{worker_id}.sock"
     worker_log = fuzz_dir / f"worker_{worker_id}.debug.log"
+    output_file = fuzz_dir / f"worker_{worker_id}.jsonl"
 
     # Set up worker-specific file logger
     logger = logging.getLogger(f"worker_{worker_id}")
@@ -107,7 +115,7 @@ def worker_main(
             except RuntimeError as e:
                 raise RuntimeError("Failed to connect to kmod socket") from e
 
-            sock.settimeout(60.0)
+            sock.settimeout(120.0)
             sf = sock.makefile("rb")
             state = read_kmod_state(sf)  # kmod signals readiness; result unused, gen not yet initialized
             if state is None:
@@ -179,6 +187,12 @@ def worker_main(
 
 
             sock.sendall(b"EXIT\n")
+            
+            work_conserving_broken = read_work_conserving_status(sf)
+            logger.info(f"EXIT status: work_conserving_broken={work_conserving_broken}")
+            if (work_conserving_broken):
+                error = "work_conserving"
+                error_category = "work conserving"
             sock.close()
             
             proc.wait(timeout=120)
@@ -234,6 +248,7 @@ def worker_main(
             ops=ops_executed,
             cov_file=result_cov,
             log_file=log_file if log_file.exists() else None,
+            output_file=output_file if output_file.exists else None,
             debug_log_file=worker_log if worker_log.exists() else None,
             linux_name=work.linux_name,
             exec_time=time.monotonic() - t0,

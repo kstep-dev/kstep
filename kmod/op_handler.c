@@ -348,6 +348,41 @@ static void print_state(void) {
   }
 }
 
+bool kstep_work_conserving_broken(void) {
+  struct cpumask idle_cpus;
+  int runnable_tasks = 0;
+  bool eligible_runnable = false;
+
+  cpumask_clear(&idle_cpus);
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct rq *rq = cpu_rq(cpu);
+
+    if (rq->nr_running < 0)
+      panic("invalid nr_running value");
+    if (rq->nr_running == 0)
+      cpumask_set_cpu(cpu, &idle_cpus);
+  }
+
+  for (int i = 0; i < MAX_TASKS; i++) {
+    struct task_struct *p = kstep_tasks[i].p;
+
+    if (!p || p->__state != TASK_RUNNING)
+      continue;
+
+    runnable_tasks++;
+    if (cpumask_intersects(p->cpus_ptr, &idle_cpus)) {
+      eligible_runnable = true;
+      TRACE_INFO("Runnable task %d (%d) can run on idle CPUs %*pbl",
+                 i, p->pid, cpumask_pr_args(p->cpus_ptr));
+    }
+  }
+
+  TRACE_INFO("work_conserving_check: runnable=%d idle_cpus=%*pbl eligible=%d",
+             runnable_tasks, cpumask_pr_args(&idle_cpus), eligible_runnable);
+
+  return runnable_tasks > 4 && !cpumask_empty(&idle_cpus) && eligible_runnable;
+}
+
 /*
  * Try to send the head queued op for task @id if its required state is met.
  * Sends at most one op per call.

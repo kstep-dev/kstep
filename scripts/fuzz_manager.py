@@ -55,6 +55,9 @@ def _save_crash(result: WorkResult, fuzz_dir: Path) -> Path:
     if result.debug_log_file and result.debug_log_file.exists():
         shutil.copy2(result.debug_log_file, crash_dir / "worker.debug.log")
 
+    if result.output_file and result.output_file.exists():
+        shutil.copy2(result.output_file, crash_dir / "worker.jsonl")
+    
     return crash_dir
 
 # ──────────────────────────────────────────────────────────────────────────────

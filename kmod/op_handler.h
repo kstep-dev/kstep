@@ -26,5 +26,6 @@ enum kstep_op_type {
 
 bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c);
 void kstep_write_state(struct file *f, bool executed);
+bool kstep_work_conserving_broken(void);
 
 #endif
