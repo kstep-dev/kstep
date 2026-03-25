@@ -103,6 +103,81 @@ void kstep_sysctl_write(const char *name, const char *fmt, ...) {
   kstep_write(path, data, size);
 }
 
+static const char *const kstep_sched_feat_names[] = {
+#define SCHED_FEAT(name, enabled) [__SCHED_FEAT_##name] = #name,
+#include <kernel/sched/features.h>
+#undef SCHED_FEAT
+};
+
+static unsigned int *kstep_sysctl_sched_features_ptr(void) {
+  static unsigned int *ptr;
+
+  if (!ptr)
+    ptr = kstep_ksym_lookup("sysctl_sched_features");
+  if (!ptr)
+    panic("failed to resolve sysctl_sched_features");
+  return ptr;
+}
+
+static int kstep_sched_feat_index(const char *name) {
+  for (int i = 0; i < __SCHED_FEAT_NR; i++) {
+    if (kstep_sched_feat_names[i] && !strcmp(kstep_sched_feat_names[i], name))
+      return i;
+  }
+  return -1;
+}
+
+static void kstep_sched_feat_set(const char *name, bool enabled) {
+  unsigned int *sysctl = kstep_sysctl_sched_features_ptr();
+  unsigned int mask;
+  int idx = kstep_sched_feat_index(name);
+
+  if (idx < 0)
+    return;
+
+  mask = 1U << idx;
+  if (!!(*sysctl & mask) == enabled)
+    return;
+
+  if (enabled) {
+    *sysctl |= mask;
+  } else {
+    *sysctl &= ~mask;
+  }
+
+  TRACE_INFO("%s sched feature %s", enabled ? "Enabled" : "Disabled", name);
+}
+
+void kstep_sched_feat_write(const char *fmt, ...) {
+  char data[MAX_DATA_LENGTH] = {0};
+  char *name = data;
+  bool enabled = true;
+
+  va_list args;
+  va_start(args, fmt);
+  int size = vsnprintf(data, sizeof(data), fmt, args);
+  va_end(args);
+  if (size <= 0 || size >= sizeof(data))
+    panic("failed to format sched feature write");
+
+  if (!strncmp(name, "NO_", 3)) {
+    enabled = false;
+    name += 3;
+  }
+
+  kstep_sched_feat_set(name, enabled);
+}
+
+void kstep_sched_feat_enable(const char *name) {
+  kstep_sched_feat_write("%s", name);
+  kstep_sleep();
+}
+
+void kstep_sched_feat_disable(const char *name) {
+  kstep_sched_feat_write("NO_%s", name);
+  kstep_sleep();
+}
+
 void kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
                         ...) {
   char data[MAX_DATA_LENGTH] = {0};

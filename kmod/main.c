@@ -33,6 +33,8 @@ static int __init kstep_main(void) {
   kstep_jiffies_init();
   kstep_sched_clock_init();
 
+  kstep_sched_feat_disable("NI_RANDOM");
+
   // Reset the scheduler state to initial state
   kstep_reset_runqueues();
   kstep_reset_cpumask();

@@ -80,6 +80,9 @@ void kstep_task_kernel_wakeup(struct task_struct *p);
 void kstep_write(const char *path, const char *buf, size_t size);
 void kstep_mkdir(const char *dir);
 void kstep_sysctl_write(const char *name, const char *fmt, ...);
+void kstep_sched_feat_write(const char *fmt, ...);
+void kstep_sched_feat_enable(const char *name);
+void kstep_sched_feat_disable(const char *name);
 void kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
                         ...);
 void kstep_cgroup_create(const char *name);
