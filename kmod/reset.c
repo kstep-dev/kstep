@@ -97,3 +97,18 @@ void kstep_reset_cpumask(void) {
   TRACE_INFO("Reset cpumask");
 #endif
 }
+
+// TODO: disable the dlserver for now
+void kstep_reset_dl_server(void) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+  KSYM_IMPORT(dl_server_apply_params);
+  for (int cpu = 1; cpu <  num_online_cpus(); cpu++) {
+    u64 runtime =  0 * NSEC_PER_MSEC;
+		u64 period = 1000 * NSEC_PER_MSEC;
+    struct rq * rq = cpu_rq(cpu);
+		struct sched_dl_entity * dl_se = &rq->fair_server;
+    
+    KSYM_dl_server_apply_params(dl_se, runtime, period, 1);
+  }
+#endif
+}

@@ -39,6 +39,7 @@ static int __init kstep_main(void) {
   kstep_reset_runqueues();
   kstep_reset_cpumask();
   kstep_reset_tasks();
+  kstep_reset_dl_server();
 
   TRACE_INFO("Running driver %s", kstep_driver->name);
 
