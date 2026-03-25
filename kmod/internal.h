@@ -45,6 +45,7 @@ void kstep_reset_runqueues(void);
 void kstep_reset_cpumask(void);
 void kstep_reset_tasks(void);
 void kstep_reset_task(struct task_struct *p);
+void kstep_reset_dl_server(void);
 
 // isolation.c
 void kstep_disable_workqueue(void);

@@ -31,7 +31,10 @@ from scripts.input_seq import InputSeq
 
 def _save_crash(result: WorkResult, fuzz_dir: Path) -> Path:
     """Persist a crashing input and its console log, routed by error category."""
-    category = result.error_category or "other"
+    if result.error:
+        category = result.error_category or "other"
+    else:
+        category = "None"
     category_dir = fuzz_dir / "crashes" / category
     category_dir.mkdir(parents=True, exist_ok=True)
 
@@ -206,38 +209,40 @@ def run_manager(
                     f"msg={result.error!r}  "
                     f"saved={crash_dir}"
                 )
+            else:
+                _save_crash(result, fuzz_dir)
 
-            elif result.cov_file:
-                signal_records = cov_parse(result.cov_file)
-                corpus.update_pc_symbolize(signal_records, result.linux_name)
+                if result.cov_file:
+                    signal_records = cov_parse(result.cov_file)
+                    corpus.update_pc_symbolize(signal_records, result.linux_name)
 
-                seq = InputSeq()
-                for op_tuple in result.ops:
-                    seq.append(op_tuple)
+                    seq = InputSeq()
+                    for op_tuple in result.ops:
+                        seq.append(op_tuple)
 
-                new_signals = corpus.analyze_new_signals(
-                    seq=seq,
-                    signal_records=signal_records,
-                    linux_name=result.linux_name,
-                )
-                if new_signals:
-                    cmd_meta = corpus.analyze_per_action_signals(
+                    new_signals = corpus.analyze_new_signals(
                         seq=seq,
                         signal_records=signal_records,
-                        new_signals=set(new_signals),
                         linux_name=result.linux_name,
                     )
-                    productive_cmd_ids = [
-                        entry["cmd_id"] for entry in cmd_meta if entry["new_edges"]
-                    ]
-                    n_new = len(new_signals)
-                    total_new_signals += n_new
-                    interval_signals  += n_new
-                    seed = pool.add(result.ops, n_new, productive_cmd_ids)
-                    logging.info(
-                        f"[+] seed #{seed.seed_id}: +{n_new} new  "
-                        f"total={len(corpus.seen_signals)}  corpus={len(pool)}"
-                    )
+                    if new_signals:
+                        cmd_meta = corpus.analyze_per_action_signals(
+                            seq=seq,
+                            signal_records=signal_records,
+                            new_signals=set(new_signals),
+                            linux_name=result.linux_name,
+                        )
+                        productive_cmd_ids = [
+                            entry["cmd_id"] for entry in cmd_meta if entry["new_edges"]
+                        ]
+                        n_new = len(new_signals)
+                        total_new_signals += n_new
+                        interval_signals  += n_new
+                        seed = pool.add(result.ops, n_new, productive_cmd_ids)
+                        logging.info(
+                            f"[+] seed #{seed.seed_id}: +{n_new} new  "
+                            f"total={len(corpus.seen_signals)}  corpus={len(pool)}"
+                        )
 
             # Immediately replace the consumed slot
             _put_task_interruptibly(_next_work(linux_name, steps, pool, fresh_ratio, mutate_ratio, rng))

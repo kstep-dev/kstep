@@ -142,7 +142,6 @@ def worker_main(
                                 break
                         
                         logger.debug(f"REPLAY {i} retry {t}: task_state={gen.task_state}")
-                        continue
                             
                     else:
                         op_name = OP_TYPE_TO_NAME.get(op, str(op))
@@ -229,9 +228,6 @@ def worker_main(
                         error_category = "fail_log"
                         logger.error(f"Worker {worker_id}: Detected 'fail' or 'warn' in log file.")
             
-        if error is None:
-            error = "None"
-            error_category = "None"
 
         result_queue.put(WorkResult(
             worker_id=worker_id,
