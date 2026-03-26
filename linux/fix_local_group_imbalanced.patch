@@ -1,0 +1,29 @@
+From 92a7dde5254c7dee18c215b16dfd9bb82ab179a7 Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Wed, 25 Mar 2026 22:46:53 -0500
+Subject: [PATCH] fix_local_group_imbalanced
+
+---
+ kernel/sched/fair.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index bf948db905ed..7db2ae27a9d4 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -11260,6 +11260,12 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
+ 		return;
+ 	}
+ 
++	if (local->group_type == group_imbalanced && env->idle) {
++		env->migration_type = migrate_task;
++		env->imbalance = 1;
++		return;
++	}
++
+ 	/*
+ 	 * Try to use spare capacity of local group without overloading it or
+ 	 * emptying busiest.
+-- 
+2.43.0
+
