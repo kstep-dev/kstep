@@ -20,9 +20,15 @@ def parse_nr_running(path: Path) -> pd.DataFrame:
 
 def parse_lb_events(path: Path, cpus: list[int], driver: str) -> pd.DataFrame:
     df = parse_jsonl(path, "load_balance")
+    if df.empty:
+        return pd.DataFrame(columns=["timestamp", "dst_cpu", "name"])
+    required_cols = {"timestamp", "dst_cpu", "name"}
+    if not required_cols.issubset(df.columns):
+        return pd.DataFrame(columns=["timestamp", "dst_cpu", "name"])
     df = df[df["timestamp"] != 0]
     df["dst_cpu"] -= min(cpus)
-    df = df[df["name"] == "MC"]
+    if driver in {"even_idle_cpu", "local_group_imbalance"}:
+        df = df[df["name"] == "MC"]
     return df
 
 
@@ -64,10 +70,12 @@ def plot_color_matrix_with_lb(
         ax.set_xlabel("Time (ms)", labelpad=0.5, fontsize=13)
 
     # ----- Plot dots for lb events -----
+    if lb_events.empty:
+        return
     ax.scatter(
         lb_events["timestamp"],
         lb_events["dst_cpu"],
-        s=10 if driver == "even_idle_cpu" else 30,
+        s=10 if driver in {"even_idle_cpu", "local_group_imbalance"} else 30,
         c="#FF9013",
         marker="o",
         zorder=5,
@@ -78,7 +86,7 @@ def plot_legend(fig, driver, cmap):
     handles = []
     labels = []
     handles.append(mlines.Line2D([], [], color="#FF9013", marker="o", linestyle="None"))
-    if driver == "even_idle_cpu":
+    if driver in {"even_idle_cpu", "local_group_imbalance"}:
         labels.append("Balance \nacross\n2-CPU group\n")
     else:
         labels.append("Balance \nin 4-CPU\ndomain\n")
