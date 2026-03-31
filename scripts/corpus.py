@@ -71,7 +71,7 @@ class SignalCorpus:
             "linux_name": linux_name,
         }
 
-        if output_path == None:
+        if output_path is None:
             output_path = CORPUS_DIR / f"{seq.digest()}.json"
         print(f"Wrote {len(new)} new edges to {output_path}")
         with open(output_path, "w", encoding="utf-8") as f:
@@ -135,7 +135,7 @@ class SignalCorpus:
                         new_signals.remove(sig)
 
         # Dump the per-action new signals to the corpus directory
-        if output_path == None:
+        if output_path is None:
             output_path = CORPUS_DIR / f"{seq.digest()}_per_action.json" 
         print(f"Wrote {len(cmd_meta)} per-action new edges to {output_path}")
         with open(output_path, "w", encoding="utf-8") as f:

@@ -21,6 +21,11 @@ LATEST_OUTPUT = DATA_DIR / "latest.jsonl"
 LATEST_COV = DATA_DIR / "latest.cov"
 LATEST_COV_JSON = DATA_DIR / "latest.cov.json"
 
+FUZZ_DIR = DATA_DIR / "fuzz"
+FUZZ_SUCCESS_DIR = FUZZ_DIR / "success"
+FUZZ_ERROR_DIR = FUZZ_DIR / "error"
+FUZZ_CORPUS_DIR = FUZZ_DIR / "corpus"
+
 
 def update_latest(latest_file: Path, new_file: Path):
     assert latest_file in (
