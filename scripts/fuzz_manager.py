@@ -98,6 +98,8 @@ class FuzzManager:
 
         paths = worker_paths(result.worker_id)
 
+        # The worker may fail before all artifacts are produced, so keep crash
+        # preservation best-effort and copy only the files that exist.
         if paths.log_file and paths.log_file.exists():
             shutil.copy2(paths.log_file, target_dir / "worker.log")
         if paths.debug_log_file and paths.debug_log_file.exists():
@@ -126,6 +128,8 @@ class FuzzManager:
                     seed_id = seed.seed_id,
                     pivot_idx = pivot_idx,
                 )
+            # Seeds without productive commands cannot drive tick-insertion
+            # mutation, so fall back to a plain replay instead of failing.
             logging.warning("Selected pivot idx is None")
         # replay mode
         return WorkItem(mode="replay", steps=0, ops=seed.ops, seed_id=seed.seed_id)
@@ -181,6 +185,8 @@ class FuzzManager:
 
     
     def _put_task(self, item: Optional[WorkItem]) -> bool:
+        # `None` is the poison pill used during shutdown, so it must still be
+        # enqueueable after `shutdown_event` is set.
         if item is None or not self.shutdown_event.is_set():
             try:
                 self.task_queue.put(item, timeout=0.5)
@@ -218,6 +224,8 @@ class FuzzManager:
         self._save_test(result)
         paths = worker_paths(result.worker_id)
 
+        # Successful executions can still produce no coverage, for example when
+        # QEMU exits early or the cov stream stays empty.
         if not (paths.cov_file.exists() and paths.cov_file.stat().st_size > 0):
             logging.warning("Success test does not have cov file")
             return
