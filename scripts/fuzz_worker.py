@@ -21,6 +21,7 @@ from scripts.fuzz_common import (
     connect_to_kmod,
     read_kmod_state,
     read_work_conserving_status,
+    worker_paths,
 )
 from scripts.gen_input_core import generate_next_command, init_genstate, _op_matches_task_state, replay_update_genstate
 from scripts.gen_input_ops import OP_NAME_TO_TYPE, OP_TYPE_TO_NAME
@@ -44,7 +45,7 @@ def _send_op(logger: logging.Logger, sock, sf, gen, op: int, a: int, b: int, c: 
     if state is None:
         sock.sendall(b"EXIT\n")
         raise RuntimeError("Failed to read task states")
-    logger.debug(f"Received task states")
+    logger.debug("Received task states")
     gen.update_from_kmod(state.task_states)
     return state.executed
 
@@ -63,23 +64,20 @@ def worker_main(
     task_queue: "mp.Queue[Optional[WorkItem]]",
     result_queue: "mp.Queue[WorkResult]",
     driver: Driver,
-    fuzz_dir: Path,
+    linux_name: str,
     qemu_cpus: Optional[str] = None,
 ) -> None:
     """Worker loop: run QEMU instances and report results to the manager."""
     signal.signal(signal.SIGINT, signal.SIG_IGN)   # manager owns shutdown
 
     rng = random.Random(os.getpid() ^ (worker_id + 1) * 0x9E3779B9)
-    log_file  = fuzz_dir / f"worker_{worker_id}.log"
-    sock_file = fuzz_dir / f"worker_{worker_id}.sock"
-    worker_log = fuzz_dir / f"worker_{worker_id}.debug.log"
-    output_file = fuzz_dir / f"worker_{worker_id}.jsonl"
+    paths = worker_paths(worker_id)
 
     # Set up worker-specific file logger
     logger = logging.getLogger(f"worker_{worker_id}")
     logger.setLevel(logging.DEBUG)
     logger.propagate = False  # Don't propagate to root logger (stdout)
-    handler = logging.FileHandler(worker_log, mode="w")
+    handler = logging.FileHandler(paths.debug_log_file, mode="w")
     handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
     logger.addHandler(handler)
 
@@ -88,10 +86,9 @@ def worker_main(
         if work is None:        # poison pill
             break
 
-        sock_file.unlink(missing_ok=True)
+        paths.sock_file.unlink(missing_ok=True)
         t0 = time.monotonic()
         ops_executed: Ops = []
-        result_cov: Optional[Path] = None
         error: Optional[str] = None
         error_category: Optional[str] = None
         proc = None
@@ -102,16 +99,16 @@ def worker_main(
 
             proc = start_qemu(
                 driver=driver,
-                linux_name=work.linux_name,
-                log_file=log_file,
-                sock_file=sock_file,
+                linux_name=linux_name,
+                log_file=paths.log_file,
+                sock_file=paths.sock_file,
                 quiet=True,
                 cpu_affinity=qemu_cpus,
             )
 
             # QEMU uses wait=on and blocks until we connect; retry until ready.
             try:
-                sock = connect_to_kmod(sock_file, timeout=10.0, retries=200)
+                sock = connect_to_kmod(paths.sock_file, timeout=10.0, retries=200)
             except RuntimeError as e:
                 raise RuntimeError("Failed to connect to kmod socket") from e
 
@@ -197,9 +194,9 @@ def worker_main(
             
             proc.wait(timeout=120)
 
-            cov_path = log_file.with_suffix(".cov")
-            if cov_path.exists() and cov_path.stat().st_size > 0:
-                result_cov = cov_path
+            # cov_path = paths.cov_file
+            # if cov_path.exists() and cov_path.stat().st_size > 0:
+            #     result_cov = cov_path
 
         except Exception as exc:
             if proc is not None:
@@ -210,7 +207,7 @@ def worker_main(
                     pass
             if isinstance(exc, subprocess.TimeoutExpired):
                 error_category = "timedout"
-            elif _check_for_crash(log_file):
+            elif _check_for_crash(paths.log_file):
                 error_category = "crash"
             elif "replay mismatch" in str(exc):
                 error_category = "retry_tick"
@@ -234,23 +231,27 @@ def worker_main(
                 error_category = "op_mismatch"
                 logger.error(f"Worker {worker_id}: {error}")
             else:
-                with log_file.open("r", errors="ignore") as lf:
+                with paths.log_file.open("r", errors="ignore") as lf:
                     log_content = lf.read()
                     log_content = log_content.lower()
                     if "fail" in log_content or "warn" in log_content:
                         error = "fail_log"
                         error_category = "fail_log"
                         logger.error(f"Worker {worker_id}: Detected 'fail' or 'warn' in log file.")
+                    # else:
+                    #     seq = input_seq_from_log(paths.log_file)
+                    #     seq2 = InputSeq()
+                    #     for op_tuple in ops_executed:
+                    #         seq.append(op_tuple)
+                    #     if seq != seq2:
+                    #         error = "op_corrupt"
+                    #         error_category = "op_corrupt"
             
+        
 
         result_queue.put(WorkResult(
             worker_id=worker_id,
             ops=ops_executed,
-            cov_file=result_cov,
-            log_file=log_file if log_file.exists() else None,
-            output_file=output_file if output_file.exists else None,
-            debug_log_file=worker_log if worker_log.exists() else None,
-            linux_name=work.linux_name,
             exec_time=time.monotonic() - t0,
             mode=work.mode,
             seed_id=work.seed_id,

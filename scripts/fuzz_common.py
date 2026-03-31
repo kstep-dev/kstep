@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
+from scripts.consts import FUZZ_DIR
 
 Ops = list[tuple[int, int, int, int]]
 
@@ -19,6 +20,24 @@ WORK_CONSERVING_PREFIX = b"WCB,"
 class KmodState:
     task_states: list[dict]
     executed: bool
+
+@dataclass(frozen=True)
+class WorkerPaths:
+    log_file: Path
+    sock_file: Path
+    debug_log_file: Path
+    output_file: Path
+    cov_file: Path
+
+
+def worker_paths(worker_id: int) -> WorkerPaths:
+    return WorkerPaths(
+        log_file = FUZZ_DIR / f"worker_{worker_id}.log",
+        sock_file = FUZZ_DIR / f"worker_{worker_id}.sock",
+        debug_log_file = FUZZ_DIR / f"worker_{worker_id}.debug.log",
+        output_file = FUZZ_DIR / f"worker_{worker_id}.jsonl",
+        cov_file = FUZZ_DIR / f"worker_{worker_id}.cov",
+    )
 
 
 def _read_frame(sf) -> Optional[bytes]:
@@ -93,7 +112,6 @@ class Seed:
 class WorkItem:
     mode: str           # "fresh" | "replay" | "mutate"
     steps: int          # used for "fresh" and for interactive generation in "mutate"
-    linux_name: str
     ops: Optional[Ops] = None         # used for "replay" / "mutate"
     seed_id: Optional[int] = None
     pivot_idx: Optional[int] = None   # "mutate": replay ops[0..pivot_idx], then generate interactively
@@ -103,11 +121,6 @@ class WorkItem:
 class WorkResult:
     worker_id: int
     ops: Ops
-    cov_file: Optional[Path]   # None when coverage is empty or on error
-    log_file: Optional[Path]   # path to worker console log (for crash triage)
-    output_file: Optional[Path]   # path to json output
-    debug_log_file: Optional[Path]   # path to worker debug log
-    linux_name: str
     exec_time: float
     mode: str = "fresh"        # "fresh" | "replay"
     seed_id: Optional[int] = None
@@ -121,6 +134,9 @@ class SeedPool:
         self._counter = 0
         self._next_idx = 0   # round-robin index
 
+    def next_seed_id(self) -> int:
+        return self._counter + 1
+    
     def add(self, ops: Ops, n_signals: int, productive_cmd_ids: Optional[list[int]] = None) -> Seed:
         seed = Seed(
             ops=ops,

@@ -28,7 +28,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from run import Driver, make_kstep
-from scripts.consts import DATA_DIR
+from scripts.consts import FUZZ_DIR
 from scripts.fuzz_manager import run_manager
 
 
@@ -65,12 +65,11 @@ def main() -> None:
                         help="In the demo mode, only run 1 test per worker")
     args = parser.parse_args()
 
-    fuzz_dir = DATA_DIR / "fuzz"
-    fuzz_dir.mkdir(parents=True, exist_ok=True)
+    FUZZ_DIR.mkdir(parents=True, exist_ok=True)
 
     # Set up file logging — all logging.* calls go to both console and this file.
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_path = fuzz_dir / f"fuzz_{timestamp}.log"
+    log_path = FUZZ_DIR / f"fuzz_{timestamp}.log"
     file_handler = logging.FileHandler(log_path)
     file_handler.setFormatter(logging.Formatter("[%(asctime)s] %(message)s", datefmt="%H:%M:%S"))
     logging.getLogger().addHandler(file_handler)
@@ -97,7 +96,6 @@ def main() -> None:
         driver=driver,
         linux_name=args.linux_name,
         steps=args.steps,
-        fuzz_dir=fuzz_dir,
         fresh_ratio=args.fresh_ratio,
         mutate_ratio=args.mutate_ratio,
         pin_cpus=args.pin_cpus,
