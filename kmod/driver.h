@@ -108,6 +108,7 @@ void kstep_topo_set_mc(const char *cpulists[], int size);
 void kstep_topo_set_pkg(const char *cpulists[], int size);
 void kstep_topo_set_node(const char *cpulists[], int size);
 void kstep_topo_apply(void);
+void kstep_topo_param_apply(void);
 void kstep_topo_print(void);
 void kstep_cpu_set_freq(int cpu, int scale);
 void kstep_cpu_set_capacity(int cpu, int scale);

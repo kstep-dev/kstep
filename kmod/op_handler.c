@@ -370,7 +370,7 @@ bool kstep_work_conserving_broken(void) {
       continue;
 
     runnable_tasks++;
-    if (cpumask_intersects(p->cpus_ptr, &idle_cpus)) {
+    if (cpumask_intersects(p->cpus_ptr, &idle_cpus) && task_rq(p)->nr_running > 1) {
       eligible_runnable = true;
       TRACE_INFO("Runnable task %d (%d) can run on idle CPUs %*pbl",
                  i, p->pid, cpumask_pr_args(p->cpus_ptr));

@@ -38,6 +38,7 @@ class Driver:
     params: Iterable[str] = ()
     num_cpus: int = 2
     mem_mb: int = 512
+    topology: Optional[str] = None
 
 
 def get_qemu_path() -> Path:
@@ -102,6 +103,8 @@ def start_qemu(
     # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
     boot_args += ["--"]
     boot_args += [f"driver={driver.name}"]
+    if driver.topology:
+        boot_args += [f"topology={driver.topology}"]
 
     if driver.params:
         boot_args.extend(driver.params)
@@ -258,6 +261,7 @@ def main():
     parser.add_argument("name", type=str, default=None, nargs="?")
     parser.add_argument("--num_cpus", type=int, default=None)
     parser.add_argument("--mem_mb", type=int, default=None)
+    parser.add_argument("--topology", type=str, default=None)
     parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 

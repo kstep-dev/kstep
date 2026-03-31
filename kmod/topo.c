@@ -1,6 +1,11 @@
 #include <linux/cpuset.h>
 
+#include "driver.h"
 #include "internal.h"
+
+#define EXECUTOR_TOPOLOGY_LEN 512
+static char executor_topology[EXECUTOR_TOPOLOGY_LEN] = "";
+module_param_string(topology, executor_topology, EXECUTOR_TOPOLOGY_LEN, 0644);
 
 KSYM_IMPORT_TYPED(struct sched_domain_topology_level *, sched_domain_topology);
 #define for_each_tl(tl) for (tl = *KSYM_sched_domain_topology; tl->mask; tl++)
@@ -191,6 +196,30 @@ void kstep_topo_set_node(const char *cpulists[], int size) {
   kstep_topo_set_level(KSTEP_TOPO_NODE, cpulists, size);
 }
 
+static void kstep_topo_set(const char *name, const char *cpulists[], int size) {
+  if (strcmp(name, "SMT") == 0) {
+    kstep_topo_set_smt(cpulists, size);
+    return;
+  }
+  if (strcmp(name, "CLS") == 0) {
+    kstep_topo_set_cls(cpulists, size);
+    return;
+  }
+  if (strcmp(name, "MC") == 0) {
+    kstep_topo_set_mc(cpulists, size);
+    return;
+  }
+  if (strcmp(name, "PKG") == 0) {
+    kstep_topo_set_pkg(cpulists, size);
+    return;
+  }
+  if (strcmp(name, "NODE") == 0) {
+    kstep_topo_set_node(cpulists, size);
+    return;
+  }
+  panic("Unknown topology level %s", name);
+}
+
 void kstep_topo_apply(void) {
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
   // https://elixir.bootlin.com/linux/v6.17.8/source/drivers/base/arch_topology.c#L205-L222
@@ -205,6 +234,61 @@ void kstep_topo_apply(void) {
 
   KSYM_IMPORT(rebuild_sched_domains);
   KSYM_rebuild_sched_domains();
+}
+
+/*
+ * Topology format:
+ *   <level>:<cpu-list>/<cpu-list>/... [+ <level>:<cpu-list>/...]
+ *
+ * Complete example:
+ *   "SMT:0/1-2/1-2/3-4/3-4+CLS:0/1-2/1-2/3-4/3-4+PKG:0-4/0-4/0-4/0-4/0-4"
+ *
+ * This applies the topology levels in order: smt -> cls -> pkg.
+ */
+void kstep_topo_param_apply(void) {
+  char topo_buf[EXECUTOR_TOPOLOGY_LEN];
+  char *cursor, *level_spec;
+
+  if (!executor_topology[0] || strcmp(executor_topology, "none") == 0) {
+    pr_info("executor: custom topology disabled\n");
+    return;
+  }
+
+  strscpy(topo_buf, executor_topology, sizeof(topo_buf));
+  cursor = topo_buf;
+
+  kstep_topo_init();
+  while ((level_spec = strsep(&cursor, "+")) != NULL) {
+    const char *cpulists[NR_CPUS];
+    char *name, *cpulist_spec, *cpulist;
+    int nr_cpulists = 0;
+
+    level_spec = strim(level_spec);
+    if (!*level_spec)
+      continue;
+
+    name = strsep(&level_spec, ":");
+    if (!name || !*name || !level_spec || !*level_spec)
+      panic("Invalid topology spec %s", executor_topology);
+
+    cpulist_spec = level_spec;
+    while ((cpulist = strsep(&cpulist_spec, "/")) != NULL) {
+      cpulist = strim(cpulist);
+      if (!*cpulist)
+        continue;
+      if (nr_cpulists >= NR_CPUS)
+        panic("Too many cpulists in topology spec %s", executor_topology);
+      cpulists[nr_cpulists++] = cpulist;
+    }
+
+    if (!nr_cpulists)
+      panic("Missing cpulists for topology level %s", name);
+
+    kstep_topo_set(name, cpulists, nr_cpulists);
+    TRACE_INFO("executor: applying topology %s (%d cpulists)\n", name, nr_cpulists);
+  }
+
+  kstep_topo_apply();
 }
 
 void kstep_cpu_set_freq(int cpu, int scale) {
