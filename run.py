@@ -261,6 +261,7 @@ def main():
     parser.add_argument("name", type=str, default=None, nargs="?")
     parser.add_argument("--num_cpus", type=int, default=None)
     parser.add_argument("--mem_mb", type=int, default=None)
+    parser.add_argument("--topology", type=str, default=None)
     parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 
