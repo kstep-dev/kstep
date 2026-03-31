@@ -46,8 +46,8 @@ def main() -> None:
     parser.add_argument(
         "--topology",
         type=str,
-        default="cls:0/1-2/1-2/3-4/3-4",
-        help="Executor topology passed as a module param, e.g. cls:0/1-2/1-2/3-4/3-4",
+        default="CLS:0/1-2/1-2/3-4/3-4",
+        help="Executor topology passed as a module param, e.g. CLS:0/1-2/1-2/3-4/3-4",
     )
     parser.add_argument("--workers", type=int,
                         default=1,

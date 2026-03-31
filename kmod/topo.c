@@ -197,23 +197,23 @@ void kstep_topo_set_node(const char *cpulists[], int size) {
 }
 
 static void kstep_topo_set(const char *name, const char *cpulists[], int size) {
-  if (strcmp(name, "smt") == 0) {
+  if (strcmp(name, "SMT") == 0) {
     kstep_topo_set_smt(cpulists, size);
     return;
   }
-  if (strcmp(name, "cls") == 0) {
+  if (strcmp(name, "CLS") == 0) {
     kstep_topo_set_cls(cpulists, size);
     return;
   }
-  if (strcmp(name, "mc") == 0) {
+  if (strcmp(name, "MC") == 0) {
     kstep_topo_set_mc(cpulists, size);
     return;
   }
-  if (strcmp(name, "pkg") == 0) {
+  if (strcmp(name, "PKG") == 0) {
     kstep_topo_set_pkg(cpulists, size);
     return;
   }
-  if (strcmp(name, "node") == 0) {
+  if (strcmp(name, "NODE") == 0) {
     kstep_topo_set_node(cpulists, size);
     return;
   }
@@ -241,7 +241,7 @@ void kstep_topo_apply(void) {
  *   <level>:<cpu-list>/<cpu-list>/... [+ <level>:<cpu-list>/...]
  *
  * Complete example:
- *   "smt:0/1-2/1-2/3-4/3-4+cls:0/1-2/1-2/3-4/3-4+pkg:0-4/0-4/0-4/0-4/0-4"
+ *   "SMT:0/1-2/1-2/3-4/3-4+CLS:0/1-2/1-2/3-4/3-4+PKG:0-4/0-4/0-4/0-4/0-4"
  *
  * This applies the topology levels in order: smt -> cls -> pkg.
  */
