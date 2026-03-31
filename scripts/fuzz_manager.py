@@ -49,7 +49,7 @@ class FuzzManager:
         self.pin_cpus = pin_cpus
         self.demo = demo
 
-        self.task_queue: "mp.Queue[Optional[WorkItem]]" = mp.Queue(maxsize=n_workers * 2)
+        self.task_queue: "mp.Queue[Optional[WorkItem]]" = mp.Queue(maxsize=n_workers * 4)
         self.result_queue: "mp.Queue[WorkResult]" = mp.Queue()
         self.shutdown_event = mp.Event()
         self.qemu_cpu_lists: list[Optional[str]] = [None] * n_workers
@@ -98,9 +98,14 @@ class FuzzManager:
 
         paths = worker_paths(result.worker_id)
 
-        shutil.copy2(paths.log_file, target_dir / "worker.log")
-        shutil.copy2(paths.debug_log_file, target_dir / "worker.debug.log")
-        shutil.copy2(paths.output_file, target_dir / "worker.jsonl")
+        # The worker may fail before all artifacts are produced, so keep crash
+        # preservation best-effort and copy only the files that exist.
+        if paths.log_file and paths.log_file.exists():
+            shutil.copy2(paths.log_file, target_dir / "worker.log")
+        if paths.debug_log_file and paths.debug_log_file.exists():
+            shutil.copy2(paths.debug_log_file, target_dir / "worker.debug.log")
+        if paths.output_file and paths.output_file.exists():
+            shutil.copy2(paths.output_file, target_dir / "worker.jsonl")
         
         return target_dir
     
@@ -115,14 +120,17 @@ class FuzzManager:
         assert seed is not None  # pool is non-empty (checked above)
         if r < self.fresh_ratio + self.mutate_ratio:
             pivot_idx = pick_pivot(seed.productive_cmd_ids, self.rng)
-            assert pivot_idx is not None
-            return WorkItem(
-                mode = "mutate",
-                steps = self.steps,
-                ops = seed.ops,
-                seed_id = seed.seed_id,
-                pivot_idx = pivot_idx,
-            )
+            if pivot_idx is not None:
+                return WorkItem(
+                    mode = "mutate",
+                    steps = self.steps,
+                    ops = seed.ops,
+                    seed_id = seed.seed_id,
+                    pivot_idx = pivot_idx,
+                )
+            # Seeds without productive commands cannot drive tick-insertion
+            # mutation, so fall back to a plain replay instead of failing.
+            logging.warning("Selected pivot idx is None")
         # replay mode
         return WorkItem(mode="replay", steps=0, ops=seed.ops, seed_id=seed.seed_id)
     
@@ -177,6 +185,8 @@ class FuzzManager:
 
     
     def _put_task(self, item: Optional[WorkItem]) -> bool:
+        # `None` is the poison pill used during shutdown, so it must still be
+        # enqueueable after `shutdown_event` is set.
         if item is None or not self.shutdown_event.is_set():
             try:
                 self.task_queue.put(item, timeout=0.5)
@@ -214,7 +224,11 @@ class FuzzManager:
         self._save_test(result)
         paths = worker_paths(result.worker_id)
 
-        assert paths.cov_file is not None
+        # Successful executions can still produce no coverage, for example when
+        # QEMU exits early or the cov stream stays empty.
+        if not (paths.cov_file.exists() and paths.cov_file.stat().st_size > 0):
+            logging.warning("Success test does not have cov file")
+            return
 
         signal_records = cov_parse(paths.cov_file)
         self.corpus.update_pc_symbolize(signal_records, self.linux_name)
