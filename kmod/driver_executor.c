@@ -81,17 +81,7 @@ static void setup(void) {
   console = filp_open("/dev/ttyS1", O_RDONLY, 0);
   sock = filp_open("/dev/ttyS3", O_RDWR, 0);
 
-  kstep_cpu_set_capacity(1, SCHED_CAPACITY_SCALE);
-  kstep_cpu_set_capacity(2, SCHED_CAPACITY_SCALE / 2);
-  kstep_cpu_set_capacity(3, SCHED_CAPACITY_SCALE);
-  kstep_cpu_set_capacity(4, SCHED_CAPACITY_SCALE / 2);
-
-  kstep_topo_init();
-  const char *cls[] = {"0", "1-2", "1-2", "3-4", "3-4"};
-  kstep_topo_set_cls(cls, ARRAY_SIZE(cls));
-  kstep_topo_apply();
-
-  
+  kstep_topo_param_apply();  
   kstep_cov_init();
 }
 

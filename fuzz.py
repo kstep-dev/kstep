@@ -27,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from run import Driver
+from run import Driver, make_kstep
 from scripts.consts import DATA_DIR
 from scripts.fuzz_manager import run_manager
 
@@ -39,16 +39,20 @@ def main() -> None:
     )
     parser.add_argument("--linux_name", required=True,
                         help="Linux build name, e.g. v6.18_test")
-    parser.add_argument("--driver", default="executor",
-                        help="kSTEP driver name")
-    parser.add_argument("--num_cpus", type=int, default=3,
+    parser.add_argument("--num_cpus", type=int, default=5,
                         help="vCPUs per QEMU instance")
     parser.add_argument("--mem_mb", type=int, default=512,
                         help="RAM per QEMU instance (MB)")
+    parser.add_argument(
+        "--topology",
+        type=str,
+        default="cls:0/1-2/1-2/3-4/3-4",
+        help="Executor topology passed as a module param, e.g. cls:0/1-2/1-2/3-4/3-4",
+    )
     parser.add_argument("--workers", type=int,
-                        default=max(1, (os.cpu_count() or 4) // 4),
+                        default=1,
                         help="Number of parallel QEMU workers")
-    parser.add_argument("--steps", type=int, default=80,
+    parser.add_argument("--steps", type=int, default=50,
                         help="Ops per test case (fresh mode)")
     parser.add_argument("--fresh_ratio", type=float, default=0.5,
                         help="Fraction of iterations using fresh random generation")
@@ -57,6 +61,8 @@ def main() -> None:
                              "(remainder is pure replay)")
     parser.add_argument("--pin_cpus", action="store_true",
                         help="Pin each QEMU to dedicated host CPUs; run Python on the rest")
+    parser.add_argument("--demo", action="store_true",
+                        help="In the demo mode, only run 1 test per worker")
     args = parser.parse_args()
 
     fuzz_dir = DATA_DIR / "fuzz"
@@ -70,11 +76,20 @@ def main() -> None:
     logging.getLogger().addHandler(file_handler)
     logging.info(f"Logging to {log_path}")
 
-    driver = Driver(name=args.driver, num_cpus=args.num_cpus, mem_mb=args.mem_mb)
+    make_kstep(args.linux_name)
+
+    driver = Driver(
+        name="executor",
+        num_cpus=args.num_cpus,
+        mem_mb=args.mem_mb,
+        topology=args.topology,
+    )
 
     logging.info(
-        f"kSTEP fuzzer: workers={args.workers}  driver={args.driver}  "
+        f"kSTEP fuzzer: workers={args.workers}  driver=executor  "
         f"linux={args.linux_name}  steps={args.steps}  "
+        f"topology={args.topology or 'default'}  "
+        f"demo={args.demo}  "
         f"fresh_ratio={args.fresh_ratio}  mutate_ratio={args.mutate_ratio}"
     )
     run_manager(
@@ -86,6 +101,7 @@ def main() -> None:
         fresh_ratio=args.fresh_ratio,
         mutate_ratio=args.mutate_ratio,
         pin_cpus=args.pin_cpus,
+        demo=args.demo,
     )
 
 

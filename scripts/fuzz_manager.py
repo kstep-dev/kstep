@@ -106,6 +106,7 @@ def run_manager(
     fresh_ratio: float,
     mutate_ratio: float = 0.35,
     pin_cpus: bool = False,
+    demo: bool = False,
 ) -> None:
     task_queue: "mp.Queue[Optional[WorkItem]]" = mp.Queue(maxsize=n_workers * 2)
     result_queue: "mp.Queue[WorkResult]" = mp.Queue()
@@ -183,6 +184,8 @@ def run_manager(
         if not _put_task_interruptibly(_next_work(linux_name, steps, pool, fresh_ratio, mutate_ratio, rng)):
             break
 
+    target_execs = n_workers if demo else -1
+
     while not shutdown_event.is_set():
         try:
             result: WorkResult = result_queue.get(timeout=0.5)
@@ -247,8 +250,17 @@ def run_manager(
                             f"total={len(corpus.seen_signals)}  corpus={len(pool)}"
                         )
 
-            # Immediately replace the consumed slot
-            _put_task_interruptibly(_next_work(linux_name, steps, pool, fresh_ratio, mutate_ratio, rng))
+
+            if target_execs != -1 and total_execs >= target_execs:
+                logging.info(
+                    f"[fuzz] Demo mode complete: collected {total_execs}/{target_execs} results"
+                )
+                shutdown_event.set()
+            else:
+                # Immediately replace the consumed slot
+                _put_task_interruptibly(
+                    _next_work(linux_name, steps, pool, fresh_ratio, mutate_ratio, rng)
+                )
 
         # Periodic stats (every 10 s)
         now = time.monotonic()
