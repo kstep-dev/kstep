@@ -423,7 +423,7 @@ void kstep_write_state(struct file *f, bool executed) {
       state = 1;
     else
       state = 0;
-    buf[len++] = (u8)i;
+    buf[len++] = (u8)i + 11; // avoid writing 10 (\n)
     buf[len++] = state;
   }
   buf[len++] = '\n';

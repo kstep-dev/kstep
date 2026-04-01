@@ -2,24 +2,12 @@
 
 from __future__ import annotations
 
-import socket
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 from scripts.consts import FUZZ_DIR
 
 Ops = list[tuple[int, int, int, int]]
-
-# Marker byte written by kstep_write_state
-OP_TYPE_NR = 16
-WORK_CONSERVING_PREFIX = b"WCB,"
-
-
-@dataclass
-class KmodState:
-    task_states: list[dict]
-    executed: bool
 
 @dataclass(frozen=True)
 class WorkerPaths:
@@ -30,74 +18,14 @@ class WorkerPaths:
     cov_file: Path
 
 
-def worker_paths(worker_id: int) -> WorkerPaths:
+def worker_paths(worker_id: int, base_dir: Path = FUZZ_DIR) -> WorkerPaths:
     return WorkerPaths(
-        log_file = FUZZ_DIR / f"worker_{worker_id}.log",
-        sock_file = FUZZ_DIR / f"worker_{worker_id}.sock",
-        debug_log_file = FUZZ_DIR / f"worker_{worker_id}.debug.log",
-        output_file = FUZZ_DIR / f"worker_{worker_id}.jsonl",
-        cov_file = FUZZ_DIR / f"worker_{worker_id}.cov",
+        log_file = base_dir / f"worker_{worker_id}.log",
+        sock_file = base_dir / f"worker_{worker_id}.sock",
+        debug_log_file = base_dir / f"worker_{worker_id}.debug.log",
+        output_file = base_dir / f"worker_{worker_id}.jsonl",
+        cov_file = base_dir / f"worker_{worker_id}.cov",
     )
-
-
-def _read_frame(sf) -> Optional[bytes]:
-    """Read one newline-terminated frame from the kmod stream."""
-    buf = bytearray()
-    while True:
-        ch = sf.read(1)
-        if not ch:
-            return None
-        buf += ch
-        if ch == b"\n":
-            return bytes(buf)
-
-
-def read_kmod_state(sf) -> Optional[KmodState]:
-    """Read state from kmod socket, discarding TTY echo.
-    Returns task states plus an executed flag, or None if socket closed."""
-    while True:
-        line = _read_frame(sf)
-        if not line:
-            return None
-        if line[0] == OP_TYPE_NR:
-            payload = line[1:-1]
-            if not payload:
-                return KmodState(task_states=[], executed=False)
-            if (len(payload) - 1) % 2 != 0:
-                continue
-            executed = bool(payload[0])
-            task_states = [{"id": payload[i], "state": payload[i + 1]}
-                           for i in range(1, len(payload), 2)]
-            return KmodState(task_states=task_states, executed=executed)
-
-
-def read_work_conserving_status(sf) -> Optional[bool]:
-    """Read the executor's final work-conserving status frame after EXIT."""
-    while True:
-        line = _read_frame(sf)
-        if not line:
-            return None
-        if not line.startswith(WORK_CONSERVING_PREFIX):
-            continue
-        payload = line[len(WORK_CONSERVING_PREFIX):-1].strip()
-        if payload == b"1":
-            return True
-        if payload == b"0":
-            return False
-
-
-def connect_to_kmod(sock_file: Path, timeout: float = 10.0, retries: int = 200) -> socket.socket:
-
-    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sleep_time = timeout / retries
-    for _ in range(retries):
-        try:
-            sock.connect(str(sock_file))
-            return sock
-        except (FileNotFoundError, ConnectionRefusedError):
-            time.sleep(sleep_time)
-    raise RuntimeError(f"Timed out connecting to {sock_file}")
-
 
 @dataclass
 class Seed:
