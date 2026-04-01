@@ -71,6 +71,7 @@ class FuzzManager:
         self.errors_by_cat: dict[str, int] = {}
         self.target_execs = n_workers if demo else None
     
+    
     def _save_test(self, result: WorkResult) -> Path:
         """Persist a error input and its console log, routed by error category."""
         if result.error:
@@ -207,6 +208,7 @@ class FuzzManager:
         else:
             self.total_fresh += 1
 
+
     def _handle_error_result(self, result: WorkResult) -> None:
         self.total_errors += 1
         assert result.error_category is not None
@@ -220,6 +222,7 @@ class FuzzManager:
             f"saved={error_dir}"
         )
         
+
     def _handle_success_result(self, result: WorkResult) -> None:
         self._save_test(result)
         paths = worker_paths(result.worker_id)
@@ -272,11 +275,19 @@ class FuzzManager:
             f"total={len(self.corpus.seen_signals)}  corpus={len(self.pool)}"
         )
 
+
+    def _classify_error(self, exc: str) -> str:
+        category, sep, _ = str(exc).partition(":")
+        if sep:
+            return category.strip().lower()
+        return "other"
+    
     def _process_result(self, result: Optional[WorkResult]) -> None:
         assert result is not None
 
         self._record_result_mode(result)
         if result.error:
+            result.error_category = self._classify_error(result.error)
             self._handle_error_result(result)
         else:
             self._handle_success_result(result)
@@ -325,6 +336,7 @@ class FuzzManager:
         self.interval_signals = 0
         self.last_stat_t = now
 
+
     def _shutdown_workers(self) -> None:
         logging.info("[fuzz] Sending poison pills to workers…")
         for _ in self.procs:
@@ -336,11 +348,13 @@ class FuzzManager:
                 proc.terminate()
                 proc.join(timeout=5)
 
+
     def _close_queues(self) -> None:
         self.task_queue.close()
         self.task_queue.cancel_join_thread()
         self.result_queue.close()
         self.result_queue.cancel_join_thread()
+
 
     def _log_final_stats(self) -> None:
         elapsed = time.monotonic() - self.t_start
@@ -351,6 +365,7 @@ class FuzzManager:
             f"corpus={len(self.pool)}  "
             f"wall={elapsed:.0f}s"
         )
+
 
     def run(self) -> None:
         # Keep the high-level lifecycle linear: configure once, run the main

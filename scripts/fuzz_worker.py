@@ -8,23 +8,27 @@ import multiprocessing as mp
 import os
 import random
 import signal
+import socket
 import subprocess
 import time
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, BinaryIO
 
 from run import Driver, start_qemu
-from scripts.fuzz_common import (
-    Ops,
-    WorkItem,
-    WorkResult,
-    connect_to_kmod,
-    read_kmod_state,
-    read_work_conserving_status,
-    worker_paths,
+from scripts.fuzz_common import Ops, WorkItem, WorkResult, worker_paths
+from scripts.gen_input_core import (
+    _op_matches_task_state,
+    generate_next_command,
+    init_genstate,
+    replay_update_genstate,
 )
-from scripts.gen_input_core import generate_next_command, init_genstate, _op_matches_task_state, replay_update_genstate
 from scripts.gen_input_ops import OP_NAME_TO_TYPE, OP_TYPE_TO_NAME
+from scripts.gen_input_state import GenState
+
+# Marker byte written by kstep_write_state
+OP_TYPE_NR = len(OP_NAME_TO_TYPE)
+WORK_CONSERVING_PREFIX = b"WCB,"
 
 _CRASH_MARKERS = [
     b"Kernel panic",
@@ -37,19 +41,7 @@ _CRASH_MARKERS = [
 ]
 
 
-def _send_op(logger: logging.Logger, sock, sf, gen, op: int, a: int, b: int, c: int) -> bool:
-    """Send one op to kmod, read back task state, and update gen. Raises on failure."""
-    sock.sendall(f"{op},{a},{b},{c}\n".encode())
-    logger.debug(f"SEND OP: {op},{a},{b},{c}")
-    state = read_kmod_state(sf)
-    if state is None:
-        sock.sendall(b"EXIT\n")
-        raise RuntimeError("Failed to read task states")
-    logger.debug("Received task states")
-    gen.update_from_kmod(state.task_states)
-    return state.executed
-
-
+# Detect whether the QEMU console log contains a kernel crash signature.
 def _check_for_crash(log_file: Path) -> bool:
     """Return True if the worker console log contains kernel crash markers."""
     try:
@@ -58,7 +50,373 @@ def _check_for_crash(log_file: Path) -> bool:
     except Exception:
         return False
 
+@dataclass
+class KmodState:
+    task_states: list[dict]
+    executed: bool
 
+
+@dataclass
+class FuzzWorkerSession:
+    proc: subprocess.Popen
+    sock: socket.socket
+    sock_file_path: Path
+    sock_file: BinaryIO
+    gen: GenState
+    logger: logging.Logger
+
+    # Connect the worker session to the executor socket and initialize I/O state.
+    def __init__(self, gen, proc, socke_file_path, logger, timeout, retries: int = 200):
+        self.gen = gen
+        self.proc = proc
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock_file_path = socke_file_path
+        self.logger = logger
+        self.timeout = timeout
+
+        sleep_time = timeout / retries
+        for _ in range(retries):
+            try:
+                self.sock.connect(str(self.sock_file_path))
+                self.sock.settimeout(timeout)
+                self.sock_file = self.sock.makefile("rb")
+                return
+            except (FileNotFoundError, ConnectionRefusedError):
+                time.sleep(sleep_time)
+        self.kill()
+        raise RuntimeError(f"Timeout: Timed out connecting to {self.sock_file}")
+
+
+    # Close session resources and optionally terminate the backing QEMU process.
+    def kill(self, kill_proc=True):
+        for resource in (self.sock_file, self.sock):
+            try:
+                resource.close()
+            except Exception:
+                pass
+        if kill_proc:
+            try:
+                self.proc.kill()
+            finally:
+                self.proc.wait()
+        else:
+            try:
+                self.proc.wait(timeout=self.timeout)
+            except subprocess.TimeoutExpired as exc:
+                raise RuntimeError("Timeout: Timed out waiting for the QEMU process") from exc
+
+                
+
+    # Read one protocol frame from the executor socket.
+    def _read_frame(self) -> Optional[bytes]:
+        """Read one newline-terminated frame from the kmod stream."""
+        buf = bytearray()
+        while True:
+            ch = self.sock_file.read(1)
+            if not ch:
+                return None
+            buf += ch
+            if ch == b"\n":
+                return bytes(buf)
+
+
+    # Decode the next task-state frame from the executor stream.
+    def read_kmod_state(self) -> Optional[KmodState]:
+        """Read state from kmod socket, discarding TTY echo."""
+        while True:
+            line = self._read_frame()
+            if not line:
+                return None
+            if line[0] != OP_TYPE_NR:
+                continue
+
+            payload = line[1:-1]
+            if not payload:
+                return KmodState(task_states=[], executed=False)
+            if (len(payload) - 1) % 2 != 0:
+                continue
+
+            executed = bool(payload[0])
+            task_states = [
+                {"id": payload[i] - 11, "state": payload[i + 1]}
+                for i in range(1, len(payload), 2)
+            ]
+            return KmodState(task_states=task_states, executed=executed)
+
+
+    # Decode the final work-conserving status sent after EXIT.
+    def read_work_conserving_status(self) -> Optional[bool]:
+        while True:
+            line = self._read_frame()
+            if not line:
+                return None
+            if not line.startswith(WORK_CONSERVING_PREFIX):
+                continue
+
+            payload = line[len(WORK_CONSERVING_PREFIX):-1].strip()
+            if payload == b"1":
+                return True
+            if payload == b"0":
+                return False
+            
+
+    # Send one op to kmod and fold the returned state into the generator model.
+    def send_op(self, op: int, a: int, b: int, c: int) -> bool:
+        self.sock.sendall(f"{op},{a},{b},{c}\n".encode())
+        self.logger.debug(f"SEND OP: {op},{a},{b},{c}")
+
+        state = self.read_kmod_state()
+        if state is None:
+            self.sock.sendall(b"EXIT\n")
+            raise RuntimeError("Readfail: Failed to read task states")
+
+        self.logger.debug("Received task states")
+        self.gen.update_from_kmod(state.task_states)
+        return state.executed
+
+class FuzzWorker:
+    def __init__(
+        self,
+        worker_id: int,
+        task_queue: "mp.Queue[Optional[WorkItem]]",
+        result_queue: "mp.Queue[WorkResult]",
+        driver: Driver,
+        linux_name: str,
+        qemu_cpus: Optional[str] = None,
+        rng_seed: Optional[int] = None,
+        base_dir: Optional[Path] = None,
+        io_timeout_sec: float = 120.0,
+    ) -> None:
+        self.worker_id = worker_id
+        self.task_queue = task_queue
+        self.result_queue = result_queue
+        self.driver = driver
+        self.linux_name = linux_name
+        self.qemu_cpus = qemu_cpus
+        self.max_tasks = driver.num_cpus * 3
+        self.max_cgroups = driver.num_cpus * 3
+        self.io_timeout_sec = io_timeout_sec
+        self.paths = worker_paths(worker_id, base_dir=base_dir) if base_dir is not None else worker_paths(worker_id)
+
+        seed = rng_seed if rng_seed is not None else (os.getpid() ^ (worker_id + 1) * 0x9E3779B9)
+        self.rng = random.Random(seed)
+        self.logger, self.handler = self._init_logger()
+
+    # Build the per-worker debug logger.
+    def _init_logger(self) -> tuple[logging.Logger, logging.FileHandler]:
+        logger = logging.getLogger(f"worker_{self.worker_id}")
+        logger.setLevel(logging.DEBUG)
+        logger.propagate = False
+        logger.handlers.clear()
+
+        handler = logging.FileHandler(self.paths.debug_log_file, mode="w")
+        handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
+        logger.addHandler(handler)
+        return logger, handler
+
+    
+
+    # Clear the previous work item's debug log before starting a new run.
+    def _reset_debug_log(self) -> None:
+        self.handler.stream.seek(0)
+        self.handler.stream.truncate()
+
+    # Start QEMU, connect to kmod, and initialize generator state for this work item.
+    def _start_session(self, work: WorkItem) -> FuzzWorkerSession:
+        proc = start_qemu(
+            driver=self.driver,
+            linux_name=self.linux_name,
+            log_file=self.paths.log_file,
+            sock_file=self.paths.sock_file,
+            quiet=True,
+            cpu_affinity=self.qemu_cpus,
+        )
+
+        gen_seed = 0 if work.mode in ("replay") else self.rng.randint(0, 2**32 - 1)
+        gen = init_genstate(self.max_tasks, self.max_cgroups, self.driver.num_cpus, gen_seed)
+        
+        session = FuzzWorkerSession(gen, proc, self.paths.sock_file, self.logger, self.io_timeout_sec)
+        
+        if session.read_kmod_state() is None:
+            session.kill()
+            raise RuntimeError("Readfail: kmod socket closed before ready signal")
+
+        return session
+
+
+    # Execute generated operations until the requested number of successful steps is reached.
+    def _execute_generated_ops(
+        self,
+        work: WorkItem,
+        session: FuzzWorkerSession,
+        ops_executed: Optional[Ops] = None,
+        *,
+        log_prefix: str = "STEP",
+    ) -> Ops:
+        if ops_executed is None:
+            ops_executed = []
+
+        generated = 0
+        while generated < work.steps:
+            op, a, b, c = generate_next_command(session.gen)
+            executed = session.send_op(op, a, b, c)
+            if executed:
+                self.logger.debug(
+                    f"{log_prefix} {generated}: op={op},{a},{b},{c} "
+                    f"executed={executed} task_state={session.gen.task_state}"
+                )
+                ops_executed.append((op, a, b, c))
+                generated += 1
+        return ops_executed
+
+    # Replay the seed prefix and optionally extend it with generated mutation steps.
+    def _execute_replay_or_mutate(self, work: WorkItem, session: FuzzWorkerSession) -> Ops:
+        assert work.ops is not None
+        ops_executed: Ops = []
+        prefix_len = len(work.ops)
+        if work.mode == "mutate" and work.pivot_idx is not None:
+            prefix_len = min(work.pivot_idx + 1, len(work.ops))
+
+        for i, (op, a, b, c) in enumerate(work.ops[:prefix_len]):
+            for retry in range(50):
+                if _op_matches_task_state(session.gen, (op, a, b, c)):
+                    executed = session.send_op(op, a, b, c)
+                    if executed:
+                        self.logger.debug(
+                            f"REPLAY {i}: op={op},{a},{b},{c} executed={executed} task_state={session.gen.task_state}"
+                        )
+                        ops_executed.append((op, a, b, c))
+                        replay_update_genstate(session.gen, op, a, b, c)
+                        break
+                self.logger.debug(f"REPLAY {i} retry {retry}: task_state={session.gen.task_state}")
+            else:
+                op_name = OP_TYPE_TO_NAME.get(op, str(op))
+                actual = session.gen.task_state.get(a, "not_found")
+                session.sock.sendall(b"EXIT\n")
+                raise RuntimeError(
+                    f"Replayfail: replay mismatch at step {i} after 50 retries: "
+                    f"{op_name}(task={a}) task_state={actual!r}"
+                )
+
+        if work.mode == "mutate" and work.pivot_idx is not None:
+            return self._execute_generated_ops(
+                work,
+                session,
+                ops_executed,
+                log_prefix="MUTATE-GEN",
+            )
+        return ops_executed
+    
+    # Dispatch execution based on whether the work item is fresh, replay, or mutate.
+    def _execute_work(self, work: WorkItem, session: FuzzWorkerSession) -> Ops:
+        if work.mode in ("replay", "mutate"):
+            return self._execute_replay_or_mutate(work, session)
+        return self._execute_generated_ops(work, session)
+
+    # Ask the executor to exit cleanly and report any work-conserving failure.
+    def _finish_session(self, session: FuzzWorkerSession) -> Optional[str]:
+        session.sock.sendall(b"EXIT\n")
+        work_conserving_broken = session.read_work_conserving_status()
+        self.logger.info(f"EXIT status: work_conserving_broken={work_conserving_broken}")
+
+        session.kill(kill_proc=False)
+        if work_conserving_broken:
+            return "wcb: work conserving broken"
+        return None
+
+
+    # Compute how many ops must execute for this work item to count as complete.
+    def _expected_ops(self, work: WorkItem) -> int:
+        if work.mode == "replay":
+            assert work.ops is not None
+            return len(work.ops)
+        if work.mode == "mutate":
+            assert work.ops is not None
+            if work.pivot_idx is not None:
+                return min(work.pivot_idx + 1, len(work.ops))
+            return len(work.ops)
+        return work.steps
+
+
+    # Check the run result for short execution or error markers in the worker log.
+    def _validate_result(
+        self,
+        work: WorkItem,
+        ops_executed: Ops,
+        error: Optional[str],
+    ) -> Optional[str]:
+        if error is not None:
+            return error
+
+        expected_ops = self._expected_ops(work)
+        if len(ops_executed) < expected_ops:
+            error = f"missop: expected {expected_ops}, got {len(ops_executed)}"
+            self.logger.error(f"Worker {self.worker_id}: {error}")
+            return error
+
+        with self.paths.log_file.open("r", errors="ignore") as lf:
+            log_content = lf.read().lower()
+        if "fail" in log_content or "warn" in log_content:
+            self.logger.error(f"Worker {self.worker_id}: Detected 'fail' or 'warn' in log file.")
+            return "errorlog"
+        return None
+    
+
+    # Run one work item end-to-end and package the resulting execution record.
+    def _run_one(self, work: WorkItem) -> WorkResult:
+        self.paths.sock_file.unlink(missing_ok=True)
+        self._reset_debug_log()
+
+        t0 = time.monotonic()
+        ops_executed: Ops = []
+        error: Optional[str] = None
+        session: Optional[FuzzWorkerSession] = None
+
+        try:
+            session = self._start_session(work)
+        except Exception as exc:
+            return WorkResult(
+                worker_id=self.worker_id,
+                ops=ops_executed,
+                exec_time=time.monotonic() - t0,
+                mode=work.mode,
+                seed_id=work.seed_id,
+                error=str(exc),
+            )
+
+        try:
+            ops_executed = self._execute_work(work, session)
+            error = self._finish_session(session)
+        except Exception as exc:
+            session.kill(kill_proc=True)
+            self.logger.error(f"Worker {self.worker_id}: {exc}")
+            if _check_for_crash(self.paths.log_file):
+                error = "qemucrash: qemucrash"
+            else:
+                error = str(exc)
+
+        error = self._validate_result(work, ops_executed, error)
+        return WorkResult(
+            worker_id=self.worker_id,
+            ops=ops_executed,
+            exec_time=time.monotonic() - t0,
+            mode=work.mode,
+            seed_id=work.seed_id,
+            error=error
+        )
+    
+    # Consume queued work items until the manager sends the shutdown sentinel.
+    def run(self) -> None:
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+        while True:
+            work: Optional[WorkItem] = self.task_queue.get()
+            if work is None:
+                break
+            self.result_queue.put(self._run_one(work))
+        return
+    
+
+# Launch a single worker process wrapper around the FuzzWorker class.
 def worker_main(
     worker_id: int,
     task_queue: "mp.Queue[Optional[WorkItem]]",
@@ -67,194 +425,13 @@ def worker_main(
     linux_name: str,
     qemu_cpus: Optional[str] = None,
 ) -> None:
-    """Worker loop: run QEMU instances and report results to the manager."""
-    signal.signal(signal.SIGINT, signal.SIG_IGN)   # manager owns shutdown
-
-    rng = random.Random(os.getpid() ^ (worker_id + 1) * 0x9E3779B9)
-    paths = worker_paths(worker_id)
-
-    # Set up worker-specific file logger
-    logger = logging.getLogger(f"worker_{worker_id}")
-    logger.setLevel(logging.DEBUG)
-    logger.propagate = False  # Don't propagate to root logger (stdout)
-    handler = logging.FileHandler(paths.debug_log_file, mode="w")
-    handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
-    logger.addHandler(handler)
-
-    while True:
-        work: Optional[WorkItem] = task_queue.get()
-        if work is None:        # poison pill
-            break
-
-        paths.sock_file.unlink(missing_ok=True)
-        t0 = time.monotonic()
-        ops_executed: Ops = []
-        error: Optional[str] = None
-        error_category: Optional[str] = None
-        proc = None
-
-        try:
-            handler.stream.seek(0)
-            handler.stream.truncate()
-
-            proc = start_qemu(
-                driver=driver,
-                linux_name=linux_name,
-                log_file=paths.log_file,
-                sock_file=paths.sock_file,
-                quiet=True,
-                cpu_affinity=qemu_cpus,
-            )
-
-            # QEMU uses wait=on and blocks until we connect; retry until ready.
-            try:
-                sock = connect_to_kmod(paths.sock_file, timeout=10.0, retries=200)
-            except RuntimeError as e:
-                raise RuntimeError("Failed to connect to kmod socket") from e
-
-            sock.settimeout(120.0)
-            sf = sock.makefile("rb")
-            state = read_kmod_state(sf)  # kmod signals readiness; result unused, gen not yet initialized
-            if state is None:
-                raise RuntimeError("kmod socket closed before ready signal")
-
-            gen_seed = 0 if work.mode in ("replay", "mutate") else rng.randint(0, 2**32 - 1)
-            gen = init_genstate(max_tasks=10, max_cgroups=10, cpus=driver.num_cpus, seed=gen_seed)
-
-
-            _TICK = OP_NAME_TO_TYPE["TICK"]
-
-            if work.mode in ("replay", "mutate"):
-                assert work.ops is not None
-                # For mutate: replay only up to and including the pivot command.
-                # For replay: replay the full sequence.
-                if work.mode == "mutate" and work.pivot_idx is not None:
-                    prefix_len = min(work.pivot_idx + 1, len(work.ops))
-                else:
-                    prefix_len = len(work.ops)
-
-                for i, (op, a, b, c) in enumerate(work.ops[:prefix_len]):
-                    for t in range(50):
-                        if _op_matches_task_state(gen, (op, a, b, c)):
-                            executed = _send_op(logger, sock, sf, gen, op, a, b, c)
-                            
-                            if executed:
-                                logger.debug(
-                                    f"REPLAY {i}: op={op},{a},{b},{c} executed={executed} task_state={gen.task_state}"
-                                )
-                                ops_executed.append((op, a, b, c))
-                                replay_update_genstate(gen, op, a, b, c)
-                                break
-                        
-                        logger.debug(f"REPLAY {i} retry {t}: task_state={gen.task_state}")
-                            
-                    else:
-                        op_name = OP_TYPE_TO_NAME.get(op, str(op))
-                        actual = gen.task_state.get(a, "not_found")
-                        sock.sendall(b"EXIT\n")
-                        raise RuntimeError(
-                            f"replay mismatch at step {i} after 50 retries: "
-                            f"{op_name}(task={a}) task_state={actual!r}"
-                        )
-
-                # After replaying the prefix, interactively generate new commands.
-                if work.mode == "mutate" and work.pivot_idx is not None:
-                    i = 0
-                    while i < work.steps:
-                        op, a, b, c = generate_next_command(gen)
-
-                        executed = _send_op(logger, sock, sf, gen, op, a, b, c)
-                        
-                        if executed:
-                            logger.debug(
-                                f"MUTATE-GEN {i}: op={op},{a},{b},{c} executed={executed} task_state={gen.task_state}"
-                            )
-                            ops_executed.append((op, a, b, c))
-                            i += 1
-            else:
-                i = 0
-                while i < work.steps:
-                    op, a, b, c = generate_next_command(gen)
-
-                    executed = _send_op(logger, sock, sf, gen, op, a, b, c)
-                    if executed:
-                        logger.debug(f"STEP {i}: executed={executed} task_state={gen.task_state}")
-                        ops_executed.append((op, a, b, c))
-                        i += 1
-
-
-            sock.sendall(b"EXIT\n")
-            
-            work_conserving_broken = read_work_conserving_status(sf)
-            logger.info(f"EXIT status: work_conserving_broken={work_conserving_broken}")
-            if (work_conserving_broken):
-                error = "work_conserving"
-                error_category = "work conserving"
-            sock.close()
-            
-            proc.wait(timeout=120)
-
-            # cov_path = paths.cov_file
-            # if cov_path.exists() and cov_path.stat().st_size > 0:
-            #     result_cov = cov_path
-
-        except Exception as exc:
-            if proc is not None:
-                try:
-                    proc.kill()
-                    proc.wait()
-                except Exception:
-                    pass
-            if isinstance(exc, subprocess.TimeoutExpired):
-                error_category = "timedout"
-            elif _check_for_crash(paths.log_file):
-                error_category = "crash"
-            elif "replay mismatch" in str(exc):
-                error_category = "retry_tick"
-            else:
-                error_category = "other"
-            error = str(exc)
-            logger.error(f"Worker {worker_id}: {exc}")
-
-        if error is None:
-            if work.mode == "replay":
-                assert work.ops is not None
-                expected_ops = len(work.ops)
-            elif work.mode == "mutate":
-                assert work.ops is not None
-                expected_ops = min(work.pivot_idx + 1, len(work.ops)) if work.pivot_idx is not None else len(work.ops)
-            else:
-                expected_ops = work.steps
-
-            if len(ops_executed) < expected_ops:
-                error = f"op count mismatch: expected {expected_ops}, got {len(ops_executed)}"
-                error_category = "op_mismatch"
-                logger.error(f"Worker {worker_id}: {error}")
-            else:
-                with paths.log_file.open("r", errors="ignore") as lf:
-                    log_content = lf.read()
-                    log_content = log_content.lower()
-                    if "fail" in log_content or "warn" in log_content:
-                        error = "fail_log"
-                        error_category = "fail_log"
-                        logger.error(f"Worker {worker_id}: Detected 'fail' or 'warn' in log file.")
-                    # else:
-                    #     seq = input_seq_from_log(paths.log_file)
-                    #     seq2 = InputSeq()
-                    #     for op_tuple in ops_executed:
-                    #         seq.append(op_tuple)
-                    #     if seq != seq2:
-                    #         error = "op_corrupt"
-                    #         error_category = "op_corrupt"
-            
-        
-
-        result_queue.put(WorkResult(
-            worker_id=worker_id,
-            ops=ops_executed,
-            exec_time=time.monotonic() - t0,
-            mode=work.mode,
-            seed_id=work.seed_id,
-            error=error,
-            error_category=error_category,
-        ))
+    """Worker loop: run one QEMU-backed test per queued work item."""
+    worker = FuzzWorker(
+        worker_id=worker_id,
+        task_queue=task_queue,
+        result_queue=result_queue,
+        driver=driver,
+        linux_name=linux_name,
+        qemu_cpus=qemu_cpus,
+    )
+    worker.run()
