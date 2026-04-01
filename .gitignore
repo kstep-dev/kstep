@@ -14,7 +14,7 @@
 /data/latest.*
 /data/rootfs/*.cpio
 /data/qemu
-/data/fuzz/*
+/data/fuzz*/*
 
 # Python
 __pycache__

@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import datetime
 
 PROJ_DIR = Path(__file__).parent.parent.resolve()
 
@@ -21,7 +22,8 @@ LATEST_OUTPUT = DATA_DIR / "latest.jsonl"
 LATEST_COV = DATA_DIR / "latest.cov"
 LATEST_COV_JSON = DATA_DIR / "latest.cov.json"
 
-FUZZ_DIR = DATA_DIR / "fuzz"
+ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+FUZZ_DIR = DATA_DIR / f"fuzz_{ts}"
 FUZZ_SUCCESS_DIR = FUZZ_DIR / "success"
 FUZZ_ERROR_DIR = FUZZ_DIR / "error"
 FUZZ_CORPUS_DIR = FUZZ_DIR / "corpus"
