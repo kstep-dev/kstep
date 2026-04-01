@@ -13,7 +13,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, BinaryIO
+from typing import BinaryIO, Optional
 
 from run import Driver, start_qemu
 from scripts.fuzz_common import Ops, WorkItem, WorkResult, worker_paths
@@ -50,6 +50,7 @@ def _check_for_crash(log_file: Path) -> bool:
     except Exception:
         return False
 
+
 @dataclass
 class KmodState:
     task_states: list[dict]
@@ -66,7 +67,15 @@ class FuzzWorkerSession:
     logger: logging.Logger
 
     # Connect the worker session to the executor socket and initialize I/O state.
-    def __init__(self, gen, proc, socke_file_path, logger, timeout, retries: int = 200):
+    def __init__(
+        self,
+        gen,
+        proc,
+        socke_file_path,
+        logger,
+        timeout,
+        retries: int = 200,
+    ):
         self.gen = gen
         self.proc = proc
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -86,7 +95,6 @@ class FuzzWorkerSession:
         self.kill()
         raise RuntimeError(f"Timeout: Timed out connecting to {self.sock_file}")
 
-
     # Close session resources and optionally terminate the backing QEMU process.
     def kill(self, kill_proc=True):
         for resource in (self.sock_file, self.sock):
@@ -105,8 +113,6 @@ class FuzzWorkerSession:
             except subprocess.TimeoutExpired as exc:
                 raise RuntimeError("Timeout: Timed out waiting for the QEMU process") from exc
 
-                
-
     # Read one protocol frame from the executor socket.
     def _read_frame(self) -> Optional[bytes]:
         """Read one newline-terminated frame from the kmod stream."""
@@ -118,7 +124,6 @@ class FuzzWorkerSession:
             buf += ch
             if ch == b"\n":
                 return bytes(buf)
-
 
     # Decode the next task-state frame from the executor stream.
     def read_kmod_state(self) -> Optional[KmodState]:
@@ -143,7 +148,6 @@ class FuzzWorkerSession:
             ]
             return KmodState(task_states=task_states, executed=executed)
 
-
     # Decode the final work-conserving status sent after EXIT.
     def read_work_conserving_status(self) -> Optional[bool]:
         while True:
@@ -158,7 +162,6 @@ class FuzzWorkerSession:
                 return True
             if payload == b"0":
                 return False
-            
 
     # Send one op to kmod and fold the returned state into the generator model.
     def send_op(self, op: int, a: int, b: int, c: int) -> bool:
@@ -173,6 +176,7 @@ class FuzzWorkerSession:
         self.logger.debug("Received task states")
         self.gen.update_from_kmod(state.task_states)
         return state.executed
+
 
 class FuzzWorker:
     def __init__(
@@ -196,7 +200,11 @@ class FuzzWorker:
         self.max_tasks = driver.num_cpus * 3
         self.max_cgroups = driver.num_cpus * 3
         self.io_timeout_sec = io_timeout_sec
-        self.paths = worker_paths(worker_id, base_dir=base_dir) if base_dir is not None else worker_paths(worker_id)
+        self.paths = (
+            worker_paths(worker_id, base_dir=base_dir)
+            if base_dir is not None
+            else worker_paths(worker_id)
+        )
 
         seed = rng_seed if rng_seed is not None else (os.getpid() ^ (worker_id + 1) * 0x9E3779B9)
         self.rng = random.Random(seed)
@@ -213,8 +221,6 @@ class FuzzWorker:
         handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
         logger.addHandler(handler)
         return logger, handler
-
-    
 
     # Clear the previous work item's debug log before starting a new run.
     def _reset_debug_log(self) -> None:
@@ -234,15 +240,14 @@ class FuzzWorker:
 
         gen_seed = 0 if work.mode in ("replay") else self.rng.randint(0, 2**32 - 1)
         gen = init_genstate(self.max_tasks, self.max_cgroups, self.driver.num_cpus, gen_seed)
-        
+
         session = FuzzWorkerSession(gen, proc, self.paths.sock_file, self.logger, self.io_timeout_sec)
-        
+
         if session.read_kmod_state() is None:
             session.kill()
             raise RuntimeError("Readfail: kmod socket closed before ready signal")
 
         return session
-
 
     # Execute generated operations until the requested number of successful steps is reached.
     def _execute_generated_ops(
@@ -306,7 +311,7 @@ class FuzzWorker:
                 log_prefix="MUTATE-GEN",
             )
         return ops_executed
-    
+
     # Dispatch execution based on whether the work item is fresh, replay, or mutate.
     def _execute_work(self, work: WorkItem, session: FuzzWorkerSession) -> Ops:
         if work.mode in ("replay", "mutate"):
@@ -324,7 +329,6 @@ class FuzzWorker:
             return "wcb: work conserving broken"
         return None
 
-
     # Compute how many ops must execute for this work item to count as complete.
     def _expected_ops(self, work: WorkItem) -> int:
         if work.mode == "replay":
@@ -336,7 +340,6 @@ class FuzzWorker:
                 return min(work.pivot_idx + 1, len(work.ops))
             return len(work.ops)
         return work.steps
-
 
     # Check the run result for short execution or error markers in the worker log.
     def _validate_result(
@@ -360,7 +363,6 @@ class FuzzWorker:
             self.logger.error(f"Worker {self.worker_id}: Detected 'fail' or 'warn' in log file.")
             return "errorlog"
         return None
-    
 
     # Run one work item end-to-end and package the resulting execution record.
     def _run_one(self, work: WorkItem) -> WorkResult:
@@ -404,7 +406,7 @@ class FuzzWorker:
             seed_id=work.seed_id,
             error=error
         )
-    
+
     # Consume queued work items until the manager sends the shutdown sentinel.
     def run(self) -> None:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -414,7 +416,7 @@ class FuzzWorker:
                 break
             self.result_queue.put(self._run_one(work))
         return
-    
+
 
 # Launch a single worker process wrapper around the FuzzWorker class.
 def worker_main(

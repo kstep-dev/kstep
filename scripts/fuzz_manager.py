@@ -24,11 +24,13 @@ from scripts.fuzz_worker import worker_main
 from scripts.fuzz_mutate import pick_pivot
 from scripts.input_seq import InputSeq
 from scripts.consts import FUZZ_ERROR_DIR, FUZZ_SUCCESS_DIR, FUZZ_CORPUS_DIR
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Manager
 # ──────────────────────────────────────────────────────────────────────────────
 
 class FuzzManager:
+    # Initialize manager-owned queues, counters, corpus state, and worker settings.
     def __init__(
         self,
         n_workers: int,
@@ -70,8 +72,8 @@ class FuzzManager:
         self.interval_signals = 0
         self.errors_by_cat: dict[str, int] = {}
         self.target_execs = n_workers if demo else None
-    
-    
+
+    # Save one worker result and its artifacts into the success or error archive.
     def _save_test(self, result: WorkResult) -> Path:
         """Persist a error input and its console log, routed by error category."""
         if result.error:
@@ -82,7 +84,6 @@ class FuzzManager:
 
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             target_dir = category_dir / f"w{result.worker_id}_{ts}"
-            
         else:
             FUZZ_SUCCESS_DIR.mkdir(parents=True, exist_ok=True)
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -107,10 +108,10 @@ class FuzzManager:
             shutil.copy2(paths.debug_log_file, target_dir / "worker.debug.log")
         if paths.output_file and paths.output_file.exists():
             shutil.copy2(paths.output_file, target_dir / "worker.jsonl")
-        
+
         return target_dir
-    
-    
+
+    # Choose the next work item from fresh, mutate, or replay modes.
     def _next_work(self) -> WorkItem:
         r = self.rng.random()
         # Fresh mode
@@ -134,8 +135,8 @@ class FuzzManager:
             logging.warning("Selected pivot idx is None")
         # replay mode
         return WorkItem(mode="replay", steps=0, ops=seed.ops, seed_id=seed.seed_id)
-    
 
+    # Partition host CPUs between QEMU instances and the Python manager when requested.
     def _configure_cpu_pinning(self) -> None:
         if not self.pin_cpus:
             return
@@ -158,14 +159,14 @@ class FuzzManager:
             f"CPU pinning: QEMU {self.qemu_cpu_lists}, Python {sorted(python_cpus)}"
         )
 
-
+    # Turn Ctrl-C into a cooperative manager shutdown signal.
     def _on_sigint(self, _sig, _frame) -> None:
         if self.shutdown_event.is_set():
             return
         logging.info("[fuzz] Caught Ctrl-C – shutting down…")
         self.shutdown_event.set()
 
-    
+    # Start all worker processes and remember their process handles.
     def _spawn_workers(self) -> None:
         for wid in range(self.n_workers):
             proc = mp.Process(
@@ -184,7 +185,7 @@ class FuzzManager:
             self.procs.append(proc)
             logging.info(f"Spawned worker {wid} (pid={proc.pid})")
 
-    
+    # Enqueue one work item unless shutdown has already stopped normal scheduling.
     def _put_task(self, item: Optional[WorkItem]) -> bool:
         # `None` is the poison pill used during shutdown, so it must still be
         # enqueueable after `shutdown_event` is set.
@@ -198,7 +199,7 @@ class FuzzManager:
                 raise RuntimeError("Shutdown: error when pushing task into queue")
         return False
 
-
+    # Update aggregate execution counters for the finished result's mode.
     def _record_result_mode(self, result: WorkResult) -> None:
         self.total_execs += 1
         if result.mode == "replay":
@@ -208,7 +209,7 @@ class FuzzManager:
         else:
             self.total_fresh += 1
 
-
+    # Archive and count one failed execution.
     def _handle_error_result(self, result: WorkResult) -> None:
         self.total_errors += 1
         assert result.error_category is not None
@@ -221,8 +222,8 @@ class FuzzManager:
             f"msg={result.error!r}  "
             f"saved={error_dir}"
         )
-        
 
+    # Parse coverage from one successful execution and add new seeds to the pool.
     def _handle_success_result(self, result: WorkResult) -> None:
         self._save_test(result)
         paths = worker_paths(result.worker_id)
@@ -245,20 +246,20 @@ class FuzzManager:
         FUZZ_CORPUS_DIR.mkdir(parents=True, exist_ok=True)
 
         new_signals = self.corpus.analyze_new_signals(
-            seq = seq,
-            signal_records = signal_records,
-            linux_name = self.linux_name,
-            output_path = FUZZ_CORPUS_DIR / f"{seed_id}.json" 
+            seq=seq,
+            signal_records=signal_records,
+            linux_name=self.linux_name,
+            output_path=FUZZ_CORPUS_DIR / f"{seed_id}.json",
         )
         if not new_signals:
             return
 
         cmd_meta = self.corpus.analyze_per_action_signals(
             seq=seq,
-            signal_records = signal_records,
-            new_signals = set(new_signals),
-            linux_name = self.linux_name,
-            output_path = FUZZ_CORPUS_DIR / f"{seed_id}_per_action.json" 
+            signal_records=signal_records,
+            new_signals=set(new_signals),
+            linux_name=self.linux_name,
+            output_path=FUZZ_CORPUS_DIR / f"{seed_id}_per_action.json",
         )
 
         productive_cmd_ids = [
@@ -275,13 +276,14 @@ class FuzzManager:
             f"total={len(self.corpus.seen_signals)}  corpus={len(self.pool)}"
         )
 
-
+    # Derive an error category from the prefix of an error string.
     def _classify_error(self, exc: str) -> str:
         category, sep, _ = str(exc).partition(":")
         if sep:
             return category.strip().lower()
         return "other"
-    
+
+    # Route one worker result through success or error handling.
     def _process_result(self, result: Optional[WorkResult]) -> None:
         assert result is not None
 
@@ -292,7 +294,7 @@ class FuzzManager:
         else:
             self._handle_success_result(result)
 
-
+    # Consume worker results, feed new work, and stop when shutdown is requested.
     def _result_loop(self) -> None:
         while not self.shutdown_event.is_set():
             try:
@@ -314,8 +316,8 @@ class FuzzManager:
             # Produce task
             self._put_task(self._next_work())
             self._maybe_log_periodic_stats()
-    
 
+    # Emit periodic high-level fuzzing stats without blocking the result loop.
     def _maybe_log_periodic_stats(self) -> None:
         now = time.monotonic()
         if now - self.last_stat_t < 10:
@@ -336,7 +338,7 @@ class FuzzManager:
         self.interval_signals = 0
         self.last_stat_t = now
 
-
+    # Ask workers to exit and forcibly terminate any process that stays alive.
     def _shutdown_workers(self) -> None:
         logging.info("[fuzz] Sending poison pills to workers…")
         for _ in self.procs:
@@ -348,14 +350,14 @@ class FuzzManager:
                 proc.terminate()
                 proc.join(timeout=5)
 
-
+    # Close multiprocessing queues once worker traffic is finished.
     def _close_queues(self) -> None:
         self.task_queue.close()
         self.task_queue.cancel_join_thread()
         self.result_queue.close()
         self.result_queue.cancel_join_thread()
 
-
+    # Print one final summary after the fuzzing session ends.
     def _log_final_stats(self) -> None:
         elapsed = time.monotonic() - self.t_start
         logging.info(
@@ -366,7 +368,7 @@ class FuzzManager:
             f"wall={elapsed:.0f}s"
         )
 
-
+    # Run the manager lifecycle from startup through teardown.
     def run(self) -> None:
         # Keep the high-level lifecycle linear: configure once, run the main
         # loop, then always tear workers and queues down in the finally block.
@@ -385,8 +387,7 @@ class FuzzManager:
             self._close_queues()
             self._log_final_stats()
 
-
-
+# Create a manager instance and run it with the provided fuzzing parameters.
 def run_manager(
     n_workers: int,
     driver: Driver,
