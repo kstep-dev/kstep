@@ -245,14 +245,15 @@ class FuzzManager:
 
         FUZZ_CORPUS_DIR.mkdir(parents=True, exist_ok=True)
 
-        new_signals = self.corpus.analyze_new_signals(
+        new_signal_info = self.corpus.analyze_new_signals(
             seq=seq,
             signal_records=signal_records,
             linux_name=self.linux_name,
             output_path=FUZZ_CORPUS_DIR / f"{seed_id}.json",
         )
-        if not new_signals:
+        if not new_signal_info:
             return
+        new_signals, distinct_signals = new_signal_info
 
         cmd_meta = self.corpus.analyze_per_action_signals(
             seq=seq,
@@ -269,10 +270,12 @@ class FuzzManager:
         n_new = len(new_signals)
         self.total_new_signals += n_new
         self.interval_signals += n_new
-        seed = self.pool.add(result.ops, n_new, productive_cmd_ids)
+        seed = self.pool.add(result.ops, distinct_signals, productive_cmd_ids)
 
         logging.info(
             f"[+] seed #{seed.seed_id}: +{n_new} new  "
+            f"distinct={distinct_signals}  "
+            f"productive_cmd={len(productive_cmd_ids)} "
             f"total={len(self.corpus.seen_signals)}  corpus={len(self.pool)}"
         )
 

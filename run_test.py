@@ -64,14 +64,15 @@ def run_test(
     )
 
     # Analyze the new signals for the test
-    new_signals = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
+    new_signal_info = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
         seq=seq,
         signal_records=signal_records,
         linux_name=linux.name,
     )
 
     # Analyze the per-action signals for the test if there are new signals
-    if new_signals:
+    if new_signal_info:
+        new_signals, _ = new_signal_info
         GLOBAL_SIGNAL_CORPUS.analyze_per_action_signals(
             seq=seq,
             signal_records=signal_records,

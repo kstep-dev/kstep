@@ -37,14 +37,16 @@ class SignalCorpus:
         for pc, (fn, loc) in pc_symbolize.items():
             self.seen_pcs[pc] = (fn, loc)
 
-    # Analyze the new signals for a test, return the new signals if any
+    # Analyze the new signals for a test.
+    # Returns the set of newly discovered signals and the number of distinct
+    # signals seen in this execution, or None if there are no new signals.
     def analyze_new_signals(
         self,
         seq: InputSeq,
         signal_records: dict[int, dict[int, list[int]]],
         linux_name: str,
         output_path: Optional[Path] = None,
-    ) -> set[int] | None:
+    ) -> tuple[set[int], int] | None:
         # signal_list = [rec[4] for rec in signal_records]
         # Check if the records have been seen before or not
         signal_list = []
@@ -57,7 +59,10 @@ class SignalCorpus:
                     sig = pc ^ (pc_hash(prev_pc) & 0xfff)
                     signal_list.append(sig)
 
-        new = set(signal_list) - self.seen_signals
+        signal_set = set(signal_list)
+        distinct_signals = len(signal_set)
+
+        new = signal_set - self.seen_signals
 
         if not new:
             print("signal: no new signals found")
@@ -77,7 +82,7 @@ class SignalCorpus:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-        return new
+        return new, distinct_signals
 
     # Analyze the per-action (each command each pid's action is an action) signals for a test
     # Save the new signal hit by each task

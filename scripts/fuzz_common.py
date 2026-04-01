@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import random
 from typing import Optional
 from scripts.consts import FUZZ_DIR
 
@@ -59,11 +60,11 @@ class WorkResult:
 class SeedPool:
     def __init__(self) -> None:
         self._seeds: list[Seed] = []
+        self._weights: list[int] = []
         self._counter = 0
-        self._next_idx = 0   # round-robin index
 
     def next_seed_id(self) -> int:
-        return self._counter + 1
+        return self._counter
     
     def add(self, ops: Ops, n_signals: int, productive_cmd_ids: Optional[list[int]] = None) -> Seed:
         seed = Seed(
@@ -73,15 +74,15 @@ class SeedPool:
             productive_cmd_ids=productive_cmd_ids or [],
         )
         self._seeds.append(seed)
+        self._weights.append(max(1, seed.n_signals))
         self._counter += 1
         return seed
 
     def pick_seed(self) -> "Optional[Seed]":
-        """Round-robin seed selection. Returns None if the pool is empty."""
+        """Pick a seed with probability proportional to its signal count."""
         if not self._seeds:
             return None
-        seed = self._seeds[self._next_idx % len(self._seeds)]
-        self._next_idx += 1
+        seed = random.choices(self._seeds, weights=self._weights, k=1)[0]
         seed.times_replayed += 1
         return seed
 
