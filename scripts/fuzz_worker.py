@@ -43,7 +43,6 @@ _CRASH_MARKERS = [
 
 # Detect whether the QEMU console log contains a kernel crash signature.
 def _check_for_crash(log_file: Path) -> bool:
-    """Return True if the worker console log contains kernel crash markers."""
     try:
         content = log_file.read_bytes()
         return any(marker in content for marker in _CRASH_MARKERS)
@@ -115,7 +114,6 @@ class FuzzWorkerSession:
 
     # Read one protocol frame from the executor socket.
     def _read_frame(self) -> Optional[bytes]:
-        """Read one newline-terminated frame from the kmod stream."""
         buf = bytearray()
         while True:
             ch = self.sock_file.read(1)
@@ -197,8 +195,6 @@ class FuzzWorker:
         self.driver = driver
         self.linux_name = linux_name
         self.qemu_cpus = qemu_cpus
-        self.max_tasks = driver.num_cpus * 3
-        self.max_cgroups = driver.num_cpus * 3
         self.io_timeout_sec = io_timeout_sec
         self.paths = (
             worker_paths(worker_id, base_dir=base_dir)
@@ -239,7 +235,9 @@ class FuzzWorker:
         )
 
         gen_seed = 0 if work.mode in ("replay") else self.rng.randint(0, 2**32 - 1)
-        gen = init_genstate(self.max_tasks, self.max_cgroups, self.driver.num_cpus, gen_seed)
+        max_tasks = self.rng.randint(self.driver.num_cpus * 2, self.driver.num_cpus * 3)
+        max_cgroups = self.rng.randint(self.driver.num_cpus * 2, self.driver.num_cpus * 3)
+        gen = init_genstate(max_tasks, max_cgroups, self.driver.num_cpus, gen_seed)
 
         session = FuzzWorkerSession(gen, proc, self.paths.sock_file, self.logger, self.io_timeout_sec)
 
@@ -427,7 +425,6 @@ def worker_main(
     linux_name: str,
     qemu_cpus: Optional[str] = None,
 ) -> None:
-    """Worker loop: run one QEMU-backed test per queued work item."""
     worker = FuzzWorker(
         worker_id=worker_id,
         task_queue=task_queue,

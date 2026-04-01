@@ -5,6 +5,7 @@
 #include "driver.h"
 #include "internal.h"
 #include "op_handler.h"
+#include "linux/cpumask.h"
 #include "linux/sched.h"
 
 #define MAX_TASKS 1024
@@ -380,7 +381,7 @@ bool kstep_work_conserving_broken(void) {
   TRACE_INFO("work_conserving_check: runnable=%d idle_cpus=%*pbl eligible=%d",
              runnable_tasks, cpumask_pr_args(&idle_cpus), eligible_runnable);
 
-  return runnable_tasks > 4 && !cpumask_empty(&idle_cpus) && eligible_runnable;
+  return runnable_tasks > num_online_cpus() - 1 && !cpumask_empty(&idle_cpus) && eligible_runnable;
 }
 
 /*

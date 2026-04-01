@@ -1,7 +1,7 @@
 import random
 
 from .gen_input_state import GenState, TASK_SLEEPING, TASK_ON_CPU
-from .gen_input_ops import build_ops, RESOURCE_TASK, RESOURCE_CGROUP, OP_NAME_TO_TYPE, OP_TYPE_TO_NAME
+from .gen_input_ops import build_ops, RESOURCE_TASK, RESOURCE_CGROUP, OP_NAME_TO_TYPE
 
 
 def choose_op(m: GenState, ops):
@@ -14,14 +14,12 @@ def choose_op(m: GenState, ops):
             return op
     return ops[-1]
 
-
 def resource_available(m: GenState, res: str) -> bool:
     if res == RESOURCE_TASK:
         return m.has_tasks()
     if res == RESOURCE_CGROUP:
         return m.has_cgroups()
     return False
-
 
 def pick_producer(ops, res: str):
     for op in ops:
@@ -30,9 +28,7 @@ def pick_producer(ops, res: str):
     return None
 
 OPS = build_ops()
-
 _OP_REPLAY = {OP_NAME_TO_TYPE[op.name]: op.replay for op in OPS if op.replay}
-
 
 def init_genstate(max_tasks: int, max_cgroups: int, cpus: int, seed: int) -> GenState:
     return GenState(max_tasks=max_tasks, max_cgroups=max_cgroups, cpus=cpus, rnd=random.Random(seed))
