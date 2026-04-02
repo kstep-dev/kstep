@@ -58,8 +58,13 @@ def main() -> None:
     parser.add_argument("--mutate_ratio", type=float, default=0.9,
                         help="Fraction of iterations applying tick-insertion mutation to a seed "
                              "(remainder is pure replay)")
-    parser.add_argument("--pin_cpus", action="store_true",
-                        help="Pin each QEMU to dedicated host CPUs; run Python on the rest")
+    parser.add_argument(
+        "--pin_cpus",
+        type=str,
+        default=None,
+        metavar="CPUSET",
+        help="Pin QEMU workers and host-side Python processes to CPUs in CPUSET, e.g. 0-9 or 0-3,8-11",
+    )
     parser.add_argument("--demo", action="store_true",
                         help="In the demo mode, only run 1 test per worker")
     args = parser.parse_args()

@@ -39,7 +39,7 @@ class FuzzManager:
         steps: int,
         fresh_ratio: float,
         mutate_ratio: float = 0.35,
-        pin_cpus: bool = False,
+        pin_cpus: Optional[str] = None,
         demo: bool = False,
     ) -> None:
         self.n_workers = n_workers
@@ -141,22 +141,22 @@ class FuzzManager:
         if not self.pin_cpus:
             return
 
-        host_cpus = os.cpu_count() or 1
+        selected_cpus = _parse_cpu_list(self.pin_cpus)
         qemu_total = self.n_workers * self.driver.num_cpus
-        if qemu_total >= host_cpus:
+        if qemu_total >= len(selected_cpus):
             raise RuntimeError(
-                f"pin_cpus: need {qemu_total} QEMU + 1 Python CPUs, only {host_cpus} available"
+                f"pin_cpus: need {qemu_total} CPUs for QEMU plus at least 1 CPU for Python, only {len(selected_cpus)} provided in {self.pin_cpus!r}"
             )
 
         for wid in range(self.n_workers):
             start = wid * self.driver.num_cpus
-            end = start + self.driver.num_cpus - 1
-            self.qemu_cpu_lists[wid] = f"{start}-{end}"
+            end = start + self.driver.num_cpus
+            self.qemu_cpu_lists[wid] = _format_cpu_list(selected_cpus[start:end])
 
-        python_cpus = set(range(qemu_total, host_cpus))
-        os.sched_setaffinity(0, python_cpus)
+        python_cpus = selected_cpus[qemu_total:]
+        os.sched_setaffinity(0, set(python_cpus))
         logging.info(
-            f"CPU pinning: QEMU {self.qemu_cpu_lists}, Python {sorted(python_cpus)}"
+            f"CPU pinning: selected={selected_cpus} QEMU={self.qemu_cpu_lists} Python={python_cpus}"
         )
 
     # Turn Ctrl-C into a cooperative manager shutdown signal.
@@ -398,7 +398,7 @@ def run_manager(
     steps: int,
     fresh_ratio: float,
     mutate_ratio: float = 0.35,
-    pin_cpus: bool = False,
+    pin_cpus: Optional[str] = None,
     demo: bool = False,
 ) -> None:
     manager = FuzzManager(
@@ -412,3 +412,41 @@ def run_manager(
         demo=demo,
     )
     manager.run()
+
+
+def _parse_cpu_list(cpu_list: str) -> list[int]:
+    cpus: list[int] = []
+    for part in cpu_list.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        if "-" in token:
+            start_str, end_str = token.split("-", 1)
+            start = int(start_str)
+            end = int(end_str)
+            if start > end:
+                raise RuntimeError(f"pin_cpus: invalid CPU range {token!r}")
+            cpus.extend(range(start, end + 1))
+        else:
+            cpus.append(int(token))
+
+    cpus = sorted(set(cpus))
+    if not cpus:
+        raise RuntimeError("pin_cpus: CPU set is empty")
+    return cpus
+
+
+def _format_cpu_list(cpus: list[int]) -> str:
+    if not cpus:
+        raise RuntimeError("pin_cpus: empty CPU allocation")
+
+    ranges: list[str] = []
+    start = prev = cpus[0]
+    for cpu in cpus[1:]:
+        if cpu == prev + 1:
+            prev = cpu
+            continue
+        ranges.append(f"{start}-{prev}" if start != prev else str(start))
+        start = prev = cpu
+    ranges.append(f"{start}-{prev}" if start != prev else str(start))
+    return ",".join(ranges)

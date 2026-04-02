@@ -158,11 +158,12 @@ class GenState:
 
     def add_cgroup(self, parent_id: int, child_id: int):
         parent_effective = self._parent_effective_cpuset(parent_id)
+        default_cpuset = self.root_cpuset()
         self.cgroups[child_id] = Cgroup(
             id=child_id,
             parent_id=parent_id,
-            cpuset=parent_effective,
-            effective_cpuset=parent_effective,
+            cpuset=default_cpuset,
+            effective_cpuset=self._compute_effective_cpuset(default_cpuset, parent_effective),
         )
         if child_id not in self.leaf_cgroups:
             self.leaf_cgroups.append(child_id)
@@ -187,4 +188,3 @@ class GenState:
 
     def cgroup_remove_task(self, task_id: int):
         self.task2cgroups.pop(task_id)
-
