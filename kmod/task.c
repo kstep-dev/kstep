@@ -99,7 +99,9 @@ void kstep_task_block(struct task_struct *p) {
 }
 
 void kstep_task_set_prio(struct task_struct *p, int prio) {
+  kstep_cov_enable_controller();
   set_user_nice(p, prio);
+  kstep_cov_disable_controller();
   TRACE_INFO("Set priority of task %d to %d", p->pid, prio);
   kstep_sleep();
 }
@@ -109,7 +111,9 @@ void kstep_task_fifo(struct task_struct *p) {
       .sched_policy = SCHED_FIFO,
       .sched_priority = 80,
   };
+  kstep_cov_enable_controller();
   sched_setattr_nocheck(p, &attr);
+  kstep_cov_disable_controller();
   TRACE_INFO("Set task %d to FIFO", p->pid);
   kstep_sleep();
 }
@@ -119,7 +123,9 @@ void kstep_task_cfs(struct task_struct *p) {
       .sched_policy = SCHED_NORMAL,
       .sched_nice = 0,
   };
+  kstep_cov_enable_controller();
   sched_setattr_nocheck(p, &attr);
+  kstep_cov_disable_controller();
   TRACE_INFO("Set task %d to CFS", p->pid);
   kstep_sleep();
 }
@@ -131,8 +137,12 @@ void kstep_task_pin(struct task_struct *p, int begin, int end) {
     cpumask_set_cpu(i, &mask);
   // directly call set_cpus_allowed_ptr is not enough, as it does not update the user_cpus_ptr
   KSYM_IMPORT(sched_setaffinity);
-  if (KSYM_sched_setaffinity(p->pid, &mask))
+  kstep_cov_enable_controller();
+  if (KSYM_sched_setaffinity(p->pid, &mask)) {
+    kstep_cov_disable_controller();
     panic("Failed to set CPU affinity for task %d to CPUs %d-%d", p->pid, begin, end);
+  }
+  kstep_cov_disable_controller();
   TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
   kstep_sleep();
 }
@@ -148,14 +158,18 @@ void kstep_task_kernel_pause(struct task_struct *p) {
   // Trigger a reschedule on the task's CPU. When returning to userspace,
   // exit_to_user_mode_loop() calls schedule(), which will see the
   // non-RUNNING state and dequeue the task via the normal blocking path.
+  kstep_cov_enable_controller();
   set_tsk_thread_flag(p, TIF_NEED_RESCHED);
   kick_process(p);
+  kstep_cov_disable_controller();
 
   kstep_sleep();
   TRACE_INFO("Paused task %d (kernel)", p->pid);
 }
 
 void kstep_task_kernel_wakeup(struct task_struct *p) {
+  kstep_cov_enable_controller();
   wake_up_process(p);
+  kstep_cov_disable_controller();
   TRACE_INFO("Waked up task %d (kernel)", p->pid);
 }
