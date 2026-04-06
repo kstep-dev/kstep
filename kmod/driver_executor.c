@@ -8,7 +8,7 @@
 #include "op_handler.h"
 
 #define MAX_LINE_LENGTH 1024
-#define WORK_CONSERVING_STATUS_PREFIX "WCB,"
+#define CHECKER_MSG_PREFIX "CHECKER,"
 struct console_parse_state {
   char line_buf[MAX_LINE_LENGTH];
   size_t line_len;
@@ -16,11 +16,13 @@ struct console_parse_state {
 static struct file *console;
 static struct file *sock;
 
-static void write_work_conserving_status(bool broken) {
-  char buf[16];
+static void kstep_write_checker_status(void) {
+  char buf[128];
   loff_t pos = 0;
-  int len = scnprintf(buf, sizeof(buf), WORK_CONSERVING_STATUS_PREFIX "%d\n",
-                      broken ? 1 : 0);
+  int len = scnprintf(buf, sizeof(buf), CHECKER_MSG_PREFIX "%d,%d,%d\n",
+                      kstep_work_conserving_broken()? 1: 0, 
+                      kstep_checker_result().cfs_util_avg_decay,
+                      kstep_checker_result().rt_util_avg_decay);
 
   kernel_write(sock, buf, len, &pos);
 }
@@ -101,12 +103,11 @@ static void run(void) {
     ssize_t nread = kernel_read(sock, buf, sizeof(buf), &pos);
     if (nread <= 0)
       continue;
-    if (process_console_chunk(buf, nread, &state)) {
-      bool broken;
 
+    // Checker: whether work conserving broken after 100 ticks
+    if (process_console_chunk(buf, nread, &state)) {
       kstep_tick_repeat(100);
-      broken = kstep_work_conserving_broken();
-      write_work_conserving_status(broken);
+      kstep_write_checker_status();
       break;
     }
   }
