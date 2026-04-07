@@ -53,9 +53,9 @@ def main() -> None:
                         help="Number of parallel QEMU workers")
     parser.add_argument("--steps", type=int, default=50,
                         help="Ops per test case (fresh mode)")
-    parser.add_argument("--fresh_ratio", type=float, default=0.1,
+    parser.add_argument("--fresh_ratio", type=float, default=0.5,
                         help="Fraction of iterations using fresh random generation")
-    parser.add_argument("--mutate_ratio", type=float, default=0.9,
+    parser.add_argument("--mutate_ratio", type=float, default=0.5,
                         help="Fraction of iterations applying tick-insertion mutation to a seed "
                              "(remainder is pure replay)")
     parser.add_argument(

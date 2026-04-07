@@ -341,20 +341,9 @@ static bool is_task_signal_op(enum kstep_op_type type) {
   }
 }
 
-
-static void print_state(void) {
-  for (int i = 0; i < MAX_TASKS; i++) {
-    struct task_struct *p = kstep_tasks[i].p;
-    if (!p)
-      continue;
-    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d\n", i, p->pid, kstep_task_running(p), p->__state, task_cpu(p));
-  }
-
-  for (int i = 1; i < num_online_cpus(); i++) {
-    struct rq *rq = cpu_rq(i);
-    pr_info("CPU %d: %ld, %ld", i, rq->cfs.avg.util_avg - rq->cfs.removed.util_avg, rq->avg_rt.util_avg);
-  }
-}
+#define for_each_leaf_cfs_rq_safe(rq, cfs_rq, pos)			\
+	list_for_each_entry_safe(cfs_rq, pos, &rq->leaf_cfs_rq_list,	\
+				 leaf_cfs_rq_list)
 
 /* Checkers: work conserving, util_avg decay rate */
 bool kstep_work_conserving_broken(void) {
@@ -398,7 +387,11 @@ static struct checker_result cr = {0};
 struct checker_states {
   s64 cfs_util_avg[NR_CPUS];
   s64 rt_util_avg[NR_CPUS];
+  u64 cfs_last_update[NR_CPUS];
+  u64 rt_last_update[NR_CPUS];
 };
+
+static struct checker_states checker_snapshot;
 
 struct checker_result kstep_checker_result(void) {
   return (struct checker_result){
@@ -408,18 +401,38 @@ struct checker_result kstep_checker_result(void) {
 }
 
 static s64 get_cfs_util_avg(struct rq *rq) {
-  return rq->cfs.avg.util_avg - rq->cfs.removed.util_avg;
+  s64 removed = 0;
+  struct cfs_rq *cfs_rq, *pos;
+  for_each_leaf_cfs_rq_safe(rq, cfs_rq, pos) {
+    removed += cfs_rq->removed.util_avg;
+  }
+  return rq->cfs.avg.util_avg - rq->cfs.removed.util_avg - removed;
 }
 
 static s64 get_rt_util_avg(struct rq *rq) {
   return rq->avg_rt.util_avg;
 }
 
-static s64 scaled_util_decay(s64 before, s64 after) {
+static s64 scaled_util_decay(s64 before, s64 after, s64 interval) {
   if (before <= 0)
     return 0;
 
-  return (before - after) * 1024 / before;
+  return (before - after) * 1024 / before / interval;
+}
+
+
+static void print_state(void) {
+  for (int i = 0; i < MAX_TASKS; i++) {
+    struct task_struct *p = kstep_tasks[i].p;
+    if (!p)
+      continue;
+    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d, class=%d\n", i, p->pid, kstep_task_running(p), p->__state, task_cpu(p), p->policy);
+  }
+
+  for (int i = 1; i < num_online_cpus(); i++) {
+    struct rq *rq = cpu_rq(i);
+    pr_info("CPU %d: %lld, %lld, %lu, %lu, %llu\n", i, get_cfs_util_avg(rq), get_rt_util_avg(rq), jiffies, rq->next_balance, rq->avg_rt.last_update_time);
+  }
 }
 
 /*
@@ -427,11 +440,14 @@ static s64 scaled_util_decay(s64 before, s64 after) {
  * Sends at most one op per call.
  */
 static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
-  struct checker_states cs = {0};
+  struct checker_states *cs = &checker_snapshot;
+  memset(cs, 0, sizeof(*cs));
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = cpu_rq(cpu);
-    cs.cfs_util_avg[cpu] = get_cfs_util_avg(rq);
-    cs.rt_util_avg[cpu] = get_rt_util_avg(rq);
+    cs->cfs_util_avg[cpu] = get_cfs_util_avg(rq);
+    cs->rt_util_avg[cpu] = get_rt_util_avg(rq);
+    cs->cfs_last_update[cpu] = rq->cfs.avg.last_update_time;
+    cs->rt_last_update[cpu] = rq->avg_rt.last_update_time;
   }
 
   kstep_cov_enable();
@@ -450,27 +466,30 @@ static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
       continue;
     // Don't force decay slowly for task migrating cpus or classes
     if (kstep_tasks[i].cur_cpu != task_cpu(p)) {
-      cs.cfs_util_avg[kstep_tasks[i].cur_cpu] = 0;
+      cs->cfs_util_avg[kstep_tasks[i].cur_cpu] = 0;
       kstep_tasks[i].cur_cpu = task_cpu(p);
     }
     if (kstep_tasks[i].cur_policy != p->policy) {
-      cs.cfs_util_avg[kstep_tasks[i].cur_cpu] = 0;
+      cs->cfs_util_avg[kstep_tasks[i].cur_cpu] = 0;
       kstep_tasks[i].cur_policy = p->policy;
     }
   }
 
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = cpu_rq(cpu);
-    s64 cfs_decay = scaled_util_decay(cs.cfs_util_avg[cpu], get_cfs_util_avg(rq));
-    s64 rt_decay = scaled_util_decay(cs.rt_util_avg[cpu], get_rt_util_avg(rq));
+    
+    s64 cfs_decay = scaled_util_decay(cs->cfs_util_avg[cpu], get_cfs_util_avg(rq), rq->clock_pelt - cs->cfs_last_update[cpu] + 1);
+    s64 rt_decay = scaled_util_decay(cs->rt_util_avg[cpu], get_rt_util_avg(rq), rq->clock_pelt - cs->rt_last_update[cpu] + 1);
 
-    if (cfs_decay > 512) {
+    if (cs->cfs_util_avg[cpu] - get_cfs_util_avg(rq) > 50 && cfs_decay > 256) {
       cr.cfs_util_avg_decay += 1;
       TRACE_INFO("cfs_util_avg_decay broken on cpu %d %lld", cpu, cfs_decay);
     }
 
-    if (rt_decay > 512)
+    if (cs->rt_util_avg[cpu] - get_rt_util_avg(rq) > 50 && rt_decay > 256) {
       cr.rt_util_avg_decay += 1;
+      TRACE_INFO("rt_util_avg_decay broken on cpu %d %lld", cpu, rt_decay);
+    }
   }
 
   return true;
