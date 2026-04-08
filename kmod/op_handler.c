@@ -23,6 +23,8 @@ struct queued_op { enum kstep_op_type type; int a, b, c; u64 seq; };
 struct kstep_task {
   struct task_struct *p;
   int cgroup_id;
+  int cur_cpu;
+  int cur_policy; // 0: cfs, 1: rt
 };
 
 static struct kstep_task kstep_tasks[MAX_TASKS];
@@ -339,16 +341,11 @@ static bool is_task_signal_op(enum kstep_op_type type) {
   }
 }
 
+#define for_each_leaf_cfs_rq_safe(rq, cfs_rq, pos)			\
+	list_for_each_entry_safe(cfs_rq, pos, &rq->leaf_cfs_rq_list,	\
+				 leaf_cfs_rq_list)
 
-static void print_state(void) {
-  for (int i = 0; i < MAX_TASKS; i++) {
-    struct task_struct *p = kstep_tasks[i].p;
-    if (!p)
-      continue;
-    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d\n", i, p->pid, kstep_task_running(p), p->__state, task_cpu(p));
-  }
-}
-
+/* Checkers: work conserving, util_avg decay rate */
 bool kstep_work_conserving_broken(void) {
   struct cpumask idle_cpus;
   int runnable_tasks = 0;
@@ -384,11 +381,65 @@ bool kstep_work_conserving_broken(void) {
   return runnable_tasks > num_online_cpus() - 1 && !cpumask_empty(&idle_cpus) && eligible_runnable;
 }
 
+
+static struct checker_result cr = {0};
+
+struct checker_states {
+  s64 cfs_util_avg[NR_CPUS];
+  s64 rt_util_avg[NR_CPUS];
+};
+
+static struct checker_states checker_snapshot;
+
+struct checker_result kstep_checker_result(void) {
+  return (struct checker_result){
+      .cfs_util_avg_decay = cr.cfs_util_avg_decay,
+      .rt_util_avg_decay = cr.rt_util_avg_decay,
+  };
+}
+
+static s64 get_cfs_util_avg(struct rq *rq) {
+  s64 removed = 0;
+  struct cfs_rq *cfs_rq, *pos;
+  for_each_leaf_cfs_rq_safe(rq, cfs_rq, pos) {
+    removed += cfs_rq->removed.util_avg;
+  }
+  return rq->cfs.avg.util_avg - rq->cfs.removed.util_avg - removed;
+}
+
+static s64 get_rt_util_avg(struct rq *rq) {
+  return rq->avg_rt.util_avg;
+}
+
+
+static void print_state(void) {
+  for (int i = 0; i < MAX_TASKS; i++) {
+    struct task_struct *p = kstep_tasks[i].p;
+    if (!p)
+      continue;
+    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d, class=%d, util_avg=%lu\n", i, 
+             p->pid, kstep_task_running(p), p->__state, task_cpu(p), p->policy, p->se.avg.util_avg);
+  }
+
+  for (int i = 1; i < num_online_cpus(); i++) {
+    struct rq *rq = cpu_rq(i);
+    pr_info("CPU %d: %lu, %lu, %llu, %llu, %lu\n", i, rq->cfs.avg.util_avg, rq->avg_rt.util_avg, rq->clock_task, rq->clock_pelt, rq->lost_idle_time);
+  }
+}
+
 /*
  * Try to send the head queued op for task @id if its required state is met.
  * Sends at most one op per call.
  */
 static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
+  struct checker_states *cs = &checker_snapshot;
+  memset(cs, 0, sizeof(*cs));
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct rq *rq = cpu_rq(cpu);
+    cs->cfs_util_avg[cpu] = get_cfs_util_avg(rq);
+    cs->rt_util_avg[cpu] = get_rt_util_avg(rq);
+  }
+
   kstep_cov_enable();
   pr_info("EXECOP: {\"op\": %d, \"a\": %d, \"b\": %d, \"c\": %d}\n", type, a, b, c);
   if (!op_handlers[type](a, b, c))
@@ -398,6 +449,41 @@ static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
   print_state();
+
+  for (int i = 0; i < MAX_TASKS; i++) {
+    struct task_struct *p = kstep_tasks[i].p;
+    if (!p)
+      continue;
+    // Don't force decay slowly for task migrating cpus or classes
+    if (kstep_tasks[i].cur_cpu != task_cpu(p)) {
+      cs->cfs_util_avg[kstep_tasks[i].cur_cpu] = 0;
+      kstep_tasks[i].cur_cpu = task_cpu(p);
+    }
+    if (kstep_tasks[i].cur_policy != p->policy) {
+      cs->cfs_util_avg[kstep_tasks[i].cur_cpu] = 0;
+      kstep_tasks[i].cur_policy = p->policy;
+    }
+  }
+
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct rq *rq = cpu_rq(cpu);
+
+    if (cs->cfs_util_avg[cpu] - get_cfs_util_avg(rq) > 1010) {
+      cr.cfs_util_avg_decay += 1;
+      TRACE_INFO("cfs_util_avg_decay broken on cpu %d", cpu);
+    }
+
+    else if (cs->rt_util_avg[cpu] - get_rt_util_avg(rq) > 1010) {
+      cr.rt_util_avg_decay += 1;
+      TRACE_INFO("rt_util_avg_decay broken on cpu %d", cpu);
+    }
+
+    else if (cs->rt_util_avg[cpu] + cs->cfs_util_avg[cpu] - get_cfs_util_avg(rq) - get_rt_util_avg(rq) > 1010) {
+      cr.rt_util_avg_decay += 1;
+      TRACE_INFO("total cfs & rt_util_avg_decay broken on cpu %d", cpu);
+    }
+  }
+
   return true;
 }
 

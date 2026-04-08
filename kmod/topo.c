@@ -7,6 +7,10 @@
 static char executor_topology[EXECUTOR_TOPOLOGY_LEN] = "";
 module_param_string(topology, executor_topology, EXECUTOR_TOPOLOGY_LEN, 0644);
 
+#define EXECUTOR_FREQUENCY_LEN 256
+static char executor_frequency[EXECUTOR_FREQUENCY_LEN] = "";
+module_param_string(frequency, executor_frequency, EXECUTOR_FREQUENCY_LEN, 0644);
+
 KSYM_IMPORT_TYPED(struct sched_domain_topology_level *, sched_domain_topology);
 #define for_each_tl(tl) for (tl = *KSYM_sched_domain_topology; tl->mask; tl++)
 
@@ -289,6 +293,43 @@ void kstep_topo_param_apply(void) {
   }
 
   kstep_topo_apply();
+}
+
+void kstep_freq_param_apply(void) {
+  char freq_buf[EXECUTOR_FREQUENCY_LEN];
+  char *cursor, *freq_spec;
+  int cpu = 0;
+
+  if (!executor_frequency[0] || strcmp(executor_frequency, "none") == 0) {
+    pr_info("executor: custom frequency disabled\n");
+    return;
+  }
+
+  strscpy(freq_buf, executor_frequency, sizeof(freq_buf));
+  cursor = freq_buf;
+
+  while ((freq_spec = strsep(&cursor, "/")) != NULL) {
+    int scale;
+
+    freq_spec = strim(freq_spec);
+    if (!*freq_spec)
+      continue;
+    if (cpu >= num_online_cpus())
+      panic("Too many CPU frequencies in spec %s", executor_frequency);
+    
+    if (kstrtoint(freq_spec, 10, &scale) != 0 || scale <= 0)
+      panic("Invalid CPU frequency scale %s in spec %s", freq_spec,
+            executor_frequency);
+
+    if (cpu != 0)
+      kstep_cpu_set_freq(cpu, scale);
+    TRACE_INFO("executor: applying frequency cpu=%d scale=%d\n", cpu, scale);
+    cpu++;
+  }
+
+  if (cpu != num_online_cpus())
+    panic("Frequency spec %s provided %d CPUs, expected %d",
+          executor_frequency, cpu, num_online_cpus());
 }
 
 void kstep_cpu_set_freq(int cpu, int scale) {

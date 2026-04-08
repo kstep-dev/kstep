@@ -13,8 +13,8 @@
 #define CGROUP_ROOT "/sys/fs/cgroup/"
 #define CGROUP_CONTROL "+cpu +cpuset"
 
-#define MAX_PATH_LENGTH 64
-#define MAX_DATA_LENGTH 64
+#define MAX_PATH_LENGTH 512
+#define MAX_DATA_LENGTH 512
 
 void kstep_write(const char *path, const char *buf, size_t size) {
   TRACE_INFO("Writing %s: %s", path, buf);

@@ -10,6 +10,13 @@ from scripts.consts import FUZZ_DIR
 
 Ops = list[tuple[int, int, int, int]]
 
+
+@dataclass(frozen=True)
+class CheckerStatus:
+    work_conserving_broken: bool
+    cfs_util_decay_broken: bool
+    rt_util_decay_broken: bool
+
 @dataclass(frozen=True)
 class WorkerPaths:
     log_file: Path
@@ -53,6 +60,7 @@ class WorkResult:
     exec_time: float
     mode: str = "fresh"        # "fresh" | "replay"
     seed_id: Optional[int] = None
+    checker_status: Optional[CheckerStatus] = None
     error: Optional[str] = None
     error_category: Optional[str] = None  # "crash" | "timedout" | "retry_tick" | "op_mismatch" | "fail_log" | "other"
 

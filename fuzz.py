@@ -48,14 +48,20 @@ def main() -> None:
         default="CLS:0/1-2/1-2/3-4/3-4",
         help="Executor topology passed as a module param, e.g. CLS:0/1-2/1-2/3-4/3-4",
     )
+    parser.add_argument(
+        "--frequency",
+        type=str,
+        default=None,
+        help="Executor per-CPU frequency scale passed as a module param, e.g. 1024/512/1024/512/1024",
+    )
     parser.add_argument("--workers", type=int,
                         default=1,
                         help="Number of parallel QEMU workers")
     parser.add_argument("--steps", type=int, default=50,
                         help="Ops per test case (fresh mode)")
-    parser.add_argument("--fresh_ratio", type=float, default=0.1,
+    parser.add_argument("--fresh_ratio", type=float, default=0.5,
                         help="Fraction of iterations using fresh random generation")
-    parser.add_argument("--mutate_ratio", type=float, default=0.9,
+    parser.add_argument("--mutate_ratio", type=float, default=0.5,
                         help="Fraction of iterations applying tick-insertion mutation to a seed "
                              "(remainder is pure replay)")
     parser.add_argument(
@@ -86,12 +92,14 @@ def main() -> None:
         num_cpus=args.num_cpus,
         mem_mb=args.mem_mb,
         topology=args.topology,
+        frequency=args.frequency,
     )
 
     logging.info(
         f"kSTEP fuzzer: workers={args.workers}  driver=executor  "
         f"linux={args.linux_name}  steps={args.steps}  "
         f"topology={args.topology or 'default'}  "
+        f"frequency={args.frequency or 'default'}  "
         f"demo={args.demo}  "
         f"fresh_ratio={args.fresh_ratio}  mutate_ratio={args.mutate_ratio}"
     )

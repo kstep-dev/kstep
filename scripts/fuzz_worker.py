@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import BinaryIO, Optional
 
 from run import Driver, start_qemu
-from scripts.fuzz_common import Ops, WorkItem, WorkResult, worker_paths
+from scripts.fuzz_common import CheckerStatus, Ops, WorkItem, WorkResult, worker_paths
 from scripts.gen_input_core import (
     _op_matches_task_state,
     generate_next_command,
@@ -28,23 +28,47 @@ from scripts.gen_input_state import GenState
 
 # Marker byte written by kstep_write_state
 OP_TYPE_NR = len(OP_NAME_TO_TYPE)
-WORK_CONSERVING_PREFIX = b"WCB,"
+CHECKER_STATUS_PREFIX = b"CHECKER,"
 
 _CRASH_MARKERS = [
-    b"Kernel panic",
-    b"kernel BUG at",
-    b"BUG: ",
-    b"KASAN: ",
-    b"UBSAN: ",
+    b"kernel panic",
+    b"kernel bug at",
+    b"bug: ",
+    b"kasan: ",
+    b"ubsan: ",
     b"general protection fault",
-    b"Oops: ",
+    b"oops: ",
+    b"error",
+    b"warn",
+    b"fail"
 ]
+
+_KSTEP_START_MARKER = b"Run /init as init process"
+
+
+def _read_log_bytes(log_file: Path) -> bytes:
+    try:
+        return log_file.read_bytes()
+    except Exception:
+        return b""
+
+
+def _has_kstep_start_marker(log_file: Path) -> bool:
+    return _KSTEP_START_MARKER in _read_log_bytes(log_file)
+
+
+def _log_region_after_kstep_start(log_file: Path) -> bytes:
+    content = _read_log_bytes(log_file)
+    start = content.find(_KSTEP_START_MARKER)
+    if start < 0:
+        return content
+    return content[start:]
 
 
 # Detect whether the QEMU console log contains a kernel crash signature.
 def _check_for_crash(log_file: Path) -> bool:
     try:
-        content = log_file.read_bytes()
+        content = _log_region_after_kstep_start(log_file).lower()
         return any(marker in content for marker in _CRASH_MARKERS)
     except Exception:
         return False
@@ -54,7 +78,6 @@ def _check_for_crash(log_file: Path) -> bool:
 class KmodState:
     task_states: list[dict]
     executed: bool
-
 
 @dataclass
 class FuzzWorkerSession:
@@ -146,20 +169,32 @@ class FuzzWorkerSession:
             ]
             return KmodState(task_states=task_states, executed=executed)
 
-    # Decode the final work-conserving status sent after EXIT.
-    def read_work_conserving_status(self) -> Optional[bool]:
+    # Decode the final checker status sent after EXIT.
+    def read_checker_status(self) -> Optional[CheckerStatus]:
         while True:
             line = self._read_frame()
             if not line:
                 return None
-            if not line.startswith(WORK_CONSERVING_PREFIX):
+            if not line.startswith(CHECKER_STATUS_PREFIX):
                 continue
 
-            payload = line[len(WORK_CONSERVING_PREFIX):-1].strip()
-            if payload == b"1":
-                return True
-            if payload == b"0":
-                return False
+            payload = line[len(CHECKER_STATUS_PREFIX):-1].strip()
+            parts = payload.split(b",", 2)
+            if len(parts) != 3:
+                continue
+
+            work_conserving_broken, cfs_util_decay_broken, rt_util_decay_broken = parts
+
+            try:
+                result = CheckerStatus(
+                    work_conserving_broken=(work_conserving_broken == b"1"),
+                    cfs_util_decay_broken=(int(cfs_util_decay_broken) > 0),
+                    rt_util_decay_broken=(int(rt_util_decay_broken) > 0),
+                )
+            except Exception as _:
+                continue
+
+            return result
 
     # Send one op to kmod and fold the returned state into the generator model.
     def send_op(self, op: int, a: int, b: int, c: int) -> bool:
@@ -235,8 +270,9 @@ class FuzzWorker:
         )
 
         gen_seed = 0 if work.mode in ("replay") else self.rng.randint(0, 2**32 - 1)
-        max_tasks = self.rng.randint(self.driver.num_cpus * 2, self.driver.num_cpus * 3)
-        max_cgroups = self.rng.randint(self.driver.num_cpus * 2, self.driver.num_cpus * 3)
+        kstep_cpus = self.driver.num_cpus - 1
+        max_tasks = self.rng.randint(kstep_cpus * 1, kstep_cpus * 3)
+        max_cgroups = self.rng.randint(kstep_cpus * 1, kstep_cpus * 3)
         gen = init_genstate(max_tasks, max_cgroups, self.driver.num_cpus, gen_seed)
 
         session = FuzzWorkerSession(gen, proc, self.paths.sock_file, self.logger, self.io_timeout_sec)
@@ -268,8 +304,12 @@ class FuzzWorker:
                     f"{log_prefix} {generated}: op={op},{a},{b},{c} "
                     f"executed={executed} task_state={session.gen.task_state}"
                 )
-                ops_executed.append((op, a, b, c))
-                generated += 1
+                if (op == OP_NAME_TO_TYPE["TICK_REPEAT"]):
+                    for i in range(a):
+                        ops_executed.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
+                else:
+                    ops_executed.append((op, a, b, c))
+                    generated += 1
         return ops_executed
 
     # Replay the seed prefix and optionally extend it with generated mutation steps.
@@ -279,6 +319,8 @@ class FuzzWorker:
         prefix_len = len(work.ops)
         if work.mode == "mutate" and work.pivot_idx is not None:
             prefix_len = min(work.pivot_idx + 1, len(work.ops))
+
+        replayed = 0
 
         for i, (op, a, b, c) in enumerate(work.ops[:prefix_len]):
             for retry in range(50):
@@ -290,6 +332,8 @@ class FuzzWorker:
                         )
                         ops_executed.append((op, a, b, c))
                         replay_update_genstate(session.gen, op, a, b, c)
+                        if op != OP_NAME_TO_TYPE["TICK"] or op != OP_NAME_TO_TYPE["TICK_REPEAT"]:
+                            replayed += 1
                         break
                 self.logger.debug(f"REPLAY {i} retry {retry}: task_state={session.gen.task_state}")
             else:
@@ -302,6 +346,7 @@ class FuzzWorker:
                 )
 
         if work.mode == "mutate" and work.pivot_idx is not None:
+            work.steps = max(int(work.steps * 0.2), work.steps - replayed)
             return self._execute_generated_ops(
                 work,
                 session,
@@ -316,16 +361,24 @@ class FuzzWorker:
             return self._execute_replay_or_mutate(work, session)
         return self._execute_generated_ops(work, session)
 
-    # Ask the executor to exit cleanly and report any work-conserving failure.
-    def _finish_session(self, session: FuzzWorkerSession) -> Optional[str]:
+    # Ask the executor to exit cleanly and report checker outputs.
+    def _finish_session(
+        self,
+        session: FuzzWorkerSession,
+    ) -> tuple[Optional[str], Optional[CheckerStatus]]:
         session.sock.sendall(b"EXIT\n")
-        work_conserving_broken = session.read_work_conserving_status()
-        self.logger.info(f"EXIT status: work_conserving_broken={work_conserving_broken}")
+        checker_status = session.read_checker_status()
+        self.logger.info(
+            "EXIT status: work_conserving_broken=%s cfs_util_decay_broken=%s rt_util_decay_broken=%s",
+            None if checker_status is None else checker_status.work_conserving_broken,
+            None if checker_status is None else checker_status.cfs_util_decay_broken,
+            None if checker_status is None else checker_status.rt_util_decay_broken,
+        )
 
         session.kill(kill_proc=False)
-        if work_conserving_broken:
-            return "wcb: work conserving broken"
-        return None
+        if checker_status is None:
+            return "checker: missing checker status", None
+        return None, checker_status
 
     # Compute how many ops must execute for this work item to count as complete.
     def _expected_ops(self, work: WorkItem) -> int:
@@ -355,11 +408,15 @@ class FuzzWorker:
             self.logger.error(f"Worker {self.worker_id}: {error}")
             return error
 
-        with self.paths.log_file.open("r", errors="ignore") as lf:
-            log_content = lf.read().lower()
-        if "fail" in log_content or "warn" in log_content:
-            self.logger.error(f"Worker {self.worker_id}: Detected 'fail' or 'warn' in log file.")
-            return "errorlog"
+        if not _has_kstep_start_marker(self.paths.log_file):
+            self.logger.error(
+                f"Worker {self.worker_id}: Missing kSTEP start marker "
+                f"{_KSTEP_START_MARKER.decode('utf-8', errors='ignore')!r} in log file."
+            )
+            return "bootfail: missing kstep start marker"
+
+        if _check_for_crash(self.paths.log_file):
+            return "errorlog: error log"
         return None
 
     # Run one work item end-to-end and package the resulting execution record.
@@ -370,6 +427,7 @@ class FuzzWorker:
         t0 = time.monotonic()
         ops_executed: Ops = []
         error: Optional[str] = None
+        checker_status: Optional[CheckerStatus] = None
         session: Optional[FuzzWorkerSession] = None
 
         try:
@@ -381,17 +439,20 @@ class FuzzWorker:
                 exec_time=time.monotonic() - t0,
                 mode=work.mode,
                 seed_id=work.seed_id,
+                checker_status=checker_status,
                 error=str(exc),
             )
 
         try:
             ops_executed = self._execute_work(work, session)
-            error = self._finish_session(session)
+            error, checker_status = self._finish_session(session)
         except Exception as exc:
             session.kill(kill_proc=True)
             self.logger.error(f"Worker {self.worker_id}: {exc}")
             if _check_for_crash(self.paths.log_file):
                 error = "qemucrash: qemucrash"
+            elif not _has_kstep_start_marker(self.paths.log_file):
+                error = "bootfail: missing kstep start marker"
             else:
                 error = str(exc)
 
@@ -402,6 +463,7 @@ class FuzzWorker:
             exec_time=time.monotonic() - t0,
             mode=work.mode,
             seed_id=work.seed_id,
+            checker_status=checker_status,
             error=error
         )
 
