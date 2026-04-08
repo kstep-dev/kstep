@@ -294,7 +294,11 @@ void kstep_cgroup_destroy(const char *name) {
   rcu_read_lock();
   css = rcu_dereference(cgrp->subsys[cpu_cgrp_id]);
   if (css)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
     tg = css_tg(css);
+#else
+    tg = css ? container_of(css, struct task_group, css) : NULL;
+#endif
   rcu_read_unlock();
 
   kstep_rmdir(path);
