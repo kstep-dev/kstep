@@ -57,7 +57,8 @@ RESOURCE_TASK = "task"
 RESOURCE_CGROUP = "cgroup"
 
 # Generator parameters
-MAX_TICK = 100
+MIN_TICK = 50
+MAX_TICK = 150
 
 def op_task_create(m: GenState):
     tid = m.next_task_id()
@@ -117,7 +118,7 @@ def op_tick(m: GenState):
 
 
 def op_tick_repeat(m: GenState):
-    n = m.rnd.randint(1, MAX_TICK)
+    n = m.rnd.randint(MIN_TICK, MAX_TICK)
     return (OP_NAME_TO_TYPE["TICK_REPEAT"], n, 0, 0)
 
 
