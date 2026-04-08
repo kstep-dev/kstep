@@ -1,4 +1,5 @@
 #include <linux/cpumask.h>
+#include <linux/cgroup.h>
 #include <linux/dcache.h>
 #include <linux/freezer.h>
 #include <linux/fs.h>
@@ -207,6 +208,44 @@ static void kstep_cgroup_mkdir(const char *name) {
   kstep_mkdir(path);
 }
 
+static void kstep_rmdir(const char *dir) {
+  struct path path;
+  struct inode *parent;
+  int err;
+
+  err = kern_path(dir, LOOKUP_DIRECTORY, &path);
+  if (err)
+    panic("kern_path %s failed: %d", dir, err);
+
+  err = mnt_want_write(path.mnt);
+  if (err) {
+    path_put(&path);
+    panic("mnt_want_write %s failed: %d", dir, err);
+  }
+
+  parent = d_inode(path.dentry->d_parent);
+  inode_lock_nested(parent, I_MUTEX_PARENT);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+  err = vfs_rmdir(&nop_mnt_idmap, parent, path.dentry, NULL);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+  err = vfs_rmdir(&nop_mnt_idmap, parent, path.dentry);
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(5, 12, 0)
+  err = vfs_rmdir(&init_user_ns, parent, path.dentry);
+#else
+  err = vfs_rmdir(parent, path.dentry);
+#endif
+
+  inode_unlock(parent);
+  mnt_drop_write(path.mnt);
+  path_put(&path);
+
+  if (err)
+    panic("rmdir %s failed: %d", dir, err);
+
+  TRACE_INFO("Removed directory %s", dir);
+}
+
 void kstep_cgroup_init(void) {
   kstep_cgroup_write("", "cgroup.subtree_control", CGROUP_CONTROL);
 
@@ -230,6 +269,45 @@ void kstep_cgroup_create(const char *name) {
     panic("failed to form cpuset for %s", name);
 
   kstep_cgroup_set_cpuset(name, cpuset);
+}
+
+void kstep_cgroup_destroy(const char *name) {
+  char path[MAX_PATH_LENGTH] = {0};
+  struct cgroup *cgrp;
+  struct cgroup_subsys_state *css = NULL;
+  struct task_group *tg = NULL;
+  typedef void(unregister_fair_sched_group_type)(struct task_group *tg);
+  KSYM_IMPORT_TYPED(unregister_fair_sched_group_type,
+                    unregister_fair_sched_group);
+
+  if (!name[0])
+    panic("refusing to destroy root cgroup");
+
+  int ret = scnprintf(path, sizeof(path), CGROUP_ROOT "%s", name);
+  if (ret <= 0 || ret >= sizeof(path))
+    panic("failed to form cgroup path for %s", name);
+
+  cgrp = cgroup_get_from_path(name);
+  if (IS_ERR(cgrp))
+    panic("cgroup_get_from_path %s failed: %ld", path, PTR_ERR(cgrp));
+
+  rcu_read_lock();
+  css = rcu_dereference(cgrp->subsys[cpu_cgrp_id]);
+  if (css)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+    tg = css_tg(css);
+#else
+    tg = css ? container_of(css, struct task_group, css) : NULL;
+#endif
+  rcu_read_unlock();
+
+  kstep_rmdir(path);
+  kstep_sleep();
+
+  if (tg)
+    KSYM_unregister_fair_sched_group(tg);
+
+  cgroup_put(cgrp);
 }
 
 void kstep_cgroup_set_cpuset(const char *name, const char *cpuset) {
