@@ -39,6 +39,7 @@ class Driver:
     num_cpus: int = 2
     mem_mb: int = 512
     topology: Optional[str] = None
+    frequency: Optional[str] = None
 
 
 def get_qemu_path() -> Path:
@@ -105,6 +106,8 @@ def start_qemu(
     boot_args += [f"driver={driver.name}"]
     if driver.topology:
         boot_args += [f"topology={driver.topology}"]
+    if driver.frequency:
+        boot_args += [f"frequency={driver.frequency}"]
 
     if driver.params:
         boot_args.extend(driver.params)
@@ -263,6 +266,7 @@ def main():
     parser.add_argument("--num_cpus", type=int, default=None)
     parser.add_argument("--mem_mb", type=int, default=None)
     parser.add_argument("--topology", type=str, default=None)
+    parser.add_argument("--frequency", type=str, default=None)
     parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 

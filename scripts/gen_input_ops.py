@@ -1,6 +1,5 @@
 from typing import Callable, List, Optional
 from dataclasses import dataclass, field
-from enum import IntEnum
 
 from .gen_input_state import (
     GenState,
@@ -58,7 +57,7 @@ RESOURCE_TASK = "task"
 RESOURCE_CGROUP = "cgroup"
 
 # Generator parameters
-MAX_TICK = 10
+MAX_TICK = 100
 
 def op_task_create(m: GenState):
     tid = m.next_task_id()
@@ -215,7 +214,7 @@ OPS: List[Op] = [
     ),
     Op(
         name="TASK_FIFO",
-        weight=1,
+        weight=2,
         is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
         emit=op_task_fifo,
         requires=[RESOURCE_TASK],
@@ -255,13 +254,13 @@ OPS: List[Op] = [
     ),
     Op(
         name="TICK",
-        weight=15,
+        weight=0,
         is_applicable=lambda m: True,
         emit=op_tick,
     ),
     Op(
         name="TICK_REPEAT",
-        weight=0,
+        weight=5,
         is_applicable=lambda m: True,
         emit=op_tick_repeat,
         arg_types=[ARG_INT, None, None],

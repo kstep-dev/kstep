@@ -83,7 +83,8 @@ static void setup(void) {
   console = filp_open("/dev/ttyS1", O_RDONLY, 0);
   sock = filp_open("/dev/ttyS3", O_RDWR, 0);
 
-  kstep_topo_param_apply();  
+  kstep_topo_param_apply();
+  kstep_freq_param_apply();
   kstep_cov_init();
 }
 
