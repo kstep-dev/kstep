@@ -59,10 +59,12 @@ def main(driver: str):
     elif driver == "h_nr_runnable":
         type = "runnable_avg"
         ylabel = "Runnable Avg"
+    elif driver == "util_avg":
+        type = "avg_util"
+        ylabel = "Average Utilization"
     else:
         type = "avg_util"
         ylabel = "Average Utilization"
-
     buggy_df = parse_jsonl(RESULTS_DIR / f"{driver}_buggy.jsonl", type)
     fixed_df = parse_jsonl(RESULTS_DIR / f"{driver}_fixed.jsonl", type)
 
