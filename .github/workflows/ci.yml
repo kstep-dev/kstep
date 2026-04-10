@@ -70,19 +70,19 @@ jobs:
           key: ${{matrix.version}}-${{hashFiles('linux/config.kstep**', 'linux/cov.c')}}
 
       - name: Linux - Download
-        if: steps.linux-cache.outputs.cache-hit != 'true'
+        # if: steps.linux-cache.outputs.cache-hit != 'true'
         run: ./checkout_linux.py ${{matrix.version}} --tarball
 
       - name: Linux - Install build dependencies
-        if: steps.linux-cache.outputs.cache-hit != 'true'
+        # if: steps.linux-cache.outputs.cache-hit != 'true'
         run: sudo apt update && sudo apt install -y libelf-dev
 
       - name: Linux - Build
-        if: steps.linux-cache.outputs.cache-hit != 'true'
+        # if: steps.linux-cache.outputs.cache-hit != 'true'
         run: make linux; make linux-clean
 
       - name: Linux - Save cache
-        if: steps.linux-cache.outputs.cache-hit != 'true'
+        # if: steps.linux-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: |
