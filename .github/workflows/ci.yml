@@ -90,6 +90,12 @@ jobs:
             build
           key: ${{matrix.version}}-${{hashFiles('linux/config.kstep**', 'linux/cov.c')}}
 
+      - name: tmp debug 1
+        run: ls
+
+      - name: tmp debug 2
+        run: ls linux/
+
       - name: Build kSTEP
         run: make kstep
 
