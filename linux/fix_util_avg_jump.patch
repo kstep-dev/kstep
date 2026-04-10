@@ -1,0 +1,87 @@
+From 8fbd03042d00267651bb1f1ce74844ff5b29d9f4 Mon Sep 17 00:00:00 2001
+From: Tingjia-0v0 <tjcao980311@gmail.com>
+Date: Fri, 10 Apr 2026 14:56:14 -0500
+Subject: [PATCH] fix_util_avg_jump
+
+---
+ kernel/Makefile       |  1 +
+ kernel/cov.c          |  1 +
+ kernel/sched/Makefile |  1 +
+ kernel/sched/pelt.h   | 29 ++++++++++++++++++++---------
+ 4 files changed, 23 insertions(+), 9 deletions(-)
+ create mode 120000 kernel/cov.c
+
+diff --git a/kernel/Makefile b/kernel/Makefile
+index 6785982013dc..60e1a8fd7d82 100644
+--- a/kernel/Makefile
++++ b/kernel/Makefile
+@@ -207,3 +207,4 @@ $(obj)/kheaders.md5: $(obj)/kheaders-srclist FORCE
+ 	$(call filechk,kheaders_md5sum)
+ 
+ clean-files := kheaders.md5 kheaders-srclist kheaders-objlist
++obj-y += cov.o
+diff --git a/kernel/cov.c b/kernel/cov.c
+new file mode 120000
+index 000000000000..c10ca564a3ef
+--- /dev/null
++++ b/kernel/cov.c
+@@ -0,0 +1 @@
++/users/Tingjia/project/kSTEP/linux/cov.c
+\ No newline at end of file
+diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
+index b1f1a367034f..b9547f594d2b 100644
+--- a/kernel/sched/Makefile
++++ b/kernel/sched/Makefile
+@@ -40,3 +40,4 @@ obj-y += core.o
+ obj-y += fair.o
+ obj-y += build_policy.o
+ obj-y += build_utility.o
++ccflags-y += -fsanitize-coverage=trace-pc
+diff --git a/kernel/sched/pelt.h b/kernel/sched/pelt.h
+index f921302dc40f..0134883b0676 100644
+--- a/kernel/sched/pelt.h
++++ b/kernel/sched/pelt.h
+@@ -139,20 +139,31 @@ static inline void update_idle_rq_clock_pelt(struct rq *rq)
+ {
+ 	u32 divider = ((LOAD_AVG_MAX - 1024) << SCHED_CAPACITY_SHIFT) - LOAD_AVG_MAX;
+ 	u32 util_sum = rq->cfs.avg.util_sum;
++	unsigned long compute_ratio;
++	u32 threshold;
++	u64 gap;
+ 	util_sum += rq->avg_rt.util_sum;
+ 	util_sum += rq->avg_dl.util_sum;
+ 
+ 	/*
+-	 * Reflecting stolen time makes sense only if the idle
+-	 * phase would be present at max capacity. As soon as the
+-	 * utilization of a rq has reached the maximum value, it is
+-	 * considered as an always running rq without idle time to
+-	 * steal. This potential idle time is considered as lost in
+-	 * this case. We keep track of this lost idle time compare to
+-	 * rq's clock_task.
++	 * Preserve a proportional part of the clock_task/clock_pelt gap once
++	 * the rq utilization exceeds the amount already implied by the current
++	 * compute ratio. This smooths the lost_idle_time update for partially
++	 * busy rq's while still preserving the full gap at saturation.
+ 	 */
+-	if (util_sum >= divider)
+-		rq->lost_idle_time += rq_clock_task(rq) - rq->clock_pelt;
++	compute_ratio = arch_scale_cpu_capacity(cpu_of(rq));
++	compute_ratio = cap_scale(compute_ratio, arch_scale_freq_capacity(cpu_of(rq)));
++	threshold = mult_frac(divider, compute_ratio, SCHED_CAPACITY_SCALE);
++	gap = rq_clock_task(rq) - rq->clock_pelt;
++
++	if (util_sum > threshold && threshold < divider) {
++		u32 preserve_num = min_t(u32, util_sum, divider) - threshold;
++		u32 preserve_den = divider - threshold;
++
++		rq->lost_idle_time += mult_frac(gap, preserve_num, preserve_den);
++	} else if (util_sum >= divider) {
++		rq->lost_idle_time += gap;
++	}
+ 
+ 	_update_idle_rq_clock_pelt(rq);
+ }
+-- 
+2.43.0
+

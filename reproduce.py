@@ -83,6 +83,14 @@ BUGS_EXTRA = [
         num_cpus=5,
         plot_format="lb_nr_running",
     ),
+
+    Bug(
+        "util_avg_jump",
+        version="c369299895a591d96745d6492d4888259b004a9e",
+        patch="fix_util_avg_jump.patch",
+        num_cpus=2,
+        plot_format="val",
+    )
 ]
 # fmt: on
 
