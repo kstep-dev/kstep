@@ -13,7 +13,7 @@ kSTEP is a framework for reproducing and testing Linux kernel scheduler bugs.
 #### 📦 Clone the repository
 
 ```sh
-git clone --recursive https://github.com/ShawnZhong/kSTEP
+git clone --recursive https://github.com/kstep-dev/kSTEP
 ```
 
 #### 💾 Install dependencies
