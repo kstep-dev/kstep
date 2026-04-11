@@ -21,6 +21,7 @@ enum kstep_op_type {
   OP_CGROUP_ADD_TASK,
   OP_CPU_SET_FREQ,
   OP_CPU_SET_CAPACITY,
+  OP_CGROUP_DESTROY,
   OP_TYPE_NR,
 };
 

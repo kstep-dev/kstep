@@ -53,6 +53,27 @@ static bool build_cgroup_name(int id, char *buf) {
   return true;
 }
 
+static bool cgroup_is_leaf(int id) {
+  for (int i = 0; i < MAX_CGROUPS; i++) {
+    if (cgroup_exists[i] && cgroup_parent_id[i] == id)
+      return false;
+  }
+  return true;
+}
+
+static void cgroup_move_tasks_to_root(int id) {
+  for (int i = 0; i < MAX_TASKS; i++) {
+    if (!kstep_tasks[i].p || kstep_tasks[i].cgroup_id != id)
+      continue;
+
+    TRACE_INFO("Moving task %d from cgroup %d to root",
+               kstep_tasks[i].p->pid, id);
+    kstep_cgroup_add_task("", kstep_tasks[i].p->pid);
+    kstep_task_pin(kstep_tasks[i].p, 1, num_online_cpus() - 1);
+    kstep_tasks[i].cgroup_id = -1;
+  }
+}
+
 static bool pid_known(pid_t pid) {
   for (int i = 0; i < MAX_TASKS; i++) {
     if (kstep_tasks[i].p && kstep_tasks[i].p->pid == pid)
@@ -218,14 +239,9 @@ static bool op_cgroup_create(int a, int b, int c) {
   if (!build_cgroup_name(child_id, name))
     return false;
 
-  // Move the task back to the root cgroup: only the leaf cgroup has tasks in cgroupv2
-  for (int i = 0; i < MAX_TASKS; i++) {
-    if (parent_id != -1 && kstep_tasks[i].p && kstep_tasks[i].cgroup_id == parent_id) {
-      kstep_cgroup_add_task("", kstep_tasks[i].p->pid);
-      kstep_task_pin(kstep_tasks[i].p, 1, num_online_cpus() - 1);
-      kstep_tasks[i].cgroup_id = -1;
-    }
-  }
+  // Only leaf cgroups can contain tasks in cgroup v2.
+  if (parent_id != -1)
+    cgroup_move_tasks_to_root(parent_id);
 
   kstep_cgroup_create(name);
   return true;
@@ -284,6 +300,25 @@ static bool op_cgroup_add_task(int a, int b, int c) {
   return true;
 }
 
+static bool op_cgroup_destroy(int a, int b, int c) {
+  char name[MAX_CGROUP_NAME_LEN];
+  (void)b;
+  (void)c;
+
+  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
+    return false;
+  if (!cgroup_is_leaf(a))
+    return false;
+  if (!build_cgroup_name(a, name))
+    return false;
+
+  cgroup_move_tasks_to_root(a);
+  kstep_cgroup_destroy(name);
+  cgroup_exists[a] = false;
+  cgroup_parent_id[a] = -1;
+  return true;
+}
+
 typedef bool (*op_handler_fn)(int a, int b, int c);
 
 static op_handler_fn op_handlers[OP_TYPE_NR] = {
@@ -303,6 +338,7 @@ static op_handler_fn op_handlers[OP_TYPE_NR] = {
     [OP_CGROUP_ADD_TASK] = op_cgroup_add_task,
     [OP_CPU_SET_FREQ] = NULL,
     [OP_CPU_SET_CAPACITY] = NULL,
+    [OP_CGROUP_DESTROY] = op_cgroup_destroy,
 };
 
 static const char op_strs[OP_TYPE_NR][30] = {
@@ -322,6 +358,7 @@ static const char op_strs[OP_TYPE_NR][30] = {
   [OP_CGROUP_ADD_TASK] = "CGROUP_ADD_TASK",
   [OP_CPU_SET_FREQ] = "CPU_SET_FREQ",
   [OP_CPU_SET_CAPACITY] = "CPU_SET_CAPACITY",
+  [OP_CGROUP_DESTROY] = "CGROUP_DESTROY",
 };
 
 

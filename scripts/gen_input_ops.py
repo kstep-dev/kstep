@@ -24,6 +24,7 @@ OP_NAME_TO_TYPE = {
     "CGROUP_ADD_TASK": 13,
     "CPU_SET_FREQ": 14,
     "CPU_SET_CAPACITY": 15,
+    "CGROUP_DESTROY": 16,
 }
 OP_TYPE_TO_NAME = {v: k for k, v in OP_NAME_TO_TYPE.items()}
 
@@ -89,6 +90,7 @@ def op_task_pin(m: GenState):
 
 def op_task_fifo(m: GenState):
     tid = m.choose_task_in_state(TASK_ON_CPU)
+    m.cgroup_remove_task(tid)
     return (OP_NAME_TO_TYPE["TASK_FIFO"], tid, 0, 0)
 
 
@@ -151,6 +153,12 @@ def op_cgroup_add_task(m: GenState):
     return (OP_NAME_TO_TYPE["CGROUP_ADD_TASK"], cgroup_id, tid, 0)
 
 
+def op_cgroup_destroy(m: GenState):
+    cgroup_id = m.choose_destroyable_leaf_cgroup()
+    m.remove_cgroup(cgroup_id)
+    return (OP_NAME_TO_TYPE["CGROUP_DESTROY"], cgroup_id, 0, 0)
+
+
 def op_cpu_set_freq(m: GenState):
     cpu = m.choose_cpu()
     scale = m.rnd.randint(1, 1024)
@@ -171,6 +179,10 @@ def replay_task_fork(m: GenState, a: int, b: int, c: int):
     if a in m.task2cgroups:
         m.cgroup_add_task(m.task2cgroups[a], b)
 
+def replay_task_fifo(m: GenState, a: int, b: int, c: int):
+    # a=tid; FIFO transitions move the task back to the root cgroup
+    m.cgroup_remove_task(a)
+
 def replay_cgroup_create(m: GenState, a: int, b: int, c: int):
     # a=parent_id, b=child_id
     if b not in m.cgroups:
@@ -184,6 +196,10 @@ def replay_cgroup_set_cpuset(m: GenState, a: int, b: int, c: int):
 def replay_cgroup_add_task(m: GenState, a: int, b: int, c: int):
     # a=cgroup_id, b=tid
     m.cgroup_add_task(a, b)
+
+def replay_cgroup_destroy(m: GenState, a: int, b: int, c: int):
+    # a=cgroup_id
+    m.remove_cgroup(a)
 
 
 OPS: List[Op] = [
@@ -220,6 +236,7 @@ OPS: List[Op] = [
         emit=op_task_fifo,
         requires=[RESOURCE_TASK],
         arg_types=[ARG_TASK, ARG_INT, None],
+        replay=replay_task_fifo,
     ),
     Op(
         name="TASK_CFS",
@@ -300,6 +317,15 @@ OPS: List[Op] = [
         requires=[RESOURCE_CGROUP, RESOURCE_TASK],
         arg_types=[ARG_CGROUP, ARG_TASK, None],
         replay=replay_cgroup_add_task,
+    ),
+    Op(
+        name="CGROUP_DESTROY",
+        weight=1,
+        is_applicable=lambda m: bool(m.destroyable_leaf_cgroups()),
+        emit=op_cgroup_destroy,
+        requires=[RESOURCE_CGROUP],
+        arg_types=[ARG_CGROUP, None, None],
+        replay=replay_cgroup_destroy,
     ),
     Op(
         name="CPU_SET_FREQ",

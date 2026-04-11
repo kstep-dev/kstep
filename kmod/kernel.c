@@ -308,6 +308,7 @@ void kstep_cgroup_destroy(const char *name) {
     KSYM_unregister_fair_sched_group(tg);
 
   cgroup_put(cgrp);
+  kstep_sleep();
 }
 
 void kstep_cgroup_set_cpuset(const char *name, const char *cpuset) {
