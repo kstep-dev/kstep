@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from scripts import (
-    BUILD_CURR_DIR,
-    BUILD_DIR,
+    # BUILD_CURR_DIR,
+    # BUILD_DIR,
     DOWNLOAD_DIR,
     LINUX_CURR_DIR,
     LINUX_MASTER_DIR,
@@ -55,10 +55,10 @@ def set_current_linux(linux_name: str):
     LINUX_CURR_DIR.symlink_to(linux_dir)
     logging.info(f"{fmt_path(LINUX_CURR_DIR)} now points to {fmt_path(linux_dir)}")
 
-    build_dir = BUILD_DIR / linux_name
-    BUILD_CURR_DIR.unlink(missing_ok=True)
-    BUILD_CURR_DIR.symlink_to(build_dir)
-    logging.info(f"{fmt_path(BUILD_CURR_DIR)} now points to {fmt_path(build_dir)}")
+    # build_dir = BUILD_DIR / linux_name
+    # BUILD_CURR_DIR.unlink(missing_ok=True)
+    # BUILD_CURR_DIR.symlink_to(build_dir)
+    # logging.info(f"{fmt_path(BUILD_CURR_DIR)} now points to {fmt_path(build_dir)}")
 
 
 def get_download_url(version: str) -> str:
