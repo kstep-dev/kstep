@@ -64,6 +64,7 @@ def start_qemu(
     debug: bool = False,
     quiet: bool = False,
     cpu_affinity: Optional[str] = None,
+    if_update_latest = True
 ) -> subprocess.Popen:
     """Start QEMU in the background. Returns the process handle."""
     kvm_path = Path("/dev/kvm")
@@ -78,9 +79,10 @@ def start_qemu(
     log_file = log_file or LOGS_DIR / f"log-{timestamp}.log"
     output_file = log_file.with_suffix(".jsonl")
     cov_file = log_file.with_suffix(".cov")
-    update_latest(LATEST_LOG, log_file)
-    update_latest(LATEST_OUTPUT, output_file)
-    update_latest(LATEST_COV, cov_file)
+    if if_update_latest:
+        update_latest(LATEST_LOG, log_file)
+        update_latest(LATEST_OUTPUT, output_file)
+        update_latest(LATEST_COV, cov_file)
 
     isol_cpus = f"1-{driver.num_cpus - 1}" if driver.num_cpus > 2 else "1"
     boot_args = [

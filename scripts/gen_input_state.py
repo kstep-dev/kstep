@@ -145,8 +145,11 @@ class GenState:
             return self.choose_cgroup()
         return self.rnd.choice(self.leaf_cgroups)
 
+    def destroyable_leaf_cgroups(self) -> list[int]:
+        return list(self.leaf_cgroups)
+
     def choose_destroyable_leaf_cgroup(self) -> int:
-        return self.rnd.choice(self.leaf_cgroups)
+        return self.rnd.choice(self.destroyable_leaf_cgroups())
 
     def next_cgroup_id(self) -> Optional[int]:
         for i in range(self.max_cgroups):
@@ -194,7 +197,7 @@ class GenState:
         self.task2cgroups[task_id] = cgroup_id
 
     def cgroup_remove_task(self, task_id: int):
-        self.task2cgroups.pop(task_id)
+        self.task2cgroups.pop(task_id, None)
 
     def remove_cgroup(self, cgroup_id: int):
         cgroup = self.cgroups.pop(cgroup_id, None)

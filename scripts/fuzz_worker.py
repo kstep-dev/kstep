@@ -267,12 +267,17 @@ class FuzzWorker:
             sock_file=self.paths.sock_file,
             quiet=True,
             cpu_affinity=self.qemu_cpus,
+            if_update_latest=False
         )
 
         gen_seed = 0 if work.mode in ("replay") else self.rng.randint(0, 2**32 - 1)
         kstep_cpus = self.driver.num_cpus - 1
-        max_tasks = self.rng.randint(kstep_cpus * 1, kstep_cpus * 3)
-        max_cgroups = self.rng.randint(kstep_cpus * 1, kstep_cpus * 3)
+        # reproducing util_avg
+        # max_tasks = self.rng.randint(kstep_cpus * 1, kstep_cpus * 3)
+        # max_cgroups = self.rng.randint(kstep_cpus * 1, kstep_cpus * 3)
+        # reproducing vruntime overflow
+        max_tasks = self.rng.randint(kstep_cpus * 3, kstep_cpus * 5)
+        max_cgroups = self.rng.randint(kstep_cpus * 3, kstep_cpus * 5)
         gen = init_genstate(max_tasks, max_cgroups, self.driver.num_cpus, gen_seed)
 
         session = FuzzWorkerSession(gen, proc, self.paths.sock_file, self.logger, self.io_timeout_sec)
@@ -455,6 +460,7 @@ class FuzzWorker:
                 error = "bootfail: missing kstep start marker"
             else:
                 error = str(exc)
+            self.logger.error("execute op fail: " + error)
 
         error = self._validate_result(work, ops_executed, error)
         return WorkResult(

@@ -58,8 +58,12 @@ RESOURCE_TASK = "task"
 RESOURCE_CGROUP = "cgroup"
 
 # Generator parameters
-MIN_TICK = 50
-MAX_TICK = 150
+# reproducing util_avg
+# MIN_TICK = 50
+# MAX_TICK = 150
+# reproducing vruntime_overflow
+MIN_TICK = 1
+MAX_TICK = 10
 
 def op_task_create(m: GenState):
     tid = m.next_task_id()

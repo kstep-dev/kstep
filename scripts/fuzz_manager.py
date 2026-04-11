@@ -89,7 +89,7 @@ class FuzzManager:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             target_dir = FUZZ_SUCCESS_DIR / f"w{result.worker_id}_{ts}"
 
-        target_dir.mkdir()
+        target_dir.mkdir(exist_ok=True)
 
         ops_data = {
             "linux_name": self.linux_name,

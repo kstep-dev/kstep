@@ -121,5 +121,5 @@ KSTEP_DRIVER_DEFINE {
   .setup = setup,
   .run = run,
   .on_tick_end = kstep_output_nr_running,
-  .step_interval_us = 1000,
+  .step_interval_us = 10000,
 };
