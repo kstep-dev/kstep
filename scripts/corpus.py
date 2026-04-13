@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import Iterator, Optional
 from pathlib import Path
 from collections import defaultdict
 from .consts import CORPUS_DIR
@@ -20,7 +20,79 @@ class SignalCorpus:
     def __init__(self):
         self.seen_signals: set[int] = set()
         self.seen_pcs: dict[int, tuple[str, str]] = {}
+        self.total_covered_tests = 0
+        self.signal_test_counts: dict[int, int] = defaultdict(int)
+        self.signal_hit_counts: dict[int, int] = defaultdict(int)
+        self.signal_edges: dict[int, set[tuple[int, int]]] = defaultdict(set)
         CORPUS_DIR.mkdir(parents=True, exist_ok=True)
+
+    def _symbolized_pc(self, pc: int) -> tuple[str, str]:
+        if pc == 0:
+            return "", ""
+        return self.seen_pcs.get(pc, (f"?{pc:x}", f"?{pc:x}"))
+
+    def _write_signal_frequency(self) -> None:
+        signals = []
+        for sig, test_count in self.signal_test_counts.items():
+            edges = []
+            for prev_pc, curr_pc in sorted(self.signal_edges.get(sig, set())):
+                prev_fn, prev_loc = self._symbolized_pc(prev_pc)
+                curr_fn, curr_loc = self._symbolized_pc(curr_pc)
+                edges.append({
+                    "prev_loc": f"{prev_loc}:{prev_fn}",
+                    "curr_loc": f"{curr_loc}:{curr_fn}",
+                })
+
+            signals.append({
+                "signal_id": sig,
+                "test_count": test_count,
+                "test_frequency": test_count / max(self.total_covered_tests, 1),
+                "hit_count": self.signal_hit_counts.get(sig, 0),
+                "edges": edges,
+            })
+
+        signals.sort(key=lambda entry: (
+            entry["test_count"],
+            entry["hit_count"],
+            entry["signal_id"],
+        ))
+
+        output_path = CORPUS_DIR / "signal_frequency.json"
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "total_covered_tests": self.total_covered_tests,
+                "signals": signals,
+            }, f, indent=2)
+
+    def iter_signals(
+        self,
+        signal_records: dict[int, dict[int, list[int]]],
+    ) -> Iterator[tuple[int, int, int, int, int]]:
+        for cmd_id, pid_pcs in signal_records.items():
+            for pid, pcs in pid_pcs.items():
+                prev_pc = 0
+                for pc in pcs:
+                    sig = pc ^ (pc_hash(prev_pc) & 0xfff)
+                    yield cmd_id, pid, prev_pc, pc, sig
+                    prev_pc = pc
+
+    def observe_signal_records(
+        self,
+        signal_records: dict[int, dict[int, list[int]]],
+    ) -> set[int]:
+        signal_set: set[int] = set()
+        for _cmd_id, _pid, prev_pc, pc, sig in self.iter_signals(signal_records):
+            self.signal_hit_counts[sig] += 1
+            self.signal_edges[sig].add((prev_pc, pc))
+            signal_set.add(sig)
+
+        self.total_covered_tests += 1
+        for sig in signal_set:
+            self.signal_test_counts[sig] += 1
+
+        self._write_signal_frequency()
+
+        return signal_set
 
     def update_pc_symbolize(self, 
         signal_records: dict[int, dict[int, list[int]]],
@@ -47,21 +119,8 @@ class SignalCorpus:
         linux_name: str,
         output_path: Optional[Path] = None,
     ) -> tuple[set[int], int] | None:
-        # signal_list = [rec[4] for rec in signal_records]
-        # Check if the records have been seen before or not
-        signal_list = []
-        
-        for pid_pcs in signal_records.values():
-            for pcs in pid_pcs.values():
-                for i in range(len(pcs)):
-                    pc = pcs[i]
-                    prev_pc = pcs[i - 1] if i > 0 else 0
-                    sig = pc ^ (pc_hash(prev_pc) & 0xfff)
-                    signal_list.append(sig)
-
-        signal_set = set(signal_list)
+        signal_set = self.observe_signal_records(signal_records)
         distinct_signals = len(signal_set)
-
         new = signal_set - self.seen_signals
 
         if not new:
@@ -113,6 +172,7 @@ class SignalCorpus:
                     "cmd_id": cmd_id,
                     "cmd_name": cmd_name,
                     "cmd_args": cmd_args,
+                    "new_signal_ids": [],
                     "new_edges": defaultdict(list), # pid -> [(sig, (fn, loc))]
                 })
                 cmd_id += 1
@@ -120,24 +180,19 @@ class SignalCorpus:
         # Add the signal to the new signals for the action if the task hits that new signal
         # Remove the signal from the new signals set if it has been recorded
         # So that the following tasks hit the same signal will not be recorded        
-        for cmd_id, pid_pcs in signal_records.items():
-            for pid, pcs in pid_pcs.items():
-                for i in range(len(pcs)):
-                    pc = pcs[i]
-                    prev_pc = pcs[i - 1] if i > 0 else 0
-                    sig = pc ^ (pc_hash(prev_pc) & 0xfff)
-
-                    if sig in new_signals:
-                        if prev_pc != 0:
-                            cmd_meta[cmd_id]["new_edges"][pid].append(
-                                (f"{self.seen_pcs[prev_pc][0]}:{self.seen_pcs[prev_pc][1]}",
-                                f"{self.seen_pcs[pc][0]}:{self.seen_pcs[pc][1]}")
-                            )
-                        else:
-                            cmd_meta[cmd_id]["new_edges"][pid].append(
-                                ("", f"{self.seen_pcs[pc][0]}:{self.seen_pcs[pc][1]}")
-                            )
-                        new_signals.remove(sig)
+        for cmd_id, pid, prev_pc, pc, sig in self.iter_signals(signal_records):
+            if sig in new_signals:
+                cmd_meta[cmd_id]["new_signal_ids"].append(sig)
+                if prev_pc != 0:
+                    cmd_meta[cmd_id]["new_edges"][pid].append(
+                        (f"{self.seen_pcs[prev_pc][0]}:{self.seen_pcs[prev_pc][1]}",
+                        f"{self.seen_pcs[pc][0]}:{self.seen_pcs[pc][1]}")
+                    )
+                else:
+                    cmd_meta[cmd_id]["new_edges"][pid].append(
+                        ("", f"{self.seen_pcs[pc][0]}:{self.seen_pcs[pc][1]}")
+                    )
+                new_signals.remove(sig)
 
         # Dump the per-action new signals to the corpus directory
         if output_path is None:

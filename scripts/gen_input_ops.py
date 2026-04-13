@@ -25,6 +25,7 @@ OP_NAME_TO_TYPE = {
     "CPU_SET_FREQ": 14,
     "CPU_SET_CAPACITY": 15,
     "CGROUP_DESTROY": 16,
+    "CGROUP_MOVE_TASK_ROOT": 17,
 }
 OP_TYPE_TO_NAME = {v: k for k, v in OP_NAME_TO_TYPE.items()}
 
@@ -63,7 +64,7 @@ RESOURCE_CGROUP = "cgroup"
 # MAX_TICK = 150
 # reproducing vruntime_overflow
 MIN_TICK = 1
-MAX_TICK = 10
+MAX_TICK = 20
 
 def op_task_create(m: GenState):
     tid = m.next_task_id()
@@ -163,6 +164,12 @@ def op_cgroup_destroy(m: GenState):
     return (OP_NAME_TO_TYPE["CGROUP_DESTROY"], cgroup_id, 0, 0)
 
 
+def op_cgroup_move_task_root(m: GenState):
+    cgroup_id, tid = m.choose_task_in_cgroup()
+    m.cgroup_remove_task(tid)
+    return (OP_NAME_TO_TYPE["CGROUP_MOVE_TASK_ROOT"], cgroup_id, tid, 0)
+
+
 def op_cpu_set_freq(m: GenState):
     cpu = m.choose_cpu()
     scale = m.rnd.randint(1, 1024)
@@ -205,6 +212,10 @@ def replay_cgroup_destroy(m: GenState, a: int, b: int, c: int):
     # a=cgroup_id
     m.remove_cgroup(a)
 
+def replay_cgroup_move_task_root(m: GenState, a: int, b: int, c: int):
+    # a=cgroup_id, b=tid
+    m.cgroup_remove_task(b)
+
 
 OPS: List[Op] = [
     Op(
@@ -235,7 +246,7 @@ OPS: List[Op] = [
     ),
     Op(
         name="TASK_FIFO",
-        weight=2,
+        weight=0,
         is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
         emit=op_task_fifo,
         requires=[RESOURCE_TASK],
@@ -289,7 +300,7 @@ OPS: List[Op] = [
     ),
     Op(
         name="CGROUP_CREATE",
-        weight=2,
+        weight=4,
         is_applicable=lambda m: m.next_cgroup_id() is not None,
         emit=op_cgroup_create,
         produces=[RESOURCE_CGROUP],
@@ -330,6 +341,15 @@ OPS: List[Op] = [
         requires=[RESOURCE_CGROUP],
         arg_types=[ARG_CGROUP, None, None],
         replay=replay_cgroup_destroy,
+    ),
+    Op(
+        name="CGROUP_MOVE_TASK_ROOT",
+        weight=2,
+        is_applicable=lambda m: m.has_tasks_in_cgroups(),
+        emit=op_cgroup_move_task_root,
+        requires=[RESOURCE_CGROUP, RESOURCE_TASK],
+        arg_types=[ARG_CGROUP, ARG_TASK, None],
+        replay=replay_cgroup_move_task_root,
     ),
     Op(
         name="CPU_SET_FREQ",

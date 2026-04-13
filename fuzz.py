@@ -59,11 +59,23 @@ def main() -> None:
                         help="Number of parallel QEMU workers")
     parser.add_argument("--steps", type=int, default=50,
                         help="Ops per test case (fresh mode)")
-    parser.add_argument("--fresh_ratio", type=float, default=0.5,
+    parser.add_argument("--fresh_ratio", type=float, default=0.1,
                         help="Fraction of iterations using fresh random generation")
-    parser.add_argument("--mutate_ratio", type=float, default=0.5,
+    parser.add_argument("--mutate_ratio", type=float, default=0.9,
                         help="Fraction of iterations applying tick-insertion mutation to a seed "
                              "(remainder is pure replay)")
+    parser.add_argument(
+        "--special_mutate_ratio",
+        type=float,
+        default=0.2,
+        help="Within mutate mode, chance to choose from the special-state seed pool before the coverage pool",
+    )
+    parser.add_argument(
+        "--pivot_rarity_alpha",
+        type=float,
+        default=2.0,
+        help="Rarity exponent for productive pivot selection; <= 0 keeps pivots near-uniform",
+    )
     parser.add_argument(
         "--pin_cpus",
         type=str,
@@ -101,7 +113,9 @@ def main() -> None:
         f"topology={args.topology or 'default'}  "
         f"frequency={args.frequency or 'default'}  "
         f"demo={args.demo}  "
-        f"fresh_ratio={args.fresh_ratio}  mutate_ratio={args.mutate_ratio}"
+        f"fresh_ratio={args.fresh_ratio}  mutate_ratio={args.mutate_ratio}  "
+        f"special_mutate_ratio={args.special_mutate_ratio}  "
+        f"pivot_rarity_alpha={args.pivot_rarity_alpha}"
     )
     run_manager(
         n_workers=args.workers,
@@ -110,6 +124,8 @@ def main() -> None:
         steps=args.steps,
         fresh_ratio=args.fresh_ratio,
         mutate_ratio=args.mutate_ratio,
+        special_mutate_ratio=args.special_mutate_ratio,
+        pivot_rarity_alpha=args.pivot_rarity_alpha,
         pin_cpus=args.pin_cpus,
         demo=args.demo,
     )

@@ -19,9 +19,17 @@ from typing import Optional
 from run import Driver
 from scripts.corpus import SignalCorpus
 from scripts.cov import cov_parse
-from scripts.fuzz_common import CheckerStatus, SeedPool, WorkItem, WorkResult, worker_paths
+from scripts.fuzz_common import (
+    CheckerStatus,
+    MutationPivot,
+    Seed,
+    SeedPool,
+    WorkItem,
+    WorkResult,
+    worker_paths,
+)
+from scripts.fuzz_mutate import bottleneck_signal
 from scripts.fuzz_worker import worker_main
-from scripts.fuzz_mutate import pick_pivot
 from scripts.input_seq import InputSeq
 from scripts.consts import FUZZ_ERROR_DIR, FUZZ_SUCCESS_DIR, FUZZ_CORPUS_DIR
 
@@ -39,6 +47,8 @@ class FuzzManager:
         steps: int,
         fresh_ratio: float,
         mutate_ratio: float = 0.35,
+        special_mutate_ratio: float = 0.2,
+        pivot_rarity_alpha: float = 1.0,
         pin_cpus: Optional[str] = None,
         demo: bool = False,
     ) -> None:
@@ -48,6 +58,8 @@ class FuzzManager:
         self.steps = steps
         self.fresh_ratio = fresh_ratio
         self.mutate_ratio = mutate_ratio
+        self.special_mutate_ratio = special_mutate_ratio
+        self.pivot_rarity_alpha = pivot_rarity_alpha
         self.pin_cpus = pin_cpus
         self.demo = demo
 
@@ -59,7 +71,9 @@ class FuzzManager:
 
         self.corpus = SignalCorpus()
         self.pool = SeedPool()
+        self.special_pool = SeedPool()
         self.rng = random.Random()
+        self.seed_counter = 0
 
         self.t_start = time.monotonic()
         self.last_stat_t = self.t_start
@@ -69,9 +83,15 @@ class FuzzManager:
         self.total_mutate = 0
         self.total_errors = 0
         self.total_new_signals = 0
+        self.total_special_seeds = 0
         self.interval_signals = 0
         self.errors_by_cat: dict[str, int] = {}
         self.target_execs = n_workers if demo else None
+
+    def _allocate_seed_id(self) -> int:
+        seed_id = self.seed_counter
+        self.seed_counter += 1
+        return seed_id
 
     # Save one worker result and its artifacts into the success or error archive.
     def _save_test(self, result: WorkResult) -> Path:
@@ -115,25 +135,66 @@ class FuzzManager:
     def _next_work(self) -> WorkItem:
         r = self.rng.random()
         # Fresh mode
-        if len(self.pool) == 0 or r < self.fresh_ratio:
+        if (len(self.pool) == 0 and len(self.special_pool) == 0) or r < self.fresh_ratio:
             return WorkItem(mode="fresh", steps=self.steps)
         # Mutate mode
-        seed = self.pool.pick_seed()
-        assert seed is not None  # pool is non-empty (checked above)
         if r < self.fresh_ratio + self.mutate_ratio:
-            pivot_idx = pick_pivot(seed.productive_cmd_ids, self.rng)
-            if pivot_idx is not None:
+            prefer_special = (
+                len(self.special_pool) > 0
+                and self.rng.random() < self.special_mutate_ratio
+            )
+            pool_order = [
+                ("special", self.special_pool),
+                ("coverage", self.pool),
+            ] if prefer_special else [
+                ("coverage", self.pool),
+                ("special", self.special_pool),
+            ]
+
+            target: Optional[tuple[str, tuple[Seed, MutationPivot]]] = None
+            for pool_name, seed_pool in pool_order:
+                picked = seed_pool.pick_mutation_target(
+                    signal_test_counts=self.corpus.signal_test_counts,
+                    rng=self.rng,
+                    rarity_alpha=self.pivot_rarity_alpha,
+                )
+                if picked is not None:
+                    target = (pool_name, picked)
+                    break
+            if target is not None:
+                pool_name, picked = target
+                seed, pivot = picked
+                bottleneck = bottleneck_signal(
+                    pivot.signal_ids,
+                    self.corpus.signal_test_counts,
+                    self.pivot_rarity_alpha,
+                )
+                bottleneck_freq = 0.0
+                if bottleneck is not None:
+                    bottleneck_freq = (
+                        self.corpus.signal_test_counts.get(bottleneck, 0)
+                        / max(self.corpus.total_covered_tests, 1)
+                    )
+                logging.info(
+                    f"[mutate] pool={pool_name} picked seed=#{seed.seed_id} pivot={pivot.cmd_id} "
+                    f"kind={pivot.kind} "
+                    f"bottleneck_signal={bottleneck} "
+                    f"bottleneck_signal_freq={bottleneck_freq:.6f} "
+                    f"score={pivot.weight(self.corpus.signal_test_counts, self.pivot_rarity_alpha):.4f}"
+                )
                 return WorkItem(
                     mode = "mutate",
                     steps = self.steps,
                     ops = seed.ops,
                     seed_id = seed.seed_id,
-                    pivot_idx = pivot_idx,
+                    pivot_idx = pivot.cmd_id,
                 )
-            # Seeds without productive commands cannot drive tick-insertion
-            # mutation, so fall back to a plain replay instead of failing.
-            logging.warning("Selected pivot idx is None")
+            logging.warning("No productive pivots available for mutate; falling back to replay")
         # replay mode
+        seed = self.pool.pick_seed(self.rng)
+        if seed is None:
+            seed = self.special_pool.pick_seed(self.rng)
+        assert seed is not None  # pool is non-empty (checked above)
         return WorkItem(mode="replay", steps=0, ops=seed.ops, seed_id=seed.seed_id)
 
     # Partition host CPUs between QEMU instances and the Python manager when requested.
@@ -241,7 +302,7 @@ class FuzzManager:
         for op_tuple in result.ops:
             seq.append(op_tuple)
 
-        seed_id = self.pool.next_seed_id()
+        seed_id = self._allocate_seed_id()
 
         FUZZ_CORPUS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -251,32 +312,70 @@ class FuzzManager:
             linux_name=self.linux_name,
             output_path=FUZZ_CORPUS_DIR / f"{seed_id}.json",
         )
-        if not new_signal_info:
+        if new_signal_info:
+            new_signals, distinct_signals = new_signal_info
+
+            cmd_meta = self.corpus.analyze_per_action_signals(
+                seq=seq,
+                signal_records=signal_records,
+                new_signals=set(new_signals),
+                linux_name=self.linux_name,
+                output_path=FUZZ_CORPUS_DIR / f"{seed_id}_per_action.json",
+            )
+
+            productive_pivots = [
+                MutationPivot(
+                    cmd_id=entry["cmd_id"],
+                    signal_ids=list(entry["new_signal_ids"]),
+                )
+                for entry in cmd_meta
+                if entry["new_signal_ids"]
+            ]
+
+            n_new = len(new_signals)
+            self.total_new_signals += n_new
+            self.interval_signals += n_new
+            seed = self.pool.add(
+                result.ops,
+                n_new,
+                productive_pivots,
+                seed_id=seed_id,
+            )
+
+            logging.info(
+                f"[+] seed #{seed.seed_id}: +{n_new} new  "
+                f"distinct={distinct_signals}  "
+                f"productive_cmd={len(productive_pivots)} "
+                f"covered={self.corpus.total_covered_tests}  "
+                f"total={len(self.corpus.seen_signals)}  corpus={len(self.pool)}"
+            )
+
+        special_pivot_idxs = sorted({
+            idx for idx in result.special_pivot_idxs
+            if 0 <= idx < len(result.ops)
+        })
+        if not special_pivot_idxs:
             return
-        new_signals, distinct_signals = new_signal_info
 
-        cmd_meta = self.corpus.analyze_per_action_signals(
-            seq=seq,
-            signal_records=signal_records,
-            new_signals=set(new_signals),
-            linux_name=self.linux_name,
-            output_path=FUZZ_CORPUS_DIR / f"{seed_id}_per_action.json",
-        )
-
-        productive_cmd_ids = [
-            entry["cmd_id"] for entry in cmd_meta if entry["new_edges"]
+        special_pivots = [
+            MutationPivot(
+                cmd_id=idx,
+                signal_ids=[],
+                kind="special_state",
+                special_score=1.0,
+            )
+            for idx in special_pivot_idxs
         ]
-
-        n_new = len(new_signals)
-        self.total_new_signals += n_new
-        self.interval_signals += n_new
-        seed = self.pool.add(result.ops, distinct_signals, productive_cmd_ids)
-
+        seed = self.special_pool.add(
+            result.ops,
+            len(special_pivots),
+            special_pivots,
+            seed_id=seed_id,
+        )
+        self.total_special_seeds += 1
         logging.info(
-            f"[+] seed #{seed.seed_id}: +{n_new} new  "
-            f"distinct={distinct_signals}  "
-            f"productive_cmd={len(productive_cmd_ids)} "
-            f"total={len(self.corpus.seen_signals)}  corpus={len(self.pool)}"
+            f"[+] special seed #{seed.seed_id}: pivots={len(special_pivots)}  "
+            f"special_corpus={len(self.special_pool)}"
         )
 
     # Derive an error category from the prefix of an error string.
@@ -314,6 +413,7 @@ class FuzzManager:
             f"mode={result.mode}  "
             f"ops={len(result.ops)}  "
             f"exec_time={result.exec_time:.2f}s  "
+            f"special_pivots={len(result.special_pivot_idxs)}  "
             f"checker_status={checker_status}"
         )
 
@@ -375,6 +475,7 @@ class FuzzManager:
             f"signals={len(self.corpus.seen_signals)} (+{self.interval_signals} this interval)  "
             f"new_total={self.total_new_signals}  "
             f"corpus={len(self.pool)}  "
+            f"special_corpus={len(self.special_pool)}  "
             f"errors={self.total_errors}"
             + (f"  [{cat_str}]" if cat_str else "")
         )
@@ -408,6 +509,7 @@ class FuzzManager:
             f"execs={self.total_execs}  "
             f"signals={len(self.corpus.seen_signals)} ({self.total_new_signals} new)  "
             f"corpus={len(self.pool)}  "
+            f"special_corpus={len(self.special_pool)} ({self.total_special_seeds} new)  "
             f"wall={elapsed:.0f}s"
         )
 
@@ -438,6 +540,8 @@ def run_manager(
     steps: int,
     fresh_ratio: float,
     mutate_ratio: float = 0.35,
+    special_mutate_ratio: float = 0.2,
+    pivot_rarity_alpha: float = 1.0,
     pin_cpus: Optional[str] = None,
     demo: bool = False,
 ) -> None:
@@ -448,6 +552,8 @@ def run_manager(
         steps=steps,
         fresh_ratio=fresh_ratio,
         mutate_ratio=mutate_ratio,
+        special_mutate_ratio=special_mutate_ratio,
+        pivot_rarity_alpha=pivot_rarity_alpha,
         pin_cpus=pin_cpus,
         demo=demo,
     )

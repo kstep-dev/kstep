@@ -137,8 +137,15 @@ class GenState:
     def has_cgroups(self) -> bool:
         return len(self.cgroups) > 0
 
+    def has_tasks_in_cgroups(self) -> bool:
+        return bool(self.task2cgroups)
+
     def choose_cgroup(self) -> int:
         return self.rnd.choice(list(self.cgroups.keys()))
+
+    def choose_task_in_cgroup(self) -> tuple[int, int]:
+        task_id = self.rnd.choice(list(self.task2cgroups.keys()))
+        return self.task2cgroups[task_id], task_id
     
     def choose_leaf_cgroup(self) -> int:
         if not self.leaf_cgroups:

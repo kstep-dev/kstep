@@ -78,6 +78,7 @@ def _check_for_crash(log_file: Path) -> bool:
 class KmodState:
     task_states: list[dict]
     executed: bool
+    executed_steps: int
 
 @dataclass
 class FuzzWorkerSession:
@@ -158,16 +159,23 @@ class FuzzWorkerSession:
 
             payload = line[1:-1]
             if not payload:
-                return KmodState(task_states=[], executed=False)
-            if (len(payload) - 1) % 2 != 0:
+                return KmodState(task_states=[], executed=False, executed_steps=0)
+            if len(payload) < 2 or (len(payload) - 2) % 2 != 0:
                 continue
 
             executed = bool(payload[0])
+            executed_steps = payload[1] - 11
+            if executed_steps < 0:
+                continue
             task_states = [
                 {"id": payload[i] - 11, "state": payload[i + 1]}
-                for i in range(1, len(payload), 2)
+                for i in range(2, len(payload), 2)
             ]
-            return KmodState(task_states=task_states, executed=executed)
+            return KmodState(
+                task_states=task_states,
+                executed=executed,
+                executed_steps=executed_steps,
+            )
 
     # Decode the final checker status sent after EXIT.
     def read_checker_status(self) -> Optional[CheckerStatus]:
@@ -197,7 +205,7 @@ class FuzzWorkerSession:
             return result
 
     # Send one op to kmod and fold the returned state into the generator model.
-    def send_op(self, op: int, a: int, b: int, c: int) -> bool:
+    def send_op(self, op: int, a: int, b: int, c: int) -> int:
         self.sock.sendall(f"{op},{a},{b},{c}\n".encode())
         self.logger.debug(f"SEND OP: {op},{a},{b},{c}")
 
@@ -208,7 +216,9 @@ class FuzzWorkerSession:
 
         self.logger.debug("Received task states")
         self.gen.update_from_kmod(state.task_states)
-        return state.executed
+        if not state.executed:
+            return 0
+        return state.executed_steps
 
 
 class FuzzWorker:
@@ -276,8 +286,8 @@ class FuzzWorker:
         # max_tasks = self.rng.randint(kstep_cpus * 1, kstep_cpus * 3)
         # max_cgroups = self.rng.randint(kstep_cpus * 1, kstep_cpus * 3)
         # reproducing vruntime overflow
-        max_tasks = self.rng.randint(kstep_cpus * 3, kstep_cpus * 5)
-        max_cgroups = self.rng.randint(kstep_cpus * 3, kstep_cpus * 5)
+        max_tasks = self.rng.randint(kstep_cpus * 3, kstep_cpus * 6)
+        max_cgroups = self.rng.randint(kstep_cpus * 3, kstep_cpus * 6)
         gen = init_genstate(max_tasks, max_cgroups, self.driver.num_cpus, gen_seed)
 
         session = FuzzWorkerSession(gen, proc, self.paths.sock_file, self.logger, self.io_timeout_sec)
@@ -294,33 +304,47 @@ class FuzzWorker:
         work: WorkItem,
         session: FuzzWorkerSession,
         ops_executed: Optional[Ops] = None,
+        special_pivot_idxs: Optional[list[int]] = None,
         *,
         log_prefix: str = "STEP",
-    ) -> Ops:
+    ) -> tuple[Ops, list[int]]:
         if ops_executed is None:
             ops_executed = []
+        if special_pivot_idxs is None:
+            special_pivot_idxs = []
 
         generated = 0
         while generated < work.steps:
             op, a, b, c = generate_next_command(session.gen)
-            executed = session.send_op(op, a, b, c)
-            if executed:
+            executed_steps = session.send_op(op, a, b, c)
+            if executed_steps > 0:
                 self.logger.debug(
                     f"{log_prefix} {generated}: op={op},{a},{b},{c} "
-                    f"executed={executed} task_state={session.gen.task_state}"
+                    f"executed_steps={executed_steps} task_state={session.gen.task_state}"
                 )
-                if (op == OP_NAME_TO_TYPE["TICK_REPEAT"]):
-                    for i in range(a):
+                if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
+                    for i in range(executed_steps):
                         ops_executed.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
+                    if executed_steps < a and executed_steps > 0:
+                        special_pivot_idxs.append(len(ops_executed) - 1)
+                        self.logger.debug(
+                            f"{log_prefix} {generated}: special_pivot={special_pivot_idxs[-1]} "
+                            f"ineligible_cgroup_state=1"
+                        )
                 else:
                     ops_executed.append((op, a, b, c))
                     generated += 1
-        return ops_executed
+        return ops_executed, special_pivot_idxs
 
     # Replay the seed prefix and optionally extend it with generated mutation steps.
-    def _execute_replay_or_mutate(self, work: WorkItem, session: FuzzWorkerSession) -> Ops:
+    def _execute_replay_or_mutate(
+        self,
+        work: WorkItem,
+        session: FuzzWorkerSession,
+    ) -> tuple[Ops, list[int]]:
         assert work.ops is not None
         ops_executed: Ops = []
+        special_pivot_idxs: list[int] = []
         prefix_len = len(work.ops)
         if work.mode == "mutate" and work.pivot_idx is not None:
             prefix_len = min(work.pivot_idx + 1, len(work.ops))
@@ -330,10 +354,10 @@ class FuzzWorker:
         for i, (op, a, b, c) in enumerate(work.ops[:prefix_len]):
             for retry in range(50):
                 if _op_matches_task_state(session.gen, (op, a, b, c)):
-                    executed = session.send_op(op, a, b, c)
-                    if executed:
+                    executed_steps = session.send_op(op, a, b, c)
+                    if executed_steps > 0:
                         self.logger.debug(
-                            f"REPLAY {i}: op={op},{a},{b},{c} executed={executed} task_state={session.gen.task_state}"
+                            f"REPLAY {i}: op={op},{a},{b},{c} executed_steps={executed_steps} task_state={session.gen.task_state}"
                         )
                         ops_executed.append((op, a, b, c))
                         replay_update_genstate(session.gen, op, a, b, c)
@@ -356,12 +380,17 @@ class FuzzWorker:
                 work,
                 session,
                 ops_executed,
+                special_pivot_idxs,
                 log_prefix="MUTATE-GEN",
             )
-        return ops_executed
+        return ops_executed, special_pivot_idxs
 
     # Dispatch execution based on whether the work item is fresh, replay, or mutate.
-    def _execute_work(self, work: WorkItem, session: FuzzWorkerSession) -> Ops:
+    def _execute_work(
+        self,
+        work: WorkItem,
+        session: FuzzWorkerSession,
+    ) -> tuple[Ops, list[int]]:
         if work.mode in ("replay", "mutate"):
             return self._execute_replay_or_mutate(work, session)
         return self._execute_generated_ops(work, session)
@@ -431,6 +460,7 @@ class FuzzWorker:
 
         t0 = time.monotonic()
         ops_executed: Ops = []
+        special_pivot_idxs: list[int] = []
         error: Optional[str] = None
         checker_status: Optional[CheckerStatus] = None
         session: Optional[FuzzWorkerSession] = None
@@ -449,7 +479,7 @@ class FuzzWorker:
             )
 
         try:
-            ops_executed = self._execute_work(work, session)
+            ops_executed, special_pivot_idxs = self._execute_work(work, session)
             error, checker_status = self._finish_session(session)
         except Exception as exc:
             session.kill(kill_proc=True)
@@ -470,7 +500,8 @@ class FuzzWorker:
             mode=work.mode,
             seed_id=work.seed_id,
             checker_status=checker_status,
-            error=error
+            special_pivot_idxs=special_pivot_idxs,
+            error=error,
         )
 
     # Consume queued work items until the manager sends the shutdown sentinel.

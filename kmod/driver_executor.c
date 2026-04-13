@@ -54,7 +54,7 @@ static void parse_console_input(char *buf) {
     return;
 
   bool executed = kstep_execute_op(fields[0], fields[1], fields[2], fields[3]);
-  kstep_write_state(sock, executed);
+  kstep_write_state(sock, executed, kstep_last_executed_steps());
 }
 
 static bool process_console_chunk(const char *buf, ssize_t nread,
@@ -97,7 +97,7 @@ static void run(void) {
 
   /* Signal to Python that the kmod is ready. The executed bit is ignored for
    * the initial handshake, so keep it non-zero to avoid an all-zero payload. */
-  kstep_write_state(sock, true);
+  kstep_write_state(sock, true, 1);
 
   while (true) {
     char buf[256];
