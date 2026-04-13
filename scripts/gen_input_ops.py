@@ -29,10 +29,12 @@ OP_NAME_TO_TYPE = {
 }
 OP_TYPE_TO_NAME = {v: k for k, v in OP_NAME_TO_TYPE.items()}
 
+OpWeight = int | Callable[[GenState], int]
+
 @dataclass
 class Op:
     name: str
-    weight: int
+    weight: OpWeight
     # function that returns True if the operation is applicable to the current state
     is_applicable: Callable
     # function that emits the operation; change the generator state accordingly; returns the operation arguments
@@ -46,6 +48,11 @@ class Op:
     # function that applies GenState side-effects for a replayed op (args already known, no randomness);
     # None means no side-effects beyond what update_from_kmod handles
     replay: Optional[Callable] = None
+
+    def resolved_weight(self, m: GenState) -> int:
+        if callable(self.weight):
+            return self.weight(m)
+        return self.weight
 
 
 # Arguments
@@ -65,6 +72,14 @@ RESOURCE_CGROUP = "cgroup"
 # reproducing vruntime_overflow
 MIN_TICK = 1
 MAX_TICK = 20
+
+
+def disable_on_small_topology(weight: int) -> OpWeight:
+    return lambda m: 0 if m.cpus <= 2 else weight
+
+
+def enable_on_cross_scheduler(weight: int) -> OpWeight:
+    return lambda m: weight if m.cross_scheduler else 0
 
 def op_task_create(m: GenState):
     tid = m.next_task_id()
@@ -217,156 +232,175 @@ def replay_cgroup_move_task_root(m: GenState, a: int, b: int, c: int):
     m.cgroup_remove_task(b)
 
 
-OPS: List[Op] = [
-    Op(
-        name="TASK_CREATE",
-        weight=6,
-        is_applicable=lambda m: m.next_task_id() is not None,
-        emit=op_task_create,
-        produces=[RESOURCE_TASK],
-        arg_types=[ARG_TASK, None, None],
-    ),
-    Op(
-        name="TASK_FORK",
-        weight=3,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU) and m.next_task_id() is not None,
-        emit=op_task_fork,
-        requires=[RESOURCE_TASK],
-        produces=[RESOURCE_TASK],
-        arg_types=[ARG_TASK, ARG_INT, None],
-        replay=replay_task_fork,
-    ),
-    Op(
-        name="TASK_PIN",
-        weight=3,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU) and m.cpus >= 2,
-        emit=op_task_pin,
-        requires=[RESOURCE_TASK],
-        arg_types=[ARG_TASK, ARG_CPU, ARG_CPU],
-    ),
-    Op(
-        name="TASK_FIFO",
-        weight=0,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
-        emit=op_task_fifo,
-        requires=[RESOURCE_TASK],
-        arg_types=[ARG_TASK, ARG_INT, None],
-        replay=replay_task_fifo,
-    ),
-    Op(
-        name="TASK_CFS",
-        weight=2,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
-        emit=op_task_cfs,
-        requires=[RESOURCE_TASK],
-        arg_types=[ARG_TASK, ARG_INT, None],
-    ),
-    Op(
-        name="TASK_PAUSE",
-        weight=4,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
-        emit=op_task_pause,
-        requires=[RESOURCE_TASK],
-        arg_types=[ARG_TASK, None, None],
-    ),
-    Op(
-        name="TASK_WAKEUP",
-        weight=10,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_SLEEPING),
-        emit=op_task_wakeup,
-        requires=[RESOURCE_TASK],
-        arg_types=[ARG_TASK, None, None],
-    ),
-    Op(
-        name="TASK_SET_PRIO",
-        weight=3,
-        is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
-        emit=op_task_set_prio,
-        requires=[RESOURCE_TASK],
-        arg_types=[ARG_TASK, ARG_INT, None],
-    ),
-    Op(
-        name="TICK",
-        weight=0,
-        is_applicable=lambda m: True,
-        emit=op_tick,
-    ),
-    Op(
-        name="TICK_REPEAT",
-        weight=5,
-        is_applicable=lambda m: True,
-        emit=op_tick_repeat,
-        arg_types=[ARG_INT, None, None],
-    ),
-    Op(
-        name="CGROUP_CREATE",
-        weight=4,
-        is_applicable=lambda m: m.next_cgroup_id() is not None,
-        emit=op_cgroup_create,
-        produces=[RESOURCE_CGROUP],
-        arg_types=[ARG_CGROUP, ARG_CGROUP, None],
-        replay=replay_cgroup_create,
-    ),
-    Op(
-        name="CGROUP_SET_CPUSET",
-        weight=2,
-        is_applicable=lambda m: m.has_cgroups() and m.cpus >= 2,
-        emit=op_cgroup_set_cpuset,
-        requires=[RESOURCE_CGROUP],
-        arg_types=[ARG_CGROUP, ARG_CPU, ARG_CPU],
-        replay=replay_cgroup_set_cpuset,
-    ),
-    Op(
-        name="CGROUP_SET_WEIGHT",
-        weight=2,
-        is_applicable=lambda m: m.has_cgroups(),
-        emit=op_cgroup_set_weight,
-        requires=[RESOURCE_CGROUP],
-        arg_types=[ARG_CGROUP, ARG_INT, None],
-    ),
-    Op(
-        name="CGROUP_ADD_TASK",
-        weight=3,
-        is_applicable=lambda m: m.has_cgroups() and m.has_tasks(),
-        emit=op_cgroup_add_task,
-        requires=[RESOURCE_CGROUP, RESOURCE_TASK],
-        arg_types=[ARG_CGROUP, ARG_TASK, None],
-        replay=replay_cgroup_add_task,
-    ),
-    Op(
-        name="CGROUP_DESTROY",
-        weight=1,
-        is_applicable=lambda m: bool(m.destroyable_leaf_cgroups()),
-        emit=op_cgroup_destroy,
-        requires=[RESOURCE_CGROUP],
-        arg_types=[ARG_CGROUP, None, None],
-        replay=replay_cgroup_destroy,
-    ),
-    Op(
-        name="CGROUP_MOVE_TASK_ROOT",
-        weight=2,
-        is_applicable=lambda m: m.has_tasks_in_cgroups(),
-        emit=op_cgroup_move_task_root,
-        requires=[RESOURCE_CGROUP, RESOURCE_TASK],
-        arg_types=[ARG_CGROUP, ARG_TASK, None],
-        replay=replay_cgroup_move_task_root,
-    ),
-    Op(
-        name="CPU_SET_FREQ",
-        weight=0,
-        is_applicable=lambda m: m.cpus >= 2,
-        emit=op_cpu_set_freq,
-        arg_types=[ARG_CPU, ARG_INT, None],
-    ),
-    Op(
-        name="CPU_SET_CAPACITY",
-        weight=0,
-        is_applicable=lambda m: m.cpus >= 2,
-        emit=op_cpu_set_capacity,
-        arg_types=[ARG_CPU, ARG_INT, None],
-    ),
-]
-
-
-def build_ops() -> List[Op]:
-    return OPS
+def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op]:
+    weights: dict[str, OpWeight] = {
+        "TASK_CREATE": 6,
+        "TASK_FORK": 3,
+        "TASK_PIN": disable_on_small_topology(3),
+        "TASK_FIFO": enable_on_cross_scheduler(2),
+        "TASK_CFS": enable_on_cross_scheduler(2),
+        "TASK_PAUSE": 4,
+        "TASK_WAKEUP": 10,
+        "TASK_SET_PRIO": 3,
+        "TICK": 0,
+        "TICK_REPEAT": 5,
+        "CGROUP_CREATE": 4,
+        "CGROUP_SET_CPUSET": disable_on_small_topology(0),
+        "CGROUP_SET_WEIGHT": 2,
+        "CGROUP_ADD_TASK": 3,
+        "CGROUP_DESTROY": 1,
+        "CGROUP_MOVE_TASK_ROOT": 2,
+        "CPU_SET_FREQ": 0,
+        "CPU_SET_CAPACITY": 0,
+    }
+    if weight_overrides:
+        weights.update(weight_overrides)
+    return [
+        Op(
+            name="TASK_CREATE",
+            weight=weights["TASK_CREATE"],
+            is_applicable=lambda m: m.next_task_id() is not None,
+            emit=op_task_create,
+            produces=[RESOURCE_TASK],
+            arg_types=[ARG_TASK, None, None],
+        ),
+        Op(
+            name="TASK_FORK",
+            weight=weights["TASK_FORK"],
+            is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU) and m.next_task_id() is not None,
+            emit=op_task_fork,
+            requires=[RESOURCE_TASK],
+            produces=[RESOURCE_TASK],
+            arg_types=[ARG_TASK, ARG_INT, None],
+            replay=replay_task_fork,
+        ),
+        Op(
+            name="TASK_PIN",
+            weight=weights["TASK_PIN"],
+            is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU) and m.cpus >= 2,
+            emit=op_task_pin,
+            requires=[RESOURCE_TASK],
+            arg_types=[ARG_TASK, ARG_CPU, ARG_CPU],
+        ),
+        Op(
+            name="TASK_FIFO",
+            weight=weights["TASK_FIFO"],
+            is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
+            emit=op_task_fifo,
+            requires=[RESOURCE_TASK],
+            arg_types=[ARG_TASK, ARG_INT, None],
+            replay=replay_task_fifo,
+        ),
+        Op(
+            name="TASK_CFS",
+            weight=weights["TASK_CFS"],
+            is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
+            emit=op_task_cfs,
+            requires=[RESOURCE_TASK],
+            arg_types=[ARG_TASK, ARG_INT, None],
+        ),
+        Op(
+            name="TASK_PAUSE",
+            weight=weights["TASK_PAUSE"],
+            is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
+            emit=op_task_pause,
+            requires=[RESOURCE_TASK],
+            arg_types=[ARG_TASK, None, None],
+        ),
+        Op(
+            name="TASK_WAKEUP",
+            weight=weights["TASK_WAKEUP"],
+            is_applicable=lambda m: m.has_tasks_in_state(TASK_SLEEPING),
+            emit=op_task_wakeup,
+            requires=[RESOURCE_TASK],
+            arg_types=[ARG_TASK, None, None],
+        ),
+        Op(
+            name="TASK_SET_PRIO",
+            weight=weights["TASK_SET_PRIO"],
+            is_applicable=lambda m: m.has_tasks_in_state(TASK_ON_CPU),
+            emit=op_task_set_prio,
+            requires=[RESOURCE_TASK],
+            arg_types=[ARG_TASK, ARG_INT, None],
+        ),
+        Op(
+            name="TICK",
+            weight=weights["TICK"],
+            is_applicable=lambda m: True,
+            emit=op_tick,
+        ),
+        Op(
+            name="TICK_REPEAT",
+            weight=weights["TICK_REPEAT"],
+            is_applicable=lambda m: True,
+            emit=op_tick_repeat,
+            arg_types=[ARG_INT, None, None],
+        ),
+        Op(
+            name="CGROUP_CREATE",
+            weight=weights["CGROUP_CREATE"],
+            is_applicable=lambda m: m.next_cgroup_id() is not None,
+            emit=op_cgroup_create,
+            produces=[RESOURCE_CGROUP],
+            arg_types=[ARG_CGROUP, ARG_CGROUP, None],
+            replay=replay_cgroup_create,
+        ),
+        Op(
+            name="CGROUP_SET_CPUSET",
+            weight=weights["CGROUP_SET_CPUSET"],
+            is_applicable=lambda m: m.has_cgroups() and m.cpus >= 2,
+            emit=op_cgroup_set_cpuset,
+            requires=[RESOURCE_CGROUP],
+            arg_types=[ARG_CGROUP, ARG_CPU, ARG_CPU],
+            replay=replay_cgroup_set_cpuset,
+        ),
+        Op(
+            name="CGROUP_SET_WEIGHT",
+            weight=weights["CGROUP_SET_WEIGHT"],
+            is_applicable=lambda m: m.has_cgroups(),
+            emit=op_cgroup_set_weight,
+            requires=[RESOURCE_CGROUP],
+            arg_types=[ARG_CGROUP, ARG_INT, None],
+        ),
+        Op(
+            name="CGROUP_ADD_TASK",
+            weight=weights["CGROUP_ADD_TASK"],
+            is_applicable=lambda m: m.has_cgroups() and m.has_tasks(),
+            emit=op_cgroup_add_task,
+            requires=[RESOURCE_CGROUP, RESOURCE_TASK],
+            arg_types=[ARG_CGROUP, ARG_TASK, None],
+            replay=replay_cgroup_add_task,
+        ),
+        Op(
+            name="CGROUP_DESTROY",
+            weight=weights["CGROUP_DESTROY"],
+            is_applicable=lambda m: bool(m.destroyable_leaf_cgroups()),
+            emit=op_cgroup_destroy,
+            requires=[RESOURCE_CGROUP],
+            arg_types=[ARG_CGROUP, None, None],
+            replay=replay_cgroup_destroy,
+        ),
+        Op(
+            name="CGROUP_MOVE_TASK_ROOT",
+            weight=weights["CGROUP_MOVE_TASK_ROOT"],
+            is_applicable=lambda m: m.has_tasks_in_cgroups(),
+            emit=op_cgroup_move_task_root,
+            requires=[RESOURCE_CGROUP, RESOURCE_TASK],
+            arg_types=[ARG_CGROUP, ARG_TASK, None],
+            replay=replay_cgroup_move_task_root,
+        ),
+        Op(
+            name="CPU_SET_FREQ",
+            weight=weights["CPU_SET_FREQ"],
+            is_applicable=lambda m: m.cpus >= 2,
+            emit=op_cpu_set_freq,
+            arg_types=[ARG_CPU, ARG_INT, None],
+        ),
+        Op(
+            name="CPU_SET_CAPACITY",
+            weight=weights["CPU_SET_CAPACITY"],
+            is_applicable=lambda m: m.cpus >= 2,
+            emit=op_cpu_set_capacity,
+            arg_types=[ARG_CPU, ARG_INT, None],
+        ),
+    ]

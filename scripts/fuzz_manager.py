@@ -49,6 +49,7 @@ class FuzzManager:
         mutate_ratio: float = 0.35,
         special_mutate_ratio: float = 0.2,
         pivot_rarity_alpha: float = 1.0,
+        cross_scheduler: bool = False,
         pin_cpus: Optional[str] = None,
         demo: bool = False,
     ) -> None:
@@ -60,6 +61,7 @@ class FuzzManager:
         self.mutate_ratio = mutate_ratio
         self.special_mutate_ratio = special_mutate_ratio
         self.pivot_rarity_alpha = pivot_rarity_alpha
+        self.cross_scheduler = cross_scheduler
         self.pin_cpus = pin_cpus
         self.demo = demo
 
@@ -238,6 +240,7 @@ class FuzzManager:
                     self.result_queue,
                     self.driver,
                     self.linux_name,
+                    self.cross_scheduler,
                     self.qemu_cpu_lists[wid],
                 ),
                 daemon=True,
@@ -542,6 +545,7 @@ def run_manager(
     mutate_ratio: float = 0.35,
     special_mutate_ratio: float = 0.2,
     pivot_rarity_alpha: float = 1.0,
+    cross_scheduler: bool = False,
     pin_cpus: Optional[str] = None,
     demo: bool = False,
 ) -> None:
@@ -554,6 +558,7 @@ def run_manager(
         mutate_ratio=mutate_ratio,
         special_mutate_ratio=special_mutate_ratio,
         pivot_rarity_alpha=pivot_rarity_alpha,
+        cross_scheduler=cross_scheduler,
         pin_cpus=pin_cpus,
         demo=demo,
     )

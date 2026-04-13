@@ -229,6 +229,7 @@ class FuzzWorker:
         result_queue: "mp.Queue[WorkResult]",
         driver: Driver,
         linux_name: str,
+        cross_scheduler: bool = False,
         qemu_cpus: Optional[str] = None,
         rng_seed: Optional[int] = None,
         base_dir: Optional[Path] = None,
@@ -239,6 +240,7 @@ class FuzzWorker:
         self.result_queue = result_queue
         self.driver = driver
         self.linux_name = linux_name
+        self.cross_scheduler = cross_scheduler
         self.qemu_cpus = qemu_cpus
         self.io_timeout_sec = io_timeout_sec
         self.paths = (
@@ -288,7 +290,13 @@ class FuzzWorker:
         # reproducing vruntime overflow
         max_tasks = self.rng.randint(kstep_cpus * 3, kstep_cpus * 6)
         max_cgroups = self.rng.randint(kstep_cpus * 3, kstep_cpus * 6)
-        gen = init_genstate(max_tasks, max_cgroups, self.driver.num_cpus, gen_seed)
+        gen = init_genstate(
+            max_tasks,
+            max_cgroups,
+            self.driver.num_cpus,
+            gen_seed,
+            cross_scheduler=self.cross_scheduler,
+        )
 
         session = FuzzWorkerSession(gen, proc, self.paths.sock_file, self.logger, self.io_timeout_sec)
 
@@ -522,6 +530,7 @@ def worker_main(
     result_queue: "mp.Queue[WorkResult]",
     driver: Driver,
     linux_name: str,
+    cross_scheduler: bool = False,
     qemu_cpus: Optional[str] = None,
 ) -> None:
     worker = FuzzWorker(
@@ -530,6 +539,7 @@ def worker_main(
         result_queue=result_queue,
         driver=driver,
         linux_name=linux_name,
+        cross_scheduler=cross_scheduler,
         qemu_cpus=qemu_cpus,
     )
     worker.run()

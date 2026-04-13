@@ -83,6 +83,12 @@ def main() -> None:
         metavar="CPUSET",
         help="Pin QEMU workers and host-side Python processes to CPUs in CPUSET, e.g. 0-9 or 0-3,8-11",
     )
+    parser.add_argument(
+        "--cross_scheduler",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Enable cross-scheduler fuzzing; sets TASK_FIFO and TASK_CFS weights to 2 instead of 0",
+    )
     parser.add_argument("--demo", action="store_true",
                         help="In the demo mode, only run 1 test per worker")
     args = parser.parse_args()
@@ -113,6 +119,7 @@ def main() -> None:
         f"topology={args.topology or 'default'}  "
         f"frequency={args.frequency or 'default'}  "
         f"demo={args.demo}  "
+        f"cross_scheduler={args.cross_scheduler}  "
         f"fresh_ratio={args.fresh_ratio}  mutate_ratio={args.mutate_ratio}  "
         f"special_mutate_ratio={args.special_mutate_ratio}  "
         f"pivot_rarity_alpha={args.pivot_rarity_alpha}"
@@ -126,6 +133,7 @@ def main() -> None:
         mutate_ratio=args.mutate_ratio,
         special_mutate_ratio=args.special_mutate_ratio,
         pivot_rarity_alpha=args.pivot_rarity_alpha,
+        cross_scheduler=args.cross_scheduler,
         pin_cpus=args.pin_cpus,
         demo=args.demo,
     )
