@@ -21,6 +21,8 @@ enum kstep_op_type {
   OP_CGROUP_ADD_TASK,
   OP_CPU_SET_FREQ,
   OP_CPU_SET_CAPACITY,
+  OP_CGROUP_DESTROY,
+  OP_CGROUP_MOVE_TASK_ROOT,
   OP_TYPE_NR,
 };
 
@@ -30,7 +32,8 @@ struct checker_result {
 };
 
 bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c);
-void kstep_write_state(struct file *f, bool executed);
+u8 kstep_last_executed_steps(void);
+void kstep_write_state(struct file *f, bool executed, u8 executed_steps);
 bool kstep_work_conserving_broken(void);
 struct checker_result kstep_checker_result(void);
 

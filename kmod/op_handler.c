@@ -1,3 +1,4 @@
+#include <linux/cgroup.h>
 #include <linux/kernel.h> // panic, scnprintf
 #include <linux/sched/signal.h> // for_each_process
 #include <linux/string.h> // strcmp, strscpy
@@ -15,6 +16,7 @@
 static int cgroup_parent_id[MAX_CGROUPS];
 static bool cgroup_exists[MAX_CGROUPS];
 static int cgroup_lineage[MAX_CGROUPS];
+static struct task_group *cgroup_tg[MAX_CGROUPS];
 
 #define TASK_OP_QUEUE_SIZE 64
 
@@ -28,6 +30,7 @@ struct kstep_task {
 };
 
 static struct kstep_task kstep_tasks[MAX_TASKS];
+static u8 last_executed_steps;
 
 static bool is_valid_task_id(int id) { return id >= 0 && id < MAX_TASKS; }
 static bool is_valid_cgroup_id(int id) { return id >= 0 && id < MAX_CGROUPS; }
@@ -51,6 +54,61 @@ static bool build_cgroup_name(int id, char *buf) {
       return false;
   }
   return true;
+}
+
+static bool cgroup_is_leaf(int id) {
+  for (int i = 0; i < MAX_CGROUPS; i++) {
+    if (cgroup_exists[i] && cgroup_parent_id[i] == id)
+      return false;
+  }
+  return true;
+}
+
+static struct task_group *lookup_cgroup_task_group(const char *name) {
+  struct cgroup *cgrp;
+  struct cgroup_subsys_state *css;
+  struct task_group *tg = NULL;
+
+  cgrp = cgroup_get_from_path(name);
+  if (IS_ERR(cgrp))
+    return NULL;
+
+  rcu_read_lock();
+  css = rcu_dereference(cgrp->subsys[cpu_cgrp_id]);
+  if (css)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+    tg = css_tg(css);
+#else
+    tg = container_of(css, struct task_group, css);
+#endif
+  rcu_read_unlock();
+  cgroup_put(cgrp);
+
+  return tg;
+}
+
+static void cgroup_move_tasks_to_root(int id) {
+  for (int i = 0; i < MAX_TASKS; i++) {
+    if (!kstep_tasks[i].p || kstep_tasks[i].cgroup_id != id)
+      continue;
+
+    TRACE_INFO("Moving task %d from cgroup %d to root",
+               kstep_tasks[i].p->pid, id);
+    kstep_cgroup_add_task("", kstep_tasks[i].p->pid);
+    kstep_task_pin(kstep_tasks[i].p, 1, num_online_cpus() - 1);
+    kstep_tasks[i].cgroup_id = -1;
+  }
+}
+
+static void move_task_to_root(int task_id) {
+  if (!is_valid_task_id(task_id) || !kstep_tasks[task_id].p)
+    panic("Invalid task id %d", task_id);
+
+  TRACE_INFO("Moving task %d from cgroup %d to root",
+             kstep_tasks[task_id].p->pid, kstep_tasks[task_id].cgroup_id);
+  kstep_cgroup_add_task("", kstep_tasks[task_id].p->pid);
+  kstep_task_pin(kstep_tasks[task_id].p, 1, num_online_cpus() - 1);
+  kstep_tasks[task_id].cgroup_id = -1;
 }
 
 static bool pid_known(pid_t pid) {
@@ -133,9 +191,7 @@ static bool op_task_fifo(int a, int b, int c) {
   if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when setting FIFO", a);
   // Move the task back to the root cgroup, otherwise the set_schedprio will fail
-  kstep_cgroup_add_task("", kstep_tasks[a].p->pid);
-  kstep_task_pin(kstep_tasks[a].p, 1, num_online_cpus() - 1);
-  kstep_tasks[a].cgroup_id = -1;
+  move_task_to_root(a);
   kstep_task_fifo(kstep_tasks[a].p);
   return true;
 }
@@ -193,11 +249,45 @@ static bool op_tick(int a, int b, int c) {
   return true;
 }
 
+static u64 count_ineligible_cgroup_se(void) {
+  u64 count = 0;
+
+  for (int id = 0; id < MAX_CGROUPS; id++) {
+    struct task_group *tg;
+
+    if (!cgroup_exists[id])
+      continue;
+
+    tg = cgroup_tg[id];
+    if (!tg)
+      continue;
+
+    for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+      struct sched_entity *se = tg->se[cpu];
+
+      if (se && !kstep_eligible(se))
+        count++;
+    }
+  }
+
+  return count;
+}
+
 static bool op_tick_repeat(int a, int b, int c) {
+  u8 executed_steps = 0;
   (void)b;
   (void)c;
-  for (int i = 0; i < a; i++)
+
+  for (int i = 0; i < a; i++) {
+    if (count_ineligible_cgroup_se() > 1)
+      break;
     kstep_execute_op(OP_TICK, 0, 0, 0);
+    executed_steps++;
+    if (count_ineligible_cgroup_se() > 1)
+      break;
+  }
+
+  last_executed_steps = executed_steps;
   return true;
 }
 
@@ -218,16 +308,14 @@ static bool op_cgroup_create(int a, int b, int c) {
   if (!build_cgroup_name(child_id, name))
     return false;
 
-  // Move the task back to the root cgroup: only the leaf cgroup has tasks in cgroupv2
-  for (int i = 0; i < MAX_TASKS; i++) {
-    if (parent_id != -1 && kstep_tasks[i].p && kstep_tasks[i].cgroup_id == parent_id) {
-      kstep_cgroup_add_task("", kstep_tasks[i].p->pid);
-      kstep_task_pin(kstep_tasks[i].p, 1, num_online_cpus() - 1);
-      kstep_tasks[i].cgroup_id = -1;
-    }
-  }
+  // Only leaf cgroups can contain tasks in cgroup v2.
+  if (parent_id != -1)
+    cgroup_move_tasks_to_root(parent_id);
 
   kstep_cgroup_create(name);
+  cgroup_tg[child_id] = lookup_cgroup_task_group(name);
+  if (!cgroup_tg[child_id])
+    panic("Failed to resolve task group for cgroup %s", name);
   return true;
 }
 
@@ -284,6 +372,40 @@ static bool op_cgroup_add_task(int a, int b, int c) {
   return true;
 }
 
+static bool op_cgroup_destroy(int a, int b, int c) {
+  char name[MAX_CGROUP_NAME_LEN];
+  (void)b;
+  (void)c;
+
+  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
+    return false;
+  if (!cgroup_is_leaf(a))
+    return false;
+  if (!build_cgroup_name(a, name))
+    return false;
+
+  cgroup_move_tasks_to_root(a);
+  kstep_cgroup_destroy(name);
+  cgroup_tg[a] = NULL;
+  cgroup_exists[a] = false;
+  cgroup_parent_id[a] = -1;
+  return true;
+}
+
+static bool op_cgroup_move_task_root(int a, int b, int c) {
+  (void)c;
+
+  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
+    return false;
+  if (!is_valid_task_id(b) || !kstep_tasks[b].p)
+    return false;
+  if (kstep_tasks[b].cgroup_id != a)
+    return false;
+
+  move_task_to_root(b);
+  return true;
+}
+
 typedef bool (*op_handler_fn)(int a, int b, int c);
 
 static op_handler_fn op_handlers[OP_TYPE_NR] = {
@@ -303,6 +425,8 @@ static op_handler_fn op_handlers[OP_TYPE_NR] = {
     [OP_CGROUP_ADD_TASK] = op_cgroup_add_task,
     [OP_CPU_SET_FREQ] = NULL,
     [OP_CPU_SET_CAPACITY] = NULL,
+    [OP_CGROUP_DESTROY] = op_cgroup_destroy,
+    [OP_CGROUP_MOVE_TASK_ROOT] = op_cgroup_move_task_root,
 };
 
 static const char op_strs[OP_TYPE_NR][30] = {
@@ -322,6 +446,8 @@ static const char op_strs[OP_TYPE_NR][30] = {
   [OP_CGROUP_ADD_TASK] = "CGROUP_ADD_TASK",
   [OP_CPU_SET_FREQ] = "CPU_SET_FREQ",
   [OP_CPU_SET_CAPACITY] = "CPU_SET_CAPACITY",
+  [OP_CGROUP_DESTROY] = "CGROUP_DESTROY",
+  [OP_CGROUP_MOVE_TASK_ROOT] = "CGROUP_MOVE_TASK_ROOT",
 };
 
 
@@ -411,20 +537,55 @@ static s64 get_rt_util_avg(struct rq *rq) {
   return rq->avg_rt.util_avg;
 }
 
+static void print_cgroup_state(int id) {
+  char name[MAX_CGROUP_NAME_LEN];
+  char eligible[256] = "";
+  int len = 0;
+  struct task_group *tg = cgroup_tg[id];
+
+  if (!build_cgroup_name(id, name))
+    return;
+
+  if (!tg) {
+    pr_info("cgroup %d %s: eligible=unavailable\n", id, name);
+    return;
+  }
+
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct sched_entity *se = tg->se[cpu];
+
+    if (!se)
+      continue;
+
+    len += scnprintf(eligible + len, sizeof(eligible) - len, "%scpu%d=%d",
+                     len ? " " : "", cpu, kstep_eligible(se));
+    if (len >= sizeof(eligible))
+      break;
+  }
+
+  pr_info("cgroup %d %s: eligible={%s}\n", id, name,
+          eligible[0] ? eligible : "n/a");
+}
 
 static void print_state(void) {
   for (int i = 0; i < MAX_TASKS; i++) {
     struct task_struct *p = kstep_tasks[i].p;
     if (!p)
       continue;
-    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d, class=%d, util_avg=%lu\n", i, 
-             p->pid, kstep_task_running(p), p->__state, task_cpu(p), p->policy, p->se.avg.util_avg);
+    pr_info("Task %d %d: on_cpu=%d, state=%d, cpu=%d, class=%d, util_avg=%lu, eligible=%d\n", i, 
+             p->pid, kstep_task_running(p), p->__state, task_cpu(p), p->policy, p->se.avg.util_avg, kstep_eligible(&p->se));
   }
 
-  for (int i = 1; i < num_online_cpus(); i++) {
-    struct rq *rq = cpu_rq(i);
-    pr_info("CPU %d: %lu, %lu, %llu, %llu, %lu\n", i, rq->cfs.avg.util_avg, rq->avg_rt.util_avg, rq->clock_task, rq->clock_pelt, rq->lost_idle_time);
+  for (int i = 0; i < MAX_CGROUPS; i++) {
+    if (!cgroup_exists[i])
+      continue;
+    print_cgroup_state(i);
   }
+
+  // for (int i = 1; i < num_online_cpus(); i++) {
+  //   struct rq *rq = cpu_rq(i);
+  //   pr_info("CPU %d: %lu, %lu, %llu, %llu, %lu\n", i, rq->cfs.avg.util_avg, rq->avg_rt.util_avg, rq->clock_task, rq->clock_pelt, rq->lost_idle_time);
+  // }
 }
 
 /*
@@ -487,18 +648,28 @@ static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   return true;
 }
 
-static u8 buf[1 + 1 + MAX_TASKS * 2 + 1];
+static u8 buf[1 + 1 + 1 + MAX_TASKS * 2 + 1];
 
-void kstep_write_state(struct file *f, bool executed) {
-  /* Format: [OP_TYPE_NR] [executed] [id] [state] [id] [state] ... ['\n']
-   * OP_TYPE_NR is the marker byte; executed, id, and state are each one byte.
-   * 2 = running on CPU, 1 = runnable on runqueue, 0 = blocked. */
+u8 kstep_last_executed_steps(void) {
+  return last_executed_steps;
+}
+
+static u8 encode_state_byte(u8 val) {
+  return val + 11; /* avoid '\n' in the binary frame */
+}
+
+void kstep_write_state(struct file *f, bool executed, u8 executed_steps) {
+  /* Format: [OP_TYPE_NR] [executed] [executed_steps+11] [id] [state] ... ['\n']
+   * OP_TYPE_NR is the marker byte; executed and state are one byte, and
+   * executed_steps is offset to avoid '\n'. 2 = running on CPU,
+   * 1 = runnable on runqueue, 0 = blocked. */
   loff_t pos = 0;
   int len = 0;
   
 
   buf[len++] = OP_TYPE_NR;
   buf[len++] = (u8) executed;
+  buf[len++] = encode_state_byte(executed_steps);
   for (int i = 0; i < MAX_TASKS; i++) {
     struct task_struct *p = kstep_tasks[i].p;
     if (!p)
@@ -518,6 +689,7 @@ void kstep_write_state(struct file *f, bool executed) {
 }
 
 bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
+  last_executed_steps = 0;
   if (type < 0 || type >= OP_TYPE_NR)
     panic("Operation failed: %d %d %d %d\n", type, a, b, c);
   if (!op_handlers[type]) {
@@ -547,5 +719,9 @@ bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
     }
   }
 
-  return execute_one_op(type, a, b, c);
+  if (!execute_one_op(type, a, b, c))
+    return false;
+
+  last_executed_steps = 1;
+  return true;
 }

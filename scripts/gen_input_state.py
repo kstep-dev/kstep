@@ -25,13 +25,14 @@ class GenState:
     max_cgroups: int
     cpus: int
     rnd: random.Random
+    cross_scheduler: bool = False
 
     # Generator state: changed by operations that produce resources or consume resources
     tasks: List[int] = field(default_factory=list) # list of task ids
     task_state: dict[int, str] = field(default_factory=dict) # key: task id, value: state
     cgroups: dict = field(default_factory=dict) # key: cgroup id, value: Cgroup
     leaf_cgroups: list[int] = field(default_factory=list) # list of leaf cgroup ids
-    task2cgroups: dict = field(default_factory=dict) # key: task id, value: list of cgroup ids
+    task2cgroups: dict = field(default_factory=dict) # key: task id, value: cgroup id
 
     # ======
     # Task related functions
@@ -137,13 +138,26 @@ class GenState:
     def has_cgroups(self) -> bool:
         return len(self.cgroups) > 0
 
+    def has_tasks_in_cgroups(self) -> bool:
+        return bool(self.task2cgroups)
+
     def choose_cgroup(self) -> int:
         return self.rnd.choice(list(self.cgroups.keys()))
+
+    def choose_task_in_cgroup(self) -> tuple[int, int]:
+        task_id = self.rnd.choice(list(self.task2cgroups.keys()))
+        return self.task2cgroups[task_id], task_id
     
     def choose_leaf_cgroup(self) -> int:
         if not self.leaf_cgroups:
             return self.choose_cgroup()
         return self.rnd.choice(self.leaf_cgroups)
+
+    def destroyable_leaf_cgroups(self) -> list[int]:
+        return list(self.leaf_cgroups)
+
+    def choose_destroyable_leaf_cgroup(self) -> int:
+        return self.rnd.choice(self.destroyable_leaf_cgroups())
 
     def next_cgroup_id(self) -> Optional[int]:
         for i in range(self.max_cgroups):
@@ -169,6 +183,10 @@ class GenState:
             self.leaf_cgroups.append(child_id)
         if parent_id != -1 and parent_id in self.leaf_cgroups:
             self.leaf_cgroups.remove(parent_id)
+        if parent_id != -1:
+            for task_id, cgroup_id in list(self.task2cgroups.items()):
+                if cgroup_id == parent_id:
+                    self.cgroup_remove_task(task_id)
 
     def set_cgroup_cpuset(self, cgroup_id: int, cpuset: tuple[int, int]):
         self.cgroups[cgroup_id].cpuset = cpuset
@@ -187,4 +205,22 @@ class GenState:
         self.task2cgroups[task_id] = cgroup_id
 
     def cgroup_remove_task(self, task_id: int):
-        self.task2cgroups.pop(task_id)
+        self.task2cgroups.pop(task_id, None)
+
+    def remove_cgroup(self, cgroup_id: int):
+        cgroup = self.cgroups.pop(cgroup_id, None)
+        if cgroup is None:
+            return
+
+        self.leaf_cgroups.remove(cgroup_id)
+
+        for task_id, task_cgroup_id in list(self.task2cgroups.items()):
+            if task_cgroup_id == cgroup_id:
+                self.cgroup_remove_task(task_id)
+
+        parent_id = cgroup.parent_id
+        if parent_id == -1:
+            return
+
+        if all(child.parent_id != parent_id for child in self.cgroups.values()) and parent_id not in self.leaf_cgroups:
+            self.leaf_cgroups.append(parent_id)
