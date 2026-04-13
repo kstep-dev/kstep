@@ -25,7 +25,7 @@ class GenState:
     max_cgroups: int
     cpus: int
     rnd: random.Random
-    cross_scheduler: bool = False
+    cross_scheduler: bool = False # whether testing across rt and cfs schedulers
 
     # Generator state: changed by operations that produce resources or consume resources
     tasks: List[int] = field(default_factory=list) # list of task ids
