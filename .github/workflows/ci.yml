@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Restore cache
         id: qemu-cache
@@ -47,7 +47,7 @@ jobs:
     strategy:
       matrix:
         version:      # https://kernel.org/
-          - v6.19     # latest
+          - v7.0      # latest
           - v6.18     # 2025 LTS
           - v6.12     # 2024 LTS
           - v6.6      # 2023 LTS
@@ -58,7 +58,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Linux - Restore cache
         id: linux-cache
@@ -131,7 +131,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Linux - Restore cache
         id: linux-cache
