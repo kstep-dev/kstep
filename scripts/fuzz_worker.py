@@ -207,14 +207,12 @@ class FuzzWorkerSession:
     # Send one op to kmod and fold the returned state into the generator model.
     def send_op(self, op: int, a: int, b: int, c: int) -> int:
         self.sock.sendall(f"{op},{a},{b},{c}\n".encode())
-        self.logger.debug(f"SEND OP: {op},{a},{b},{c}")
 
         state = self.read_kmod_state()
         if state is None:
             self.sock.sendall(b"EXIT\n")
             raise RuntimeError("Readfail: Failed to read task states")
 
-        self.logger.debug("Received task states")
         self.gen.update_from_kmod(state.task_states)
         if not state.executed:
             return 0
@@ -326,20 +324,25 @@ class FuzzWorker:
             op, a, b, c = generate_next_command(session.gen)
             executed_steps = session.send_op(op, a, b, c)
             if executed_steps > 0:
-                self.logger.debug(
-                    f"{log_prefix} {generated}: op={op},{a},{b},{c} "
-                    f"executed_steps={executed_steps} task_state={session.gen.task_state}"
-                )
+                
                 if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
                     for i in range(executed_steps):
                         ops_executed.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
+                        self.logger.debug(
+                            f"{log_prefix}: op={OP_NAME_TO_TYPE["TICK"]},0,0,0 "
+                            f"executed_steps={executed_steps} task_state={session.gen.task_state}"
+                        )
                     if executed_steps < a and executed_steps > 0:
                         special_pivot_idxs.append(len(ops_executed) - 1)
                         self.logger.debug(
-                            f"{log_prefix} {generated}: special_pivot={special_pivot_idxs[-1]} "
+                            f"{log_prefix}: special_pivot={special_pivot_idxs[-1]} "
                             f"special_state=1"
                         )
                 else:
+                    self.logger.debug(
+                        f"{log_prefix}: op={op},{a},{b},{c} "
+                        f"executed_steps={executed_steps} task_state={session.gen.task_state}"
+                    )
                     ops_executed.append((op, a, b, c))
                     generated += 1
         return ops_executed, special_pivot_idxs
@@ -365,7 +368,7 @@ class FuzzWorker:
                     executed_steps = session.send_op(op, a, b, c)
                     if executed_steps > 0:
                         self.logger.debug(
-                            f"REPLAY {i}: op={op},{a},{b},{c} executed_steps={executed_steps} task_state={session.gen.task_state}"
+                            f"REPLAY: op={op},{a},{b},{c} executed_steps={executed_steps} task_state={session.gen.task_state}"
                         )
                         ops_executed.append((op, a, b, c))
                         replay_update_genstate(session.gen, op, a, b, c)

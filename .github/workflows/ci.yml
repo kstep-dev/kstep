@@ -123,3 +123,52 @@ jobs:
 
       - name: Write job summary
         run: echo "[${{matrix.version}}](${{steps.upload-artifact.outputs.artifact-url}})" >> $GITHUB_STEP_SUMMARY
+  
+  fuzz:
+    needs: test
+
+    name: Fuzz
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux - Restore cache
+        id: linux-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            linux
+            build
+          key: v6.18-${{hashFiles('linux/config.kstep**', 'linux/cov.c')}}
+          fail-on-cache-miss: true
+
+      - name: Build kSTEP
+        run: make kstep
+
+      - name: Restore QEMU
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.QEMU_INSTALL_PATH }}
+          key: ${{ env.QEMU_CACHE_KEY }}
+          fail-on-cache-miss: true
+
+      - name: Run fuzz test (1 fresh, 1 replay, 1 mutation)
+        timeout-minutes: 5
+        run: |
+          ./fuzz.py \
+            --linux_name v6.18 \
+            --workers 1 \
+            --steps 10 \
+            --ci_mode
+
+      - name: Print fresh test log
+        run: cat data/fuzz/fresh/worker.debug.log
+
+      - name: Print replay test log
+        run: cat data/fuzz/replay/worker.debug.log
+
+      - name: Print mutation test log
+        run: cat data/fuzz/mutation/worker.debug.log
+
+          

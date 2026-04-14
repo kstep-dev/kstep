@@ -31,7 +31,7 @@ from scripts.fuzz_common import (
 from scripts.fuzz_mutate import bottleneck_signal
 from scripts.fuzz_worker import worker_main
 from scripts.input_seq import InputSeq
-from scripts.consts import FUZZ_ERROR_DIR, FUZZ_SUCCESS_DIR, FUZZ_CORPUS_DIR
+from scripts.consts import FUZZ_CORPUS_DIR, FUZZ_ERROR_DIR, FUZZ_SUCCESS_DIR, fuzz_mode_dir
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Manager
@@ -51,7 +51,7 @@ class FuzzManager:
         pivot_rarity_alpha: float = 1.0,
         cross_scheduler: bool = False,
         pin_cpus: Optional[str] = None,
-        demo: bool = False,
+        ci_mode: bool = False,
     ) -> None:
         self.n_workers = n_workers
         self.driver = driver
@@ -63,7 +63,7 @@ class FuzzManager:
         self.pivot_rarity_alpha = pivot_rarity_alpha
         self.cross_scheduler = cross_scheduler
         self.pin_cpus = pin_cpus
-        self.demo = demo
+        self.ci_mode = ci_mode
 
         self.task_queue: "mp.Queue[Optional[WorkItem]]" = mp.Queue(maxsize=n_workers * 4)
         self.result_queue: "mp.Queue[WorkResult]" = mp.Queue()
@@ -86,37 +86,45 @@ class FuzzManager:
         self.total_errors = 0
         self.total_new_signals = 0
         self.total_special_seeds = 0
+        self.seen_modes: set[str] = set()
         self.interval_signals = 0
         self.errors_by_cat: dict[str, int] = {}
-        self.target_execs = n_workers if demo else None
+        self.ci_plan = ["fresh", "replay", "mutate"] if ci_mode else []
+        self.target_execs = len(self.ci_plan) if ci_mode else None
+
+        if self.ci_mode and self.n_workers != 1:
+            raise RuntimeError("ci_mode requires exactly one worker")
 
     def _allocate_seed_id(self) -> int:
         seed_id = self.seed_counter
         self.seed_counter += 1
         return seed_id
 
-    # Save one worker result and its artifacts into the success or error archive.
+    # Save one worker result and its artifacts into the configured archive layout.
     def _save_test(self, result: WorkResult) -> Path:
-        """Persist a error input and its console log, routed by error category."""
-        if result.error:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        if self.ci_mode:
+            mode_dir = fuzz_mode_dir(result.mode)
+            mode_dir.mkdir(parents=True, exist_ok=True)
+            target_dir = mode_dir
+        elif result.error:
             assert result.error_category is not None
-            category = result.error_category
-            category_dir = FUZZ_ERROR_DIR / category
+            category_dir = FUZZ_ERROR_DIR / result.error_category
             category_dir.mkdir(parents=True, exist_ok=True)
-
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             target_dir = category_dir / f"w{result.worker_id}_{ts}"
         else:
             FUZZ_SUCCESS_DIR.mkdir(parents=True, exist_ok=True)
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
             target_dir = FUZZ_SUCCESS_DIR / f"w{result.worker_id}_{ts}"
 
         target_dir.mkdir(exist_ok=True)
 
         ops_data = {
             "linux_name": self.linux_name,
+            "mode": result.mode,
             "seed_id": result.seed_id,
             "ops": result.ops,
+            "error": result.error,
+            "error_category": result.error_category,
         }
         (target_dir / "ops.json").write_text(json.dumps(ops_data, indent=2))
 
@@ -133,69 +141,106 @@ class FuzzManager:
 
         return target_dir
 
-    # Choose the next work item from fresh, mutate, or replay modes.
-    def _next_work(self) -> WorkItem:
-        r = self.rng.random()
-        # Fresh mode
-        if (len(self.pool) == 0 and len(self.special_pool) == 0) or r < self.fresh_ratio:
-            return WorkItem(mode="fresh", steps=self.steps)
-        # Mutate mode
-        if r < self.fresh_ratio + self.mutate_ratio:
-            prefer_special = (
-                len(self.special_pool) > 0
-                and self.rng.random() < self.special_mutate_ratio
-            )
-            pool_order = [
-                ("special", self.special_pool),
-                ("coverage", self.pool),
-            ] if prefer_special else [
-                ("coverage", self.pool),
-                ("special", self.special_pool),
-            ]
-
-            target: Optional[tuple[str, tuple[Seed, MutationPivot]]] = None
-            for pool_name, seed_pool in pool_order:
-                picked = seed_pool.pick_mutation_target(
-                    signal_test_counts=self.corpus.signal_test_counts,
-                    rng=self.rng,
-                    rarity_alpha=self.pivot_rarity_alpha,
-                )
-                if picked is not None:
-                    target = (pool_name, picked)
-                    break
-            if target is not None:
-                pool_name, picked = target
-                seed, pivot = picked
-                bottleneck = bottleneck_signal(
-                    pivot.signal_ids,
-                    self.corpus.signal_test_counts,
-                    self.pivot_rarity_alpha,
-                )
-                bottleneck_freq = 0.0
-                if bottleneck is not None:
-                    bottleneck_freq = (
-                        self.corpus.signal_test_counts.get(bottleneck, 0)
-                        / max(self.corpus.total_covered_tests, 1)
-                    )
-                logging.info(
-                    f"[mutate] pool={pool_name} picked seed=#{seed.seed_id} pivot={pivot.cmd_id} "
-                    f"kind={pivot.kind} "
-                    f"bottleneck_signal={bottleneck} "
-                    f"bottleneck_signal_freq={bottleneck_freq:.6f} "
-                    f"score={pivot.weight(self.corpus.signal_test_counts, self.pivot_rarity_alpha):.4f}"
-                )
-                return WorkItem(
-                    mode = "mutate",
-                    steps = self.steps,
-                    ops = seed.ops,
-                    seed_id = seed.seed_id,
-                    pivot_idx = pivot.cmd_id,
-                )
-            logging.warning("No productive pivots available for mutate; falling back to replay")
-        # replay mode
+    def _pick_replay_seed(self) -> Optional[Seed]:
         seed = self.pool.pick_seed(self.rng)
         if seed is None:
             seed = self.special_pool.pick_seed(self.rng)
+        return seed
+
+    def _pick_mutation_target(self) -> Optional[tuple[str, Seed, MutationPivot]]:
+        prefer_special = (
+            len(self.special_pool) > 0
+            and self.rng.random() < self.special_mutate_ratio
+        )
+        pool_order = [
+            ("special", self.special_pool),
+            ("coverage", self.pool),
+        ] if prefer_special else [
+            ("coverage", self.pool),
+            ("special", self.special_pool),
+        ]
+
+        for pool_name, seed_pool in pool_order:
+            picked = seed_pool.pick_mutation_target(
+                signal_test_counts=self.corpus.signal_test_counts,
+                rng=self.rng,
+                rarity_alpha=self.pivot_rarity_alpha,
+            )
+            if picked is not None:
+                seed, pivot = picked
+                return pool_name, seed, pivot
+        return None
+
+    def _make_mutation_work(
+        self,
+        pool_name: str,
+        seed: Seed,
+        pivot: MutationPivot,
+    ) -> WorkItem:
+        bottleneck = bottleneck_signal(
+            pivot.signal_ids,
+            self.corpus.signal_test_counts,
+            self.pivot_rarity_alpha,
+        )
+        bottleneck_freq = 0.0
+        if bottleneck is not None:
+            bottleneck_freq = (
+                self.corpus.signal_test_counts.get(bottleneck, 0)
+                / max(self.corpus.total_covered_tests, 1)
+            )
+        logging.info(
+            f"[mutate] pool={pool_name} picked seed=#{seed.seed_id} pivot={pivot.cmd_id} "
+            f"kind={pivot.kind} "
+            f"bottleneck_signal={bottleneck} "
+            f"bottleneck_signal_freq={bottleneck_freq:.6f} "
+            f"score={pivot.weight(self.corpus.signal_test_counts, self.pivot_rarity_alpha):.4f}"
+        )
+        return WorkItem(
+            mode="mutate",
+            steps=self.steps,
+            ops=seed.ops,
+            seed_id=seed.seed_id,
+            pivot_idx=pivot.cmd_id,
+        )
+
+    def _next_ci_work(self) -> WorkItem:
+        mode_idx = self.total_execs
+        if mode_idx >= len(self.ci_plan):
+            raise RuntimeError("ci_mode scheduled more work than expected")
+
+        planned_mode = self.ci_plan[mode_idx]
+        if planned_mode == "fresh":
+            return WorkItem(mode="fresh", steps=self.steps)
+
+        if planned_mode == "replay":
+            seed = self._pick_replay_seed()
+            if seed is None:
+                raise RuntimeError("ci_mode: no seed available for replay")
+            return WorkItem(mode="replay", steps=0, ops=seed.ops, seed_id=seed.seed_id)
+
+        target = self._pick_mutation_target()
+        if target is not None:
+            return self._make_mutation_work(*target)
+        
+        raise RuntimeError("ci_mode: no pivot available for mutation")
+
+
+    # Choose the next work item from fresh, mutate, or replay modes.
+    def _next_work(self) -> WorkItem:
+        if self.ci_mode:
+            return self._next_ci_work()
+
+        r = self.rng.random()
+        if (len(self.pool) == 0 and len(self.special_pool) == 0) or r < self.fresh_ratio:
+            return WorkItem(mode="fresh", steps=self.steps)
+
+        if r < self.fresh_ratio + self.mutate_ratio:
+            target = self._pick_mutation_target()
+            if target is not None:
+                return self._make_mutation_work(*target)
+            logging.warning("No productive pivots available for mutate; falling back to replay")
+
+        seed = self._pick_replay_seed()
         assert seed is not None  # pool is non-empty (checked above)
         return WorkItem(mode="replay", steps=0, ops=seed.ops, seed_id=seed.seed_id)
 
@@ -266,6 +311,7 @@ class FuzzManager:
     # Update aggregate execution counters for the finished result's mode.
     def _record_result_mode(self, result: WorkResult) -> None:
         self.total_execs += 1
+        self.seen_modes.add(result.mode)
         if result.mode == "replay":
             self.total_replay += 1
         elif result.mode == "mutate":
@@ -453,9 +499,13 @@ class FuzzManager:
 
             # Consume result
             self._process_result(result)
+            if self.ci_mode and self.total_errors > 0:
+                logging.info("[fuzz] CI mode stopping after first error result")
+                self.shutdown_event.set()
+                return
             if self.target_execs is not None and self.total_execs >= self.target_execs:
                 logging.info(
-                    f"[fuzz] Demo mode complete: collected {self.total_execs}/{self.target_execs} results"
+                    f"[fuzz] Target run complete: collected {self.total_execs}/{self.target_execs} results"
                 )
                 self.shutdown_event.set()
                 return
@@ -516,6 +566,20 @@ class FuzzManager:
             f"wall={elapsed:.0f}s"
         )
 
+    # Enforce CLI-configured expectations after cleanup has finished.
+    def _validate_outcome(self) -> None:
+        if self.total_errors > 0:
+            raise RuntimeError(f"Fuzzing reported {self.total_errors} error result(s)")
+
+        required_modes = set(self.ci_plan)
+        missing_modes = sorted(required_modes - self.seen_modes)
+        if missing_modes:
+            seen_modes = ", ".join(sorted(self.seen_modes)) or "none"
+            missing = ", ".join(missing_modes)
+            raise RuntimeError(
+                f"Required fuzz mode(s) not observed: {missing}; seen={seen_modes}"
+            )
+
     # Run the manager lifecycle from startup through teardown.
     def run(self) -> None:
         # Keep the high-level lifecycle linear: configure once, run the main
@@ -534,6 +598,8 @@ class FuzzManager:
             self._shutdown_workers()
             self._close_queues()
             self._log_final_stats()
+            if self.ci_mode:
+                self._validate_outcome()
 
 # Create a manager instance and run it with the provided fuzzing parameters.
 def run_manager(
@@ -547,7 +613,7 @@ def run_manager(
     pivot_rarity_alpha: float = 1.0,
     cross_scheduler: bool = False,
     pin_cpus: Optional[str] = None,
-    demo: bool = False,
+    ci_mode: bool = False,
 ) -> None:
     manager = FuzzManager(
         n_workers=n_workers,
@@ -560,7 +626,7 @@ def run_manager(
         pivot_rarity_alpha=pivot_rarity_alpha,
         cross_scheduler=cross_scheduler,
         pin_cpus=pin_cpus,
-        demo=demo,
+        ci_mode=ci_mode,
     )
     manager.run()
 
