@@ -277,7 +277,7 @@ static inline struct sched_entity *node_to_se(struct rb_node *node) {
   return rb_entry(node, struct sched_entity, run_node);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
 static bool cfs_rq_tree_has_eligible_entity(struct rb_node *node) {
   struct sched_entity *se;
 
@@ -296,7 +296,7 @@ static bool cfs_rq_tree_has_eligible_entity(struct rb_node *node) {
 # endif
 
 static bool cfs_rq_nonempty_with_zero_eligible(struct cfs_rq *cfs_rq) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
   struct sched_entity *curr;
   bool curr_present;
 
