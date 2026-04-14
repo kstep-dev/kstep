@@ -337,7 +337,7 @@ class FuzzWorker:
                         special_pivot_idxs.append(len(ops_executed) - 1)
                         self.logger.debug(
                             f"{log_prefix} {generated}: special_pivot={special_pivot_idxs[-1]} "
-                            f"ineligible_cgroup_state=1"
+                            f"special_state=1"
                         )
                 else:
                     ops_executed.append((op, a, b, c))

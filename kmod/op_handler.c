@@ -273,18 +273,91 @@ static u64 count_ineligible_cgroup_se(void) {
   return count;
 }
 
+static inline struct sched_entity *node_to_se(struct rb_node *node) {
+  return rb_entry(node, struct sched_entity, run_node);
+}
+
+static bool cfs_rq_tree_has_eligible_entity(struct rb_node *node) {
+  struct sched_entity *se;
+
+  if (!node)
+    return false;
+
+  se = node_to_se(node);
+  if (se->on_rq && kstep_eligible(se))
+    return true;
+
+  return cfs_rq_tree_has_eligible_entity(node->rb_left) ||
+         cfs_rq_tree_has_eligible_entity(node->rb_right);
+}
+
+static bool cfs_rq_nonempty_with_zero_eligible(struct cfs_rq *cfs_rq) {
+  struct sched_entity *curr;
+  bool curr_present;
+
+  if (!cfs_rq)
+    return false;
+
+  curr = cfs_rq->curr;
+  curr_present = curr && curr->cfs_rq == cfs_rq && curr->on_rq;
+  if (!curr_present && cfs_rq->nr_queued == 0)
+    return false;
+
+  if (curr_present && kstep_eligible(curr))
+    return false;
+
+  return !cfs_rq_tree_has_eligible_entity(cfs_rq->tasks_timeline.rb_root.rb_node);
+}
+
+static bool has_nonempty_cfs_rq_with_zero_eligible(void) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    if (cfs_rq_nonempty_with_zero_eligible(&cpu_rq(cpu)->cfs))
+      return true;
+  }
+
+  for (int id = 0; id < MAX_CGROUPS; id++) {
+    struct task_group *tg;
+
+    if (!cgroup_exists[id])
+      continue;
+
+    tg = cgroup_tg[id];
+    if (!tg)
+      continue;
+
+    for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+      if (cfs_rq_nonempty_with_zero_eligible(tg->cfs_rq[cpu]))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 static bool op_tick_repeat(int a, int b, int c) {
   u8 executed_steps = 0;
   (void)b;
   (void)c;
 
   for (int i = 0; i < a; i++) {
-    if (count_ineligible_cgroup_se() > 1)
+    /*
+      Some bugs require special task/task group states to trigger. 
+      These conditions are hard to capture with code coverage, 
+      and sensitive to time (i.e. how many ticks invoked).
+      Break if special state found
+      These states come from studied bug set.
+    */
+    // Special state #1: more than 1 ineligible cgroup se exist on a cpu  
+    if (count_ineligible_cgroup_se() > (num_online_cpus() - 1))
       break;
+    // Special state #2: non-empty cfs_rq with zero eligible entities
+    if (has_nonempty_cfs_rq_with_zero_eligible()) {
+      TRACE_INFO("Found nonempty cfs with zero eligible");
+      break;
+    }
+
     kstep_execute_op(OP_TICK, 0, 0, 0);
     executed_steps++;
-    if (count_ineligible_cgroup_se() > 1)
-      break;
   }
 
   last_executed_steps = executed_steps;
