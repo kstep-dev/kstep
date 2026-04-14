@@ -278,6 +278,7 @@ static inline struct sched_entity *node_to_se(struct rb_node *node) {
 }
 
 static bool cfs_rq_tree_has_eligible_entity(struct rb_node *node) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
   struct sched_entity *se;
 
   if (!node)
@@ -289,9 +290,12 @@ static bool cfs_rq_tree_has_eligible_entity(struct rb_node *node) {
 
   return cfs_rq_tree_has_eligible_entity(node->rb_left) ||
          cfs_rq_tree_has_eligible_entity(node->rb_right);
+# endif
+  return true;
 }
 
 static bool cfs_rq_nonempty_with_zero_eligible(struct cfs_rq *cfs_rq) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
   struct sched_entity *curr;
   bool curr_present;
 
@@ -307,6 +311,8 @@ static bool cfs_rq_nonempty_with_zero_eligible(struct cfs_rq *cfs_rq) {
     return false;
 
   return !cfs_rq_tree_has_eligible_entity(cfs_rq->tasks_timeline.rb_root.rb_node);
+# endif
+  return false;
 }
 
 static bool has_nonempty_cfs_rq_with_zero_eligible(void) {
