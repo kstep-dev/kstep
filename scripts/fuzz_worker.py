@@ -324,13 +324,14 @@ class FuzzWorker:
             op, a, b, c = generate_next_command(session.gen)
             executed_steps = session.send_op(op, a, b, c)
             if executed_steps > 0:
-                self.logger.debug(
-                    f"{log_prefix} {generated}: op={op},{a},{b},{c} "
-                    f"executed_steps={executed_steps} task_state={session.gen.task_state}"
-                )
+                
                 if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
                     for i in range(executed_steps):
                         ops_executed.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
+                        self.logger.debug(
+                            f"{log_prefix} {generated}: op={OP_NAME_TO_TYPE["TICK"]},0,0,0 "
+                            f"executed_steps={executed_steps} task_state={session.gen.task_state}"
+                        )
                     if executed_steps < a and executed_steps > 0:
                         special_pivot_idxs.append(len(ops_executed) - 1)
                         self.logger.debug(
@@ -338,6 +339,10 @@ class FuzzWorker:
                             f"special_state=1"
                         )
                 else:
+                    self.logger.debug(
+                        f"{log_prefix} {generated}: op={op},{a},{b},{c} "
+                        f"executed_steps={executed_steps} task_state={session.gen.task_state}"
+                    )
                     ops_executed.append((op, a, b, c))
                     generated += 1
         return ops_executed, special_pivot_idxs

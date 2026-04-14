@@ -153,7 +153,7 @@ jobs:
           key: ${{ env.QEMU_CACHE_KEY }}
           fail-on-cache-miss: true
 
-      - name: Run a fuzz smoke test
+      - name: Run fuzz test (1 fresh, 1 replay, 1 mutation)
         timeout-minutes: 5
         run: |
           ./fuzz.py \
