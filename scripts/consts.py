@@ -29,6 +29,15 @@ FUZZ_ERROR_DIR = FUZZ_DIR / "error"
 FUZZ_CORPUS_DIR = FUZZ_DIR / "corpus"
 
 
+def fuzz_mode_dir(mode: str) -> Path:
+    name = {
+        "fresh": "fresh",
+        "replay": "replay",
+        "mutate": "mutation",
+    }.get(mode, mode)
+    return  DATA_DIR / "fuzz" / name
+
+
 def update_latest(latest_file: Path, new_file: Path):
     assert latest_file in (
         LATEST_LOG,

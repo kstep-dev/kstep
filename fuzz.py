@@ -89,8 +89,11 @@ def main() -> None:
         default=False,
         help="Enable cross-scheduler fuzzing; sets TASK_FIFO and TASK_CFS weights to 2 instead of 0",
     )
-    parser.add_argument("--demo", action="store_true",
-                        help="In the demo mode, only run 1 test per worker")
+    parser.add_argument(
+        "--ci_mode",
+        action="store_true",
+        help="Run a bounded CI smoke test: exactly 3 executions in fresh, replay, then mutate mode",
+    )
     args = parser.parse_args()
 
     FUZZ_DIR.mkdir(parents=True, exist_ok=True)
@@ -118,7 +121,7 @@ def main() -> None:
         f"linux={args.linux_name}  steps={args.steps}  "
         f"topology={args.topology or 'default'}  "
         f"frequency={args.frequency or 'default'}  "
-        f"demo={args.demo}  "
+        f"ci_mode={args.ci_mode}  "
         f"cross_scheduler={args.cross_scheduler}  "
         f"fresh_ratio={args.fresh_ratio}  mutate_ratio={args.mutate_ratio}  "
         f"special_mutate_ratio={args.special_mutate_ratio}  "
@@ -135,7 +138,7 @@ def main() -> None:
         pivot_rarity_alpha=args.pivot_rarity_alpha,
         cross_scheduler=args.cross_scheduler,
         pin_cpus=args.pin_cpus,
-        demo=args.demo,
+        ci_mode=args.ci_mode,
     )
 
 

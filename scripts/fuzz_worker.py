@@ -207,14 +207,12 @@ class FuzzWorkerSession:
     # Send one op to kmod and fold the returned state into the generator model.
     def send_op(self, op: int, a: int, b: int, c: int) -> int:
         self.sock.sendall(f"{op},{a},{b},{c}\n".encode())
-        self.logger.debug(f"SEND OP: {op},{a},{b},{c}")
 
         state = self.read_kmod_state()
         if state is None:
             self.sock.sendall(b"EXIT\n")
             raise RuntimeError("Readfail: Failed to read task states")
 
-        self.logger.debug("Received task states")
         self.gen.update_from_kmod(state.task_states)
         if not state.executed:
             return 0
