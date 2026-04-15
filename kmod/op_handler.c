@@ -4,7 +4,6 @@
 #include <linux/string.h> // strcmp, strscpy
 
 #include "driver.h"
-#include "internal.h"
 #include "op_handler.h"
 #include "linux/cpumask.h"
 #include "linux/sched.h"
@@ -602,6 +601,27 @@ struct checker_result kstep_checker_result(void) {
       .cfs_util_avg_decay = cr.cfs_util_avg_decay,
       .rt_util_avg_decay = cr.rt_util_avg_decay,
   };
+}
+
+void kstep_check_extra_balance(int cpu, struct sched_domain *sd) {
+  kstep_output_balance(cpu, sd);
+
+  if (cpu_rq(cpu)-> nr_running == 0)
+    return;
+  int i;
+  struct sched_group *sg = sd->groups;
+  do {
+    int local_group;
+    local_group = cpumask_test_cpu(cpu, sched_group_span(sg));
+    if (!local_group)
+      continue;
+    for_each_cpu(i, sched_group_span(sg)) {
+      if (cpu_rq(i)->nr_running == 0) {
+        pr_info("warn: load balance triggered on busy cpu while idle cpu in the same group");
+        return;
+      }
+    }
+  } while (sg != sd->groups);
 }
 
 static s64 get_cfs_util_avg(struct rq *rq) {

@@ -245,7 +245,7 @@ def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op
         "TICK": 0,
         "TICK_REPEAT": 5,
         "CGROUP_CREATE": 4,
-        "CGROUP_SET_CPUSET": disable_on_small_topology(0),
+        "CGROUP_SET_CPUSET": disable_on_small_topology(1),
         "CGROUP_SET_WEIGHT": 2,
         "CGROUP_ADD_TASK": 3,
         "CGROUP_DESTROY": 1,

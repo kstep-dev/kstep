@@ -3,6 +3,7 @@
 
 #include <linux/fs.h>
 #include <linux/types.h>
+#include "internal.h"
 
 enum kstep_op_type {
   OP_TASK_CREATE,
@@ -36,5 +37,6 @@ u8 kstep_last_executed_steps(void);
 void kstep_write_state(struct file *f, bool executed, u8 executed_steps);
 bool kstep_work_conserving_broken(void);
 struct checker_result kstep_checker_result(void);
+void kstep_check_extra_balance(int cpu, struct sched_domain *sd);
 
 #endif
