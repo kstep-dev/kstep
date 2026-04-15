@@ -27,7 +27,7 @@ def parse_lb_events(path: Path, cpus: list[int], driver: str) -> pd.DataFrame:
         return pd.DataFrame(columns=["timestamp", "dst_cpu", "name"])
     df = df[df["timestamp"] != 0]
     df["dst_cpu"] -= min(cpus)
-    if driver in {"even_idle_cpu", "local_group_imbalance"}:
+    if driver in {"extra_balance"}:
         df = df[df["name"] == "MC"]
     return df
 
