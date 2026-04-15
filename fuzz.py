@@ -47,7 +47,7 @@ def main() -> None:
         type=str,
         default="CLS:0/1-2/1-2/3-4/3-4",
         help="Executor topology passed as a module param, e.g. CLS:0/1-2/1-2/3-4/3-4",
-    )
+    ) # for example: SMT:0/1-2/1-2/3-4/3-4+CLS:0/1-2/1-2/3-4/3-4 for extra_balance
     parser.add_argument(
         "--frequency",
         type=str,
@@ -67,7 +67,7 @@ def main() -> None:
     parser.add_argument(
         "--special_mutate_ratio",
         type=float,
-        default=0.2,
+        default=0.1,
         help="Within mutate mode, chance to choose from the special-state seed pool before the coverage pool",
     )
     parser.add_argument(

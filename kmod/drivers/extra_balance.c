@@ -1,7 +1,7 @@
 // https://github.com/torvalds/linux/commit/6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3
 
 #include "driver.h"
-#include "internal.h" // cpu_rq
+#include "op_handler.h"
 
 static struct task_struct *tasks[5];
 
@@ -33,12 +33,11 @@ static void run(void) {
   kstep_tick_repeat(500);
 }
 
-
 KSTEP_DRIVER_DEFINE{
     .name = "extra_balance",
     .setup = setup,
     .run = run,
     .on_tick_begin = kstep_output_nr_running,
-    .on_sched_balance_selected = kstep_output_balance,
+    .on_sched_balance_selected = kstep_check_extra_balance,
     .step_interval_us = 100,
 };

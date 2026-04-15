@@ -282,12 +282,8 @@ class FuzzWorker:
 
         gen_seed = 0 if work.mode in ("replay") else self.rng.randint(0, 2**32 - 1)
         kstep_cpus = self.driver.num_cpus - 1
-        # reproducing util_avg
-        # max_tasks = self.rng.randint(kstep_cpus * 1, kstep_cpus * 3)
-        # max_cgroups = self.rng.randint(kstep_cpus * 1, kstep_cpus * 3)
-        # reproducing vruntime overflow
-        max_tasks = self.rng.randint(kstep_cpus * 3, kstep_cpus * 6)
-        max_cgroups = self.rng.randint(kstep_cpus * 3, kstep_cpus * 6)
+        max_tasks = self.rng.randint(kstep_cpus * 1, kstep_cpus * 6)
+        max_cgroups = self.rng.randint(kstep_cpus * 1, kstep_cpus * 6)
         gen = init_genstate(
             max_tasks,
             max_cgroups,
