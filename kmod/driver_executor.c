@@ -80,10 +80,18 @@ static bool process_console_chunk(const char *buf, ssize_t nread,
 }
 
 static void setup(void) {
+  bool capacity_applied;
+  bool topology_applied;
+
   console = filp_open("/dev/ttyS1", O_RDONLY, 0);
   sock = filp_open("/dev/ttyS3", O_RDWR, 0);
 
-  kstep_topo_param_apply();
+  capacity_applied = kstep_capacity_param_apply();
+  topology_applied = kstep_topo_param_apply();
+  if (capacity_applied && !topology_applied) {
+    TRACE_INFO("executor: rebuilding sched domains for custom capacity");
+    kstep_topo_apply();
+  }
   kstep_freq_param_apply();
   kstep_cov_init();
 }
