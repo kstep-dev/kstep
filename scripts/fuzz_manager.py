@@ -50,6 +50,7 @@ class FuzzManager:
         special_mutate_ratio: float = 0.2,
         pivot_rarity_alpha: float = 1.0,
         cross_scheduler: bool = False,
+        enable_kthreads: bool = False,
         pin_cpus: Optional[str] = None,
         ci_mode: bool = False,
     ) -> None:
@@ -62,6 +63,7 @@ class FuzzManager:
         self.special_mutate_ratio = special_mutate_ratio
         self.pivot_rarity_alpha = pivot_rarity_alpha
         self.cross_scheduler = cross_scheduler
+        self.enable_kthreads = enable_kthreads
         self.pin_cpus = pin_cpus
         self.ci_mode = ci_mode
 
@@ -286,6 +288,7 @@ class FuzzManager:
                     self.driver,
                     self.linux_name,
                     self.cross_scheduler,
+                    self.enable_kthreads,
                     self.qemu_cpu_lists[wid],
                 ),
                 daemon=True,
@@ -612,6 +615,7 @@ def run_manager(
     special_mutate_ratio: float = 0.2,
     pivot_rarity_alpha: float = 1.0,
     cross_scheduler: bool = False,
+    enable_kthreads: bool = False,
     pin_cpus: Optional[str] = None,
     ci_mode: bool = False,
 ) -> None:
@@ -625,6 +629,7 @@ def run_manager(
         special_mutate_ratio=special_mutate_ratio,
         pivot_rarity_alpha=pivot_rarity_alpha,
         cross_scheduler=cross_scheduler,
+        enable_kthreads=enable_kthreads,
         pin_cpus=pin_cpus,
         ci_mode=ci_mode,
     )

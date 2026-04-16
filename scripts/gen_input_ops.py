@@ -2,7 +2,14 @@ from typing import Callable, List, Optional
 from dataclasses import dataclass, field
 
 from .gen_input_state import (
+    KTHREAD_BLOCK_REQUESTED,
     GenState,
+    KTHREAD_BLOCKED,
+    KTHREAD_CREATED,
+    KTHREAD_DEAD,
+    KTHREAD_SPIN,
+    KTHREAD_SYNCWAKE_REQUESTED,
+    KTHREAD_YIELD,
     TASK_SLEEPING,
     TASK_ON_CPU,
 )
@@ -26,6 +33,12 @@ OP_NAME_TO_TYPE = {
     "CPU_SET_CAPACITY": 15,
     "CGROUP_DESTROY": 16,
     "CGROUP_MOVE_TASK_ROOT": 17,
+    "KTHREAD_CREATE": 18,
+    "KTHREAD_BIND": 19,
+    "KTHREAD_START": 20,
+    "KTHREAD_YIELD": 21,
+    "KTHREAD_BLOCK": 22,
+    "KTHREAD_SYNCWAKE": 23,
 }
 OP_TYPE_TO_NAME = {v: k for k, v in OP_NAME_TO_TYPE.items()}
 
@@ -57,12 +70,14 @@ class Op:
 
 # Arguments
 ARG_TASK = "task"
+ARG_KTHREAD = "kthread"
 ARG_CGROUP = "cgroup"
 ARG_CPU = "cpu"
 ARG_INT = "int"
 
 # Resources
 RESOURCE_TASK = "task"
+RESOURCE_KTHREAD = "kthread"
 RESOURCE_CGROUP = "cgroup"
 
 # Generator parameters
@@ -80,6 +95,10 @@ def disable_on_small_topology(weight: int) -> OpWeight:
 
 def enable_on_cross_scheduler(weight: int) -> OpWeight:
     return lambda m: weight if m.cross_scheduler else 0
+
+
+def enable_kthread_ops(weight: int) -> OpWeight:
+    return lambda m: weight if m.enable_kthreads else 0
 
 def op_task_create(m: GenState):
     tid = m.next_task_id()
@@ -133,6 +152,53 @@ def op_task_set_prio(m: GenState):
     tid = m.choose_task_in_state(TASK_ON_CPU)
     prio = m.rnd.randint(-20, 19)
     return (OP_NAME_TO_TYPE["TASK_SET_PRIO"], tid, prio, 0)
+
+
+def op_kthread_create(m: GenState):
+    ktid = m.next_kthread_id()
+    if ktid is None:
+        return None
+    return (OP_NAME_TO_TYPE["KTHREAD_CREATE"], ktid, 0, 0)
+
+
+def op_kthread_bind(m: GenState):
+    ktid = m.choose_kthread_in_states(
+        (
+            KTHREAD_CREATED,
+            KTHREAD_YIELD,
+            KTHREAD_BLOCKED,
+        )
+    )
+    rng = m.choose_cpuset()
+    if rng is None:
+        return None
+    begin, end = rng
+    return (OP_NAME_TO_TYPE["KTHREAD_BIND"], ktid, begin, end)
+
+
+def op_kthread_start(m: GenState):
+    ktid = m.choose_kthread_in_state(KTHREAD_CREATED)
+    return (OP_NAME_TO_TYPE["KTHREAD_START"], ktid, 0, 0)
+
+
+def op_kthread_yield(m: GenState):
+    ktid = m.choose_kthread_in_states((KTHREAD_SPIN, KTHREAD_YIELD))
+    return (OP_NAME_TO_TYPE["KTHREAD_YIELD"], ktid, 0, 0)
+
+
+def op_kthread_block(m: GenState):
+    ktid = m.choose_kthread_in_states((KTHREAD_SPIN, KTHREAD_YIELD))
+    return (OP_NAME_TO_TYPE["KTHREAD_BLOCK"], ktid, 0, 0)
+
+
+def op_kthread_syncwake(m: GenState):
+    wakee = m.choose_kthread_in_state(KTHREAD_BLOCKED)
+    wakers = [
+        ktid for ktid in m.kthreads
+        if ktid != wakee and m.kthread_state.get(ktid) in (KTHREAD_SPIN, KTHREAD_YIELD)
+    ]
+    waker = m.rnd.choice(wakers)
+    return (OP_NAME_TO_TYPE["KTHREAD_SYNCWAKE"], waker, wakee, 0)
 
 
 def op_tick(m: GenState):
@@ -232,6 +298,27 @@ def replay_cgroup_move_task_root(m: GenState, a: int, b: int, c: int):
     m.cgroup_remove_task(b)
 
 
+def has_bindable_kthreads(m: GenState) -> bool:
+    return any(
+        m.kthread_state.get(ktid) in {
+            KTHREAD_CREATED,
+            KTHREAD_YIELD,
+            KTHREAD_BLOCK_REQUESTED,
+            KTHREAD_BLOCKED,
+            KTHREAD_SYNCWAKE_REQUESTED,
+        }
+        for ktid in m.kthreads)
+
+
+def has_syncwake_pair(m: GenState) -> bool:
+    wakees = [ktid for ktid in m.kthreads if m.kthread_state.get(ktid) == KTHREAD_BLOCKED]
+    wakers = [
+        ktid for ktid in m.kthreads
+        if m.kthread_state.get(ktid) in (KTHREAD_SPIN, KTHREAD_YIELD)
+    ]
+    return any(waker != wakee for waker in wakers for wakee in wakees)
+
+
 def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op]:
     weights: dict[str, OpWeight] = {
         "TASK_CREATE": 6,
@@ -252,6 +339,12 @@ def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op
         "CGROUP_MOVE_TASK_ROOT": 2,
         "CPU_SET_FREQ": 0,
         "CPU_SET_CAPACITY": 0,
+        "KTHREAD_CREATE": enable_kthread_ops(2),
+        "KTHREAD_BIND": enable_kthread_ops(2),
+        "KTHREAD_START": enable_kthread_ops(2),
+        "KTHREAD_YIELD": enable_kthread_ops(0),
+        "KTHREAD_BLOCK": enable_kthread_ops(2),
+        "KTHREAD_SYNCWAKE": enable_kthread_ops(2),
     }
     if weight_overrides:
         weights.update(weight_overrides)
@@ -322,6 +415,54 @@ def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op
             emit=op_task_set_prio,
             requires=[RESOURCE_TASK],
             arg_types=[ARG_TASK, ARG_INT, None],
+        ),
+        Op(
+            name="KTHREAD_CREATE",
+            weight=weights["KTHREAD_CREATE"],
+            is_applicable=lambda m: m.next_kthread_id() is not None,
+            emit=op_kthread_create,
+            produces=[RESOURCE_KTHREAD],
+            arg_types=[ARG_KTHREAD, None, None],
+        ),
+        Op(
+            name="KTHREAD_BIND",
+            weight=weights["KTHREAD_BIND"],
+            is_applicable=lambda m: has_bindable_kthreads(m) and m.cpus >= 2,
+            emit=op_kthread_bind,
+            requires=[RESOURCE_KTHREAD],
+            arg_types=[ARG_KTHREAD, ARG_CPU, ARG_CPU],
+        ),
+        Op(
+            name="KTHREAD_START",
+            weight=weights["KTHREAD_START"],
+            is_applicable=lambda m: m.has_kthreads_in_state(KTHREAD_CREATED),
+            emit=op_kthread_start,
+            requires=[RESOURCE_KTHREAD],
+            arg_types=[ARG_KTHREAD, None, None],
+        ),
+        Op(
+            name="KTHREAD_YIELD",
+            weight=weights["KTHREAD_YIELD"],
+            is_applicable=lambda m: m.has_kthreads_in_states((KTHREAD_SPIN, KTHREAD_YIELD)),
+            emit=op_kthread_yield,
+            requires=[RESOURCE_KTHREAD],
+            arg_types=[ARG_KTHREAD, None, None],
+        ),
+        Op(
+            name="KTHREAD_BLOCK",
+            weight=weights["KTHREAD_BLOCK"],
+            is_applicable=lambda m: m.has_kthreads_in_states((KTHREAD_SPIN, KTHREAD_YIELD)),
+            emit=op_kthread_block,
+            requires=[RESOURCE_KTHREAD],
+            arg_types=[ARG_KTHREAD, None, None],
+        ),
+        Op(
+            name="KTHREAD_SYNCWAKE",
+            weight=weights["KTHREAD_SYNCWAKE"],
+            is_applicable=has_syncwake_pair,
+            emit=op_kthread_syncwake,
+            requires=[RESOURCE_KTHREAD],
+            arg_types=[ARG_KTHREAD, ARG_KTHREAD, None],
         ),
         Op(
             name="TICK",

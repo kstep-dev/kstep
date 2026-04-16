@@ -10,6 +10,15 @@ TASK_SLEEPING = "sleeping"   # blocked/dequeued; eligible for WAKEUP
 TASK_RUNNABLE = "runnable"   # on runqueue but not on CPU
 TASK_ON_CPU   = "on_cpu"     # currently executing; eligible for signal ops
 
+# Kthread states exported by kmod/kthread.c
+KTHREAD_CREATED = "created"
+KTHREAD_SPIN = "spin"
+KTHREAD_YIELD = "yield"
+KTHREAD_BLOCK_REQUESTED = "block_requested"
+KTHREAD_BLOCKED = "blocked"
+KTHREAD_SYNCWAKE_REQUESTED = "syncwake_requested"
+KTHREAD_DEAD = "dead"
+
 @dataclass
 class Cgroup:
     id: int
@@ -22,14 +31,18 @@ class Cgroup:
 class GenState:
     # Generator parameters
     max_tasks: int
+    max_kthreads: int
     max_cgroups: int
     cpus: int
     rnd: random.Random
     cross_scheduler: bool = False # whether testing across rt and cfs schedulers
+    enable_kthreads: bool = False
 
     # Generator state: changed by operations that produce resources or consume resources
     tasks: List[int] = field(default_factory=list) # list of task ids
     task_state: dict[int, str] = field(default_factory=dict) # key: task id, value: state
+    kthreads: List[int] = field(default_factory=list) # list of kthread ids
+    kthread_state: dict[int, str] = field(default_factory=dict) # key: kthread id, value: state
     cgroups: dict = field(default_factory=dict) # key: cgroup id, value: Cgroup
     leaf_cgroups: list[int] = field(default_factory=list) # list of leaf cgroup ids
     task2cgroups: dict = field(default_factory=dict) # key: task id, value: cgroup id
@@ -60,7 +73,45 @@ class GenState:
 
     _KMOD_STATE_MAP = {0: TASK_SLEEPING, 1: TASK_RUNNABLE, 2: TASK_ON_CPU}
 
-    def update_from_kmod(self, task_states: list[dict]):
+    # ======
+    # Kthread related functions
+    def has_kthreads(self) -> bool:
+        return len(self.kthreads) > 0
+
+    def has_kthreads_in_state(self, state: str) -> bool:
+        return any(self.kthread_state.get(ktid) == state for ktid in self.kthreads)
+
+    def has_kthreads_in_states(self, states: tuple[str, ...]) -> bool:
+        return any(self.kthread_state.get(ktid) in states for ktid in self.kthreads)
+
+    def choose_kthread(self) -> int:
+        return self.rnd.choice(self.kthreads)
+
+    def choose_kthread_in_state(self, state: str) -> int:
+        choices = [ktid for ktid in self.kthreads if self.kthread_state.get(ktid) == state]
+        return self.rnd.choice(choices)
+
+    def choose_kthread_in_states(self, states: tuple[str, ...]) -> int:
+        choices = [ktid for ktid in self.kthreads if self.kthread_state.get(ktid) in states]
+        return self.rnd.choice(choices)
+
+    def next_kthread_id(self) -> Optional[int]:
+        for i in range(self.max_kthreads):
+            if i not in self.kthreads:
+                return i
+        return None
+
+    _KMOD_KTHREAD_STATE_MAP = {
+        0: KTHREAD_CREATED,
+        1: KTHREAD_SPIN,
+        2: KTHREAD_YIELD,
+        3: KTHREAD_BLOCK_REQUESTED,
+        4: KTHREAD_BLOCKED,
+        5: KTHREAD_SYNCWAKE_REQUESTED,
+        6: KTHREAD_DEAD,
+    }
+
+    def update_from_kmod(self, task_states: list[dict], kthread_states: list[dict] | None = None):
         """Sync task list and states from the kmod's STATE response.
         task_states is a list of {"id": int, "state": int} dicts where
         state is 0=blocked, 1=runnable, 2=on_cpu."""
@@ -73,6 +124,22 @@ class GenState:
             if tid not in kmod:
                 self.tasks.remove(tid)
                 self.task_state.pop(tid, None)
+
+        if kthread_states is None:
+            return
+
+        kmod_kthreads = {
+            d["id"]: self._KMOD_KTHREAD_STATE_MAP[d["state"]]
+            for d in kthread_states
+        }
+        for ktid, py_state in kmod_kthreads.items():
+            if ktid not in self.kthreads:
+                self.kthreads.append(ktid)
+            self.kthread_state[ktid] = py_state
+        for ktid in list(self.kthreads):
+            if ktid not in kmod_kthreads:
+                self.kthreads.remove(ktid)
+                self.kthread_state.pop(ktid, None)
 
     # ======
     # cpuset related functions
