@@ -77,6 +77,7 @@ def _check_for_crash(log_file: Path) -> bool:
 @dataclass
 class KmodState:
     task_states: list[dict]
+    kthread_states: list[dict]
     executed: bool
     executed_steps: int
 
@@ -159,20 +160,41 @@ class FuzzWorkerSession:
 
             payload = line[1:-1]
             if not payload:
-                return KmodState(task_states=[], executed=False, executed_steps=0)
-            if len(payload) < 2 or (len(payload) - 2) % 2 != 0:
+                return KmodState(
+                    task_states=[],
+                    kthread_states=[],
+                    executed=False,
+                    executed_steps=0,
+                )
+            if len(payload) < 3:
                 continue
 
             executed = bool(payload[0])
             executed_steps = payload[1] - 11
             if executed_steps < 0:
                 continue
-            task_states = [
+
+            cursor = 2
+            task_states: list[dict] = []
+            while cursor < len(payload) and payload[cursor] != 0:
+                if cursor + 1 >= len(payload):
+                    break
+                task_states.append(
+                    {"id": payload[cursor] - 11, "state": payload[cursor + 1]}
+                )
+                cursor += 2
+            if cursor >= len(payload) or payload[cursor] != 0:
+                continue
+            cursor += 1
+            if (len(payload) - cursor) % 2 != 0:
+                continue
+            kthread_states = [
                 {"id": payload[i] - 11, "state": payload[i + 1]}
-                for i in range(2, len(payload), 2)
+                for i in range(cursor, len(payload), 2)
             ]
             return KmodState(
                 task_states=task_states,
+                kthread_states=kthread_states,
                 executed=executed,
                 executed_steps=executed_steps,
             )
@@ -213,7 +235,7 @@ class FuzzWorkerSession:
             self.sock.sendall(b"EXIT\n")
             raise RuntimeError("Readfail: Failed to read task states")
 
-        self.gen.update_from_kmod(state.task_states)
+        self.gen.update_from_kmod(state.task_states, state.kthread_states)
         if not state.executed:
             return 0
         return state.executed_steps
@@ -228,6 +250,7 @@ class FuzzWorker:
         driver: Driver,
         linux_name: str,
         cross_scheduler: bool = False,
+        enable_kthreads: bool = False,
         qemu_cpus: Optional[str] = None,
         rng_seed: Optional[int] = None,
         base_dir: Optional[Path] = None,
@@ -239,6 +262,7 @@ class FuzzWorker:
         self.driver = driver
         self.linux_name = linux_name
         self.cross_scheduler = cross_scheduler
+        self.enable_kthreads = enable_kthreads
         self.qemu_cpus = qemu_cpus
         self.io_timeout_sec = io_timeout_sec
         self.paths = (
@@ -282,14 +306,17 @@ class FuzzWorker:
 
         gen_seed = 0 if work.mode in ("replay") else self.rng.randint(0, 2**32 - 1)
         kstep_cpus = self.driver.num_cpus - 1
-        max_tasks = self.rng.randint(kstep_cpus * 1, kstep_cpus * 6)
+        max_tasks = self.rng.randint(kstep_cpus // 2, kstep_cpus * 2)
+        max_kthreads = self.rng.randint(1, min(16, max(1, kstep_cpus * 2)))
         max_cgroups = self.rng.randint(kstep_cpus * 1, kstep_cpus * 6)
         gen = init_genstate(
             max_tasks,
+            max_kthreads,
             max_cgroups,
             self.driver.num_cpus,
             gen_seed,
             cross_scheduler=self.cross_scheduler,
+            enable_kthreads=self.enable_kthreads,
         )
 
         session = FuzzWorkerSession(gen, proc, self.paths.sock_file, self.logger, self.io_timeout_sec)
@@ -325,8 +352,10 @@ class FuzzWorker:
                     for i in range(executed_steps):
                         ops_executed.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
                         self.logger.debug(
-                            f"{log_prefix}: op={OP_NAME_TO_TYPE["TICK"]},0,0,0 "
-                            f"executed_steps={executed_steps} task_state={session.gen.task_state}"
+                            f"{log_prefix}: op={OP_NAME_TO_TYPE['TICK']},0,0,0 "
+                            f"executed_steps={executed_steps} "
+                            f"task_state={session.gen.task_state} "
+                            f"kthread_state={session.gen.kthread_state}"
                         )
                     if executed_steps < a and executed_steps > 0:
                         special_pivot_idxs.append(len(ops_executed) - 1)
@@ -337,7 +366,9 @@ class FuzzWorker:
                 else:
                     self.logger.debug(
                         f"{log_prefix}: op={op},{a},{b},{c} "
-                        f"executed_steps={executed_steps} task_state={session.gen.task_state}"
+                        f"executed_steps={executed_steps} "
+                        f"task_state={session.gen.task_state} "
+                        f"kthread_state={session.gen.kthread_state}"
                     )
                     ops_executed.append((op, a, b, c))
                     generated += 1
@@ -364,17 +395,22 @@ class FuzzWorker:
                     executed_steps = session.send_op(op, a, b, c)
                     if executed_steps > 0:
                         self.logger.debug(
-                            f"REPLAY: op={op},{a},{b},{c} executed_steps={executed_steps} task_state={session.gen.task_state}"
+                            f"REPLAY: op={op},{a},{b},{c} executed_steps={executed_steps} "
+                            f"task_state={session.gen.task_state} "
+                            f"kthread_state={session.gen.kthread_state}"
                         )
                         ops_executed.append((op, a, b, c))
                         replay_update_genstate(session.gen, op, a, b, c)
-                        if op != OP_NAME_TO_TYPE["TICK"] or op != OP_NAME_TO_TYPE["TICK_REPEAT"]:
+                        if op != OP_NAME_TO_TYPE["TICK"] and op != OP_NAME_TO_TYPE["TICK_REPEAT"]:
                             replayed += 1
                         break
-                self.logger.debug(f"REPLAY {i} retry {retry}: task_state={session.gen.task_state}")
+                self.logger.debug(
+                    f"REPLAY {i} retry {retry}: task_state={session.gen.task_state} "
+                    f"kthread_state={session.gen.kthread_state}"
+                )
             else:
                 op_name = OP_TYPE_TO_NAME.get(op, str(op))
-                actual = session.gen.task_state.get(a, "not_found")
+                actual = session.gen.task_state.get(a, session.gen.kthread_state.get(a, "not_found"))
                 session.sock.sendall(b"EXIT\n")
                 raise RuntimeError(
                     f"Replayfail: replay mismatch at step {i} after 50 retries: "
@@ -530,6 +566,7 @@ def worker_main(
     driver: Driver,
     linux_name: str,
     cross_scheduler: bool = False,
+    enable_kthreads: bool = False,
     qemu_cpus: Optional[str] = None,
 ) -> None:
     worker = FuzzWorker(
@@ -539,6 +576,7 @@ def worker_main(
         driver=driver,
         linux_name=linux_name,
         cross_scheduler=cross_scheduler,
+        enable_kthreads=enable_kthreads,
         qemu_cpus=qemu_cpus,
     )
     worker.run()

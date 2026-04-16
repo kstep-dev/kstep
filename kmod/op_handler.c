@@ -28,11 +28,19 @@ struct kstep_task {
   int cur_policy; // 0: cfs, 1: rt
 };
 
+struct kstep_managed_kthread {
+  struct task_struct *p;
+};
+
 static struct kstep_task kstep_tasks[MAX_TASKS];
+static struct kstep_managed_kthread kstep_kthreads[KSTEP_MAX_KTHREADS];
 static u8 last_executed_steps;
 
 static bool is_valid_task_id(int id) { return id >= 0 && id < MAX_TASKS; }
 static bool is_valid_cgroup_id(int id) { return id >= 0 && id < MAX_CGROUPS; }
+static bool is_valid_kthread_id(int id) {
+  return id >= 0 && id < KSTEP_MAX_KTHREADS;
+}
 
 static bool build_cgroup_name(int id, char *buf) {
   int depth = 0;
@@ -124,6 +132,12 @@ static bool kstep_task_running(struct task_struct * p) {
 #else
   return p->on_cpu && !test_tsk_thread_flag(p, TIF_NEED_RESCHED);
 #endif
+}
+
+static enum kstep_kthread_state kthread_state(int id) {
+  if (!is_valid_kthread_id(id) || !kstep_kthreads[id].p)
+    return KSTEP_KTHREAD_DEAD;
+  return kstep_kthread_get_state(kstep_kthreads[id].p);
 }
 
 static struct task_struct *find_new_child(struct task_struct *parent) {
@@ -237,6 +251,100 @@ static bool op_task_set_prio(int a, int b, int c) {
   if (b < -20 || b > 19)
     return false;
   kstep_task_set_prio(kstep_tasks[a].p, b);
+  return true;
+}
+
+static bool op_kthread_create(int a, int b, int c) {
+  char name[16];
+
+  (void)b;
+  (void)c;
+  if (!is_valid_kthread_id(a) || kstep_kthreads[a].p)
+    return false;
+
+  scnprintf(name, sizeof(name), "kt%d", a);
+  kstep_kthreads[a].p = kstep_kthread_create(name);
+  return true;
+}
+
+static bool op_kthread_bind(int a, int b, int c) {
+  struct cpumask mask;
+  enum kstep_kthread_state state = kthread_state(a);
+
+  if (!is_valid_kthread_id(a) || !kstep_kthreads[a].p ||
+      state == KSTEP_KTHREAD_DEAD)
+    return false;
+  if (b > c || b < 1 || c > num_online_cpus() - 1)
+    return false;
+
+  cpumask_clear(&mask);
+  for (int cpu = b; cpu <= c; cpu++)
+    cpumask_set_cpu(cpu, &mask);
+  kstep_kthread_bind(kstep_kthreads[a].p, &mask);
+  return true;
+}
+
+static bool op_kthread_start(int a, int b, int c) {
+  (void)b;
+  (void)c;
+
+  if (!is_valid_kthread_id(a) || !kstep_kthreads[a].p)
+    return false;
+  if (kthread_state(a) != KSTEP_KTHREAD_CREATED)
+    return false;
+  kstep_kthread_start(kstep_kthreads[a].p);
+  return true;
+}
+
+static bool op_kthread_yield(int a, int b, int c) {
+  enum kstep_kthread_state state;
+
+  (void)b;
+  (void)c;
+  if (!is_valid_kthread_id(a) || !kstep_kthreads[a].p)
+    return false;
+  state = kthread_state(a);
+  if (state != KSTEP_KTHREAD_SPIN && state != KSTEP_KTHREAD_YIELD)
+    return false;
+  kstep_kthread_yield(kstep_kthreads[a].p);
+  return true;
+}
+
+static bool op_kthread_block(int a, int b, int c) {
+  enum kstep_kthread_state state;
+
+  (void)b;
+  (void)c;
+  if (!is_valid_kthread_id(a) || !kstep_kthreads[a].p)
+    return false;
+  state = kthread_state(a);
+  if (state != KSTEP_KTHREAD_SPIN && state != KSTEP_KTHREAD_YIELD)
+    return false;
+  kstep_kthread_block(kstep_kthreads[a].p);
+  return true;
+}
+
+static bool op_kthread_syncwake(int a, int b, int c) {
+  enum kstep_kthread_state waker_state;
+  enum kstep_kthread_state wakee_state;
+
+  (void)c;
+  if (!is_valid_kthread_id(a) || !is_valid_kthread_id(b))
+    return false;
+  if (a == b)
+    return false;
+
+  waker_state = kthread_state(a);
+  wakee_state = kthread_state(b);
+  if (!kstep_kthreads[a].p || !kstep_kthreads[b].p)
+    return false;
+  if (waker_state != KSTEP_KTHREAD_SPIN &&
+      waker_state != KSTEP_KTHREAD_YIELD)
+    return false;
+  if (wakee_state != KSTEP_KTHREAD_BLOCKED)
+    return false;
+
+  kstep_kthread_syncwake(kstep_kthreads[a].p, kstep_kthreads[b].p);
   return true;
 }
 
@@ -506,6 +614,12 @@ static op_handler_fn op_handlers[OP_TYPE_NR] = {
     [OP_CPU_SET_CAPACITY] = NULL,
     [OP_CGROUP_DESTROY] = op_cgroup_destroy,
     [OP_CGROUP_MOVE_TASK_ROOT] = op_cgroup_move_task_root,
+    [OP_KTHREAD_CREATE] = op_kthread_create,
+    [OP_KTHREAD_BIND] = op_kthread_bind,
+    [OP_KTHREAD_START] = op_kthread_start,
+    [OP_KTHREAD_YIELD] = op_kthread_yield,
+    [OP_KTHREAD_BLOCK] = op_kthread_block,
+    [OP_KTHREAD_SYNCWAKE] = op_kthread_syncwake,
 };
 
 static const char op_strs[OP_TYPE_NR][30] = {
@@ -527,6 +641,12 @@ static const char op_strs[OP_TYPE_NR][30] = {
   [OP_CPU_SET_CAPACITY] = "CPU_SET_CAPACITY",
   [OP_CGROUP_DESTROY] = "CGROUP_DESTROY",
   [OP_CGROUP_MOVE_TASK_ROOT] = "CGROUP_MOVE_TASK_ROOT",
+  [OP_KTHREAD_CREATE] = "KTHREAD_CREATE",
+  [OP_KTHREAD_BIND] = "KTHREAD_BIND",
+  [OP_KTHREAD_START] = "KTHREAD_START",
+  [OP_KTHREAD_YIELD] = "KTHREAD_YIELD",
+  [OP_KTHREAD_BLOCK] = "KTHREAD_BLOCK",
+  [OP_KTHREAD_SYNCWAKE] = "KTHREAD_SYNCWAKE",
 };
 
 
@@ -676,6 +796,16 @@ static void print_state(void) {
              p->pid, kstep_task_running(p), p->__state, task_cpu(p), p->policy, p->se.avg.util_avg, kstep_eligible(&p->se));
   }
 
+  for (int i = 0; i < KSTEP_MAX_KTHREADS; i++) {
+    enum kstep_kthread_state state;
+
+    if (!kstep_kthreads[i].p)
+      continue;
+    state = kthread_state(i);
+    pr_info("Kthread %d: pid=%d state=%d\n", i,
+            state == KSTEP_KTHREAD_DEAD ? -1 : kstep_kthreads[i].p->pid, kstep_kthreads[i].p->__state);
+  }
+
   for (int i = 0; i < MAX_CGROUPS; i++) {
     if (!cgroup_exists[i])
       continue;
@@ -692,8 +822,21 @@ static void print_state(void) {
  * Try to send the head queued op for task @id if its required state is met.
  * Sends at most one op per call.
  */
+static bool skip_global_cov(enum kstep_op_type type) {
+  switch (type) {
+  case OP_KTHREAD_START:
+  case OP_KTHREAD_YIELD:
+  case OP_KTHREAD_BLOCK:
+  case OP_KTHREAD_SYNCWAKE:
+    return true;
+  default:
+    return false;
+  }
+}
+
 static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   struct checker_states *cs = &checker_snapshot;
+  bool collect_cov = !skip_global_cov(type);
   memset(cs, 0, sizeof(*cs));
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct rq *rq = cpu_rq(cpu);
@@ -701,12 +844,22 @@ static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
     cs->rt_util_avg[cpu] = get_rt_util_avg(rq);
   }
 
-  kstep_cov_enable();
+  /*
+   * START/YIELD hand control to a live remote kthread that can keep running
+   * during the helper's trailing sleep. Global coverage in that window floods
+   * the async kthread path rather than the command itself.
+   */
+  if (collect_cov)
+    kstep_cov_enable();
   pr_info("EXECOP: {\"op\": %d, \"a\": %d, \"b\": %d, \"c\": %d}\n", type, a, b, c);
-  if (!op_handlers[type](a, b, c))
+  if (!op_handlers[type](a, b, c)) {
+    if (collect_cov)
+      kstep_cov_disable();
     // panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
     return false;
-  kstep_cov_disable();
+  }
+  if (collect_cov)
+    kstep_cov_disable();
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
   print_state();
@@ -748,7 +901,7 @@ static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   return true;
 }
 
-static u8 buf[1 + 1 + 1 + MAX_TASKS * 2 + 1];
+static u8 buf[1 + 1 + 1 + MAX_TASKS * 2 + 1 + KSTEP_MAX_KTHREADS * 2 + 1];
 
 u8 kstep_last_executed_steps(void) {
   return last_executed_steps;
@@ -759,12 +912,17 @@ static u8 encode_state_byte(u8 val) {
 }
 
 void kstep_write_state(struct file *f, bool executed, u8 executed_steps) {
-  /* Format: [OP_TYPE_NR] [executed] [executed_steps+11] [id] [state] ... ['\n']
-   * OP_TYPE_NR is the marker byte; executed and state are one byte, and
-   * executed_steps is offset to avoid '\n'. 2 = running on CPU,
-   * 1 = runnable on runqueue, 0 = blocked. */
+  /* Format:
+   * [OP_TYPE_NR] [executed] [executed_steps+11]
+   * [task_id] [task_state] ... [0]
+   * [kthread_id] [kthread_state] ... ['\n']
+   *
+   * Task ids and kthread ids are offset by 11 to avoid '\n'. The zero byte
+   * terminates the task section; the rest of the payload is the kthread
+   * section. Task states are 0=blocked, 1=runnable, 2=on_cpu. */
   loff_t pos = 0;
   int len = 0;
+  printk("starting buf ");
   
 
   buf[len++] = OP_TYPE_NR;
@@ -784,7 +942,20 @@ void kstep_write_state(struct file *f, bool executed, u8 executed_steps) {
     buf[len++] = (u8)i + 11; // avoid writing 10 (\n)
     buf[len++] = state;
   }
+  buf[len++] = 0;
+  for (int i = 0; i < KSTEP_MAX_KTHREADS; i++) {
+    enum kstep_kthread_state state;
+
+    if (!kstep_kthreads[i].p)
+      continue;
+    state = kstep_kthread_get_state(kstep_kthreads[i].p);
+    buf[len++] = (u8)i + 11;
+    buf[len++] = (u8)state;
+    if (state == KSTEP_KTHREAD_DEAD)
+      kstep_kthreads[i].p = NULL;
+  }
   buf[len++] = '\n';
+  printk("constructing buf successfully");
   kernel_write(f, buf, len, &pos);
 }
 

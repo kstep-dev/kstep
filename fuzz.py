@@ -42,12 +42,14 @@ def main() -> None:
                         help="vCPUs per QEMU instance")
     parser.add_argument("--mem_mb", type=int, default=512,
                         help="RAM per QEMU instance (MB)")
+    # for example: SMT:0/1-2/1-2/3-4/3-4+CLS:0/1-2/1-2/3-4/3-4  for extra_balance
+    #              CLS:0/1-2/1-2/3-4/3-4                        for even_idle_cpu
     parser.add_argument(
         "--topology",
         type=str,
-        default="CLS:0/1-2/1-2/3-4/3-4",
+        default="",
         help="Executor topology passed as a module param, e.g. CLS:0/1-2/1-2/3-4/3-4",
-    ) # for example: SMT:0/1-2/1-2/3-4/3-4+CLS:0/1-2/1-2/3-4/3-4 for extra_balance
+    ) 
     parser.add_argument(
         "--frequency",
         type=str,
@@ -90,6 +92,12 @@ def main() -> None:
         help="Enable cross-scheduler fuzzing; sets TASK_FIFO and TASK_CFS weights to 2 instead of 0",
     )
     parser.add_argument(
+        "--kthreads",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Enable KTHREAD_* fuzz ops; when disabled their weights are 0",
+    )
+    parser.add_argument(
         "--ci_mode",
         action="store_true",
         help="Run a bounded CI smoke test: exactly 3 executions in fresh, replay, then mutate mode",
@@ -123,6 +131,7 @@ def main() -> None:
         f"frequency={args.frequency or 'default'}  "
         f"ci_mode={args.ci_mode}  "
         f"cross_scheduler={args.cross_scheduler}  "
+        f"kthreads={args.kthreads}  "
         f"fresh_ratio={args.fresh_ratio}  mutate_ratio={args.mutate_ratio}  "
         f"special_mutate_ratio={args.special_mutate_ratio}  "
         f"pivot_rarity_alpha={args.pivot_rarity_alpha}"
@@ -137,6 +146,7 @@ def main() -> None:
         special_mutate_ratio=args.special_mutate_ratio,
         pivot_rarity_alpha=args.pivot_rarity_alpha,
         cross_scheduler=args.cross_scheduler,
+        enable_kthreads=args.kthreads,
         pin_cpus=args.pin_cpus,
         ci_mode=args.ci_mode,
     )

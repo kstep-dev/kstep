@@ -1,11 +1,23 @@
 import random
 
-from .gen_input_state import GenState, TASK_SLEEPING, TASK_ON_CPU
+from .gen_input_state import (
+    GenState,
+    KTHREAD_BLOCK_REQUESTED,
+    KTHREAD_BLOCKED,
+    KTHREAD_CREATED,
+    KTHREAD_DEAD,
+    KTHREAD_SPIN,
+    KTHREAD_SYNCWAKE_REQUESTED,
+    KTHREAD_YIELD,
+    TASK_SLEEPING,
+    TASK_ON_CPU,
+)
 from .gen_input_ops import (
     OpWeight,
     build_ops,
-    RESOURCE_TASK,
     RESOURCE_CGROUP,
+    RESOURCE_KTHREAD,
+    RESOURCE_TASK,
     OP_NAME_TO_TYPE,
 )
 
@@ -30,6 +42,8 @@ def choose_op(m: GenState, ops):
 def resource_available(m: GenState, res: str) -> bool:
     if res == RESOURCE_TASK:
         return m.has_tasks()
+    if res == RESOURCE_KTHREAD:
+        return m.has_kthreads()
     if res == RESOURCE_CGROUP:
         return m.has_cgroups()
     return False
@@ -54,17 +68,21 @@ configure_ops()
 
 def init_genstate(
     max_tasks: int,
+    max_kthreads: int,
     max_cgroups: int,
     cpus: int,
     seed: int,
     cross_scheduler: bool = False,
+    enable_kthreads: bool = False,
 ) -> GenState:
     return GenState(
         max_tasks=max_tasks,
+        max_kthreads=max_kthreads,
         max_cgroups=max_cgroups,
         cpus=cpus,
         rnd=random.Random(seed),
         cross_scheduler=cross_scheduler,
+        enable_kthreads=enable_kthreads,
     )
 
 def _generate_next_command(m: GenState) -> tuple[int, int, int, int]:
@@ -80,8 +98,9 @@ def _generate_next_command(m: GenState) -> tuple[int, int, int, int]:
     return op.emit(m)
 
 def _op_matches_task_state(m: GenState, op: tuple[int, int, int, int]) -> bool:
-    op_type, a, _, _ = op
+    op_type, a, b, _ = op
     task_state = m.task_state.get(a)
+    kthread_state = m.kthread_state.get(a)
 
     if op_type == OP_NAME_TO_TYPE["TASK_WAKEUP"]:
         return task_state == TASK_SLEEPING
@@ -94,6 +113,27 @@ def _op_matches_task_state(m: GenState, op: tuple[int, int, int, int]) -> bool:
         OP_NAME_TO_TYPE["TASK_SET_PRIO"],
     }:
         return task_state == TASK_ON_CPU
+    if op_type == OP_NAME_TO_TYPE["KTHREAD_BIND"]:
+        return kthread_state in {
+            KTHREAD_CREATED,
+            KTHREAD_YIELD,
+            KTHREAD_BLOCK_REQUESTED,
+            KTHREAD_BLOCKED,
+            KTHREAD_SYNCWAKE_REQUESTED,
+        }
+    if op_type == OP_NAME_TO_TYPE["KTHREAD_START"]:
+        return kthread_state == KTHREAD_CREATED
+    if op_type in {
+        OP_NAME_TO_TYPE["KTHREAD_YIELD"],
+        OP_NAME_TO_TYPE["KTHREAD_BLOCK"],
+    }:
+        return kthread_state in {KTHREAD_SPIN, KTHREAD_YIELD}
+    if op_type == OP_NAME_TO_TYPE["KTHREAD_SYNCWAKE"]:
+        return (
+            a != b
+            and kthread_state in {KTHREAD_SPIN, KTHREAD_YIELD}
+            and m.kthread_state.get(b) == KTHREAD_BLOCKED
+        )
     return True
 
 def generate_next_command(m: GenState) -> tuple[int, int, int, int]:
@@ -107,8 +147,9 @@ def replay_update_genstate(m: GenState, op: int, a: int, b: int, c: int) -> None
     """Apply the GenState side-effects of a replayed op without calling emit().
 
     During replay, args come from the seed so emit() is not called.
-    Task states are kept in sync via update_from_kmod(); this function
-    handles the remaining state: cgroups, leaf_cgroups, and task2cgroups.
+    Task and kthread states are kept in sync via update_from_kmod(); this
+    function handles the remaining state: cgroups, leaf_cgroups, and
+    task2cgroups.
     Each op's replay logic lives in its Op.replay field in gen_input_ops.py.
     """
     fn = _OP_REPLAY.get(op)
