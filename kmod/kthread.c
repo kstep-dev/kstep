@@ -111,8 +111,15 @@ static void do_syncwakeup(struct kstep_kthread *kt, void *arg) {
       runnable_task ++;
     }
   }
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
   if (runnable_task == 1)
-    pr_info("warn: sync wakeup pick the remote cpu while local cpu will become idle queued_task=%d, delayed_task=%d", rq->nr_running, rq->cfs.h_nr_queued - rq->cfs.h_nr_runnable);
+    pr_info("warn: sync wakeup pick the remote cpu while local cpu will become idle queued_task=%d, delayed_task=%d", 
+            rq->nr_running, rq->cfs.h_nr_queued - rq->cfs.h_nr_runnable);
+#else
+  if (runnable_task == 1)
+    pr_info("warn: sync wakeup pick the remote cpu while local cpu will become idle queued_task=%d", 
+            rq->nr_running);
+#endif
 
   kt->action = NULL; // After the sync wakeup, the parent kthread should exit
   kt->state = KSTEP_KTHREAD_DEAD;
