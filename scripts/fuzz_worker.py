@@ -306,7 +306,7 @@ class FuzzWorker:
 
         gen_seed = 0 if work.mode in ("replay") else self.rng.randint(0, 2**32 - 1)
         kstep_cpus = self.driver.num_cpus - 1
-        max_tasks = self.rng.randint(kstep_cpus // 2, kstep_cpus * 2)
+        max_tasks = self.rng.randint(kstep_cpus // 2, kstep_cpus * 6)
         max_kthreads = self.rng.randint(1, min(16, max(1, kstep_cpus * 2)))
         max_cgroups = self.rng.randint(kstep_cpus * 1, kstep_cpus * 6)
         gen = init_genstate(

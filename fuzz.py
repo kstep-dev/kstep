@@ -56,6 +56,12 @@ def main() -> None:
         default=None,
         help="Executor per-CPU frequency scale passed as a module param, e.g. 1024/512/1024/512/1024",
     )
+    parser.add_argument(
+        "--capacity",
+        type=str,
+        default=None,
+        help="Executor per-CPU capacity scale passed as a module param, e.g. 1024/1024/512/1024/512",
+    )
     parser.add_argument("--workers", type=int,
                         default=1,
                         help="Number of parallel QEMU workers")
@@ -122,6 +128,7 @@ def main() -> None:
         mem_mb=args.mem_mb,
         topology=args.topology,
         frequency=args.frequency,
+        capacity=args.capacity,
     )
 
     logging.info(
@@ -129,6 +136,7 @@ def main() -> None:
         f"linux={args.linux_name}  steps={args.steps}  "
         f"topology={args.topology or 'default'}  "
         f"frequency={args.frequency or 'default'}  "
+        f"capacity={args.capacity or 'default'}  "
         f"ci_mode={args.ci_mode}  "
         f"cross_scheduler={args.cross_scheduler}  "
         f"kthreads={args.kthreads}  "

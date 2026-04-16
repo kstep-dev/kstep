@@ -40,6 +40,7 @@ class Driver:
     mem_mb: int = 512
     topology: Optional[str] = None
     frequency: Optional[str] = None
+    capacity: Optional[str] = None
 
 
 def get_qemu_path() -> Path:
@@ -110,6 +111,8 @@ def start_qemu(
         boot_args += [f"topology={driver.topology}"]
     if driver.frequency:
         boot_args += [f"frequency={driver.frequency}"]
+    if driver.capacity:
+        boot_args += [f"capacity={driver.capacity}"]
 
     if driver.params:
         boot_args.extend(driver.params)
@@ -268,6 +271,7 @@ def main():
     parser.add_argument("--mem_mb", type=int, default=None)
     parser.add_argument("--topology", type=str, default=None)
     parser.add_argument("--frequency", type=str, default=None)
+    parser.add_argument("--capacity", type=str, default=None)
     parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 

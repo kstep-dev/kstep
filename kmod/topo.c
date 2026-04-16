@@ -11,6 +11,10 @@ module_param_string(topology, executor_topology, EXECUTOR_TOPOLOGY_LEN, 0644);
 static char executor_frequency[EXECUTOR_FREQUENCY_LEN] = "";
 module_param_string(frequency, executor_frequency, EXECUTOR_FREQUENCY_LEN, 0644);
 
+#define EXECUTOR_CAPACITY_LEN 256
+static char executor_capacity[EXECUTOR_CAPACITY_LEN] = "";
+module_param_string(capacity, executor_capacity, EXECUTOR_CAPACITY_LEN, 0644);
+
 KSYM_IMPORT_TYPED(struct sched_domain_topology_level *, sched_domain_topology);
 #define for_each_tl(tl) for (tl = *KSYM_sched_domain_topology; tl->mask; tl++)
 
@@ -249,13 +253,13 @@ void kstep_topo_apply(void) {
  *
  * This applies the topology levels in order: smt -> cls -> pkg.
  */
-void kstep_topo_param_apply(void) {
+bool kstep_topo_param_apply(void) {
   char topo_buf[EXECUTOR_TOPOLOGY_LEN];
   char *cursor, *level_spec;
 
   if (!executor_topology[0] || strcmp(executor_topology, "none") == 0) {
     pr_info("executor: custom topology disabled\n");
-    return;
+    return false;
   }
 
   strscpy(topo_buf, executor_topology, sizeof(topo_buf));
@@ -293,6 +297,45 @@ void kstep_topo_param_apply(void) {
   }
 
   kstep_topo_apply();
+  return true;
+}
+
+bool kstep_capacity_param_apply(void) {
+  char capacity_buf[EXECUTOR_CAPACITY_LEN];
+  char *cursor, *capacity_spec;
+  int cpu = 0;
+
+  if (!executor_capacity[0] || strcmp(executor_capacity, "none") == 0) {
+    pr_info("executor: custom capacity disabled\n");
+    return false;
+  }
+
+  strscpy(capacity_buf, executor_capacity, sizeof(capacity_buf));
+  cursor = capacity_buf;
+
+  while ((capacity_spec = strsep(&cursor, "/")) != NULL) {
+    int scale;
+
+    capacity_spec = strim(capacity_spec);
+    if (!*capacity_spec)
+      continue;
+    if (cpu >= num_online_cpus())
+      panic("Too many CPU capacities in spec %s", executor_capacity);
+
+    if (kstrtoint(capacity_spec, 10, &scale) != 0 || scale <= 0)
+      panic("Invalid CPU capacity scale %s in spec %s", capacity_spec,
+            executor_capacity);
+
+    if (cpu != 0)
+      kstep_cpu_set_capacity(cpu, scale);
+    TRACE_INFO("executor: applying capacity cpu=%d scale=%d\n", cpu, scale);
+    cpu++;
+  }
+
+  if (cpu != num_online_cpus())
+    panic("Capacity spec %s provided %d CPUs, expected %d", executor_capacity,
+          cpu, num_online_cpus());
+  return true;
 }
 
 void kstep_freq_param_apply(void) {
