@@ -342,7 +342,7 @@ def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op
         "KTHREAD_CREATE": enable_kthread_ops(2),
         "KTHREAD_BIND": enable_kthread_ops(2),
         "KTHREAD_START": enable_kthread_ops(2),
-        "KTHREAD_YIELD": enable_kthread_ops(2),
+        "KTHREAD_YIELD": enable_kthread_ops(0),
         "KTHREAD_BLOCK": enable_kthread_ops(2),
         "KTHREAD_SYNCWAKE": enable_kthread_ops(2),
     }

@@ -461,10 +461,8 @@ static bool op_tick_repeat(int a, int b, int c) {
       Break if special state found
       These states come from studied bug set.
     */
-    // Special state #1: more than 1 ineligible cgroup se exist on a cpu  
     if (count_ineligible_cgroup_se() > (num_online_cpus() - 1))
       break;
-    // Special state #2: non-empty cfs_rq with zero eligible entities
     if (has_nonempty_cfs_rq_with_zero_eligible()) {
       TRACE_INFO("Found nonempty cfs with zero eligible");
       break;
@@ -802,8 +800,8 @@ static void print_state(void) {
     if (!kstep_kthreads[i].p)
       continue;
     state = kthread_state(i);
-    pr_info("Kthread %d: pid=%d state=%d\n", i,
-            state == KSTEP_KTHREAD_DEAD ? -1 : kstep_kthreads[i].p->pid, kstep_kthreads[i].p->__state);
+    pr_info("Kthread %d: pid=%d, cpu=%d, state=%d\n", i,
+            state == KSTEP_KTHREAD_DEAD ? -1 : kstep_kthreads[i].p->pid, task_cpu(kstep_kthreads[i].p), kstep_kthreads[i].p->__state);
   }
 
   for (int i = 0; i < MAX_CGROUPS; i++) {
@@ -824,7 +822,9 @@ static void print_state(void) {
  */
 static bool skip_global_cov(enum kstep_op_type type) {
   switch (type) {
+  case OP_KTHREAD_CREATE:
   case OP_KTHREAD_START:
+  case OP_KTHREAD_BIND:
   case OP_KTHREAD_YIELD:
   case OP_KTHREAD_BLOCK:
   case OP_KTHREAD_SYNCWAKE:
@@ -922,7 +922,6 @@ void kstep_write_state(struct file *f, bool executed, u8 executed_steps) {
    * section. Task states are 0=blocked, 1=runnable, 2=on_cpu. */
   loff_t pos = 0;
   int len = 0;
-  printk("starting buf ");
   
 
   buf[len++] = OP_TYPE_NR;
@@ -955,7 +954,6 @@ void kstep_write_state(struct file *f, bool executed, u8 executed_steps) {
       kstep_kthreads[i].p = NULL;
   }
   buf[len++] = '\n';
-  printk("constructing buf successfully");
   kernel_write(f, buf, len, &pos);
 }
 

@@ -103,6 +103,7 @@ static void do_syncwakeup(struct kstep_kthread *kt, void *arg) {
   __wake_up_sync(arg, TASK_NORMAL);
 
   struct task_struct *p;
+  struct rq * rq = cpu_rq(task_cpu(kt->task));
   int runnable_task = 0;
 
   for_each_process(p) {
@@ -111,7 +112,7 @@ static void do_syncwakeup(struct kstep_kthread *kt, void *arg) {
     }
   }
   if (runnable_task == 1)
-    pr_info("warn: sync wakeup pick the remote cpu while local cpu will become idle");
+    pr_info("warn: sync wakeup pick the remote cpu while local cpu will become idle queued_task=%d, delayed_task=%d", rq->nr_running, rq->cfs.h_nr_queued - rq->cfs.h_nr_runnable);
 
   kt->action = NULL; // After the sync wakeup, the parent kthread should exit
   kt->state = KSTEP_KTHREAD_DEAD;
@@ -193,10 +194,18 @@ void kstep_kthread_yield(struct task_struct *p) {
 void kstep_kthread_syncwake(struct task_struct *waker, struct task_struct *wakee) {
   struct kstep_kthread *waker_kt = kt_find(waker);
   struct kstep_kthread *wakee_kt = kt_find(wakee);
+  struct cpumask mask;
 
   if ((waker_kt->action != do_spin && waker_kt->action != do_yield) || 
       wakee_kt->action != do_block_on_wq)
     panic("kstep: waker or wakee is not in the correct state");
+  
+  cpumask_clear(&mask);
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
+    cpumask_set_cpu(cpu, &mask);
+
+  set_cpus_allowed_ptr(wakee, & mask);
+  kstep_sleep();
 
   TRACE_INFO("kthread_syncwake: waker_pid=%d wakee_pid=%d", waker->pid, wakee->pid);
   // satisfy wakee's wait_event condition before the wakeup signal arrives
