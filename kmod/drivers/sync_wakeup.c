@@ -45,11 +45,11 @@ static void run(void) {
   // Tick until there is an ineligible task on CPU 1.
   kstep_tick_until(is_ineligible);
 
-  // Trigger waker (on CPU 1) to call __wake_up_sync targeting wakee.
-  kstep_kthread_syncwake(waker_task, wakee_task);
-
   // Pause the ineligible task
   kstep_task_pause(other_task);
+
+  // Trigger waker (on CPU 1) to call __wake_up_sync targeting wakee.
+  kstep_kthread_syncwake(waker_task, wakee_task);
 
   // tick to show the impact
   kstep_tick_repeat(10);
