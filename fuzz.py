@@ -43,7 +43,7 @@ def main() -> None:
     parser.add_argument("--mem_mb", type=int, default=512,
                         help="RAM per QEMU instance (MB)")
     # for example: SMT:0/1-2/1-2/3-4/3-4+CLS:0/1-2/1-2/3-4/3-4  for extra_balance
-    #              CLS:0/1-2/1-2/3-4/3-4                        for even_idle_cpu
+    #              CLS:0/1-2/1-2/3-4/3-4                        for even_idle_cpu, local_cgroup_imbalance
     parser.add_argument(
         "--topology",
         type=str,
