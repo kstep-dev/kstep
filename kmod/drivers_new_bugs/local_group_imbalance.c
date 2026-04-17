@@ -107,10 +107,6 @@ static void run(void) {
 
   for (i = 0; i < ARRAY_SIZE(ops); i++) {
     while (!kstep_execute_op(ops[i].type, ops[i].a, ops[i].b, ops[i].c)) {
-      // kstep_fail("replay op %d failed: type=%d a=%d b=%d c=%d", i, ops[i].type,
-      //            ops[i].a, ops[i].b, ops[i].c);
-      // return;
-      // kstep_execute_op(OP_TICK, 0, 0, 0);
       continue;
     }
   }
