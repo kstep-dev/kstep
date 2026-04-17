@@ -522,9 +522,15 @@ static bool op_cgroup_set_cpuset(int a, int b, int c) {
   return true;
 }
 
+typedef void(update_min_vruntime_fn_t)(struct cfs_rq *cfs_rq);
+
 static bool op_cgroup_set_weight(int a, int b, int c) {
   char name[MAX_CGROUP_NAME_LEN];
+  int cpu;
+  struct task_group *tg;
   (void)c;
+  
+
 
   if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
     return false;
@@ -534,6 +540,43 @@ static bool op_cgroup_set_weight(int a, int b, int c) {
     return false;
 
   kstep_cgroup_set_weight(name, b);
+
+  // check whether the min_vruntime has been updated in time
+  tg = cgroup_tg[a];
+  if (!tg)
+    return false;
+
+  for (cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct sched_entity *se = tg->se[cpu];
+    struct cfs_rq *cfs_rq;
+    u64 old_min_vruntime;
+    u64 new_min_vruntime;
+
+    if (!se)
+      continue;
+
+    cfs_rq = cfs_rq_of(se);
+    if (!cfs_rq)
+      continue;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+    KSYM_IMPORT_TYPED(update_min_vruntime_fn_t, avg_vruntime);
+    old_min_vruntime = cfs_rq->zero_vruntime;
+    KSYM_avg_vruntime(cfs_rq);
+    new_min_vruntime = cfs_rq->zero_vruntime;
+#else
+    KSYM_IMPORT_TYPED(update_min_vruntime_fn_t, update_min_vruntime);
+    old_min_vruntime = cfs_rq->min_vruntime;
+    KSYM_update_min_vruntime(cfs_rq);
+    new_min_vruntime = cfs_rq->min_vruntime;
+#endif
+
+    if (new_min_vruntime != old_min_vruntime) {
+      pr_info("warn: the parent of cgroup %s on cpu%d delayed vruntime update (%llu -> %llu)\n",
+              name, cpu, old_min_vruntime, new_min_vruntime);
+    }
+  }
+
   return true;
 }
 
