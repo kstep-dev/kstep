@@ -529,7 +529,7 @@ static bool op_cgroup_set_weight(int a, int b, int c) {
   int cpu;
   struct task_group *tg;
   (void)c;
-  KSYM_IMPORT_TYPED(update_min_vruntime_fn_t, update_min_vruntime);
+  
 
 
   if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
@@ -558,18 +558,16 @@ static bool op_cgroup_set_weight(int a, int b, int c) {
     cfs_rq = cfs_rq_of(se);
     if (!cfs_rq)
       continue;
-    
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+    KSYM_IMPORT_TYPED(update_min_vruntime_fn_t, avg_vruntime);
     old_min_vruntime = cfs_rq->zero_vruntime;
-#else
-    old_min_vruntime = cfs_rq->min_vruntime;
-#endif
-
-    KSYM_update_min_vruntime(cfs_rq);
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+    KSYM_avg_vruntime(cfs_rq);
     new_min_vruntime = cfs_rq->zero_vruntime;
 #else
+    KSYM_IMPORT_TYPED(update_min_vruntime_fn_t, update_min_vruntime);
+    old_min_vruntime = cfs_rq->min_vruntime;
+    KSYM_update_min_vruntime(cfs_rq);
     new_min_vruntime = cfs_rq->min_vruntime;
 #endif
 
