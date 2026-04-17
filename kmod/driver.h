@@ -1,7 +1,6 @@
 #ifndef KSTEP_DRIVER_H
 #define KSTEP_DRIVER_H
 
-#include "invariant.h"
 #include <linux/sched.h>
 
 #define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
@@ -27,7 +26,6 @@ struct kstep_driver {
   void (*on_sched_group_alloc)(struct task_group *tg, int cpu);
   u64 step_interval_us;                // Real time sleep between steps in us
   u64 tick_interval_ns;                // Virtual clock advance per tick in ns
-  struct kstep_invariant **invariants; // NULL-terminated array of invariants
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 
