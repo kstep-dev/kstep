@@ -20,7 +20,6 @@ from run import Driver
 from scripts.corpus import SignalCorpus
 from scripts.cov import cov_parse
 from scripts.fuzz_common import (
-    CheckerStatus,
     MutationPivot,
     Seed,
     SeedPool,
@@ -437,36 +436,14 @@ class FuzzManager:
             return category.strip().lower()
         return "other"
 
-    # Derive a checker-specific error category from structured worker output.
-    def _classify_checker_status(self, checker_status: CheckerStatus) -> Optional[str]:
-        if checker_status.work_conserving_broken:
-            return "wsv"
-        if checker_status.cfs_util_decay_broken:
-            return "cfs_util_decay"
-        if checker_status.rt_util_decay_broken:
-            return "rt_util_decay"
-        return None
-
-    # Convert structured checker failures into a human-readable error message.
-    def _checker_error_message(self, checker_status: CheckerStatus) -> Optional[str]:
-        if checker_status.work_conserving_broken:
-            return "wsv: work conserving violation"
-        if checker_status.cfs_util_decay_broken:
-            return "cfs_util_decay: cfs util decay violation"
-        if checker_status.rt_util_decay_broken:
-            return "rt_util_decay: rt util decay violation"
-        return None
-
-    # Log per-result execution metadata, including the checker output.
+    # Log per-result execution metadata.
     def _log_result(self, result: WorkResult) -> None:
-        checker_status = result.checker_status
         logging.info(
             f"[result] worker={result.worker_id}  "
             f"mode={result.mode}  "
             f"ops={len(result.ops)}  "
             f"exec_time={result.exec_time:.2f}s  "
-            f"special_pivots={len(result.special_pivot_idxs)}  "
-            f"checker_status={checker_status}"
+            f"special_pivots={len(result.special_pivot_idxs)}"
         )
 
     # Route one worker result through success or error handling.
@@ -479,13 +456,6 @@ class FuzzManager:
             result.error_category = self._classify_error(result.error)
             self._handle_error_result(result)
             return
-
-        if result.checker_status is not None:
-            result.error_category = self._classify_checker_status(result.checker_status)
-            if result.error_category is not None:
-                result.error = self._checker_error_message(result.checker_status)
-                self._handle_error_result(result)
-                return
 
         self._handle_success_result(result)
 

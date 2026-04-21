@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import BinaryIO, Optional
 
 from run import Driver, start_qemu
-from scripts.fuzz_common import CheckerStatus, Ops, WorkItem, WorkResult, worker_paths
+from scripts.fuzz_common import Ops, WorkItem, WorkResult, worker_paths
 from scripts.gen_input_core import (
     _op_matches_task_state,
     generate_next_command,
@@ -28,7 +28,6 @@ from scripts.gen_input_state import GenState
 
 # Marker byte written by kstep_write_state
 OP_TYPE_NR = len(OP_NAME_TO_TYPE)
-CHECKER_STATUS_PREFIX = b"CHECKER,"
 
 _CRASH_MARKERS = [
     b"kernel panic",
@@ -72,7 +71,6 @@ def _check_for_crash(log_file: Path) -> bool:
         return any(marker in content for marker in _CRASH_MARKERS)
     except Exception:
         return False
-
 
 @dataclass
 class KmodState:
@@ -198,33 +196,6 @@ class FuzzWorkerSession:
                 executed=executed,
                 executed_steps=executed_steps,
             )
-
-    # Decode the final checker status sent after EXIT.
-    def read_checker_status(self) -> Optional[CheckerStatus]:
-        while True:
-            line = self._read_frame()
-            if not line:
-                return None
-            if not line.startswith(CHECKER_STATUS_PREFIX):
-                continue
-
-            payload = line[len(CHECKER_STATUS_PREFIX):-1].strip()
-            parts = payload.split(b",", 2)
-            if len(parts) != 3:
-                continue
-
-            work_conserving_broken, cfs_util_decay_broken, rt_util_decay_broken = parts
-
-            try:
-                result = CheckerStatus(
-                    work_conserving_broken=(work_conserving_broken == b"1"),
-                    cfs_util_decay_broken=(int(cfs_util_decay_broken) > 0),
-                    rt_util_decay_broken=(int(rt_util_decay_broken) > 0),
-                )
-            except Exception as _:
-                continue
-
-            return result
 
     # Send one op to kmod and fold the returned state into the generator model.
     def send_op(self, op: int, a: int, b: int, c: int) -> int:
@@ -438,24 +409,14 @@ class FuzzWorker:
             return self._execute_replay_or_mutate(work, session)
         return self._execute_generated_ops(work, session)
 
-    # Ask the executor to exit cleanly and report checker outputs.
+    # Ask the executor to exit cleanly and wait for QEMU to terminate.
     def _finish_session(
         self,
         session: FuzzWorkerSession,
-    ) -> tuple[Optional[str], Optional[CheckerStatus]]:
+    ) -> Optional[str]:
         session.sock.sendall(b"EXIT\n")
-        checker_status = session.read_checker_status()
-        self.logger.info(
-            "EXIT status: work_conserving_broken=%s cfs_util_decay_broken=%s rt_util_decay_broken=%s",
-            None if checker_status is None else checker_status.work_conserving_broken,
-            None if checker_status is None else checker_status.cfs_util_decay_broken,
-            None if checker_status is None else checker_status.rt_util_decay_broken,
-        )
-
         session.kill(kill_proc=False)
-        if checker_status is None:
-            return "checker: missing checker status", None
-        return None, checker_status
+        return None
 
     # Compute how many ops must execute for this work item to count as complete.
     def _expected_ops(self, work: WorkItem) -> int:
@@ -505,7 +466,6 @@ class FuzzWorker:
         ops_executed: Ops = []
         special_pivot_idxs: list[int] = []
         error: Optional[str] = None
-        checker_status: Optional[CheckerStatus] = None
         session: Optional[FuzzWorkerSession] = None
 
         try:
@@ -517,13 +477,12 @@ class FuzzWorker:
                 exec_time=time.monotonic() - t0,
                 mode=work.mode,
                 seed_id=work.seed_id,
-                checker_status=checker_status,
                 error=str(exc),
             )
 
         try:
             ops_executed, special_pivot_idxs = self._execute_work(work, session)
-            error, checker_status = self._finish_session(session)
+            error = self._finish_session(session)
         except Exception as exc:
             session.kill(kill_proc=True)
             self.logger.error(f"Worker {self.worker_id}: {exc}")
@@ -542,7 +501,6 @@ class FuzzWorker:
             exec_time=time.monotonic() - t0,
             mode=work.mode,
             seed_id=work.seed_id,
-            checker_status=checker_status,
             special_pivot_idxs=special_pivot_idxs,
             error=error,
         )
