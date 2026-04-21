@@ -3,38 +3,17 @@
 #include <linux/sched/signal.h> // for_each_process
 #include <linux/string.h> // strcmp, strscpy
 
+#include "checker.h"
 #include "driver.h"
+#include "op_state.h"
 #include "op_handler.h"
 #include "linux/cpumask.h"
 #include "linux/sched.h"
 
-#define MAX_TASKS 1024
-#define MAX_CGROUPS 1024
-#define MAX_CGROUP_NAME_LEN 256
-
-static int cgroup_parent_id[MAX_CGROUPS];
-static bool cgroup_exists[MAX_CGROUPS];
-static int cgroup_lineage[MAX_CGROUPS];
-static struct task_group *cgroup_tg[MAX_CGROUPS];
-
-#define TASK_OP_QUEUE_SIZE 64
-
-struct queued_op { enum kstep_op_type type; int a, b, c; u64 seq; };
-
-struct kstep_task {
-  struct task_struct *p;
-  int cgroup_id;
-  int cur_cpu;
-  int cur_policy; // 0: cfs, 1: rt
-};
-
-struct kstep_managed_kthread {
-  struct task_struct *p;
-};
-
-static struct kstep_task kstep_tasks[MAX_TASKS];
-static struct kstep_managed_kthread kstep_kthreads[KSTEP_MAX_KTHREADS];
-static u8 last_executed_steps;
+struct kstep_task kstep_tasks[MAX_TASKS];
+struct kstep_managed_kthread kstep_kthreads[KSTEP_MAX_KTHREADS];
+struct kstep_cgroup_state kstep_cgroups[MAX_CGROUPS];
+int cgroup_lineage[MAX_CGROUPS];
 
 static bool is_valid_task_id(int id) { return id >= 0 && id < MAX_TASKS; }
 static bool is_valid_cgroup_id(int id) { return id >= 0 && id < MAX_CGROUPS; }
@@ -48,10 +27,11 @@ static bool build_cgroup_name(int id, char *buf) {
   int len = 0;
 
   while (cur != -1) {
-    if (!is_valid_cgroup_id(cur) || !cgroup_exists[cur] || depth >= MAX_CGROUPS)
+    if (!is_valid_cgroup_id(cur) || !kstep_cgroups[cur].exists ||
+        depth >= MAX_CGROUPS)
       return false;
     cgroup_lineage[depth++] = cur;
-    cur = cgroup_parent_id[cur];
+    cur = kstep_cgroups[cur].parent_id;
   }
 
   for (int i = depth - 1; i >= 0; i--) {
@@ -65,7 +45,7 @@ static bool build_cgroup_name(int id, char *buf) {
 
 static bool cgroup_is_leaf(int id) {
   for (int i = 0; i < MAX_CGROUPS; i++) {
-    if (cgroup_exists[i] && cgroup_parent_id[i] == id)
+    if (kstep_cgroups[i].exists && kstep_cgroups[i].parent_id == id)
       return false;
   }
   return true;
@@ -155,205 +135,205 @@ static struct task_struct *find_new_child(struct task_struct *parent) {
     panic("No new child found for parent %d", parent->pid);
 }
 
-static bool op_task_create(int a, int b, int c) {
+static u8 op_task_create(int a, int b, int c) {
   (void)b;
   (void)c;
   if (!is_valid_task_id(a) || kstep_tasks[a].p)
     panic("Invalid task id");
   kstep_tasks[a].p = kstep_task_create();
   kstep_tasks[a].cgroup_id = -1;
-  return true;
+  return 1;
 }
 
-static bool op_task_fork(int a, int b, int c) {
+static u8 op_task_fork(int a, int b, int c) {
   struct task_struct *p;
   (void)c;
 
   if (!is_valid_task_id(a) || !is_valid_task_id(b))
-    return false;
+    return 0;
   if (!kstep_tasks[a].p || kstep_tasks[b].p)
-    return false;
+    return 0;
 
   if (!kstep_task_running(kstep_tasks[a].p))
       panic("Task %d is not on CPU when forking", a);
   kstep_task_fork(kstep_tasks[a].p, 1);
   p = find_new_child(kstep_tasks[a].p);
   if (!p)
-    return false;
+    return 0;
 
   kstep_tasks[b].p = p;
   kstep_tasks[b].cgroup_id = kstep_tasks[a].cgroup_id;
-  return true;
+  return 1;
 }
 
-static bool op_task_pin(int a, int b, int c) {
+static u8 op_task_pin(int a, int b, int c) {
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
-    return false;
+    return 0;
   if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when pinning", a);
   kstep_task_pin(kstep_tasks[a].p, b, c);
-  return true;
+  return 1;
 }
 
-static bool op_task_fifo(int a, int b, int c) {
+static u8 op_task_fifo(int a, int b, int c) {
   (void)b;
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
-    return false;
+    return 0;
 
   if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when setting FIFO", a);
   // Move the task back to the root cgroup, otherwise the set_schedprio will fail
   move_task_to_root(a);
   kstep_task_fifo(kstep_tasks[a].p);
-  return true;
+  return 1;
 }
 
-static bool op_task_cfs(int a, int b, int c) {
+static u8 op_task_cfs(int a, int b, int c) {
   (void)b;
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
-    return false;
+    return 0;
   if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when setting CFS", a);
   kstep_task_cfs(kstep_tasks[a].p);
-  return true;
+  return 1;
 }
 
-static bool op_task_pause(int a, int b, int c) {
+static u8 op_task_pause(int a, int b, int c) {
   (void)b;
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
-    return false;
+    return 0;
   if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when pausing", a);
   kstep_task_pause(kstep_tasks[a].p);
-  return true;
+  return 1;
 }
 
-static bool op_task_wakeup(int a, int b, int c) {
+static u8 op_task_wakeup(int a, int b, int c) {
   (void)b;
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
-    return false;
+    return 0;
   if (kstep_tasks[a].p->__state == TASK_RUNNING)
     panic("Task %d is already on CPU when waking up", a);
   kstep_task_wakeup(kstep_tasks[a].p);
-  return true;
+  return 1;
 }
 
-static bool op_task_set_prio(int a, int b, int c) {
+static u8 op_task_set_prio(int a, int b, int c) {
   (void)c;
   if (!is_valid_task_id(a) || !kstep_tasks[a].p)
-    return false;
+    return 0;
   if (!kstep_task_running(kstep_tasks[a].p))
     panic("Task %d is not on CPU when setting priority", a);
   if (b < -20 || b > 19)
-    return false;
+    return 0;
   kstep_task_set_prio(kstep_tasks[a].p, b);
-  return true;
+  return 1;
 }
 
-static bool op_kthread_create(int a, int b, int c) {
+static u8 op_kthread_create(int a, int b, int c) {
   char name[16];
 
   (void)b;
   (void)c;
   if (!is_valid_kthread_id(a) || kstep_kthreads[a].p)
-    return false;
+    return 0;
 
   scnprintf(name, sizeof(name), "kt%d", a);
   kstep_kthreads[a].p = kstep_kthread_create(name);
-  return true;
+  return 1;
 }
 
-static bool op_kthread_bind(int a, int b, int c) {
+static u8 op_kthread_bind(int a, int b, int c) {
   struct cpumask mask;
   enum kstep_kthread_state state = kthread_state(a);
 
   if (!is_valid_kthread_id(a) || !kstep_kthreads[a].p ||
       state == KSTEP_KTHREAD_DEAD)
-    return false;
+    return 0;
   if (b > c || b < 1 || c > num_online_cpus() - 1)
-    return false;
+    return 0;
 
   cpumask_clear(&mask);
   for (int cpu = b; cpu <= c; cpu++)
     cpumask_set_cpu(cpu, &mask);
   kstep_kthread_bind(kstep_kthreads[a].p, &mask);
-  return true;
+  return 1;
 }
 
-static bool op_kthread_start(int a, int b, int c) {
+static u8 op_kthread_start(int a, int b, int c) {
   (void)b;
   (void)c;
 
   if (!is_valid_kthread_id(a) || !kstep_kthreads[a].p)
-    return false;
+    return 0;
   if (kthread_state(a) != KSTEP_KTHREAD_CREATED)
-    return false;
+    return 0;
   kstep_kthread_start(kstep_kthreads[a].p);
-  return true;
+  return 1;
 }
 
-static bool op_kthread_yield(int a, int b, int c) {
+static u8 op_kthread_yield(int a, int b, int c) {
   enum kstep_kthread_state state;
 
   (void)b;
   (void)c;
   if (!is_valid_kthread_id(a) || !kstep_kthreads[a].p)
-    return false;
+    return 0;
   state = kthread_state(a);
   if (state != KSTEP_KTHREAD_SPIN && state != KSTEP_KTHREAD_YIELD)
-    return false;
+    return 0;
   kstep_kthread_yield(kstep_kthreads[a].p);
-  return true;
+  return 1;
 }
 
-static bool op_kthread_block(int a, int b, int c) {
+static u8 op_kthread_block(int a, int b, int c) {
   enum kstep_kthread_state state;
 
   (void)b;
   (void)c;
   if (!is_valid_kthread_id(a) || !kstep_kthreads[a].p)
-    return false;
+    return 0;
   state = kthread_state(a);
   if (state != KSTEP_KTHREAD_SPIN && state != KSTEP_KTHREAD_YIELD)
-    return false;
+    return 0;
   kstep_kthread_block(kstep_kthreads[a].p);
-  return true;
+  return 1;
 }
 
-static bool op_kthread_syncwake(int a, int b, int c) {
+static u8 op_kthread_syncwake(int a, int b, int c) {
   enum kstep_kthread_state waker_state;
   enum kstep_kthread_state wakee_state;
 
   (void)c;
   if (!is_valid_kthread_id(a) || !is_valid_kthread_id(b))
-    return false;
+    return 0;
   if (a == b)
-    return false;
+    return 0;
 
   waker_state = kthread_state(a);
   wakee_state = kthread_state(b);
   if (!kstep_kthreads[a].p || !kstep_kthreads[b].p)
-    return false;
+    return 0;
   if (waker_state != KSTEP_KTHREAD_SPIN &&
       waker_state != KSTEP_KTHREAD_YIELD)
-    return false;
+    return 0;
   if (wakee_state != KSTEP_KTHREAD_BLOCKED)
-    return false;
+    return 0;
 
   kstep_kthread_syncwake(kstep_kthreads[a].p, kstep_kthreads[b].p);
-  return true;
+  return 1;
 }
 
-static bool op_tick(int a, int b, int c) {
+static u8 op_tick(int a, int b, int c) {
   (void)a;
   (void)b;
   (void)c;
   kstep_tick();
-  return true;
+  return 1;
 }
 
 static u64 count_ineligible_cgroup_se(void) {
@@ -362,10 +342,10 @@ static u64 count_ineligible_cgroup_se(void) {
   for (int id = 0; id < MAX_CGROUPS; id++) {
     struct task_group *tg;
 
-    if (!cgroup_exists[id])
+    if (!kstep_cgroups[id].exists)
       continue;
 
-    tg = cgroup_tg[id];
+    tg = kstep_cgroups[id].tg;
     if (!tg)
       continue;
 
@@ -432,10 +412,10 @@ static bool has_nonempty_cfs_rq_with_zero_eligible(void) {
   for (int id = 0; id < MAX_CGROUPS; id++) {
     struct task_group *tg;
 
-    if (!cgroup_exists[id])
+    if (!kstep_cgroups[id].exists)
       continue;
 
-    tg = cgroup_tg[id];
+    tg = kstep_cgroups[id].tg;
     if (!tg)
       continue;
 
@@ -448,12 +428,14 @@ static bool has_nonempty_cfs_rq_with_zero_eligible(void) {
   return false;
 }
 
-static bool op_tick_repeat(int a, int b, int c) {
+static u8 op_tick_repeat(int a, int b, int c) {
   u8 executed_steps = 0;
   (void)b;
   (void)c;
 
   for (int i = 0; i < a; i++) {
+    kstep_execute_op(OP_TICK, 0, 0, 0);
+
     /*
       Some bugs require special task/task group states to trigger. 
       These conditions are hard to capture with code coverage, 
@@ -467,64 +449,62 @@ static bool op_tick_repeat(int a, int b, int c) {
       TRACE_INFO("Found nonempty cfs with zero eligible");
       break;
     }
-
-    kstep_execute_op(OP_TICK, 0, 0, 0);
     executed_steps++;
   }
 
-  last_executed_steps = executed_steps;
-  return true;
+  return executed_steps;
 }
 
-static bool op_cgroup_create(int a, int b, int c) {
+static u8 op_cgroup_create(int a, int b, int c) {
   int parent_id = a;
   int child_id = b;
   char name[MAX_CGROUP_NAME_LEN];
   (void)c;
 
-  if (!is_valid_cgroup_id(child_id) || cgroup_exists[child_id])
-    return false;
-  if (parent_id != -1 && (!is_valid_cgroup_id(parent_id) || !cgroup_exists[parent_id]))
-    return false;
+  if (!is_valid_cgroup_id(child_id) || kstep_cgroups[child_id].exists)
+    return 0;
+  if (parent_id != -1 &&
+      (!is_valid_cgroup_id(parent_id) || !kstep_cgroups[parent_id].exists))
+    return 0;
 
-  cgroup_parent_id[child_id] = parent_id;
-  cgroup_exists[child_id] = true;
+  kstep_cgroups[child_id].parent_id = parent_id;
+  kstep_cgroups[child_id].exists = true;
 
   if (!build_cgroup_name(child_id, name))
-    return false;
+    return 0;
 
   // Only leaf cgroups can contain tasks in cgroup v2.
   if (parent_id != -1)
     cgroup_move_tasks_to_root(parent_id);
 
   kstep_cgroup_create(name);
-  cgroup_tg[child_id] = lookup_cgroup_task_group(name);
-  if (!cgroup_tg[child_id])
+  kstep_cgroups[child_id].tg = lookup_cgroup_task_group(name);
+  if (!kstep_cgroups[child_id].tg)
     panic("Failed to resolve task group for cgroup %s", name);
-  return true;
+  return 1;
 }
 
-static bool op_cgroup_set_cpuset(int a, int b, int c) {
+static u8 op_cgroup_set_cpuset(int a, int b, int c) {
   char name[MAX_CGROUP_NAME_LEN];
   char cpuset[32];
 
-  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
-    return false;
+  if (!is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
+    return 0;
   if (!build_cgroup_name(a, name))
-    return false;
+    return 0;
   if (b > c || b < 1 || c > num_online_cpus() - 1)
-    return false;
+    return 0;
 
   if (scnprintf(cpuset, sizeof(cpuset), "%d-%d", b, c) >= sizeof(cpuset))
-    return false;
+    return 0;
 
   kstep_cgroup_set_cpuset(name, cpuset);
-  return true;
+  return 1;
 }
 
 typedef void(update_min_vruntime_fn_t)(struct cfs_rq *cfs_rq);
 
-static bool op_cgroup_set_weight(int a, int b, int c) {
+static u8 op_cgroup_set_weight(int a, int b, int c) {
   char name[MAX_CGROUP_NAME_LEN];
   int cpu;
   struct task_group *tg;
@@ -532,19 +512,19 @@ static bool op_cgroup_set_weight(int a, int b, int c) {
   
 
 
-  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
-    return false;
+  if (!is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
+    return 0;
   if (!build_cgroup_name(a, name))
-    return false;
+    return 0;
   if (b <= 0 || b > 10000)
-    return false;
+    return 0;
 
   kstep_cgroup_set_weight(name, b);
 
   // check whether the min_vruntime has been updated in time
-  tg = cgroup_tg[a];
+  tg = kstep_cgroups[a].tg;
   if (!tg)
-    return false;
+    return 0;
 
   for (cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct sched_entity *se = tg->se[cpu];
@@ -577,19 +557,19 @@ static bool op_cgroup_set_weight(int a, int b, int c) {
     }
   }
 
-  return true;
+  return 1;
 }
 
-static bool op_cgroup_add_task(int a, int b, int c) {
+static u8 op_cgroup_add_task(int a, int b, int c) {
   char name[MAX_CGROUP_NAME_LEN];
   (void)c;
 
-  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
-    return false;
+  if (!is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
+    return 0;
   if (!build_cgroup_name(a, name))
-    return false;
+    return 0;
   if (!is_valid_task_id(b) || !kstep_tasks[b].p)
-    return false;
+    return 0;
 
   if (kstep_tasks[b].p->policy != 0)
     kstep_task_cfs(kstep_tasks[b].p);
@@ -597,44 +577,44 @@ static bool op_cgroup_add_task(int a, int b, int c) {
   kstep_cgroup_add_task(name, kstep_tasks[b].p->pid);
 
   kstep_tasks[b].cgroup_id = a;
-  return true;
+  return 1;
 }
 
-static bool op_cgroup_destroy(int a, int b, int c) {
+static u8 op_cgroup_destroy(int a, int b, int c) {
   char name[MAX_CGROUP_NAME_LEN];
   (void)b;
   (void)c;
 
-  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
-    return false;
+  if (!is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
+    return 0;
   if (!cgroup_is_leaf(a))
-    return false;
+    return 0;
   if (!build_cgroup_name(a, name))
-    return false;
+    return 0;
 
   cgroup_move_tasks_to_root(a);
   kstep_cgroup_destroy(name);
-  cgroup_tg[a] = NULL;
-  cgroup_exists[a] = false;
-  cgroup_parent_id[a] = -1;
-  return true;
+  kstep_cgroups[a].tg = NULL;
+  kstep_cgroups[a].exists = false;
+  kstep_cgroups[a].parent_id = -1;
+  return 1;
 }
 
-static bool op_cgroup_move_task_root(int a, int b, int c) {
+static u8 op_cgroup_move_task_root(int a, int b, int c) {
   (void)c;
 
-  if (!is_valid_cgroup_id(a) || !cgroup_exists[a])
-    return false;
+  if (!is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
+    return 0;
   if (!is_valid_task_id(b) || !kstep_tasks[b].p)
-    return false;
+    return 0;
   if (kstep_tasks[b].cgroup_id != a)
-    return false;
+    return 0;
 
   move_task_to_root(b);
-  return true;
+  return 1;
 }
 
-typedef bool (*op_handler_fn)(int a, int b, int c);
+typedef u8 (*op_handler_fn)(int a, int b, int c);
 
 static op_handler_fn op_handlers[OP_TYPE_NR] = {
     [OP_TASK_CREATE] = op_task_create,
@@ -707,92 +687,11 @@ static bool is_task_signal_op(enum kstep_op_type type) {
   }
 }
 
-#define for_each_leaf_cfs_rq_safe(rq, cfs_rq, pos)			\
-	list_for_each_entry_safe(cfs_rq, pos, &rq->leaf_cfs_rq_list,	\
-				 leaf_cfs_rq_list)
-
-/* Checkers: work conserving, util_avg decay rate */
-bool kstep_work_conserving_broken(void) {
-  struct cpumask idle_cpus;
-  int runnable_tasks = 0;
-  bool eligible_runnable = false;
-
-  cpumask_clear(&idle_cpus);
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    struct rq *rq = cpu_rq(cpu);
-
-    if (rq->nr_running < 0)
-      panic("invalid nr_running value");
-    if (rq->nr_running == 0)
-      cpumask_set_cpu(cpu, &idle_cpus);
-  }
-
-  for (int i = 0; i < MAX_TASKS; i++) {
-    struct task_struct *p = kstep_tasks[i].p;
-
-    if (!p || p->__state != TASK_RUNNING)
-      continue;
-
-    runnable_tasks++;
-    if (cpumask_intersects(p->cpus_ptr, &idle_cpus) && task_rq(p)->nr_running > 1) {
-      eligible_runnable = true;
-      TRACE_INFO("Runnable task %d (%d) can run on idle CPUs %*pbl",
-                 i, p->pid, cpumask_pr_args(p->cpus_ptr));
-    }
-  }
-
-  TRACE_INFO("work_conserving_check: runnable=%d idle_cpus=%*pbl eligible=%d",
-             runnable_tasks, cpumask_pr_args(&idle_cpus), eligible_runnable);
-
-  return runnable_tasks > num_online_cpus() - 1 && !cpumask_empty(&idle_cpus) && eligible_runnable;
-}
-
-struct checker_states {
-  s64 cfs_util_avg[NR_CPUS];
-  s64 rt_util_avg[NR_CPUS];
-};
-
-static struct checker_states checker_snapshot;
-
-void kstep_check_extra_balance(int cpu, struct sched_domain *sd) {
-  kstep_output_balance(cpu, sd);
-
-  if (cpu_rq(cpu)-> nr_running == 0)
-    return;
-  int i;
-  struct sched_group *sg = sd->groups;
-  do {
-    int local_group;
-    local_group = cpumask_test_cpu(cpu, sched_group_span(sg));
-    if (!local_group)
-      continue;
-    for_each_cpu(i, sched_group_span(sg)) {
-      if (cpu_rq(i)->nr_running == 0) {
-        pr_info("warn: load balance triggered on busy cpu while idle cpu in the same group");
-        return;
-      }
-    }
-  } while (sg != sd->groups);
-}
-
-static s64 get_cfs_util_avg(struct rq *rq) {
-  s64 removed = 0;
-  struct cfs_rq *cfs_rq, *pos;
-  for_each_leaf_cfs_rq_safe(rq, cfs_rq, pos) {
-    removed += cfs_rq->removed.util_avg;
-  }
-  return rq->cfs.avg.util_avg - rq->cfs.removed.util_avg - removed;
-}
-
-static s64 get_rt_util_avg(struct rq *rq) {
-  return rq->avg_rt.util_avg;
-}
-
 static void print_cgroup_state(int id) {
   char name[MAX_CGROUP_NAME_LEN];
   char eligible[256] = "";
   int len = 0;
-  struct task_group *tg = cgroup_tg[id];
+  struct task_group *tg = kstep_cgroups[id].tg;
 
   if (!build_cgroup_name(id, name))
     return;
@@ -838,7 +737,7 @@ static void print_state(void) {
   }
 
   for (int i = 0; i < MAX_CGROUPS; i++) {
-    if (!cgroup_exists[i])
+    if (!kstep_cgroups[i].exists)
       continue;
     print_cgroup_state(i);
   }
@@ -850,96 +749,55 @@ static void print_state(void) {
  */
 static bool skip_global_cov(enum kstep_op_type type) {
   switch (type) {
-  case OP_KTHREAD_CREATE:
-  case OP_KTHREAD_START:
-  case OP_KTHREAD_BIND:
-  case OP_KTHREAD_YIELD:
-  case OP_KTHREAD_BLOCK:
-  case OP_KTHREAD_SYNCWAKE:
+  case OP_KTHREAD_CREATE: case OP_KTHREAD_START: case OP_KTHREAD_BIND:
+  case OP_KTHREAD_YIELD: case OP_KTHREAD_BLOCK: case OP_KTHREAD_SYNCWAKE:
     return true;
   default:
     return false;
   }
 }
 
-static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
-  struct checker_states *cs = &checker_snapshot;
+static u8 execute_one_op(enum kstep_op_type type, int a, int b, int c) {
+  struct kstep_check_state check_state;
   bool collect_cov = !skip_global_cov(type);
-  memset(cs, 0, sizeof(*cs));
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    struct rq *rq = cpu_rq(cpu);
-    cs->cfs_util_avg[cpu] = get_cfs_util_avg(rq);
-    cs->rt_util_avg[cpu] = get_rt_util_avg(rq);
-  }
+  u8 executed_steps;
+
+  kstep_check_before_op(&check_state);
 
   /*
    * START/YIELD hand control to a live remote kthread that can keep running
    * during the helper's trailing sleep. Global coverage in that window floods
    * the async kthread path rather than the command itself.
-   */
+  */
   if (collect_cov)
     kstep_cov_enable();
   pr_info("EXECOP: {\"op\": %d, \"a\": %d, \"b\": %d, \"c\": %d}\n", type, a, b, c);
-  if (!op_handlers[type](a, b, c)) {
+  executed_steps = op_handlers[type](a, b, c);
+  if (executed_steps == 0) {
     if (collect_cov)
       kstep_cov_disable();
     // panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
-    return false;
+    return 0;
   }
   if (collect_cov)
     kstep_cov_disable();
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
   print_state();
+  kstep_check_after_op(&check_state);
 
-  for (int i = 0; i < MAX_TASKS; i++) {
-    struct task_struct *p = kstep_tasks[i].p;
-    if (!p)
-      continue;
-    // Don't force decay slowly for task migrating cpus or classes
-    if (kstep_tasks[i].cur_cpu != task_cpu(p)) {
-      cs->cfs_util_avg[kstep_tasks[i].cur_cpu] = 0;
-      kstep_tasks[i].cur_cpu = task_cpu(p);
-    }
-    if (kstep_tasks[i].cur_policy != p->policy) {
-      cs->cfs_util_avg[kstep_tasks[i].cur_cpu] = 0;
-      kstep_tasks[i].cur_policy = p->policy;
-    }
-  }
-
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
-    struct rq *rq = cpu_rq(cpu);
-
-    if (cs->cfs_util_avg[cpu] - get_cfs_util_avg(rq) > 1010) {
-      pr_info("warn: cfs_util_avg_decay violation on cpu %d\n", cpu);
-    }
-
-    else if (cs->rt_util_avg[cpu] - get_rt_util_avg(rq) > 1010) {
-      pr_info("warn: rt_util_avg_decay violation on cpu %d\n", cpu);
-    }
-
-    else if (cs->rt_util_avg[cpu] + cs->cfs_util_avg[cpu] - get_cfs_util_avg(rq) - get_rt_util_avg(rq) > 1010) {
-      pr_info("warn: rt_util_avg_decay violation on cpu %d (combined cfs+rt delta)\n",
-              cpu);
-    }
-  }
-
-  return true;
+  return executed_steps;
 }
 
 static u8 buf[1 + 1 + 1 + MAX_TASKS * 2 + 1 + KSTEP_MAX_KTHREADS * 2 + 1];
-
-u8 kstep_last_executed_steps(void) {
-  return last_executed_steps;
-}
 
 static u8 encode_state_byte(u8 val) {
   return val + 11; /* avoid '\n' in the binary frame */
 }
 
-void kstep_write_state(struct file *f, bool executed, u8 executed_steps) {
+void kstep_write_state(struct file *f, u8 executed_steps) {
   /* Format:
-   * [OP_TYPE_NR] [executed] [executed_steps+11]
+   * [OP_TYPE_NR] [executed_steps+11]
    * [task_id] [task_state] ... [0]
    * [kthread_id] [kthread_state] ... ['\n']
    *
@@ -951,7 +809,6 @@ void kstep_write_state(struct file *f, bool executed, u8 executed_steps) {
   
 
   buf[len++] = OP_TYPE_NR;
-  buf[len++] = (u8) executed;
   buf[len++] = encode_state_byte(executed_steps);
   for (int i = 0; i < MAX_TASKS; i++) {
     struct task_struct *p = kstep_tasks[i].p;
@@ -983,19 +840,16 @@ void kstep_write_state(struct file *f, bool executed, u8 executed_steps) {
   kernel_write(f, buf, len, &pos);
 }
 
-bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
-  last_executed_steps = 0;
+u8 kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
   if (type < 0 || type >= OP_TYPE_NR)
     panic("Operation failed: %d %d %d %d\n", type, a, b, c);
   if (!op_handlers[type]) {
     TRACE_INFO("Operation not implemented: %d\n", type);
-    return false;
+    return 0;
   }
 
-  if (type == OP_TICK_REPEAT) {
-    op_handlers[type](a, b, c);
-    return true;
-  }
+  if (type == OP_TICK_REPEAT)
+    return op_handlers[type](a, b, c);
 
   /*
    * Signal ops are serialised through the per-task queue.
@@ -1010,13 +864,9 @@ bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
       // directly return when task is not in the required state
       // then, the executor will send the latest state to the input generator
       TRACE_INFO("Task %d is not in the required state for operation %s", a, op_strs[type]);
-      return false;
+      return 0;
     }
   }
 
-  if (!execute_one_op(type, a, b, c))
-    return false;
-
-  last_executed_steps = 1;
-  return true;
+  return execute_one_op(type, a, b, c);
 }
