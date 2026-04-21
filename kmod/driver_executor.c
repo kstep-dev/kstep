@@ -8,24 +8,12 @@
 #include "op_handler.h"
 
 #define MAX_LINE_LENGTH 1024
-#define CHECKER_MSG_PREFIX "CHECKER,"
 struct console_parse_state {
   char line_buf[MAX_LINE_LENGTH];
   size_t line_len;
 };
 static struct file *console;
 static struct file *sock;
-
-static void kstep_write_checker_status(void) {
-  char buf[128];
-  loff_t pos = 0;
-  int len = scnprintf(buf, sizeof(buf), CHECKER_MSG_PREFIX "%d,%d,%d\n",
-                      kstep_work_conserving_broken()? 1: 0, 
-                      kstep_checker_result().cfs_util_avg_decay,
-                      kstep_checker_result().rt_util_avg_decay);
-
-  kernel_write(sock, buf, len, &pos);
-}
 
 static void parse_console_input(char *buf) {
   char *cursor;
@@ -116,7 +104,8 @@ static void run(void) {
     // Checker: whether work conserving broken after 100 ticks
     if (process_console_chunk(buf, nread, &state)) {
       kstep_tick_repeat(100);
-      kstep_write_checker_status();
+      if (kstep_work_conserving_broken())
+        pr_info("warn: work conserving violation\n");
       break;
     }
   }

@@ -747,22 +747,12 @@ bool kstep_work_conserving_broken(void) {
   return runnable_tasks > num_online_cpus() - 1 && !cpumask_empty(&idle_cpus) && eligible_runnable;
 }
 
-
-static struct checker_result cr = {0};
-
 struct checker_states {
   s64 cfs_util_avg[NR_CPUS];
   s64 rt_util_avg[NR_CPUS];
 };
 
 static struct checker_states checker_snapshot;
-
-struct checker_result kstep_checker_result(void) {
-  return (struct checker_result){
-      .cfs_util_avg_decay = cr.cfs_util_avg_decay,
-      .rt_util_avg_decay = cr.rt_util_avg_decay,
-  };
-}
 
 void kstep_check_extra_balance(int cpu, struct sched_domain *sd) {
   kstep_output_balance(cpu, sd);
@@ -852,11 +842,6 @@ static void print_state(void) {
       continue;
     print_cgroup_state(i);
   }
-
-  // for (int i = 1; i < num_online_cpus(); i++) {
-  //   struct rq *rq = cpu_rq(i);
-  //   pr_info("CPU %d: %lu, %lu, %llu, %llu, %lu\n", i, rq->cfs.avg.util_avg, rq->avg_rt.util_avg, rq->clock_task, rq->clock_pelt, rq->lost_idle_time);
-  // }
 }
 
 /*
@@ -926,18 +911,16 @@ static bool execute_one_op(enum kstep_op_type type, int a, int b, int c) {
     struct rq *rq = cpu_rq(cpu);
 
     if (cs->cfs_util_avg[cpu] - get_cfs_util_avg(rq) > 1010) {
-      cr.cfs_util_avg_decay += 1;
-      TRACE_INFO("cfs_util_avg_decay broken on cpu %d", cpu);
+      pr_info("warn: cfs_util_avg_decay violation on cpu %d\n", cpu);
     }
 
     else if (cs->rt_util_avg[cpu] - get_rt_util_avg(rq) > 1010) {
-      cr.rt_util_avg_decay += 1;
-      TRACE_INFO("rt_util_avg_decay broken on cpu %d", cpu);
+      pr_info("warn: rt_util_avg_decay violation on cpu %d\n", cpu);
     }
 
     else if (cs->rt_util_avg[cpu] + cs->cfs_util_avg[cpu] - get_cfs_util_avg(rq) - get_rt_util_avg(rq) > 1010) {
-      cr.rt_util_avg_decay += 1;
-      TRACE_INFO("total cfs & rt_util_avg_decay broken on cpu %d", cpu);
+      pr_info("warn: rt_util_avg_decay violation on cpu %d (combined cfs+rt delta)\n",
+              cpu);
     }
   }
 

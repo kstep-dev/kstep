@@ -33,16 +33,10 @@ enum kstep_op_type {
   OP_TYPE_NR,
 };
 
-struct checker_result {
-  int cfs_util_avg_decay;
-  int rt_util_avg_decay;
-};
-
 bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c);
 u8 kstep_last_executed_steps(void);
 void kstep_write_state(struct file *f, bool executed, u8 executed_steps);
 bool kstep_work_conserving_broken(void);
-struct checker_result kstep_checker_result(void);
 void kstep_check_extra_balance(int cpu, struct sched_domain *sd);
 
 #endif
