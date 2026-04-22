@@ -219,7 +219,7 @@ class FuzzWorker:
         qemu_cpus: Optional[str] = None,
         rng_seed: Optional[int] = None,
         base_dir: Optional[Path] = None,
-        io_timeout_sec: float = 120.0,
+        io_timeout_sec: float = 10.0,
     ) -> None:
         self.worker_id = worker_id
         self.task_queue = task_queue

@@ -31,12 +31,14 @@ static void kstep_check_cgroup_set_weight(int cgroup_id) {
     struct cfs_rq *cfs_rq;
     u64 old_min_vruntime, new_min_vruntime;
 
-    if (!se || se->on_rq == 0)
-      continue;
+    if (!se || se->on_rq == 0) continue;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+    if (se->on_rq && se->sched_delayed) continue;
+#endif 
 
     cfs_rq = cfs_rq_of(se);
-    if (!cfs_rq)
-      continue;
+    if (!cfs_rq) continue;
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
     KSYM_IMPORT_TYPED(update_min_vruntime_fn_t, avg_vruntime);
@@ -50,10 +52,10 @@ static void kstep_check_cgroup_set_weight(int cgroup_id) {
     new_min_vruntime = cfs_rq->min_vruntime;
 #endif
 
-    if (new_min_vruntime != old_min_vruntime) {
+    if (new_min_vruntime != old_min_vruntime)
       pr_info("warn: the parent of cgroup %s on cpu%d delayed vruntime update (%llu -> %llu)\n",
               name, cpu, old_min_vruntime, new_min_vruntime);
-    }
+    
   }
 }
 
