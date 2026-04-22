@@ -33,10 +33,9 @@ enum kstep_op_type {
   OP_TYPE_NR,
 };
 
-bool kstep_execute_op(enum kstep_op_type type, int a, int b, int c);
-u8 kstep_last_executed_steps(void);
-void kstep_write_state(struct file *f, bool executed, u8 executed_steps);
-bool kstep_work_conserving_broken(void);
+u8 kstep_execute_op(enum kstep_op_type type, int a, int b, int c);
+void kstep_write_state(struct file *f, u8 executed_steps);
+void kstep_check_work_conserve(void);
 void kstep_check_extra_balance(int cpu, struct sched_domain *sd);
 
 #endif

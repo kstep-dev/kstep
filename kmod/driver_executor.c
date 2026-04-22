@@ -41,8 +41,7 @@ static void parse_console_input(char *buf) {
   if (fields[0] < OP_TASK_CREATE || fields[0] >= OP_TYPE_NR)
     return;
 
-  bool executed = kstep_execute_op(fields[0], fields[1], fields[2], fields[3]);
-  kstep_write_state(sock, executed, kstep_last_executed_steps());
+  kstep_write_state(sock, kstep_execute_op(fields[0], fields[1], fields[2], fields[3]));
 }
 
 static bool process_console_chunk(const char *buf, ssize_t nread,
@@ -91,9 +90,9 @@ static void run(void) {
   if (IS_ERR(sock))
     panic("Failed to open /dev/ttyS3");
 
-  /* Signal to Python that the kmod is ready. The executed bit is ignored for
-   * the initial handshake, so keep it non-zero to avoid an all-zero payload. */
-  kstep_write_state(sock, true, 1);
+  /* Signal to Python that the kmod is ready. Keep the step count non-zero to
+   * avoid an all-zero payload. */
+  kstep_write_state(sock, 1);
 
   while (true) {
     char buf[256];
@@ -104,8 +103,7 @@ static void run(void) {
     // Checker: whether work conserving broken after 100 ticks
     if (process_console_chunk(buf, nread, &state)) {
       kstep_tick_repeat(100);
-      if (kstep_work_conserving_broken())
-        pr_info("warn: work conserving violation\n");
+      kstep_check_work_conserve();
       break;
     }
   }

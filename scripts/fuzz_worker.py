@@ -76,7 +76,6 @@ def _check_for_crash(log_file: Path) -> bool:
 class KmodState:
     task_states: list[dict]
     kthread_states: list[dict]
-    executed: bool
     executed_steps: int
 
 @dataclass
@@ -161,18 +160,16 @@ class FuzzWorkerSession:
                 return KmodState(
                     task_states=[],
                     kthread_states=[],
-                    executed=False,
                     executed_steps=0,
                 )
-            if len(payload) < 3:
+            if len(payload) < 2:
                 continue
 
-            executed = bool(payload[0])
-            executed_steps = payload[1] - 11
+            executed_steps = payload[0] - 11
             if executed_steps < 0:
                 continue
 
-            cursor = 2
+            cursor = 1
             task_states: list[dict] = []
             while cursor < len(payload) and payload[cursor] != 0:
                 if cursor + 1 >= len(payload):
@@ -193,7 +190,6 @@ class FuzzWorkerSession:
             return KmodState(
                 task_states=task_states,
                 kthread_states=kthread_states,
-                executed=executed,
                 executed_steps=executed_steps,
             )
 
@@ -207,8 +203,6 @@ class FuzzWorkerSession:
             raise RuntimeError("Readfail: Failed to read task states")
 
         self.gen.update_from_kmod(state.task_states, state.kthread_states)
-        if not state.executed:
-            return 0
         return state.executed_steps
 
 
