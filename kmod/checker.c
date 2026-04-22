@@ -29,10 +29,9 @@ static void kstep_check_cgroup_set_weight(int cgroup_id) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct sched_entity *se = tg->se[cpu];
     struct cfs_rq *cfs_rq;
-    u64 old_min_vruntime;
-    u64 new_min_vruntime;
+    u64 old_min_vruntime, new_min_vruntime;
 
-    if (!se)
+    if (!se || se->on_rq == 0)
       continue;
 
     cfs_rq = cfs_rq_of(se);

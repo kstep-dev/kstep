@@ -16,10 +16,8 @@ bool kstep_op_is_valid_kthread_id(int id) {
 }
 
 bool kstep_build_cgroup_name(int id, char *buf) {
-  int depth = 0;
-  int cur = id;
-  int len = 0;
-
+  int depth = 0, cur = id, len = 0;
+  
   while (cur != -1) {
     if (!kstep_op_is_valid_cgroup_id(cur) || !kstep_cgroups[cur].exists ||
         depth >= MAX_CGROUPS)
@@ -128,9 +126,7 @@ static void print_cgroup_state(int id) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
     struct sched_entity *se = tg->se[cpu];
 
-    if (!se)
-      continue;
-
+    if (!se) continue;
     len += scnprintf(eligible + len, sizeof(eligible) - len, "%scpu%d=%d",
                      len ? " " : "", cpu, kstep_eligible(se));
     if (len >= sizeof(eligible))
@@ -203,7 +199,6 @@ static u8 execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   if (executed_steps == 0) {
     if (collect_cov)
       kstep_cov_disable();
-    // panic("Operation failed: %s %d %d %d\n", op_strs[type], a, b, c);
     return 0;
   }
   if (collect_cov)
