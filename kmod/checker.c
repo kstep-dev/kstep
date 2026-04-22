@@ -10,6 +10,54 @@
   list_for_each_entry_safe(cfs_rq, pos, &rq->leaf_cfs_rq_list,            \
                            leaf_cfs_rq_list)
 
+typedef void(update_min_vruntime_fn_t)(struct cfs_rq *cfs_rq);
+
+/* Warn when a cgroup weight change leaves the parent vruntime baseline stale. */
+static void kstep_check_cgroup_set_weight(int cgroup_id) {
+  char name[MAX_CGROUP_NAME_LEN];
+  struct task_group *tg;
+
+  if (cgroup_id < 0 || cgroup_id >= MAX_CGROUPS || !kstep_cgroups[cgroup_id].exists)
+    return;
+  if (!kstep_build_cgroup_name(cgroup_id, name))
+    return;
+
+  tg = kstep_cgroups[cgroup_id].tg;
+  if (!tg)
+    return;
+
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct sched_entity *se = tg->se[cpu];
+    struct cfs_rq *cfs_rq;
+    u64 old_min_vruntime;
+    u64 new_min_vruntime;
+
+    if (!se)
+      continue;
+
+    cfs_rq = cfs_rq_of(se);
+    if (!cfs_rq)
+      continue;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+    KSYM_IMPORT_TYPED(update_min_vruntime_fn_t, avg_vruntime);
+    old_min_vruntime = cfs_rq->zero_vruntime;
+    KSYM_avg_vruntime(cfs_rq);
+    new_min_vruntime = cfs_rq->zero_vruntime;
+#else
+    KSYM_IMPORT_TYPED(update_min_vruntime_fn_t, update_min_vruntime);
+    old_min_vruntime = cfs_rq->min_vruntime;
+    KSYM_update_min_vruntime(cfs_rq);
+    new_min_vruntime = cfs_rq->min_vruntime;
+#endif
+
+    if (new_min_vruntime != old_min_vruntime) {
+      pr_info("warn: the parent of cgroup %s on cpu%d delayed vruntime update (%llu -> %llu)\n",
+              name, cpu, old_min_vruntime, new_min_vruntime);
+    }
+  }
+}
+
 /* Log a warning when runnable work could be placed on an idle CPU right now. */
 void kstep_check_work_conserve(void) {
   struct cpumask idle_cpus;
@@ -93,7 +141,11 @@ void kstep_check_before_op(struct kstep_check_state *check) {
 
 /* Update the saved baselines for legal accounting moves, then emit warnings
  * for unexpectedly large util drops caused by the op. */
-void kstep_check_after_op(struct kstep_check_state *check) {
+void kstep_check_after_op(struct kstep_check_state *check,
+                          enum kstep_op_type type, int a, int b, int c) {
+  (void)b;
+  (void)c;
+
   for (int i = 0; i < MAX_TASKS; i++) {
     struct task_struct *p = kstep_tasks[i].p;
 
@@ -124,4 +176,7 @@ void kstep_check_after_op(struct kstep_check_state *check) {
       pr_info("warn: total_util_avg violation on cpu %d\n", cpu);
     }
   }
+
+  if (type == OP_CGROUP_SET_WEIGHT)
+    kstep_check_cgroup_set_weight(a);
 }

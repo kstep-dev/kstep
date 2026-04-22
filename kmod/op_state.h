@@ -29,4 +29,6 @@ extern struct kstep_managed_kthread kstep_kthreads[KSTEP_MAX_KTHREADS];
 extern struct kstep_cgroup_state kstep_cgroups[MAX_CGROUPS];
 extern int cgroup_lineage[MAX_CGROUPS];
 
+bool kstep_build_cgroup_name(int id, char *buf);
+
 #endif

@@ -21,7 +21,7 @@ static bool is_valid_kthread_id(int id) {
   return id >= 0 && id < KSTEP_MAX_KTHREADS;
 }
 
-static bool build_cgroup_name(int id, char *buf) {
+bool kstep_build_cgroup_name(int id, char *buf) {
   int depth = 0;
   int cur = id;
   int len = 0;
@@ -470,7 +470,7 @@ static u8 op_cgroup_create(int a, int b, int c) {
   kstep_cgroups[child_id].parent_id = parent_id;
   kstep_cgroups[child_id].exists = true;
 
-  if (!build_cgroup_name(child_id, name))
+  if (!kstep_build_cgroup_name(child_id, name))
     return 0;
 
   // Only leaf cgroups can contain tasks in cgroup v2.
@@ -490,7 +490,7 @@ static u8 op_cgroup_set_cpuset(int a, int b, int c) {
 
   if (!is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
     return 0;
-  if (!build_cgroup_name(a, name))
+  if (!kstep_build_cgroup_name(a, name))
     return 0;
   if (b > c || b < 1 || c > num_online_cpus() - 1)
     return 0;
@@ -502,61 +502,18 @@ static u8 op_cgroup_set_cpuset(int a, int b, int c) {
   return 1;
 }
 
-typedef void(update_min_vruntime_fn_t)(struct cfs_rq *cfs_rq);
-
 static u8 op_cgroup_set_weight(int a, int b, int c) {
   char name[MAX_CGROUP_NAME_LEN];
-  int cpu;
-  struct task_group *tg;
   (void)c;
-  
-
 
   if (!is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
     return 0;
-  if (!build_cgroup_name(a, name))
+  if (!kstep_build_cgroup_name(a, name))
     return 0;
   if (b <= 0 || b > 10000)
     return 0;
 
   kstep_cgroup_set_weight(name, b);
-
-  // check whether the min_vruntime has been updated in time
-  tg = kstep_cgroups[a].tg;
-  if (!tg)
-    return 0;
-
-  for (cpu = 1; cpu < num_online_cpus(); cpu++) {
-    struct sched_entity *se = tg->se[cpu];
-    struct cfs_rq *cfs_rq;
-    u64 old_min_vruntime;
-    u64 new_min_vruntime;
-
-    if (!se)
-      continue;
-
-    cfs_rq = cfs_rq_of(se);
-    if (!cfs_rq)
-      continue;
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
-    KSYM_IMPORT_TYPED(update_min_vruntime_fn_t, avg_vruntime);
-    old_min_vruntime = cfs_rq->zero_vruntime;
-    KSYM_avg_vruntime(cfs_rq);
-    new_min_vruntime = cfs_rq->zero_vruntime;
-#else
-    KSYM_IMPORT_TYPED(update_min_vruntime_fn_t, update_min_vruntime);
-    old_min_vruntime = cfs_rq->min_vruntime;
-    KSYM_update_min_vruntime(cfs_rq);
-    new_min_vruntime = cfs_rq->min_vruntime;
-#endif
-
-    if (new_min_vruntime != old_min_vruntime) {
-      pr_info("warn: the parent of cgroup %s on cpu%d delayed vruntime update (%llu -> %llu)\n",
-              name, cpu, old_min_vruntime, new_min_vruntime);
-    }
-  }
-
   return 1;
 }
 
@@ -566,7 +523,7 @@ static u8 op_cgroup_add_task(int a, int b, int c) {
 
   if (!is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
     return 0;
-  if (!build_cgroup_name(a, name))
+  if (!kstep_build_cgroup_name(a, name))
     return 0;
   if (!is_valid_task_id(b) || !kstep_tasks[b].p)
     return 0;
@@ -589,7 +546,7 @@ static u8 op_cgroup_destroy(int a, int b, int c) {
     return 0;
   if (!cgroup_is_leaf(a))
     return 0;
-  if (!build_cgroup_name(a, name))
+  if (!kstep_build_cgroup_name(a, name))
     return 0;
 
   cgroup_move_tasks_to_root(a);
@@ -693,7 +650,7 @@ static void print_cgroup_state(int id) {
   int len = 0;
   struct task_group *tg = kstep_cgroups[id].tg;
 
-  if (!build_cgroup_name(id, name))
+  if (!kstep_build_cgroup_name(id, name))
     return;
 
   if (!tg) {
@@ -784,7 +741,7 @@ static u8 execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
   print_state();
-  kstep_check_after_op(&check_state);
+  kstep_check_after_op(&check_state, type, a, b, c);
 
   return executed_steps;
 }
