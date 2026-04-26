@@ -65,8 +65,8 @@ def main(driver: str):
     else:
         type = "avg_util"
         ylabel = "Average Utilization"
-    buggy_df = parse_jsonl(RESULTS_DIR / f"{driver}_buggy.jsonl", type)
-    fixed_df = parse_jsonl(RESULTS_DIR / f"{driver}_fixed.jsonl", type)
+    buggy_df = parse_jsonl(RESULTS_DIR / f"repro_{driver}" / "buggy.jsonl", type)
+    fixed_df = parse_jsonl(RESULTS_DIR / f"repro_{driver}" / "fixed.jsonl", type)
 
     fig = plot_util(buggy_df, fixed_df, ylabel)
     save_fig(fig, driver)

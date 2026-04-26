@@ -107,13 +107,16 @@ def reproduce(linux: Linux, driver: Driver, skip_build: bool):
     if not skip_build:
         make_linux(linux_name=linux_name)
     make_kstep(linux_name=linux_name)
-    log_file = RESULTS_DIR / f"{linux_name}.log"
+    log_file = RESULTS_DIR / f"repro_{driver.name}" / f"{linux.name}.log"
     run_qemu(linux_name=linux_name, driver=driver, log_file=log_file)
     print_run_results(linux_name=linux_name)
 
 
 def main(bug: Bug, run: List[str], skip_build: bool):
     linux_map = {linux.name: linux for linux in bug.linux}
+    result_dir = RESULTS_DIR / f"repro_{bug.driver.name}" 
+    result_dir.mkdir(exist_ok=True)
+
     for r in [r for r in run if r != "plot"]:
         linux = linux_map.get(r, Linux(name=r, version=r))
         reproduce(linux, bug.driver, skip_build)

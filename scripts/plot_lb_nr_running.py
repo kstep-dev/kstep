@@ -106,8 +106,8 @@ def plot_legend(fig, driver, cmap):
 
 
 def main(driver: str):
-    out_file_buggy = RESULTS_DIR / f"{driver}_buggy.jsonl"
-    out_file_fixed = RESULTS_DIR / f"{driver}_fixed.jsonl"
+    out_file_buggy = RESULTS_DIR / f"repro_{driver}" / "buggy.jsonl"
+    out_file_fixed = RESULTS_DIR / f"repro_{driver}" / "fixed.jsonl"
 
     nr_running_buggy = parse_nr_running(out_file_buggy)
     nr_running_fixed = parse_nr_running(out_file_fixed)

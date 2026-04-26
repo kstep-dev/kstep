@@ -56,8 +56,8 @@ def plot_min_vruntime(buggy_df, fixed_df):
 
 
 def main(driver: str):
-    buggy_df = parse_jsonl(RESULTS_DIR / f"{driver}_buggy.jsonl", "min_vruntime")
-    fixed_df = parse_jsonl(RESULTS_DIR / f"{driver}_fixed.jsonl", "min_vruntime")
+    buggy_df = parse_jsonl(RESULTS_DIR / f"repro_{driver}" / "buggy.jsonl", "min_vruntime")
+    fixed_df = parse_jsonl(RESULTS_DIR / f"repro_{driver}" / "fixed.jsonl", "min_vruntime")
 
     fig = plot_min_vruntime(buggy_df, fixed_df)
     save_fig(fig, driver)
