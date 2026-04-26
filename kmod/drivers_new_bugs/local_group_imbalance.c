@@ -21,12 +21,12 @@ static void run(void) {
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     kstep_task_wakeup(tasks[i]);
 
-  kstep_tick_repeat(100);
+  kstep_tick_repeat(10);
 
   for (int i = 3; i < 6; i++)
     kstep_task_pin(tasks[i], 1, 4);
 
-  kstep_tick_repeat(1000);
+  kstep_tick_repeat(400);
   
 }
 
@@ -35,5 +35,6 @@ KSTEP_DRIVER_DEFINE{
     .setup = setup,
     .run = run,
     .on_tick_end = kstep_output_nr_running,
+    .on_sched_balance_selected = kstep_output_balance,
     .step_interval_us = 10000,
 };
