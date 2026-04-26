@@ -45,8 +45,8 @@ def plot_rebalance_comparison(buggy_df, fixed_df):
 
 def main(driver: str):
     target_cpu = 2
-    buggy_df = parse_log_file(RESULTS_DIR / f"{driver}_buggy.jsonl", target_cpu)
-    fixed_df = parse_log_file(RESULTS_DIR / f"{driver}_fixed.jsonl", target_cpu)
+    buggy_df = parse_log_file(RESULTS_DIR / f"repro_{driver}" / "buggy.jsonl", target_cpu)
+    fixed_df = parse_log_file(RESULTS_DIR / f"repro_{driver}" / "fixed.jsonl", target_cpu)
 
     fig = plot_rebalance_comparison(buggy_df, fixed_df)
     save_fig(fig, driver)

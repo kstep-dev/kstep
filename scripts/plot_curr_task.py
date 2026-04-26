@@ -174,8 +174,8 @@ def main(driver: str):
         title_fixed = "Fixed"
 
     fig = plot_curr_task(
-        log_file_buggy=RESULTS_DIR / f"{driver}_buggy.log",
-        log_file_fixed=RESULTS_DIR / f"{driver}_fixed.log",
+        log_file_buggy=RESULTS_DIR / f"repro_{driver}" / "buggy.log",
+        log_file_fixed=RESULTS_DIR / f"repro_{driver}" / "fixed.log",
         title_buggy=title_buggy,
         title_fixed=title_fixed,
         color_map=COLOR_MAPS.get(driver, {}),

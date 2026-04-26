@@ -6,7 +6,7 @@ from matplotlib.figure import Figure
 
 def save_fig(fig: Figure, name: Path | str) -> list[Path]:
     path = Path(name) if isinstance(name, str) else name
-    path = path if path.is_absolute() else RESULTS_DIR / path
+    path = path if path.is_absolute() else RESULTS_DIR / f"repro_{path}" / "plot"
     paths = [path.with_suffix(f".{ext}") for ext in ["pdf", "png"]]
 
     fig.tight_layout(pad=0)
