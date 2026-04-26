@@ -1,7 +1,5 @@
 // Replay driver for data/fuzz/crashes/work conserving/work conserving_20260325_201209_w0
 #include "driver.h"
-#include "linux/array_size.h"
-#include "linux/sched.h"
 
 static struct task_struct *tasks[6];
 static void setup(void) {
