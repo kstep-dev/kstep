@@ -1,16 +1,32 @@
-From 92a7dde5254c7dee18c215b16dfd9bb82ab179a7 Mon Sep 17 00:00:00 2001
+From a6393f8be27d2b53aa68d3dfb825150bf7fe07a0 Mon Sep 17 00:00:00 2001
 From: Tingjia-0v0 <tjcao980311@gmail.com>
-Date: Wed, 25 Mar 2026 22:46:53 -0500
-Subject: [PATCH] fix_local_group_imbalanced
+Date: Sat, 25 Apr 2026 19:08:27 -0500
+Subject: [PATCH] local_imbalance
 
 ---
- kernel/sched/fair.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ kernel/sched/fair.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index bf948db905ed..7db2ae27a9d4 100644
+index bf948db905ed..81f9d70ec666 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
+@@ -10298,12 +10298,12 @@ group_type group_classify(unsigned int imbalance_pct,
+ 			  struct sched_group *group,
+ 			  struct sg_lb_stats *sgs)
+ {
+-	if (group_is_overloaded(imbalance_pct, sgs))
+-		return group_overloaded;
+-
+ 	if (sg_imbalanced(group))
+ 		return group_imbalanced;
+ 
++	if (group_is_overloaded(imbalance_pct, sgs))
++		return group_overloaded;
++
+ 	if (sgs->group_asym_packing)
+ 		return group_asym_packing;
+ 
 @@ -11260,6 +11260,12 @@ static inline void calculate_imbalance(struct lb_env *env, struct sd_lb_stats *s
  		return;
  	}
