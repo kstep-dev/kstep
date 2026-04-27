@@ -116,14 +116,31 @@ u8 kstep_op_task_pause(int a, int b, int c) {
 }
 
 u8 kstep_op_task_wakeup(int a, int b, int c) {
+  struct task_struct *p;
+
+  (void)b;
+  (void)c;
+
+  if (!kstep_op_is_valid_task_id(a) || !kstep_tasks[a].p)
+    return 0;
+  p = kstep_tasks[a].p;
+  if (p->__state == TASK_RUNNING)
+    panic("Task %d is already on CPU when waking up", a);
+  if (READ_ONCE(p->__state) & TASK_FROZEN)
+    kstep_thaw_task(p);
+  kstep_task_wakeup(p);
+  return 1;
+}
+
+u8 kstep_op_task_freeze(int a, int b, int c) {
   (void)b;
   (void)c;
 
   if (!kstep_op_is_valid_task_id(a) || !kstep_tasks[a].p)
     return 0;
   if (kstep_tasks[a].p->__state == TASK_RUNNING)
-    panic("Task %d is already on CPU when waking up", a);
-  kstep_task_wakeup(kstep_tasks[a].p);
+    panic("Task %d is running when freezing", a);
+  kstep_freeze_task(kstep_tasks[a].p);
   return 1;
 }
 

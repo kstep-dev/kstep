@@ -90,6 +90,7 @@ void kstep_cgroup_set_cpuset(const char *name, const char *cpuset);
 void kstep_cgroup_set_weight(const char *name, int weight);
 void kstep_cgroup_add_task(const char *name, int pid);
 void kstep_freeze_task(struct task_struct *p);
+void kstep_thaw_task(struct task_struct *p);
 int kstep_eligible(struct sched_entity *se);
 
 // kthread.c

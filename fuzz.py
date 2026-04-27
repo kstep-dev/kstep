@@ -104,6 +104,12 @@ def main() -> None:
         help="Enable KTHREAD_* fuzz ops; when disabled their weights are 0",
     )
     parser.add_argument(
+        "--task_freeze",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Enable TASK_FREEZE fuzz ops; when disabled its weight is 0",
+    )
+    parser.add_argument(
         "--ci_mode",
         action="store_true",
         help="Run a bounded CI smoke test: exactly 3 executions in fresh, replay, then mutate mode",
@@ -140,6 +146,7 @@ def main() -> None:
         f"ci_mode={args.ci_mode}  "
         f"cross_scheduler={args.cross_scheduler}  "
         f"kthreads={args.kthreads}  "
+        f"task_freeze={args.task_freeze}  "
         f"fresh_ratio={args.fresh_ratio}  mutate_ratio={args.mutate_ratio}  "
         f"special_mutate_ratio={args.special_mutate_ratio}  "
         f"pivot_rarity_alpha={args.pivot_rarity_alpha}"
@@ -155,6 +162,7 @@ def main() -> None:
         pivot_rarity_alpha=args.pivot_rarity_alpha,
         cross_scheduler=args.cross_scheduler,
         enable_kthreads=args.kthreads,
+        enable_task_freeze=args.task_freeze,
         pin_cpus=args.pin_cpus,
         ci_mode=args.ci_mode,
     )

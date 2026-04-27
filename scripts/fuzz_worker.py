@@ -216,6 +216,7 @@ class FuzzWorker:
         linux_name: str,
         cross_scheduler: bool = False,
         enable_kthreads: bool = False,
+        enable_task_freeze: bool = True,
         qemu_cpus: Optional[str] = None,
         rng_seed: Optional[int] = None,
         base_dir: Optional[Path] = None,
@@ -228,6 +229,7 @@ class FuzzWorker:
         self.linux_name = linux_name
         self.cross_scheduler = cross_scheduler
         self.enable_kthreads = enable_kthreads
+        self.enable_task_freeze = enable_task_freeze
         self.qemu_cpus = qemu_cpus
         self.io_timeout_sec = io_timeout_sec
         self.paths = (
@@ -282,6 +284,7 @@ class FuzzWorker:
             gen_seed,
             cross_scheduler=self.cross_scheduler,
             enable_kthreads=self.enable_kthreads,
+            enable_task_freeze=self.enable_task_freeze,
         )
 
         session = FuzzWorkerSession(gen, proc, self.paths.sock_file, self.logger, self.io_timeout_sec)
@@ -519,6 +522,7 @@ def worker_main(
     linux_name: str,
     cross_scheduler: bool = False,
     enable_kthreads: bool = False,
+    enable_task_freeze: bool = True,
     qemu_cpus: Optional[str] = None,
 ) -> None:
     worker = FuzzWorker(
@@ -529,6 +533,7 @@ def worker_main(
         linux_name=linux_name,
         cross_scheduler=cross_scheduler,
         enable_kthreads=enable_kthreads,
+        enable_task_freeze=enable_task_freeze,
         qemu_cpus=qemu_cpus,
     )
     worker.run()

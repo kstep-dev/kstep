@@ -23,6 +23,7 @@ u8 kstep_op_task_fifo(int a, int b, int c);
 u8 kstep_op_task_cfs(int a, int b, int c);
 u8 kstep_op_task_pause(int a, int b, int c);
 u8 kstep_op_task_wakeup(int a, int b, int c);
+u8 kstep_op_task_freeze(int a, int b, int c);
 u8 kstep_op_task_set_prio(int a, int b, int c);
 
 u8 kstep_op_tick(int a, int b, int c);

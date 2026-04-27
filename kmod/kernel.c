@@ -327,6 +327,11 @@ void kstep_cgroup_add_task(const char *name, int pid) {
 }
 
 void kstep_freeze_task(struct task_struct *p) {
+  if (READ_ONCE(p->__state) & TASK_FROZEN) {
+    TRACE_INFO("Task %d already frozen", p->pid);
+    return;
+  }
+
 // https://github.com/torvalds/linux/commit/f5d39b020809146cc28e6e73369bf8065e0310aa
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
   static_branch_inc(&freezer_active);
@@ -348,6 +353,13 @@ void kstep_freeze_task(struct task_struct *p) {
 #else
   atomic_dec(&system_freezing_cnt);
 #endif
+}
+
+void kstep_thaw_task(struct task_struct *p) {
+  KSYM_IMPORT(__thaw_task);
+
+  TRACE_INFO("Thawing task %d", p->pid);
+  KSYM___thaw_task(p);
 }
 
 int kstep_eligible(struct sched_entity *se) {
