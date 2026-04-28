@@ -25,10 +25,14 @@ static void kstep_check_task_freeze(int task_id) {
     return;
 
   state = READ_ONCE(p->__state);
-  if (state != TASK_FROZEN) {
-    pr_info("warn: TASK_FREEZE left task %d pid=%d in state=0x%x expected=0x%x\n",
-            task_id, p->pid, state, TASK_FROZEN);
-  }
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
+  if (READ_ONCE(p->__state) & TASK_FROZEN)
+# else
+  if (READ_ONCE(p->flags) & PF_FROZEN)
+# endif
+    pr_info("warn: TASK_FREEZE left task %d pid=%d in state=0x%x\n",
+            task_id, p->pid, state);
+  
 }
 
 /* Warn when a cgroup weight change leaves the parent vruntime baseline stale. */

@@ -126,7 +126,11 @@ u8 kstep_op_task_wakeup(int a, int b, int c) {
   p = kstep_tasks[a].p;
   if (p->__state == TASK_RUNNING)
     panic("Task %d is already on CPU when waking up", a);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
   if (READ_ONCE(p->__state) & TASK_FROZEN)
+# else
+  if (READ_ONCE(p->flags) & PF_FROZEN)
+# endif
     kstep_thaw_task(p);
   kstep_task_wakeup(p);
   return 1;

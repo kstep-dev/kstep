@@ -327,7 +327,11 @@ void kstep_cgroup_add_task(const char *name, int pid) {
 }
 
 void kstep_freeze_task(struct task_struct *p) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
   if (READ_ONCE(p->__state) & TASK_FROZEN) {
+# else
+  if (READ_ONCE(p->flags) & PF_FROZEN) {
+# endif
     TRACE_INFO("Task %d already frozen", p->pid);
     return;
   }
