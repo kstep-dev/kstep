@@ -56,12 +56,12 @@ class Bug:
 # fmt: off
 BUGS = [
     Bug("sync_wakeup", version="v6.14", patch="sync_wakeup.patch", num_cpus=3, plot_format="curr_task"),
-    Bug("freeze", fix="cd9626e9ebc77edec33023fe95dab4b04ffc819d", plot_format="curr_task"),
     Bug("vruntime_overflow", fix="bbce3de72be56e4b5f68924b7da9630cc89aa1a8", plot_format="curr_task"),
-    Bug("long_balance", fix="2feab2492deb2f14f9675dd6388e9e2bf669c27a", num_cpus=3, mem_mb=4096, plot_format="rebalance"),
-    Bug("util_avg", fix="17e3e88ed0b6318fde0d1c14df1a804711cab1b5", plot_format="val"),
-    Bug("lag_vruntime", fix="5068d84054b766efe7c6202fc71b2350d1c326f1", plot_format="min_vruntime"),
+    Bug("freeze", fix="cd9626e9ebc77edec33023fe95dab4b04ffc819d", plot_format="curr_task"),
     Bug("extra_balance", fix="6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3", num_cpus=5, plot_format="lb_nr_running"),
+    Bug("util_avg", fix="17e3e88ed0b6318fde0d1c14df1a804711cab1b5", plot_format="val"),
+    Bug("long_balance", fix="2feab2492deb2f14f9675dd6388e9e2bf669c27a", num_cpus=3, mem_mb=4096, plot_format="rebalance"),
+    Bug("lag_vruntime", fix="5068d84054b766efe7c6202fc71b2350d1c326f1", plot_format="min_vruntime"),
     Bug("rt_runtime_toggle", fix="9b58e976b3b391c0cf02e038d53dd0478ed3013c", plot_format="curr_task"),
     Bug("uclamp_inversion", fix="0213b7083e81f4acd69db32cb72eb4e5f220329a", plot_format="val"),
     Bug("h_nr_runnable", fix="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734", plot_format="val"),
@@ -134,7 +134,7 @@ if __name__ == "__main__":
         "name",
         type=str,
         default="all",
-        choices=["all", *[bug.driver.name for bug in BUGS + BUGS_EXTRA]],
+        choices=["all", "ae", *[bug.driver.name for bug in BUGS + BUGS_EXTRA]],
         help="The name of the bug to reproduce, or 'all' to reproduce all BUGS.",
     )
     parser.add_argument(
@@ -153,6 +153,10 @@ if __name__ == "__main__":
 
     if args.name == "all":
         for bug in BUGS:
+            main(bug=bug, run=args.run, skip_build=args.skip_build)
+    elif args.name == "ae":
+        AE_BUGS = BUGS[: 7] + BUGS_EXTRA[: 1]
+        for bug in AE_BUGS:
             main(bug=bug, run=args.run, skip_build=args.skip_build)
     else:
         bug = next((bug for bug in BUGS + BUGS_EXTRA if bug.driver.name == args.name), None)

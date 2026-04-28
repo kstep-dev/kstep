@@ -7,7 +7,7 @@ This repository contains the source code for
 
 The instructions will reproduce the key results in Figure 14 (reproduced bugs by kSTEP) and Figure 15 (a new bug found by kSTEP).
 
-The entire artifact evaluation process can take ~30 minutes.
+The entire artifact evaluation process can take around 30 minutes.
 
 ## Environment
 
@@ -16,7 +16,7 @@ We reserved three servers ([c220g5](https://docs.cloudlab.us/hardware.html#(part
 Inside each server, you can access the kSTEP repo with
 
 ```bash
-cd ~/project/kSTEP
+cd ~/project/kstep
 ```
 
 ## Evaluation instructions
@@ -26,10 +26,16 @@ cd ~/project/kSTEP
 ```
 ### Install Python packages
 ```bash
+source $HOME/.local/bin/env
 uv sync
 source .venv/bin/activate
 ```
 ### Reproduce Figure 14 (reproduced bugs by kSTEP) 
+```bash
+# Figure 14.1-14.7
+./reproduce.py ae
+```
+You can also reproduce bugs one by one
 ```bash
 # Figure 14.1
 ./reproduce.py sync_wakeup
@@ -40,26 +46,26 @@ source .venv/bin/activate
 # Figure 14.4
 ./reproduce.py extra_balance
 # Figure 14.5 
-./reproduce.py driver_util_avg
+./reproduce.py util_avg
 # Figure 14.6 
 ./reproduce.py long_balance
 # Figure 14.7
 ./reproduce.py lag_vruntime
 ```
-The results are saved at ``~/project/kSTEP/results/repro_*/plot.pdf``. You can download the plots to review them.
+The results are saved at ``~/project/kstep/results/repro_*/plot.pdf``. You can download the plots to review them.
 
 ```bash
-scp -r 'Tingjia@{ServerIP}:~/project/kSTEP/results/repro_*/' /LOCAL/DIR
+scp -r 'Tingjia@{ServerIP}:~/project/kstep/results/repro_*/' /LOCAL/DIR
 ```
 
-Note: each command may take a while to finish because it checks out and compiles both the buggy and fixed versions of the Linux source code.
+Note: each command checks out and compiles both the buggy and fixed versions of the Linux source code; then it runs the driver program on buggy and fixed versions. 
 
 ### Reproduce Figure 15 (a new bug found by kSTEP)
 ```bash
 # Figure 15.2
 ./reproduce.py even_idle_cpu
 ```
-Similarly, the result is saved at ``~/project/kSTEP/results/repro_even_idle_cpu/plot.pdf``.
+Similarly, the result is saved at ``~/project/kstep/results/repro_even_idle_cpu/plot.pdf``.
 
 ## Directory Structure
 
@@ -69,5 +75,11 @@ Similarly, the result is saved at ``~/project/kSTEP/results/repro_even_idle_cpu/
   - `internal.h` and other `*.c` files: Framework primitives and utilities
 
 - **user/**: Minimal userspace (`init.c`) that mounts filesystems and loads `kstep.ko`
+
+- **linux/**: Git worktrees of Linux source
+  - `linux/{bug_name}_buggy/fixed`: the buggy and fixed versions to reproduce each bug
+  - `linux/master`: Main clone of Linux kernel
+  - `linux/current`: Symlink to active kernel version
+  - `linux/*.patch`: Fixes for specific bugs
 
 - **scripts/**: Python utilities for parsing logs and plotting results
