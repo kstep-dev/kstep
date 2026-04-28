@@ -46,7 +46,11 @@ source .venv/bin/activate
 # Figure 14.7
 ./reproduce.py lag_vruntime
 ```
-The results are saved at ``~/project/kSTEP/results/repro_{bug_name}/plot.pdf``. You can download the plots to review them.
+The results are saved at ``~/project/kSTEP/results/repro_*/plot.pdf``. You can download the plots to review them.
+
+```bash
+scp -r 'Tingjia@{ServerIP}:~/project/kSTEP/results/repro_*/' /LOCAL/DIR
+```
 
 Note: each command may take a while to finish because it checks out and compiles both the buggy and fixed versions of the Linux source code.
 
