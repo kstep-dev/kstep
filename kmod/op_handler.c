@@ -63,6 +63,7 @@ static op_handler_fn op_handlers[OP_TYPE_NR] = {
     [OP_KTHREAD_YIELD] = kstep_op_kthread_yield,
     [OP_KTHREAD_BLOCK] = kstep_op_kthread_block,
     [OP_KTHREAD_SYNCWAKE] = kstep_op_kthread_syncwake,
+    [OP_TASK_FREEZE] = kstep_op_task_freeze,
 };
 
 static const char op_strs[OP_TYPE_NR][30] = {
@@ -90,12 +91,13 @@ static const char op_strs[OP_TYPE_NR][30] = {
   [OP_KTHREAD_YIELD] = "KTHREAD_YIELD",
   [OP_KTHREAD_BLOCK] = "KTHREAD_BLOCK",
   [OP_KTHREAD_SYNCWAKE] = "KTHREAD_SYNCWAKE",
+  [OP_TASK_FREEZE] = "TASK_FREEZE",
 };
 
 
 /* Returns true if task p is in the state required to receive op type. */
 static bool op_task_state_ready(enum kstep_op_type type, struct task_struct *p) {
-  if (type == OP_TASK_WAKEUP)
+  if (type == OP_TASK_WAKEUP || type == OP_TASK_FREEZE)
     return p->__state != TASK_RUNNING; /* task must be blocked/dequeued */
   return kstep_op_task_running(p);     /* all other signal ops need on-cpu */
 }
@@ -104,7 +106,7 @@ static bool is_task_signal_op(enum kstep_op_type type) {
   switch (type) {
   case OP_TASK_FORK: case OP_TASK_PIN:  case OP_TASK_FIFO:
   case OP_TASK_CFS:  case OP_TASK_PAUSE: case OP_TASK_WAKEUP:
-  case OP_TASK_SET_PRIO: return true;
+  case OP_TASK_SET_PRIO: case OP_TASK_FREEZE: return true;
   default: return false;
   }
 }

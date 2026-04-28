@@ -39,6 +39,7 @@ OP_NAME_TO_TYPE = {
     "KTHREAD_YIELD": 21,
     "KTHREAD_BLOCK": 22,
     "KTHREAD_SYNCWAKE": 23,
+    "TASK_FREEZE": 24,
 }
 OP_TYPE_TO_NAME = {v: k for k, v in OP_NAME_TO_TYPE.items()}
 
@@ -100,6 +101,11 @@ def enable_on_cross_scheduler(weight: int) -> OpWeight:
 def enable_kthread_ops(weight: int) -> OpWeight:
     return lambda m: weight if m.enable_kthreads else 0
 
+
+def enable_task_freeze_ops(weight: int) -> OpWeight:
+    return lambda m: weight if m.enable_task_freeze else 0
+
+
 def op_task_create(m: GenState):
     tid = m.next_task_id()
     if tid is None:
@@ -146,6 +152,11 @@ def op_task_pause(m: GenState):
 def op_task_wakeup(m: GenState):
     tid = m.choose_task_in_state(TASK_SLEEPING)
     return (OP_NAME_TO_TYPE["TASK_WAKEUP"], tid, 0, 0)
+
+
+def op_task_freeze(m: GenState):
+    tid = m.choose_task_in_state(TASK_SLEEPING)
+    return (OP_NAME_TO_TYPE["TASK_FREEZE"], tid, 0, 0)
 
 
 def op_task_set_prio(m: GenState):
@@ -328,6 +339,7 @@ def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op
         "TASK_CFS": enable_on_cross_scheduler(2),
         "TASK_PAUSE": 4,
         "TASK_WAKEUP": 10,
+        "TASK_FREEZE": enable_task_freeze_ops(2),
         "TASK_SET_PRIO": 3,
         "TICK": 0,
         "TICK_REPEAT": 5,
@@ -405,6 +417,14 @@ def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op
             weight=weights["TASK_WAKEUP"],
             is_applicable=lambda m: m.has_tasks_in_state(TASK_SLEEPING),
             emit=op_task_wakeup,
+            requires=[RESOURCE_TASK],
+            arg_types=[ARG_TASK, None, None],
+        ),
+        Op(
+            name="TASK_FREEZE",
+            weight=weights["TASK_FREEZE"],
+            is_applicable=lambda m: m.has_tasks_in_state(TASK_SLEEPING),
+            emit=op_task_freeze,
             requires=[RESOURCE_TASK],
             arg_types=[ARG_TASK, None, None],
         ),

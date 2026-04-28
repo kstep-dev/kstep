@@ -30,6 +30,7 @@ enum kstep_op_type {
   OP_KTHREAD_YIELD,
   OP_KTHREAD_BLOCK,
   OP_KTHREAD_SYNCWAKE,
+  OP_TASK_FREEZE,
   OP_TYPE_NR,
 };
 

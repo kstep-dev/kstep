@@ -74,6 +74,7 @@ def init_genstate(
     seed: int,
     cross_scheduler: bool = False,
     enable_kthreads: bool = False,
+    enable_task_freeze: bool = True,
 ) -> GenState:
     return GenState(
         max_tasks=max_tasks,
@@ -83,6 +84,7 @@ def init_genstate(
         rnd=random.Random(seed),
         cross_scheduler=cross_scheduler,
         enable_kthreads=enable_kthreads,
+        enable_task_freeze=enable_task_freeze,
     )
 
 def _generate_next_command(m: GenState) -> tuple[int, int, int, int]:
@@ -102,7 +104,10 @@ def _op_matches_task_state(m: GenState, op: tuple[int, int, int, int]) -> bool:
     task_state = m.task_state.get(a)
     kthread_state = m.kthread_state.get(a)
 
-    if op_type == OP_NAME_TO_TYPE["TASK_WAKEUP"]:
+    if op_type in {
+        OP_NAME_TO_TYPE["TASK_WAKEUP"],
+        OP_NAME_TO_TYPE["TASK_FREEZE"],
+    }:
         return task_state == TASK_SLEEPING
     if op_type in {
         OP_NAME_TO_TYPE["TASK_FORK"],
