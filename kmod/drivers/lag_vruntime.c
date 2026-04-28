@@ -9,17 +9,16 @@ static struct task_struct *other_task;
 static void setup(void) {
   // Create target task and add it to group g0
   target_task = kstep_task_create();
-  kstep_cgroup_create("g0");
-  kstep_cgroup_add_task("g0", target_task->pid);
-
   // Create other tasks
   other_task = kstep_task_create();
 }
 
 static void run(void) {
+  kstep_cgroup_create("g0");
+  kstep_cgroup_add_task("g0", target_task->pid);
   kstep_task_set_prio(other_task, 19);
-  kstep_task_wakeup(other_task);
 
+  kstep_task_wakeup(other_task);
   kstep_task_wakeup(target_task);
 
   kstep_tick_repeat(5);
