@@ -3,6 +3,7 @@ import subprocess
 from enum import StrEnum
 from pathlib import Path
 import json
+from typing import TextIO
 
 
 class TermColor(StrEnum):
@@ -17,9 +18,53 @@ class TermColor(StrEnum):
     RESET = "\033[0m"
 
 
+_COMMAND_LOG_PATH: Path | None = None
+
+
+def set_command_log_path(path: Path | None):
+    global _COMMAND_LOG_PATH
+    _COMMAND_LOG_PATH = path
+
+
+def get_command_log_path() -> Path | None:
+    return _COMMAND_LOG_PATH
+
+
+def append_log_line(line: str):
+    if _COMMAND_LOG_PATH is None:
+        return
+    _COMMAND_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _COMMAND_LOG_PATH.open("a", encoding="utf-8") as f:
+        f.write(line)
+        if not line.endswith("\n"):
+            f.write("\n")
+
+def _open_command_log() -> TextIO | None:
+    if _COMMAND_LOG_PATH is None:
+        return None
+    _COMMAND_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    return _COMMAND_LOG_PATH.open("a", encoding="utf-8")
+
+
 def system(cmd: str):
     logging.info(f"Running: `{TermColor.BLUE}{cmd}{TermColor.RESET}`")
-    subprocess.run(cmd, shell=True, check=True)
+
+    log_file = _open_command_log()
+    if log_file is None:
+        subprocess.run(cmd, shell=True, check=True)
+    else:
+        log_file.write(f"$ {cmd}\n")
+        log_file.flush()
+        subprocess.run(
+            cmd,
+            shell=True,
+            check=True,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+        )
+        log_file.write("\n")
+        log_file.flush()
+
 
 def download(url: str, output_path: Path):
     if output_path.exists():

@@ -1,13 +1,22 @@
 #!/usr/bin/env -S uv run --script
 
 import argparse
+import logging
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
 from checkout_linux import Linux, checkout_linux
-from run import Driver, make_kstep, make_linux, print_run_results, run_qemu
-from scripts import LINUX_ROOT_DIR, PROJ_DIR, RESULTS_DIR, system
+from run import Driver, make_kstep, make_linux, run_qemu
+from scripts import (
+    LINUX_ROOT_DIR,
+    PROJ_DIR,
+    RESULTS_DIR,
+    REPRODUCE_LOG,
+    set_command_log_path,
+    system,
+)
 
 
 @dataclass(frozen=True)
@@ -92,38 +101,89 @@ BUGS_EXTRA = [
         plot_format="val",
     )
 ]
-# fmt: on
 
+@dataclass
+class ProgressState:
+    total_bugs: int
+    run: List[str]
+    bug_name: str = ""
+    bug_index: int = 0
+    step_index: int = 0
 
-def plot_data(python_script: str, driver: str):
+    @property
+    def kernel_runs(self) -> list[str]:
+        return [name for name in self.run if name != "plot"]
+
+    @property
+    def has_plot(self) -> bool:
+        return "plot" in self.run
+
+    @property
+    def total_steps(self) -> int:
+        return len(self.kernel_runs) * 5 + int(self.has_plot)
+
+    def start_bug(self, bug_name: str):
+        self.print("-" * 80)
+        self.bug_name = bug_name
+        self.bug_index += 1
+        self.step_index = 1
+        self.print_bug_header()
+
+    def print(self, message: str):
+        print(message, flush=True)
+
+    def print_bug_header(self):
+        variants = ", ".join(self.run)
+        self.print(f"[{self.bug_index}/{self.total_bugs}] {self.bug_name}")
+        self.print(f"[{self.bug_index}/{self.total_bugs}] plan: {variants}")
+
+    def print_bug_step(self, message: str):
+        self.print(
+            f"[{self.bug_index}/{self.total_bugs}] "
+            f"{self.bug_name} [{self.step_index}/{self.total_steps}] {message}"
+        )
+        self.step_index += 1
+
+def plot_data(python_script: str, driver: str, progress: ProgressState):
+    progress.print_bug_step(f"plot results to results/repro_{driver}/plot.png")
     system(f"{PROJ_DIR}/scripts/plot_{python_script}.py {driver}")
 
 
-def reproduce(linux: Linux, driver: Driver, skip_build: bool):
+def reproduce(linux: Linux, driver: Driver, skip_build: bool, progress: ProgressState):
     linux_name = f"{driver.name}_{linux.name}"
+
+    progress.print_bug_step(f"{linux.name}: check out Linux {linux.version}")
     checkout_linux(
         linux.version, linux_name=linux_name, patch=linux.patch, tarball=True
     )
+
+    progress.print_bug_step(f"{linux.name}: compile Linux")
     if not skip_build:
         make_linux(linux_name=linux_name)
+
+    progress.print_bug_step(f"{linux.name}: build kSTEP")
     make_kstep(linux_name=linux_name)
+
+    progress.print_bug_step(f"{linux.name}: run QEMU")
     log_file = RESULTS_DIR / f"repro_{driver.name}" / f"{linux.name}.log"
-    run_qemu(linux_name=linux_name, driver=driver, log_file=log_file)
-    print_run_results(linux_name=linux_name)
+    run_qemu(linux_name=linux_name, driver=driver, log_file=log_file, quiet=True)
+    
+    progress.print_bug_step(f"{linux.name}: done, log={log_file}")
 
 
-def main(bug: Bug, run: List[str], skip_build: bool):
+def main(bug: Bug, skip_build: bool, progress: ProgressState):
     linux_map = {linux.name: linux for linux in bug.linux}
     result_dir = RESULTS_DIR / f"repro_{bug.driver.name}" 
     result_dir.mkdir(exist_ok=True)
+    progress.start_bug(bug_name=bug.driver.name)
 
-    for r in [r for r in run if r != "plot"]:
+    for r in progress.kernel_runs:
         linux = linux_map.get(r, Linux(name=r, version=r))
-        reproduce(linux, bug.driver, skip_build)
+        reproduce(linux, bug.driver, skip_build, progress)
 
-    if "plot" in run:
+    if progress.has_plot:
         if bug.plot_format:
-            plot_data(bug.plot_format, bug.driver.name)
+            plot_data(bug.plot_format, bug.driver.name, progress)
         else:
             print(f"Plot format not specified for bug '{bug.driver.name}'")
 
@@ -151,15 +211,26 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
+    logging.getLogger().setLevel(logging.WARNING)
+    REPRODUCE_LOG.write_text("", encoding="utf-8")
+    set_command_log_path(REPRODUCE_LOG)
+
     if args.name == "all":
-        for bug in BUGS:
-            main(bug=bug, run=args.run, skip_build=args.skip_build)
+        selected_bugs = BUGS
     elif args.name == "ae":
-        AE_BUGS = BUGS[: 7] + BUGS_EXTRA[: 1]
-        for bug in AE_BUGS:
-            main(bug=bug, run=args.run, skip_build=args.skip_build)
+        selected_bugs = BUGS[: 7] + BUGS_EXTRA[: 1]
     else:
         bug = next((bug for bug in BUGS + BUGS_EXTRA if bug.driver.name == args.name), None)
         if not bug:
             raise ValueError(f"Bug '{args.name}' not found.")
-        main(bug=bug, run=args.run, skip_build=args.skip_build)
+        selected_bugs = [bug]
+
+    total_bugs = len(selected_bugs)
+    progress = ProgressState(total_bugs=total_bugs, run=args.run)
+    print(f"running {total_bugs} bug(s); detailed logs: {REPRODUCE_LOG}")
+    for bug in selected_bugs:
+        main(
+            bug=bug,
+            skip_build=args.skip_build,
+            progress=progress,
+        )

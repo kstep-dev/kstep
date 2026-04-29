@@ -22,6 +22,8 @@ LATEST_OUTPUT = DATA_DIR / "latest.jsonl"
 LATEST_COV = DATA_DIR / "latest.cov"
 LATEST_COV_JSON = DATA_DIR / "latest.cov.json"
 
+REPRODUCE_LOG = DATA_DIR / "reproduce.log"
+
 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 FUZZ_DIR = DATA_DIR / f"fuzz_{ts}"
 FUZZ_SUCCESS_DIR = FUZZ_DIR / "success"
