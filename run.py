@@ -172,8 +172,9 @@ def run_qemu(
     log_file: Optional[Path] = None,
     sock_file: Optional[Path] = None,
     debug: bool = False,
+    quiet: bool = False,
 ):
-    proc = start_qemu(driver, linux_name, log_file, sock_file, debug)
+    proc = start_qemu(driver, linux_name, log_file, sock_file, debug, quiet)
     proc.wait()
 
 def print_run_results(

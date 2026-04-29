@@ -12,6 +12,7 @@
 /data/logs/*
 !/data/logs/README.md
 /data/latest.*
+/data/reproduce.*
 /data/rootfs/*.cpio
 /data/qemu
 /data/fuzz*/*
