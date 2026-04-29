@@ -17,7 +17,7 @@ In [AE.md](AE.md), we provide instructions for accessing our reserved machines a
 #### 📦 Clone the repository
 
 ```sh
-git clone --recursive https://github.com/kstep-dev/kSTEP
+git clone --recursive https://github.com/kstep-dev/kstep
 ```
 
 #### 💾 Install dependencies
