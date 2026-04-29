@@ -23,12 +23,7 @@ cd ~/project/kstep
 ### Install dependencies
 ```bash
 ./install_deps.sh
-```
-### Install Python packages
-```bash
 source $HOME/.local/bin/env
-uv sync
-source .venv/bin/activate
 ```
 ### Reproduce Figure 14 (reproduced bugs by kSTEP) 
 ```bash
