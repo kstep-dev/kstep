@@ -52,7 +52,7 @@ You can also reproduce bugs one by one
 # Figure 14.7
 ./reproduce.py lag_vruntime
 ```
-The results are saved at ``~/project/kstep/results/repro_*/plot.pdf``. You can download the plots to review them.
+The results are saved at ``~/project/kstep/results/repro_*/plot.pdf``. You can download the plots to review them. Run the following command on your local PC:
 
 ```bash
 scp -r 'Tingjia@{ServerIP}:~/project/kstep/results/repro_*/' /LOCAL/DIR
