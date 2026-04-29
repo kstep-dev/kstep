@@ -9,8 +9,8 @@
 kSTEP is a framework for reproducing and testing Linux kernel scheduler bugs.
 
 > [!IMPORTANT]
-> **OSDI'26 AE reviewers:** start with [AE.md](AE.md), not the general getting-started instructions below.
-> `AE.md` contains the reviewer-specific instructions for accessing our reserved machines and reproducing the paper figures.
+> **OSDI'26 AE reviewers:** start with [AE.md](docs/AE.md), not the general getting-started instructions below.
+> `docs/AE.md` contains the reviewer-specific instructions for accessing our reserved machines and reproducing the paper figures.
 
 ## 🚀 Getting Started
 
