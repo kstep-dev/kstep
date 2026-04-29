@@ -11,7 +11,7 @@ The entire artifact evaluation process can take around 30 minutes.
 
 ## Environment
 
-We reserved three servers ([c220g5](https://docs.cloudlab.us/hardware.html#(part._cloudlab-wisconsin)) in Cloudlab), one for each reviewer. Please add your SSH public key to the [spreadsheet](https://docs.google.com/spreadsheets/d/1HB2LAww1IrGjMe0bNfvnsGPhwDcuICfwcPPICZBJEpE/edit?usp=sharing ) next to the IP address of the server you will use.
+We reserved three servers ([c220g5](https://docs.cloudlab.us/hardware.html#(part._cloudlab-wisconsin)) in Cloudlab with Ubuntu 24.04), one for each reviewer. Please add your SSH public key to the [spreadsheet](https://docs.google.com/spreadsheets/d/1HB2LAww1IrGjMe0bNfvnsGPhwDcuICfwcPPICZBJEpE/edit?usp=sharing ) next to the IP address of the server you will use.
 
 Inside each server, you can access the kSTEP repo with
 
