@@ -93,11 +93,11 @@ $(LINUX_DIR)/.config: $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH) $(KSTEP_EXTRA_CONF
 	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $^ && touch $@
 
 .PHONY: linux-patch
-linux-patch: $(LINUX_DIR)/kernel/cov.c
-$(LINUX_DIR)/kernel/cov.c: $(PROJ_DIR)/linux/cov.c
-	ln -sf $< $@
-	echo 'obj-y += cov.o' >> $(LINUX_DIR)/kernel/Makefile
-	echo 'ccflags-y += -fsanitize-coverage=trace-pc' >> $(LINUX_DIR)/kernel/sched/Makefile
+linux-patch: $(LINUX_DIR)/kernel/sched/cov.c
+$(LINUX_DIR)/kernel/sched/cov.c: $(PROJ_DIR)/linux/cov.c $(PROJ_DIR)/linux/Kconfig.kstep $(PROJ_DIR)/linux/Makefile.kstep
+	ln -sft $(LINUX_DIR)/kernel/sched/ $(PROJ_DIR)/linux/cov.c $(PROJ_DIR)/linux/Kconfig.kstep $(PROJ_DIR)/linux/Makefile.kstep
+	echo 'include $$(src)/Makefile.kstep' >> $(LINUX_DIR)/kernel/sched/Makefile
+	echo 'source "kernel/sched/Kconfig.kstep"' >> $(LINUX_DIR)/init/Kconfig
 
 .PHONY: linux-clean
 linux-clean:

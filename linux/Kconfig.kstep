@@ -1,0 +1,7 @@
+config KSTEP_COV
+	bool "kstep scheduler coverage instrumentation"
+	default n
+	help
+	  Build the cov.o stub and add -fsanitize-coverage=trace-pc to
+	  kernel/sched/, exposing sanitizer_cov_trace_pc for the kSTEP kmod
+	  to hook. Required for kSTEP fuzzing; safe to leave off otherwise.

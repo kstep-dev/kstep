@@ -26,8 +26,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from run import Driver, make_kstep
-from scripts.consts import FUZZ_DIR
+from run import Driver, make_kstep, make_linux
+from scripts.consts import FUZZ_DIR, LINUX_ROOT_DIR
 from scripts.fuzz_manager import run_manager
 
 
@@ -126,6 +126,7 @@ def main() -> None:
     logging.getLogger().addHandler(file_handler)
     logging.info(f"Logging to {log_path}")
 
+    make_linux(args.linux_name, config=LINUX_ROOT_DIR / "config.kstep.fuzz")
     make_kstep(args.linux_name)
 
     driver = Driver(

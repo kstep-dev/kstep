@@ -2,7 +2,6 @@
 
 import argparse
 import logging
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
@@ -159,7 +158,7 @@ def reproduce(linux: Linux, driver: Driver, skip_build: bool, progress: Progress
 
     progress.print_bug_step(f"{linux.name}: compile Linux")
     if not skip_build:
-        make_linux(linux_name=linux_name)
+        make_linux(linux_name=linux_name, config=linux.config)
 
     progress.print_bug_step(f"{linux.name}: build kSTEP")
     make_kstep(linux_name=linux_name)
