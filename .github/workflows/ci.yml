@@ -71,7 +71,7 @@ jobs:
 
       - name: Linux - Download
         if: steps.linux-cache.outputs.cache-hit != 'true'
-        run: ./checkout_linux.py ${{matrix.version}} --tarball
+        run: ./checkout.py ${{matrix.version}} --tarball
 
       - name: Linux - Install build dependencies
         if: steps.linux-cache.outputs.cache-hit != 'true'
@@ -106,20 +106,6 @@ jobs:
 
       - name: Print output
         run: cat data/latest.jsonl
-
-      - name: Print coverage
-        run: cat data/latest.cov.json
-
-      - name: Upload artifact
-        id: upload-artifact
-        uses: actions/upload-artifact@v6
-        with:
-          path: |
-            data/latest.log
-            data/latest.out
-            data/latest.cov.json
-          name: ${{matrix.version}}
-          if-no-files-found: error
 
       - name: Write job summary
         run: echo "[${{matrix.version}}](${{steps.upload-artifact.outputs.artifact-url}})" >> $GITHUB_STEP_SUMMARY

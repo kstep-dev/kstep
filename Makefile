@@ -76,7 +76,7 @@ endif
 linux: build-current linux-config linux-patch
 	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(LINUX_NAME) WERROR=0 HOSTCFLAGS=-Wno-error
 	mkdir -p $(BUILD_DIR)
-	cp $(LINUX_IMAGE) $(BUILD_DIR)/image
+	cp $(LINUX_IMAGE) $(BUILD_DIR)/kernel
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
 
 .PHONY: build-current

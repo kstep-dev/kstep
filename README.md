@@ -69,12 +69,12 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 #### 🐧 Checkout Linux source code
 
 ```sh
-./checkout_linux.py <version> [<name>] [--tarball]
+./checkout.py <version> [<name>] [--tarball]
 ```
 
 - `<version>`: Linux tag (e.g., `v6.14`) or commit hash (e.g., `6d7e478`, `5068d84~1`).
 
-- **Example:** `./checkout_linux.py v6.14 foo_buggy` checks out Linux v6.14 under `linux/foo_buggy`, and symlinks `linux/current` to it.
+- **Example:** `./checkout.py v6.14 foo_buggy` checks out Linux v6.14 under `linux/foo_buggy`, and symlinks `linux/current` to it.
 
 #### 🛠️ Build Linux and kSTEP
 ```sh

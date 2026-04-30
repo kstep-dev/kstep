@@ -73,7 +73,7 @@ def start_qemu(
         system(f"sudo chmod 666 {kvm_path}")
 
     qemu_path = get_qemu_path()
-    kernel_img = BUILD_DIR / linux_name / "image"
+    kernel_img = BUILD_DIR / linux_name / "kernel"
     rootfs_img = BUILD_DIR / linux_name / "rootfs.cpio"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
