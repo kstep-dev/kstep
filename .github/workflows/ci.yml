@@ -8,20 +8,20 @@ on:
     - cron: "0 0 * * 0" # Every week
 
 jobs:
-  qemu:
-    name: Build QEMU
+  deps:
+    name: Cache deps
     runs-on: ubuntu-latest
     outputs:
-      install_path: ${{ steps.build.outputs.install_path }}
-      key: ${{ steps.build.outputs.key }}
+      key: ${{ steps.cache.outputs.key }}
     steps:
       - uses: actions/checkout@v6
-      - id: build
-        name: Build QEMU
-        uses: ./.github/actions/build-qemu
+      - id: cache
+        uses: ./.github/actions/cache-deps
+        with:
+          packages: qemu-system-x86 libelf-dev
 
   test:
-    needs: qemu
+    needs: deps
     name: ${{ matrix.fuzz && 'Fuzz' || 'Run' }} ${{ matrix.version }}
     strategy:
       matrix:
@@ -37,6 +37,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Restore deps
+        uses: ./.github/actions/restore-deps
+        with:
+          key: ${{ needs.deps.outputs.key }}
 
       - name: Build Linux
         uses: ./.github/actions/build-linux
