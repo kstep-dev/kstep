@@ -94,7 +94,7 @@ KSTEP_EXTRA_CONFIG ?=
 .PHONY: linux-config
 linux-config: $(LINUX_DIR)/.config
 $(LINUX_DIR)/.config: $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH) $(KSTEP_EXTRA_CONFIG)
-	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $^ && touch $@
+	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $(abspath $^) && touch $@
 
 .PHONY: linux-patch
 linux-patch: $(LINUX_DIR)/kernel/sched/cov.c

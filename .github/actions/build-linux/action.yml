@@ -31,9 +31,5 @@ runs:
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        if [ "${{ inputs.cov }}" = "true" ]; then
-          make linux KSTEP_EXTRA_CONFIG=linux/config.kstep.cov
-        else
-          make linux
-        fi
+        make linux KSTEP_EXTRA_CONFIG=${{ inputs.cov == 'true' && 'linux/config.kstep.cov' || '' }}
         make linux-clean
