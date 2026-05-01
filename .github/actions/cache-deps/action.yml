@@ -1,0 +1,39 @@
+name: Cache apt dependencies
+description: Download apt packages and cache the .deb archives.
+
+inputs:
+  packages:
+    description: Space-separated apt package names
+    required: true
+
+outputs:
+  key:
+    description: Cache key (pass to restore-deps)
+    value: ${{ steps.meta.outputs.key }}
+
+runs:
+  using: composite
+  steps:
+    - id: meta
+      shell: bash
+      run: echo "key=$(echo '${{ inputs.packages }}' | tr ' ' '+')" >> $GITHUB_OUTPUT
+
+    - id: cache
+      uses: actions/cache/restore@v4
+      with:
+        path: data/debs/*.deb
+        key: ${{ steps.meta.outputs.key }}
+        lookup-only: true
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p data/debs/partial
+        sudo apt-get update
+        sudo apt-get install -y --download-only -o Dir::Cache::archives="$PWD/data/debs" ${{ inputs.packages }}
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: data/debs/*.deb
+        key: ${{ steps.meta.outputs.key }}

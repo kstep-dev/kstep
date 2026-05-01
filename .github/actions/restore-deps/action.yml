@@ -1,0 +1,19 @@
+name: Restore apt dependencies
+description: Restore cached .deb archives and install them via dpkg.
+
+inputs:
+  key:
+    description: Cache key from cache-deps
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache/restore@v4
+      with:
+        path: data/debs/*.deb
+        key: ${{ inputs.key }}
+        fail-on-cache-miss: true
+
+    - shell: bash
+      run: sudo dpkg -i --force-unsafe-io data/debs/*.deb

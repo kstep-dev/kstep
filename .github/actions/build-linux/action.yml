@@ -22,10 +22,6 @@ runs:
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      run: sudo apt update && sudo apt install -y libelf-dev
-
-    - if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
       run: ./checkout.py ${{ inputs.version }} --tarball
 
     - if: steps.cache.outputs.cache-hit != 'true'
