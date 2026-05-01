@@ -19,7 +19,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cache-deps
         with:
-          packages: qemu-system-x86 libelf-dev
+          packages: qemu-system-x86 libelf-dev musl-tools
 
   test:
     needs: deps

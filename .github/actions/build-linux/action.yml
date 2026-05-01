@@ -13,12 +13,12 @@ runs:
   using: composite
   steps:
     - id: cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           linux
           build
-        key: ${{ inputs.version }}-cov=${{ inputs.cov }}-${{ hashFiles('linux/config.kstep*', 'linux/cov.c', 'linux/*.kstep') }}
+        key: ${{ inputs.version }}${{ inputs.cov == 'true' && '-cov' || '' }}-${{ hashFiles('linux/config.kstep*', 'linux/cov.c', 'linux/*.kstep') }}
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash

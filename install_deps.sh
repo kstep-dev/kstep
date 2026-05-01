@@ -11,6 +11,7 @@ PACKAGES=(
     libncurses-dev
     libssl-dev
     libelf-dev
+    musl-tools     # musl-gcc for static user binaries
     cpio           # rootfs
     bear           # clangd completion
     qemu-kvm       # run virtual machine

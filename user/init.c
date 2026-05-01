@@ -1,12 +1,13 @@
 #define _GNU_SOURCE
 
+#include <errno.h>       // EEXIST
+#include <fcntl.h>       // open, O_RDONLY, O_RDWR, O_NOCTTY
 #include <string.h>      // strlcat
-#include <sys/errno.h>   // EEXIST
 #include <sys/mount.h>   // mount
 #include <sys/stat.h>    // mkdir
 #include <sys/syscall.h> // SYS_*
 #include <termios.h>     // termios, tcgetattr, tcsetattr
-#include <unistd.h>      // open, close, syscall
+#include <unistd.h>      // close, syscall
 
 #include "utils.h"
 

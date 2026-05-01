@@ -27,7 +27,7 @@ USER_OUT_FILES := $(USER_OUT_DIR)/init $(USER_OUT_DIR)/task
 user: build-current $(USER_OUT_FILES)
 
 $(USER_OUT_DIR)/init: $(USER_SRC_FILES) | $(USER_OUT_DIR)
-	gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ \
+	musl-gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ \
 	    $(USER_SRC_DIR)/main.c $(USER_SRC_DIR)/init.c $(USER_SRC_DIR)/task.c
 
 $(USER_OUT_DIR)/task: $(USER_OUT_DIR)/init
@@ -62,8 +62,9 @@ ROOTFS_IMG := $(BUILD_DIR)/rootfs.cpio
 kstep: build-current $(ROOTFS_IMG)
 
 $(ROOTFS_IMG): $(KMOD_OUT_FILE) $(USER_OUT_FILES)
-	cd $(KMOD_OUT_DIR) && echo kmod.ko | cpio -o --format=newc > $(ROOTFS_IMG)
-	cd $(USER_OUT_DIR) && ls | cpio -o --format=newc >> $(ROOTFS_IMG)
+	find $(KMOD_OUT_DIR) $(USER_OUT_DIR) -exec touch -d @0 {} +
+	cd $(KMOD_OUT_DIR) && echo kmod.ko | cpio -o --format=newc --reproducible > $(ROOTFS_IMG)
+	cd $(USER_OUT_DIR) && ls | cpio -o --format=newc --reproducible >> $(ROOTFS_IMG)
 
 # ========= linux =========
 
