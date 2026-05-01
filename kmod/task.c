@@ -36,12 +36,11 @@ static int task_init(struct subprocess_info *info, struct cred *new) {
 }
 
 struct task_struct *kstep_task_create(void) {
-  char *path = "task";
-  char *argv[] = {path, NULL, NULL};
+  char *argv[] = {"task", NULL};
 
   struct task_struct *p = NULL;
   struct subprocess_info *info = call_usermodehelper_setup(
-      path, argv, NULL, GFP_KERNEL, task_init, NULL, &p);
+      "/user", argv, NULL, GFP_KERNEL, task_init, NULL, &p);
   if (info == NULL)
     panic("Failed to setup user mode helper");
 

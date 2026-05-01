@@ -19,7 +19,7 @@ jobs:
         id: cache
         uses: ./.github/actions/cache-deps
         with:
-          packages: qemu-system-x86 libelf-dev
+          packages: qemu-system-x86 libelf-dev musl-tools
 
   test:
     needs: deps
@@ -51,12 +51,12 @@ jobs:
           cov: ${{ matrix.fuzz }}
 
       - name: Build kSTEP
-        run: make kstep LINUX_NAME=${{ matrix.version }}
+        run: make kstep NAME=${{ matrix.version }}
 
       - name: "[Run] Execute driver"
         if: ${{ ! matrix.fuzz }}
         timeout-minutes: 1
-        run: ./run.py --linux_name ${{ matrix.version }}
+        run: ./run.py --name ${{ matrix.version }}
 
       - name: "[Run] Show driver output"
         if: ${{ ! matrix.fuzz }}
@@ -67,7 +67,7 @@ jobs:
         timeout-minutes: 5
         run: |
           ./fuzz.py \
-            --linux_name ${{ matrix.version }} \
+            --name ${{ matrix.version }} \
             --workers 1 \
             --steps 10 \
             --ci_mode

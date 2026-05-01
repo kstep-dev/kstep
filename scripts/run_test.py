@@ -17,16 +17,16 @@ def run_test(
     steps: int,
     seed: int,
 ):
-    linux_name = linux.name
-    checkout(linux.version, linux_name=linux_name, tarball=True)
-    make_linux(linux_name=linux_name)
+    name = linux.name
+    checkout(linux.version, name=linux.name, tarball=True)
+    make_linux(name=name)
 
     driver = Driver(
         name="executor",
         num_cpus=num_cpus,
     )
 
-    make_kstep(linux_name=linux_name)
+    make_kstep(name=name)
     task_queue: "mp.Queue[WorkItem | None]" = mp.Queue()
     result_queue: "mp.Queue" = mp.Queue()
     task_queue.put(WorkItem(mode="fresh", steps=steps))
@@ -37,7 +37,7 @@ def run_test(
         task_queue = task_queue,
         result_queue = result_queue,
         driver = driver,
-        linux_name = linux_name,
+        name = name,
         rng_seed = seed,
         base_dir = LOGS_DIR
     )
@@ -60,14 +60,14 @@ def run_test(
     # Symbolize the pcs
     GLOBAL_SIGNAL_CORPUS.update_pc_symbolize(
         signal_records=signal_records,
-        linux_name=linux.name,
+        name=linux.name,
     )
 
     # Analyze the new signals for the test
     new_signal_info = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
         seq=seq,
         signal_records=signal_records,
-        linux_name=linux.name,
+        name=linux.name,
     )
 
     # Analyze the per-action signals for the test if there are new signals
@@ -77,7 +77,7 @@ def run_test(
             seq=seq,
             signal_records=signal_records,
             new_signals=new_signals,
-            linux_name=linux.name,
+            name=linux.name,
         )
     
     return

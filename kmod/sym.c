@@ -5,7 +5,7 @@
 
 #define MAX_SYM_NAME_LENGTH 64
 
-KSYM_IMPORT_RAW(struct rq, runqueues);
+KSYM_IMPORT_RAW(struct rq __percpu, runqueues);
 
 static void *get_kallsyms_lookup_name(void) {
   struct kprobe kp = {.symbol_name = "kallsyms_lookup_name"};

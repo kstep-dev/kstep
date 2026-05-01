@@ -13,19 +13,17 @@ runs:
   using: composite
   steps:
     - id: cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
-        path: |
-          linux
-          build
-        key: ${{ inputs.version }}-cov=${{ inputs.cov }}-${{ hashFiles('linux/config.kstep*', 'linux/cov.c', 'linux/*.kstep') }}
+        path: build
+        key: ${{ inputs.version }}${{ inputs.cov == 'true' && '-cov' || '' }}-${{ hashFiles('linux/config.kstep*', 'linux/cov.c', 'linux/*.kstep') }}
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      run: ./checkout.py ${{ inputs.version }} --tarball
+      run: ./checkout.py ${{ inputs.version }} --tar
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         make linux KSTEP_EXTRA_CONFIG=${{ inputs.cov == 'true' && 'linux/config.kstep.cov' || '' }}
-        make linux-clean
+        make clean-linux

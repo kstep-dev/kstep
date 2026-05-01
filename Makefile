@@ -1,71 +1,61 @@
 .DEFAULT_GOAL := kstep
 
+.PHONY: all
+all:
+	$(MAKE) linux
+	$(MAKE) kstep
+
 # ========= common =========
 
 PROJ_DIR := $(CURDIR)
 MAKEFLAGS := $(MAKEFLAGS) $(if $(findstring -j,$(MAKEFLAGS)),,-j$(shell nproc))
 BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.json --,)
 
-LINUX_NAME ?= $(notdir $(realpath $(PROJ_DIR)/linux/current))
-ifeq ($(LINUX_NAME),)
-    $(error linux/current does not exist or is a broken symlink)
+NAME ?= $(notdir $(realpath $(PROJ_DIR)/build/current))
+ifeq ($(NAME),)
+    $(error NAME is unset and build/current is missing; run ./checkout.py <version> first, or pass NAME=<version> explicitly)
 endif
-$(info ======= LINUX_NAME: $(LINUX_NAME) =======)
+$(info ======= NAME: $(NAME) =======)
 
-LINUX_DIR := $(PROJ_DIR)/linux/$(LINUX_NAME)
-BUILD_DIR := $(PROJ_DIR)/build/$(LINUX_NAME)
-BUILD_CURR_DIR := $(PROJ_DIR)/build/current
+BUILD_DIR := $(PROJ_DIR)/build/$(NAME)
 
 # ========= user =========
 
-USER_SRC_DIR := $(PROJ_DIR)/user
-USER_SRC_FILES := $(wildcard $(USER_SRC_DIR)/*)
-USER_OUT_DIR := $(BUILD_DIR)/user
-USER_OUT_FILES := $(USER_OUT_DIR)/init $(USER_OUT_DIR)/task
-
 .PHONY: user
-user: build-current $(USER_OUT_FILES)
+user: $(BUILD_DIR)/user
 
-$(USER_OUT_DIR)/init: $(USER_SRC_FILES) | $(USER_OUT_DIR)
-	gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ \
-	    $(USER_SRC_DIR)/main.c $(USER_SRC_DIR)/init.c $(USER_SRC_DIR)/task.c
-
-$(USER_OUT_DIR)/task: $(USER_OUT_DIR)/init
-	ln -f $< $@
-
-$(USER_OUT_DIR):
-	mkdir -p $@
+$(BUILD_DIR)/user: $(wildcard $(PROJ_DIR)/user/*)
+	mkdir -p $(dir $@)
+	musl-gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ \
+	    $(filter %.c, $^)
 
 # ========= kmod =========
 
 KMOD_SRC_DIR := $(PROJ_DIR)/kmod
-KMOD_SRC_FILES := $(shell find $(KMOD_SRC_DIR) -name '*.c' -o -name '*.h')
 KMOD_OUT_DIR := $(BUILD_DIR)/kmod
-KMOD_OUT_FILE := $(KMOD_OUT_DIR)/kmod.ko
 
 .PHONY: kmod
-kmod: build-current $(KMOD_OUT_FILE)
+kmod: $(KMOD_OUT_DIR)/kmod.ko
 
-$(KMOD_OUT_FILE): $(KMOD_SRC_FILES) | $(KMOD_OUT_DIR)
+$(KMOD_OUT_DIR)/kmod.ko: $(shell find $(KMOD_SRC_DIR) -type f -not -name compile_commands.json) $(BUILD_DIR)/kernel
+	mkdir -p $(dir $@)
 	find $(KMOD_OUT_DIR) -type l -delete
 	cp -rs $(KMOD_SRC_DIR)/* $(KMOD_OUT_DIR)
 	cd $(BUILD_DIR) && $(BEAR_CMD) $(MAKE) -C $(LINUX_DIR) M=$(KMOD_OUT_DIR) modules
 
-$(KMOD_OUT_DIR):
-	mkdir -p $@
-
 # ========= kstep =========
 
-ROOTFS_IMG := $(BUILD_DIR)/rootfs.cpio
-
 .PHONY: kstep
-kstep: build-current $(ROOTFS_IMG)
+kstep: $(BUILD_DIR)/rootfs.cpio
 
-$(ROOTFS_IMG): $(KMOD_OUT_FILE) $(USER_OUT_FILES)
-	cd $(KMOD_OUT_DIR) && echo kmod.ko | cpio -o --format=newc > $(ROOTFS_IMG)
-	cd $(USER_OUT_DIR) && ls | cpio -o --format=newc >> $(ROOTFS_IMG)
+$(BUILD_DIR)/rootfs.cpio: $(KMOD_OUT_DIR)/kmod.ko $(BUILD_DIR)/user
+	touch -d @0 $^
+	cd $(KMOD_OUT_DIR) && echo kmod.ko | cpio -o --format=newc --reproducible > $@
+	cd $(BUILD_DIR) && echo user | cpio -o --format=newc --reproducible >> $@
 
 # ========= linux =========
+
+LINUX_DIR := $(BUILD_DIR)/linux
 
 ARCH := $(shell uname -m)
 ifeq ($(ARCH), x86_64)
@@ -77,16 +67,13 @@ else
 endif
 
 .PHONY: linux
-linux: build-current linux-config linux-patch
-	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(LINUX_NAME) WERROR=0 HOSTCFLAGS=-Wno-error
-	mkdir -p $(BUILD_DIR)
+linux: linux-config linux-patch
+	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(NAME) WERROR=0 HOSTCFLAGS=-Wno-error
 	cp $(LINUX_IMAGE) $(BUILD_DIR)/kernel
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
 
-.PHONY: build-current
-build-current:
-	mkdir -p $(dir $(BUILD_CURR_DIR))
-	ln -sfn $(BUILD_DIR) $(BUILD_CURR_DIR)
+$(BUILD_DIR)/kernel:
+	$(MAKE) linux
 
 KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
 KSTEP_EXTRA_CONFIG ?=
@@ -103,13 +90,17 @@ $(LINUX_DIR)/kernel/sched/cov.c: $(PROJ_DIR)/linux/cov.c $(PROJ_DIR)/linux/Kconf
 	echo 'include $$(src)/Makefile.kstep' >> $(LINUX_DIR)/kernel/sched/Makefile
 	echo 'source "kernel/sched/Kconfig.kstep"' >> $(LINUX_DIR)/init/Kconfig
 
-.PHONY: linux-clean
-linux-clean:
-	cd $(LINUX_DIR) && $(MAKE) clean
-
 # ========= clean =========
 
-.PHONY: clean
-clean:
+.PHONY: clean clean-all clean-kmod clean-user clean-linux
+clean: clean-kmod clean-user
+clean-all: clean clean-linux
+
+clean-kmod:
 	rm -rf $(KMOD_OUT_DIR)
-	rm -rf $(USER_OUT_DIR)
+
+clean-user:
+	rm -f $(BUILD_DIR)/user
+
+clean-linux:
+	cd $(LINUX_DIR) && $(MAKE) clean

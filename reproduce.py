@@ -149,23 +149,23 @@ def plot_data(python_script: str, driver: str, progress: ProgressState):
 
 
 def reproduce(linux: Linux, driver: Driver, skip_build: bool, progress: ProgressState):
-    linux_name = f"{driver.name}_{linux.name}"
+    name = f"{driver.name}_{linux.name}"
 
     progress.print_bug_step(f"{linux.name}: check out Linux {linux.version}")
     checkout(
-        linux.version, linux_name=linux_name, patch=linux.patch, tarball=True
+        linux.version, name=name, patch=linux.patch, tarball=True
     )
 
     progress.print_bug_step(f"{linux.name}: compile Linux")
     if not skip_build:
-        make_linux(linux_name=linux_name, config=linux.config)
+        make_linux(name=name, config=linux.config)
 
     progress.print_bug_step(f"{linux.name}: build kSTEP")
-    make_kstep(linux_name=linux_name)
+    make_kstep(name=name)
 
     progress.print_bug_step(f"{linux.name}: run QEMU")
     log_file = RESULTS_DIR / f"repro_{driver.name}" / f"{linux.name}.log"
-    run_qemu(linux_name=linux_name, driver=driver, log_file=log_file, quiet=True)
+    run_qemu(name=name, driver=driver, log_file=log_file, quiet=True)
     
     progress.print_bug_step(f"{linux.name}: done, log={log_file}")
 

@@ -9,7 +9,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: actions/cache/restore@v4
+    - uses: actions/cache/restore@v5
       with:
         path: data/debs/*.deb
         key: ${{ inputs.key }}

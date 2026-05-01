@@ -1,8 +1,6 @@
 #define _GNU_SOURCE
 
-#include <sched.h>      // sched_setaffinity
 #include <stdio.h>      // fprintf
-#include <unistd.h>     // getpid
 #include <sys/reboot.h> // reboot
 
 #define panic(msg, ...)                                                        \

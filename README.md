@@ -69,20 +69,22 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 #### 🐧 Checkout Linux source code
 
 ```sh
-./checkout.py <version> [<name>] [--tarball]
+./checkout.py <version> [<name>] [--tar | --git]
 ```
 
 - `<version>`: Linux tag (e.g., `v6.14`) or commit hash (e.g., `6d7e478`, `5068d84~1`).
+- `--tar` (default): download tarball from kernel.org / GitHub (fast, one-shot).
+- `--git`: add a worktree from `build/master` (multi-version dev, supports `git log`/`git diff`).
 
-- **Example:** `./checkout.py v6.14 foo_buggy` checks out Linux v6.14 under `linux/foo_buggy`, and symlinks `linux/current` to it.
+- **Example:** `./checkout.py v6.14 foo_buggy` checks out Linux v6.14 under `build/foo_buggy/linux/` and points `build/current` at `build/foo_buggy/`.
 
 #### 🛠️ Build Linux and kSTEP
 ```sh
-make linux [LINUX_NAME=<name>]  # Build kernel
-make kstep [LINUX_NAME=<name>]  # Build kSTEP rootfs (default target)
+make linux [NAME=<name>]  # Build kernel
+make kstep [NAME=<name>]  # Build kSTEP rootfs (default target)
 ```
 
-- `[LINUX_NAME=<name>]`: Name of the Linux directory under `linux/`, default to what `linux/current` points to.
+- `[NAME=<name>]`: Build name (i.e., the directory under `build/`), defaults to whatever `build/current` points to.
 
 #### 🏃‍♂️ Run kSTEP
 
@@ -105,13 +107,19 @@ make kstep [LINUX_NAME=<name>]  # Build kSTEP rootfs (default target)
 
 - **user/**: Minimal userspace (`init.c`) that mounts filesystems and loads `kstep.ko`
 
-- **linux/**: Git worktrees of Linux source
-  - `linux/master`: Main clone of Linux kernel
-  - `linux/current`: Symlink to active kernel version
-  - `linux/*.patch`: Fixes for specific bugs
+- **linux/**: Project-static kernel files (committed to git)
+  - `config.kstep*`: Kconfig fragments merged into the build
+  - `cov.c`, `Kconfig.kstep`, `Makefile.kstep`: scheduler-coverage instrumentation
+  - `*.patch`: Fixes for specific bugs
 
-- **data/**: Data directory
-  - `data/rootfs`: Root filesystem images
-  - `data/logs`: QEMU log files
+- **build/**: Per-version build artifacts (gitignored, kstep-dev/build submodule)
+  - `build/<name>/linux/`: Extracted kernel source (or git worktree)
+  - `build/<name>/kmod/`: Out-of-tree kernel module build (`.o`, `.ko`)
+  - `build/<name>/user`: Statically-linked userspace init
+  - `build/<name>/kernel`, `build/<name>/rootfs.cpio`: bootable artifacts
+  - `build/master/`: Bare git clone reused across `--git` checkouts
+  - `build/current`: Symlink to the active `build/<name>/`
+
+- **data/**: Runtime/output (logs, fuzz results, latest symlinks)
 
 - **scripts/**: Python utilities for parsing logs and plotting results

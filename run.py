@@ -12,15 +12,13 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 from scripts import (
-    BUILD_DIR,
+    BUILD_CURR_DIR,
     LATEST_COV,
     LATEST_LOG,
     LATEST_OUTPUT,
-    LINUX_CURR_DIR,
-    LINUX_ROOT_DIR,
     LOGS_DIR,
     PROJ_DIR,
-    QEMU_DIR,
+    build_dir,
     system,
     update_latest,
 )
@@ -45,21 +43,15 @@ class Driver:
 
 def get_qemu_path() -> Path:
     name = f"qemu-system-{ARCH}"
-
     path = shutil.which(name)
-    if path is not None:
-        return Path(path)
-
-    path = QEMU_DIR / "install" / "bin" / name
-    if path.exists():
-        return path
-
-    raise RuntimeError(f"QEMU executable not found: {name}")
+    if path is None:
+        raise RuntimeError(f"QEMU executable not found: {name}")
+    return Path(path)
 
 
 def start_qemu(
     driver: Driver,
-    linux_name: str,
+    name: str,
     log_file: Optional[Path] = None,
     sock_file: Optional[Path] = None,
     debug: bool = False,
@@ -73,8 +65,8 @@ def start_qemu(
         system(f"sudo chmod 666 {kvm_path}")
 
     qemu_path = get_qemu_path()
-    kernel_img = BUILD_DIR / linux_name / "kernel"
-    rootfs_img = BUILD_DIR / linux_name / "rootfs.cpio"
+    kernel_img = build_dir(name) / "kernel"
+    rootfs_img = build_dir(name) / "rootfs.cpio"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_file or LOGS_DIR / f"log-{timestamp}.log"
@@ -95,7 +87,7 @@ def start_qemu(
         "irqaffinity=0",
         f"rcu_nocbs={isol_cpus}",
         f"nohz_full={isol_cpus}",
-        "init=/init",
+        "init=/user",
         "panic=-1",  # Exit immediately on panic
         "console=ttyS0",
     ]
@@ -168,17 +160,17 @@ def start_qemu(
 
 def run_qemu(
     driver: Driver,
-    linux_name: str,
+    name: str,
     log_file: Optional[Path] = None,
     sock_file: Optional[Path] = None,
     debug: bool = False,
     quiet: bool = False,
 ):
-    proc = start_qemu(driver, linux_name, log_file, sock_file, debug, quiet)
+    proc = start_qemu(driver, name, log_file, sock_file, debug, quiet)
     proc.wait()
 
 def print_run_results(
-    linux_name: str,
+    name: str,
     log_file=LATEST_LOG,
     output_file=LATEST_OUTPUT,
     cov_file=LATEST_COV,
@@ -195,7 +187,7 @@ def print_run_results(
         # Symbolize the pcs
         GLOBAL_SIGNAL_CORPUS.update_pc_symbolize(
             signal_records=signal_records,
-            linux_name=linux_name,
+            name=name,
         )
 
         # Parse the input sequence from the log file
@@ -207,7 +199,7 @@ def print_run_results(
         new_signal_info = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
             seq=seq,
             signal_records=signal_records,
-            linux_name=linux_name,
+            name=name,
             output_path=LOGS_DIR / f"{cov_file}.new_edges.json",
         )
 
@@ -218,7 +210,7 @@ def print_run_results(
                 seq=seq,
                 signal_records=signal_records,
                 new_signals=new_signals,
-                linux_name=linux_name,
+                name=name,
                 output_path=LOGS_DIR / f"{cov_file}.json",
             )
 
@@ -230,10 +222,10 @@ def is_port_free(port: int) -> bool:
         return s.connect_ex(("localhost", port)) != 0
 
 
-def run_gdb(linux_name: str):
+def run_gdb(name: str):
     import signal
 
-    linux_dir = LINUX_ROOT_DIR / linux_name
+    linux_dir = build_dir(name) / "linux"
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     args = [
         "-iex 'set pagination off'",
@@ -245,26 +237,26 @@ def run_gdb(linux_name: str):
     system(f"gdb {linux_dir}/vmlinux " + " ".join(args))
 
 
-def make_kstep(linux_name: str):
-    system(f"make -C {PROJ_DIR} kstep LINUX_NAME={linux_name}")
+def make_kstep(name: str):
+    system(f"make -C {PROJ_DIR} kstep NAME={name}")
 
 
-def make_linux(linux_name: str, config: Optional[Path] = None):
+def make_linux(name: str, config: Optional[Path] = None):
     extra = f" KSTEP_EXTRA_CONFIG={config}" if config else ""
-    system(f"make -C {PROJ_DIR} linux LINUX_NAME={linux_name}{extra}")
+    system(f"make -C {PROJ_DIR} linux NAME={name}{extra}")
 
 
-def resolve_linux_name(linux_name: Optional[str] = None) -> str:
-    if linux_name is not None:
-        return linux_name
-    name = LINUX_CURR_DIR.resolve().name
-    logging.info(f"Using linux_name={name} (from linux/current)")
+def resolve_name(name: Optional[str] = None) -> str:
+    if name is not None:
+        return name
+    name = BUILD_CURR_DIR.resolve().name
+    logging.info(f"Using name={name} (from build/current)")
     return name
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--linux_name", type=str, default=None)
+    parser.add_argument("--name", type=str, default=None)
     parser.add_argument("--log_file", type=Path, default=None)
     parser.add_argument("--debug", action="store_true")
     # See driver config
@@ -277,13 +269,13 @@ def main():
     parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 
-    linux_name = resolve_linux_name(args.linux_name)
+    name = resolve_name(args.name)
 
     if args.debug and not is_port_free(1234):
         logging.info("Port 1234 is already in use, running GDB...")
-        run_gdb(linux_name=linux_name)
+        run_gdb(name=name)
     else:
-        make_kstep(linux_name=linux_name)
+        make_kstep(name=name)
         driver = Driver(
             **{
                 field.name: value
@@ -293,11 +285,11 @@ def main():
         )
         run_qemu(
             driver=driver,
-            linux_name=linux_name,
+            name=name,
             debug=args.debug,
             log_file=args.log_file,
         )
-        print_run_results(linux_name=linux_name)
+        print_run_results(name=name)
 
 
 if __name__ == "__main__":

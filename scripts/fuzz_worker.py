@@ -42,7 +42,7 @@ _CRASH_MARKERS = [
     b"fail"
 ]
 
-_KSTEP_START_MARKER = b"Run /init as init process"
+_KSTEP_START_MARKER = b"Run /user as init process"
 
 
 def _read_log_bytes(log_file: Path) -> bytes:
@@ -213,7 +213,7 @@ class FuzzWorker:
         task_queue: "mp.Queue[Optional[WorkItem]]",
         result_queue: "mp.Queue[WorkResult]",
         driver: Driver,
-        linux_name: str,
+        name: str,
         cross_scheduler: bool = False,
         enable_kthreads: bool = False,
         enable_task_freeze: bool = True,
@@ -226,7 +226,7 @@ class FuzzWorker:
         self.task_queue = task_queue
         self.result_queue = result_queue
         self.driver = driver
-        self.linux_name = linux_name
+        self.name = name
         self.cross_scheduler = cross_scheduler
         self.enable_kthreads = enable_kthreads
         self.enable_task_freeze = enable_task_freeze
@@ -263,7 +263,7 @@ class FuzzWorker:
     def _start_session(self, work: WorkItem) -> FuzzWorkerSession:
         proc = start_qemu(
             driver=self.driver,
-            linux_name=self.linux_name,
+            name=self.name,
             log_file=self.paths.log_file,
             sock_file=self.paths.sock_file,
             quiet=True,
@@ -519,7 +519,7 @@ def worker_main(
     task_queue: "mp.Queue[Optional[WorkItem]]",
     result_queue: "mp.Queue[WorkResult]",
     driver: Driver,
-    linux_name: str,
+    name: str,
     cross_scheduler: bool = False,
     enable_kthreads: bool = False,
     enable_task_freeze: bool = True,
@@ -530,7 +530,7 @@ def worker_main(
         task_queue=task_queue,
         result_queue=result_queue,
         driver=driver,
-        linux_name=linux_name,
+        name=name,
         cross_scheduler=cross_scheduler,
         enable_kthreads=enable_kthreads,
         enable_task_freeze=enable_task_freeze,

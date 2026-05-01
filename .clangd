@@ -1,7 +1,8 @@
 CompileFlags:
     Remove:
+        - -fno-allow-store-data-races
+        - -fconserve-stack
         - -m*
-        - -f*
         - -enable-trivial-auto-var-init-zero-knowing-it-will-be-removed-from-clang
 Diagnostics:
     ClangTidy:
