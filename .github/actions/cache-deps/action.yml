@@ -16,24 +16,24 @@ runs:
   steps:
     - id: meta
       shell: bash
-      run: echo "key=apt-$(echo '${{ inputs.packages }}' | tr ' ' '_')" >> $GITHUB_OUTPUT
+      run: echo "key=$(echo '${{ inputs.packages }}' | tr ' ' '_')" >> $GITHUB_OUTPUT
 
     - id: cache
       uses: actions/cache/restore@v4
       with:
-        path: /var/cache/apt/archives/*.deb
+        path: debs/*.deb
         key: ${{ steps.meta.outputs.key }}
         lookup-only: true
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        sudo rm -f /etc/apt/apt.conf.d/docker-clean
+        mkdir -p debs/partial
         sudo apt-get update
-        sudo apt-get install -y --download-only ${{ inputs.packages }}
+        sudo apt-get install -y --download-only -o Dir::Cache::archives="$PWD/debs" ${{ inputs.packages }}
 
     - if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
-        path: /var/cache/apt/archives/*.deb
+        path: debs/*.deb
         key: ${{ steps.meta.outputs.key }}

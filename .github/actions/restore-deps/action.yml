@@ -11,9 +11,9 @@ runs:
   steps:
     - uses: actions/cache/restore@v4
       with:
-        path: /var/cache/apt/archives/*.deb
+        path: debs/*.deb
         key: ${{ inputs.key }}
         fail-on-cache-miss: true
 
     - shell: bash
-      run: sudo dpkg -i /var/cache/apt/archives/*.deb
+      run: sudo dpkg -i debs/*.deb
