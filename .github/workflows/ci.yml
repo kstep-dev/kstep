@@ -44,13 +44,6 @@ jobs:
           version: ${{ matrix.version }}
           cov: ${{ matrix.fuzz }}
 
-      - name: Restore QEMU
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ needs.qemu.outputs.install_path }}
-          key: ${{ needs.qemu.outputs.key }}
-          fail-on-cache-miss: true
-
       - name: Build kSTEP
         run: make kstep LINUX_NAME=${{ matrix.version }}
 
