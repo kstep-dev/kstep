@@ -76,7 +76,7 @@ def patch_linux(linux_dir: Path, patch: Path):
     system(f"cd {linux_dir} && patch -p1 --forward --batch < {patch}")
 
 
-def checkout_linux(
+def checkout(
     version: str,
     linux_name: str,
     patch: Path | None = None,
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--patch", type=Path, default=None)
     args = parser.parse_args()
 
-    checkout_linux(
+    checkout(
         version=args.version,
         linux_name=args.linux_name if args.linux_name else args.version,
         tarball=args.tarball,

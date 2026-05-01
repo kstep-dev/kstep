@@ -26,8 +26,12 @@ USER_OUT_FILES := $(USER_OUT_DIR)/init $(USER_OUT_DIR)/task
 .PHONY: user
 user: build-current $(USER_OUT_FILES)
 
-$(USER_OUT_DIR)/%: $(USER_SRC_FILES) | $(USER_OUT_DIR)
-	gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ $(USER_SRC_DIR)/$*.c
+$(USER_OUT_DIR)/init: $(USER_SRC_FILES) | $(USER_OUT_DIR)
+	gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ \
+	    $(USER_SRC_DIR)/main.c $(USER_SRC_DIR)/init.c $(USER_SRC_DIR)/task.c
+
+$(USER_OUT_DIR)/task: $(USER_OUT_DIR)/init
+	ln -f $< $@
 
 $(USER_OUT_DIR):
 	mkdir -p $@
@@ -76,7 +80,7 @@ endif
 linux: build-current linux-config linux-patch
 	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(LINUX_NAME) WERROR=0 HOSTCFLAGS=-Wno-error
 	mkdir -p $(BUILD_DIR)
-	cp $(LINUX_IMAGE) $(BUILD_DIR)/image
+	cp $(LINUX_IMAGE) $(BUILD_DIR)/kernel
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
 
 .PHONY: build-current
@@ -90,14 +94,14 @@ KSTEP_EXTRA_CONFIG ?=
 .PHONY: linux-config
 linux-config: $(LINUX_DIR)/.config
 $(LINUX_DIR)/.config: $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH) $(KSTEP_EXTRA_CONFIG)
-	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $^ && touch $@
+	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $(abspath $^) && touch $@
 
 .PHONY: linux-patch
-linux-patch: $(LINUX_DIR)/kernel/cov.c
-$(LINUX_DIR)/kernel/cov.c: $(PROJ_DIR)/linux/cov.c
-	ln -sf $< $@
-	echo 'obj-y += cov.o' >> $(LINUX_DIR)/kernel/Makefile
-	echo 'ccflags-y += -fsanitize-coverage=trace-pc' >> $(LINUX_DIR)/kernel/sched/Makefile
+linux-patch: $(LINUX_DIR)/kernel/sched/cov.c
+$(LINUX_DIR)/kernel/sched/cov.c: $(PROJ_DIR)/linux/cov.c $(PROJ_DIR)/linux/Kconfig.kstep $(PROJ_DIR)/linux/Makefile.kstep
+	ln -sft $(LINUX_DIR)/kernel/sched/ $(PROJ_DIR)/linux/cov.c $(PROJ_DIR)/linux/Kconfig.kstep $(PROJ_DIR)/linux/Makefile.kstep
+	echo 'include $$(src)/Makefile.kstep' >> $(LINUX_DIR)/kernel/sched/Makefile
+	echo 'source "kernel/sched/Kconfig.kstep"' >> $(LINUX_DIR)/init/Kconfig
 
 .PHONY: linux-clean
 linux-clean:

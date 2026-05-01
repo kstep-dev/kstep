@@ -73,7 +73,7 @@ def start_qemu(
         system(f"sudo chmod 666 {kvm_path}")
 
     qemu_path = get_qemu_path()
-    kernel_img = BUILD_DIR / linux_name / "image"
+    kernel_img = BUILD_DIR / linux_name / "kernel"
     rootfs_img = BUILD_DIR / linux_name / "rootfs.cpio"
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -249,8 +249,9 @@ def make_kstep(linux_name: str):
     system(f"make -C {PROJ_DIR} kstep LINUX_NAME={linux_name}")
 
 
-def make_linux(linux_name: str):
-    system(f"make -C {PROJ_DIR} linux LINUX_NAME={linux_name}")
+def make_linux(linux_name: str, config: Optional[Path] = None):
+    extra = f" KSTEP_EXTRA_CONFIG={config}" if config else ""
+    system(f"make -C {PROJ_DIR} linux LINUX_NAME={linux_name}{extra}")
 
 
 def resolve_linux_name(linux_name: Optional[str] = None) -> str:

@@ -1,0 +1,3 @@
+obj-$(CONFIG_KSTEP_COV) += cov.o
+ccflags-$(CONFIG_KSTEP_COV) += -fsanitize-coverage=trace-pc
+CFLAGS_REMOVE_cov.o += -fsanitize-coverage=trace-pc

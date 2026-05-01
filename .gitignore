@@ -2,10 +2,6 @@
 /linux/*/
 /linux/current
 
-# Build artifacts
-/kmod/build
-/user/build
-/build
 
 # Data files
 /data/download/*.tar.xz
@@ -13,15 +9,12 @@
 !/data/logs/README.md
 /data/latest.*
 /data/reproduce.*
-/data/rootfs/*.cpio
 /data/qemu
 /data/fuzz*/*
+/data/corpus/*.json
 
 # Python
 __pycache__
 
 # clangd
 .cache
-
-# Corpus
-/data/corpus/*.json

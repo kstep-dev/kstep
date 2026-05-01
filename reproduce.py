@@ -2,12 +2,11 @@
 
 import argparse
 import logging
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-from checkout_linux import Linux, checkout_linux
+from checkout import Linux, checkout
 from run import Driver, make_kstep, make_linux, run_qemu
 from scripts import (
     LINUX_ROOT_DIR,
@@ -153,13 +152,13 @@ def reproduce(linux: Linux, driver: Driver, skip_build: bool, progress: Progress
     linux_name = f"{driver.name}_{linux.name}"
 
     progress.print_bug_step(f"{linux.name}: check out Linux {linux.version}")
-    checkout_linux(
+    checkout(
         linux.version, linux_name=linux_name, patch=linux.patch, tarball=True
     )
 
     progress.print_bug_step(f"{linux.name}: compile Linux")
     if not skip_build:
-        make_linux(linux_name=linux_name)
+        make_linux(linux_name=linux_name, config=linux.config)
 
     progress.print_bug_step(f"{linux.name}: build kSTEP")
     make_kstep(linux_name=linux_name)

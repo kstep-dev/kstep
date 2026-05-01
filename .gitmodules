@@ -1,3 +1,6 @@
 [submodule "data/results"]
 	path = results
 	url = https://github.com/kstep-dev/results.git
+[submodule "build"]
+	path = build
+	url = https://github.com/kstep-dev/build.git

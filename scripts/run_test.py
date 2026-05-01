@@ -3,7 +3,7 @@
 import argparse
 import multiprocessing as mp
 
-from checkout_linux import Linux, checkout_linux
+from checkout import Linux, checkout
 from run import Driver, make_kstep, make_linux
 from scripts import GLOBAL_SIGNAL_CORPUS, cov_parse
 from scripts.fuzz_common import WorkItem, worker_paths
@@ -18,7 +18,7 @@ def run_test(
     seed: int,
 ):
     linux_name = linux.name
-    checkout_linux(linux.version, linux_name=linux_name, tarball=True)
+    checkout(linux.version, linux_name=linux_name, tarball=True)
     make_linux(linux_name=linux_name)
 
     driver = Driver(
