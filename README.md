@@ -69,14 +69,14 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 #### 🐧 Checkout Linux source code
 
 ```sh
-./checkout.py <version> [<name>] (--tar | --git)
+./checkout.py <version> [<name>] [--tar | --git]
 ```
 
 - `<version>`: Linux tag (e.g., `v6.14`) or commit hash (e.g., `6d7e478`, `5068d84~1`).
-- `--tar`: download tarball from kernel.org / GitHub (fast, one-shot).
+- `--tar` (default): download tarball from kernel.org / GitHub (fast, one-shot).
 - `--git`: add a worktree from `build/master` (multi-version dev, supports `git log`/`git diff`).
 
-- **Example:** `./checkout.py v6.14 foo_buggy --tar` checks out Linux v6.14 under `build/foo_buggy/linux/` and points `build/current` at `build/foo_buggy/`.
+- **Example:** `./checkout.py v6.14 foo_buggy` checks out Linux v6.14 under `build/foo_buggy/linux/` and points `build/current` at `build/foo_buggy/`.
 
 #### 🛠️ Build Linux and kSTEP
 ```sh
