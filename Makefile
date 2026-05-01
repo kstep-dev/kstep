@@ -21,12 +21,10 @@ BUILD_DIR := $(PROJ_DIR)/build/$(NAME)
 
 # ========= user =========
 
-USER_OUT_FILE := $(BUILD_DIR)/user
-
 .PHONY: user
-user: $(USER_OUT_FILE)
+user: $(BUILD_DIR)/user
 
-$(USER_OUT_FILE): $(wildcard $(PROJ_DIR)/user/*)
+$(BUILD_DIR)/user: $(wildcard $(PROJ_DIR)/user/*)
 	mkdir -p $(dir $@)
 	musl-gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ \
 	    $(filter %.c, $^)
@@ -34,14 +32,12 @@ $(USER_OUT_FILE): $(wildcard $(PROJ_DIR)/user/*)
 # ========= kmod =========
 
 KMOD_SRC_DIR := $(PROJ_DIR)/kmod
-KMOD_SRC_FILES := $(shell find $(KMOD_SRC_DIR) -type f -not -name compile_commands.json)
 KMOD_OUT_DIR := $(BUILD_DIR)/kmod
-KMOD_OUT_FILE := $(KMOD_OUT_DIR)/kmod.ko
 
 .PHONY: kmod
-kmod: $(KMOD_OUT_FILE)
+kmod: $(KMOD_OUT_DIR)/kmod.ko
 
-$(KMOD_OUT_FILE): $(KMOD_SRC_FILES) | $(BUILD_DIR)/kernel
+$(KMOD_OUT_DIR)/kmod.ko: $(shell find $(KMOD_SRC_DIR) -type f -not -name compile_commands.json) $(BUILD_DIR)/kernel
 	mkdir -p $(dir $@)
 	find $(KMOD_OUT_DIR) -type l -delete
 	cp -rs $(KMOD_SRC_DIR)/* $(KMOD_OUT_DIR)
@@ -49,15 +45,13 @@ $(KMOD_OUT_FILE): $(KMOD_SRC_FILES) | $(BUILD_DIR)/kernel
 
 # ========= kstep =========
 
-ROOTFS_IMG := $(BUILD_DIR)/rootfs.cpio
-
 .PHONY: kstep
-kstep: $(ROOTFS_IMG)
+kstep: $(BUILD_DIR)/rootfs.cpio
 
-$(ROOTFS_IMG): $(KMOD_OUT_FILE) $(USER_OUT_FILE)
+$(BUILD_DIR)/rootfs.cpio: $(KMOD_OUT_DIR)/kmod.ko $(BUILD_DIR)/user
 	touch -d @0 $^
-	cd $(dir $(KMOD_OUT_FILE)) && echo $(notdir $(KMOD_OUT_FILE)) | cpio -o --format=newc --reproducible > $@
-	cd $(dir $(USER_OUT_FILE)) && echo $(notdir $(USER_OUT_FILE)) | cpio -o --format=newc --reproducible >> $@
+	cd $(KMOD_OUT_DIR) && echo kmod.ko | cpio -o --format=newc --reproducible > $@
+	cd $(BUILD_DIR) && echo user | cpio -o --format=newc --reproducible >> $@
 
 # ========= linux =========
 
@@ -78,9 +72,6 @@ linux: linux-config linux-patch
 	cp $(LINUX_IMAGE) $(BUILD_DIR)/kernel
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
 
-# Built only if missing; recursively invokes the linux phony target.
-# kmod uses this as an order-only prereq so existence is enforced without
-# triggering an expensive recursive make-check on every kmod build.
 $(BUILD_DIR)/kernel:
 	$(MAKE) linux
 
@@ -109,7 +100,7 @@ clean-kmod:
 	rm -rf $(KMOD_OUT_DIR)
 
 clean-user:
-	rm -f $(USER_OUT_FILE)
+	rm -f $(BUILD_DIR)/user
 
 clean-linux:
 	cd $(LINUX_DIR) && $(MAKE) clean
