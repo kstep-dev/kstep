@@ -16,7 +16,7 @@ runs:
   steps:
     - id: meta
       shell: bash
-      run: echo "key=apt-$(echo '${{ inputs.packages }}' | tr ' ' '+')" >> $GITHUB_OUTPUT
+      run: echo "key=$(echo '${{ inputs.packages }}' | tr ' ' '+')" >> $GITHUB_OUTPUT
 
     - id: cache
       uses: actions/cache/restore@v4
@@ -28,6 +28,7 @@ runs:
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
+        mkdir -p data/debs/partial
         sudo apt-get update
         sudo apt-get install -y --download-only -o Dir::Cache::archives="$PWD/data/debs" ${{ inputs.packages }}
 
