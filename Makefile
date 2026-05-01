@@ -1,5 +1,10 @@
 .DEFAULT_GOAL := kstep
 
+.PHONY: all
+all:
+	$(MAKE) linux
+	$(MAKE) kstep
+
 # ========= common =========
 
 PROJ_DIR := $(CURDIR)
@@ -36,7 +41,7 @@ KMOD_OUT_FILE := $(KMOD_OUT_DIR)/kmod.ko
 .PHONY: kmod
 kmod: $(KMOD_OUT_FILE)
 
-$(KMOD_OUT_FILE): $(KMOD_SRC_FILES)
+$(KMOD_OUT_FILE): $(KMOD_SRC_FILES) | $(BUILD_DIR)/kernel
 	mkdir -p $(dir $@)
 	find $(KMOD_OUT_DIR) -type l -delete
 	cp -rs $(KMOD_SRC_DIR)/* $(KMOD_OUT_DIR)
@@ -71,6 +76,13 @@ endif
 linux: linux-config linux-patch
 	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(NAME) WERROR=0 HOSTCFLAGS=-Wno-error
 	cp $(LINUX_IMAGE) $(BUILD_DIR)/kernel
+	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
+
+# Built only if missing; recursively invokes the linux phony target.
+# kmod uses this as an order-only prereq so existence is enforced without
+# triggering an expensive recursive make-check on every kmod build.
+$(BUILD_DIR)/kernel:
+	$(MAKE) linux
 
 KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
 KSTEP_EXTRA_CONFIG ?=

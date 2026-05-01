@@ -26,7 +26,7 @@ def cov_parse(cov_file: Path) -> dict[int, dict[int, list[int]]]:
     return records
 
 def symbolize_pcs(pcs: list[int], name: str) -> dict[int, tuple[str, str]]:
-    vmlinux_path = build_dir(name) / "linux" / "vmlinux"
+    vmlinux_path = build_dir(name) / "vmlinux"
     if not vmlinux_path.exists():
         raise RuntimeError(f"Missing vmlinux: {vmlinux_path}")
 
