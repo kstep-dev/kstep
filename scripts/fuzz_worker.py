@@ -42,7 +42,7 @@ _CRASH_MARKERS = [
     b"fail"
 ]
 
-_KSTEP_START_MARKER = b"Run /init as init process"
+_KSTEP_START_MARKER = b"Run /user as init process"
 
 
 def _read_log_bytes(log_file: Path) -> bytes:
