@@ -1,0 +1,39 @@
+name: Build Linux kernel
+description: Restore from cache, or download/build/save the Linux kernel.
+
+inputs:
+  version:
+    description: Linux version (e.g., v6.18)
+    required: true
+  cov:
+    description: Enable scheduler coverage instrumentation (merges linux/config.kstep.cov)
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - id: cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          linux
+          build
+        key: ${{ inputs.version }}-cov=${{ inputs.cov }}-${{ hashFiles('linux/config.kstep*', 'linux/cov.c', 'linux/*.kstep') }}
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: sudo apt update && sudo apt install -y libelf-dev
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: ./checkout.py ${{ inputs.version }} --tarball
+
+    - if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        if [ "${{ inputs.cov }}" = "true" ]; then
+          make linux KSTEP_EXTRA_CONFIG=linux/config.kstep.cov
+        else
+          make linux
+        fi
+        make linux-clean

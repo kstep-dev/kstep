@@ -7,154 +7,78 @@ on:
   schedule:
     - cron: "0 0 * * 0" # Every week
 
-env:
-  QEMU_CACHE_KEY: qemu
-  QEMU_INSTALL_PATH: data/qemu/install
-
 jobs:
   qemu:
     name: Build QEMU
     runs-on: ubuntu-latest
-
+    outputs:
+      install_path: ${{ steps.build.outputs.install_path }}
+      key: ${{ steps.build.outputs.key }}
     steps:
       - uses: actions/checkout@v6
-
-      - name: Restore cache
-        id: qemu-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ env.QEMU_INSTALL_PATH }}
-          key: ${{ env.QEMU_CACHE_KEY }}
-          lookup-only: true
-
-      - name: Install build dependencies
-        if: steps.qemu-cache.outputs.cache-hit != 'true'
-        run: sudo apt update && sudo apt install -y libglib2.0-dev ninja-build
-
-      - name: Build QEMU
-        if: steps.qemu-cache.outputs.cache-hit != 'true'
-        run: ./scripts/build_qemu.py
-
-      - name: Save cache
-        if: steps.qemu-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ env.QEMU_INSTALL_PATH }}
-          key: ${{ env.QEMU_CACHE_KEY }}
+      - id: build
+        uses: ./.github/actions/build-qemu
 
   test:
     needs: qemu
+    name: ${{ matrix.fuzz && 'Fuzz' || 'Run' }} ${{ matrix.version }}
     strategy:
       matrix:
-        version:      # https://kernel.org/
-          - v7.0      # latest
-          - v6.18     # 2025 LTS
-          - v6.12     # 2024 LTS
-          - v6.6      # 2023 LTS
-          - v6.1      # 2022 LTS
-          - v5.15     # 2021 LTS
-
-    name: Linux ${{matrix.version}}
+        include:
+          - version: v7.0  # latest
+          - version: v6.18 # 2025 LTS
+          - version: v6.12 # 2024 LTS
+          - version: v6.6  # 2023 LTS
+          - version: v6.1  # 2022 LTS
+          - version: v5.15 # 2021 LTS
+          - version: v6.18
+            fuzz: true
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v6
 
-      - name: Linux - Restore cache
-        id: linux-cache
-        uses: actions/cache/restore@v4
+      - uses: ./.github/actions/build-linux
         with:
-          path: |
-            linux
-            build
-          key: ${{matrix.version}}-${{hashFiles('linux/config.kstep**', 'linux/cov.c')}}
-
-      - name: Linux - Download
-        if: steps.linux-cache.outputs.cache-hit != 'true'
-        run: ./checkout.py ${{matrix.version}} --tarball
-
-      - name: Linux - Install build dependencies
-        if: steps.linux-cache.outputs.cache-hit != 'true'
-        run: sudo apt update && sudo apt install -y libelf-dev
-
-      - name: Linux - Build
-        if: steps.linux-cache.outputs.cache-hit != 'true'
-        run: make linux; make linux-clean
-
-      - name: Linux - Save cache
-        if: steps.linux-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            linux
-            build
-          key: ${{matrix.version}}-${{hashFiles('linux/config.kstep**', 'linux/cov.c')}}
-
-      - name: Build kSTEP
-        run: make kstep
+          version: ${{ matrix.version }}
+          cov: ${{ matrix.fuzz }}
 
       - name: Restore QEMU
         uses: actions/cache/restore@v4
         with:
-          path: ${{ env.QEMU_INSTALL_PATH }}
-          key: ${{ env.QEMU_CACHE_KEY }}
+          path: ${{ needs.qemu.outputs.install_path }}
+          key: ${{ needs.qemu.outputs.key }}
           fail-on-cache-miss: true
 
-      - name: Run kSTEP
-        timeout-minutes: 1
-        run: ./run.py
+      - name: Build kSTEP
+        run: make kstep LINUX_NAME=${{ matrix.version }}
 
-      - name: Print output
+      - name: "[Run] Execute driver"
+        if: ${{ ! matrix.fuzz }}
+        timeout-minutes: 1
+        run: ./run.py --linux_name ${{ matrix.version }}
+
+      - name: "[Run] Show driver output"
+        if: ${{ ! matrix.fuzz }}
         run: cat data/latest.jsonl
 
-      - name: Write job summary
-        run: echo "[${{matrix.version}}](${{steps.upload-artifact.outputs.artifact-url}})" >> $GITHUB_STEP_SUMMARY
-  
-  fuzz:
-    needs: test
-
-    name: Fuzz
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Linux - Restore cache
-        id: linux-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            linux
-            build
-          key: v6.18-${{hashFiles('linux/config.kstep**', 'linux/cov.c')}}
-          fail-on-cache-miss: true
-
-      - name: Build kSTEP
-        run: make kstep
-
-      - name: Restore QEMU
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ env.QEMU_INSTALL_PATH }}
-          key: ${{ env.QEMU_CACHE_KEY }}
-          fail-on-cache-miss: true
-
-      - name: Run fuzz test (1 fresh, 1 replay, 1 mutation)
+      - name: "[Fuzz] Execute workers"
+        if: ${{ matrix.fuzz }}
         timeout-minutes: 5
         run: |
           ./fuzz.py \
-            --linux_name v6.18 \
+            --linux_name ${{ matrix.version }} \
             --workers 1 \
             --steps 10 \
             --ci_mode
 
-      - name: Print fresh test log
+      - name: "[Fuzz] Show fresh-mode log"
+        if: ${{ matrix.fuzz }}
         run: cat data/fuzz/fresh/worker.debug.log
 
-      - name: Print replay test log
+      - name: "[Fuzz] Show replay-mode log"
+        if: ${{ matrix.fuzz }}
         run: cat data/fuzz/replay/worker.debug.log
 
-      - name: Print mutation test log
+      - name: "[Fuzz] Show mutation-mode log"
+        if: ${{ matrix.fuzz }}
         run: cat data/fuzz/mutation/worker.debug.log
-
-          

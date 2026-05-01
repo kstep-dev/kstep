@@ -126,7 +126,8 @@ def main() -> None:
     logging.getLogger().addHandler(file_handler)
     logging.info(f"Logging to {log_path}")
 
-    make_linux(args.linux_name, config=LINUX_ROOT_DIR / "config.kstep.fuzz")
+    if not args.ci_mode:
+        make_linux(args.linux_name, config=LINUX_ROOT_DIR / "config.kstep.cov")
     make_kstep(args.linux_name)
 
     driver = Driver(

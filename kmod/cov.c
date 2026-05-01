@@ -89,7 +89,7 @@ static void* sanitizer_cov_trace_pc_ptr = NULL;
 void kstep_cov_init(void) {
   sanitizer_cov_trace_pc_ptr = kstep_ksym_lookup("sanitizer_cov_trace_pc");
   if (sanitizer_cov_trace_pc_ptr == NULL)
-    panic("kstep: rebuild with linux/config.kstep.fuzz to enable coverage");
+    panic("kstep: rebuild with linux/config.kstep.cov to enable coverage");
 
   cov_file = filp_open("/dev/ttyS2", O_WRONLY | O_NOCTTY, 0);
   if (IS_ERR(cov_file))

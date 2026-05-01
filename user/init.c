@@ -68,7 +68,7 @@ static void set_proc_affinity(int begin, int end) { // [begin, end]
     panic("Failed to set CPU affinity for task %d to CPUs %d-%d", getpid(), begin, end);
 }
 
-int main(int argc, char *argv[], char *envp[]) {
+int init_main(int argc, char *argv[], char *envp[]) {
   mount_fs("/dev", "devtmpfs");
   mount_fs("/proc", "proc");
   mount_fs("/sys", "sysfs");

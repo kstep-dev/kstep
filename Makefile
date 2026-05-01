@@ -26,8 +26,12 @@ USER_OUT_FILES := $(USER_OUT_DIR)/init $(USER_OUT_DIR)/task
 .PHONY: user
 user: build-current $(USER_OUT_FILES)
 
-$(USER_OUT_DIR)/%: $(USER_SRC_FILES) | $(USER_OUT_DIR)
-	gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ $(USER_SRC_DIR)/$*.c
+$(USER_OUT_DIR)/init: $(USER_SRC_FILES) | $(USER_OUT_DIR)
+	gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ \
+	    $(USER_SRC_DIR)/main.c $(USER_SRC_DIR)/init.c $(USER_SRC_DIR)/task.c
+
+$(USER_OUT_DIR)/task: $(USER_OUT_DIR)/init
+	ln -f $< $@
 
 $(USER_OUT_DIR):
 	mkdir -p $@

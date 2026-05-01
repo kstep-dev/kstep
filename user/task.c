@@ -36,12 +36,12 @@ static void handler(int signum, siginfo_t *info, void *context) {
     panic("Unknown signal code: %d\n", code);
 }
 
-static void loop() {
+__attribute__((noreturn)) static void loop() {
   while (1)
     __asm__("" : : : "memory");
 }
 
-int main(int argc, char **argv) {
+int task_main(int argc, char **argv) {
   struct sigaction sa = {.sa_sigaction = handler,
                          .sa_flags = SA_SIGINFO | SA_NODEFER};
   sigaction(SIGUSR1, &sa, NULL);
