@@ -15,7 +15,8 @@ jobs:
       key: ${{ steps.cache.outputs.key }}
     steps:
       - uses: actions/checkout@v6
-      - id: cache
+      - name: Cache deps
+        id: cache
         uses: ./.github/actions/cache-deps
         with:
           packages: qemu-system-x86 libelf-dev
