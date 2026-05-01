@@ -2,12 +2,13 @@
 
 #include <errno.h>       // EEXIST
 #include <fcntl.h>       // open, O_RDONLY, O_RDWR, O_NOCTTY
+#include <sched.h>       // sched_setaffinity, cpu_set_t
 #include <string.h>      // strlcat
 #include <sys/mount.h>   // mount
 #include <sys/stat.h>    // mkdir
 #include <sys/syscall.h> // SYS_*
 #include <termios.h>     // termios, tcgetattr, tcsetattr
-#include <unistd.h>      // close, syscall
+#include <unistd.h>      // close, getpid, syscall
 
 #include "utils.h"
 

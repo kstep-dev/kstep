@@ -15,7 +15,7 @@ Seed scheduling:
   fraction of iterations use fresh random generation vs. seed replay.
 
 Usage:
-  python fuzz.py --linux_name v6.18_test [options]
+  python fuzz.py --name v6.18_test [options]
 """
 
 import argparse
@@ -36,7 +36,7 @@ def main() -> None:
         description="Concurrent coverage-guided fuzzer for kSTEP",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--linux_name", required=True,
+    parser.add_argument("--name", required=True,
                         help="Linux build name, e.g. v6.18_test")
     parser.add_argument("--num_cpus", type=int, default=5,
                         help="vCPUs per QEMU instance")
@@ -127,8 +127,8 @@ def main() -> None:
     logging.info(f"Logging to {log_path}")
 
     if not args.ci_mode:
-        make_linux(args.linux_name, config=LINUX_ROOT_DIR / "config.kstep.cov")
-    make_kstep(args.linux_name)
+        make_linux(args.name, config=LINUX_ROOT_DIR / "config.kstep.cov")
+    make_kstep(args.name)
 
     driver = Driver(
         name="executor",
@@ -141,7 +141,7 @@ def main() -> None:
 
     logging.info(
         f"kSTEP fuzzer: workers={args.workers}  driver=executor  "
-        f"linux={args.linux_name}  steps={args.steps}  "
+        f"linux={args.name}  steps={args.steps}  "
         f"topology={args.topology or 'default'}  "
         f"frequency={args.frequency or 'default'}  "
         f"capacity={args.capacity or 'default'}  "
@@ -156,7 +156,7 @@ def main() -> None:
     run_manager(
         n_workers=args.workers,
         driver=driver,
-        linux_name=args.linux_name,
+        name=args.name,
         steps=args.steps,
         fresh_ratio=args.fresh_ratio,
         mutate_ratio=args.mutate_ratio,

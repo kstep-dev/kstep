@@ -3,6 +3,7 @@
 
 #include <linux/types.h>
 #include <linux/version.h>
+#include <linux/compiler_types.h>
 
 // kernel internal headers
 #pragma GCC diagnostic push
@@ -80,7 +81,11 @@ struct kstep_driver *kstep_sym_init(const char *driver_name);
 #define KSYM_IMPORT_RAW(type, name) type *KSYM_##name
 void *kstep_ksym_lookup(const char *name);
 
-extern KSYM_IMPORT_RAW(struct rq, runqueues);
+#ifndef __percpu
+#define __percpu
+#endif
+
+extern KSYM_IMPORT_RAW(struct rq __percpu, runqueues);
 #undef cpu_rq
 #define cpu_rq(cpu) (per_cpu_ptr(KSYM_runqueues, (cpu)))
 #undef this_rq

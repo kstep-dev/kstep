@@ -96,7 +96,7 @@ class SignalCorpus:
 
     def update_pc_symbolize(self, 
         signal_records: dict[int, dict[int, list[int]]],
-        linux_name: str,
+        name: str,
     ):
         # new_pcs = {rec[3] for rec in signal_records if rec[3] not in self.seen_pcs}
         new_pcs = set()
@@ -105,7 +105,7 @@ class SignalCorpus:
                 for pc in pcs:
                     if pc not in self.seen_pcs:
                         new_pcs.add(pc)
-        pc_symbolize = symbolize_pcs(list(new_pcs), linux_name)
+        pc_symbolize = symbolize_pcs(list(new_pcs), name)
         for pc, (fn, loc) in pc_symbolize.items():
             self.seen_pcs[pc] = (fn, loc)
 
@@ -116,7 +116,7 @@ class SignalCorpus:
         self,
         seq: InputSeq,
         signal_records: dict[int, dict[int, list[int]]],
-        linux_name: str,
+        name: str,
         output_path: Optional[Path] = None,
     ) -> tuple[set[int], int] | None:
         signal_set = self.observe_signal_records(signal_records)
@@ -132,7 +132,7 @@ class SignalCorpus:
         data = {
             "seq": seq.to_list(), # input sequence
             "new_signals": sorted(new), # new signals in the signal file
-            "linux_name": linux_name,
+            "name": name,
         }
 
         if output_path is None:
@@ -151,7 +151,7 @@ class SignalCorpus:
         seq: InputSeq,
         signal_records: dict[int, dict[int, list[int]]], # each entry is a signal record, cmd_id -> pid -> list of pcs
         new_signals: set[int],
-        linux_name: str,
+        name: str,
         output_path: Optional[Path] = None,
     ) -> list[dict]:
         tick_repeat = OP_NAME_TO_TYPE["TICK_REPEAT"]
@@ -199,7 +199,7 @@ class SignalCorpus:
             output_path = CORPUS_DIR / f"{seq.digest()}_per_action.json" 
         print(f"Wrote {len(cmd_meta)} per-action new edges to {output_path}")
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump({"Linux_name": linux_name, "cmd_meta": cmd_meta}, f, indent=2)
+            json.dump({"name": name, "cmd_meta": cmd_meta}, f, indent=2)
 
         return cmd_meta
 

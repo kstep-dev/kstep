@@ -22,7 +22,7 @@ from scripts.fuzz_worker import FuzzWorker
 class ReplayResult:
     crash_dir: Path
     rerun_dir: Path
-    linux_name: str
+    name: str
     num_cpus: int
     mem_mb: int
     executed_ops: int
@@ -32,9 +32,9 @@ class ReplayResult:
 def load_ops(crash_dir: Path) -> tuple[str, list[tuple[int, int, int, int]]]:
     ops_path = crash_dir / "ops.json"
     data = json.loads(ops_path.read_text())
-    linux_name = data["linux_name"]
+    name = data["name"]
     ops = [tuple(op) for op in data["ops"]]
-    return linux_name, ops
+    return name, ops
 
 
 def infer_num_cpus(crash_dir: Path) -> int | None:
@@ -57,14 +57,14 @@ def infer_num_cpus(crash_dir: Path) -> int | None:
 
 def replay_crash(
     crash_dir: Path,
-    linux_name: str | None,
+    name: str | None,
     num_cpus: int | None,
     mem_mb: int,
     timeout_sec: float,
 ) -> ReplayResult:
     crash_dir = crash_dir.resolve()
-    ops_linux_name, ops = load_ops(crash_dir)
-    linux_name = linux_name or ops_linux_name
+    ops_name, ops = load_ops(crash_dir)
+    name = name or ops_name
     num_cpus = num_cpus or infer_num_cpus(crash_dir) or 3
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -80,7 +80,7 @@ def replay_crash(
         task_queue=task_queue,
         result_queue=result_queue,
         driver=Driver(name="executor", num_cpus=num_cpus, mem_mb=mem_mb),
-        linux_name=linux_name,
+        name=name,
         base_dir=rerun_dir,
         io_timeout_sec=timeout_sec,
     )
@@ -97,7 +97,7 @@ def replay_crash(
     return ReplayResult(
         crash_dir=crash_dir,
         rerun_dir=rerun_dir,
-        linux_name=linux_name,
+        name=name,
         num_cpus=num_cpus,
         mem_mb=mem_mb,
         executed_ops=len(result.ops),
@@ -110,7 +110,7 @@ def main() -> None:
         description="Replay the recorded ops from a crash directory through driver=executor."
     )
     parser.add_argument("crash_dir", type=Path)
-    parser.add_argument("--linux_name", type=str, default=None)
+    parser.add_argument("--name", type=str, default=None)
     parser.add_argument("--num_cpus", type=int, default=None)
     parser.add_argument("--mem_mb", type=int, default=512)
     parser.add_argument("--timeout_sec", type=float, default=120.0)
@@ -118,7 +118,7 @@ def main() -> None:
 
     result = replay_crash(
         crash_dir=args.crash_dir,
-        linux_name=args.linux_name,
+        name=args.name,
         num_cpus=args.num_cpus,
         mem_mb=args.mem_mb,
         timeout_sec=args.timeout_sec,
@@ -127,7 +127,7 @@ def main() -> None:
     
     print(f"crash_dir: {result.crash_dir}")
     print(f"rerun_dir: {result.rerun_dir}")
-    print(f"linux_name: {result.linux_name}")
+    print(f"name: {result.name}")
     print(f"num_cpus: {result.num_cpus}")
     print(f"mem_mb: {result.mem_mb}")
     print(f"ops: {result.executed_ops}/{result.total_ops}")

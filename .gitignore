@@ -1,15 +1,8 @@
-# Linux source code
-/linux/*/
-/linux/current
-
-
 # Data files
-/data/download/*.tar.xz
 /data/logs/*
 !/data/logs/README.md
 /data/latest.*
 /data/reproduce.*
-/data/qemu
 /data/fuzz*/*
 /data/corpus/*.json
 

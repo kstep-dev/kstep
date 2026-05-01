@@ -6,13 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from scripts import (
-    # BUILD_CURR_DIR,
-    # BUILD_DIR,
-    DOWNLOAD_DIR,
-    LINUX_CURR_DIR,
+    BUILD_CURR_DIR,
     LINUX_MASTER_DIR,
-    LINUX_ROOT_DIR,
     PROJ_DIR,
+    build_dir,
     decompress,
     download,
     system,
@@ -49,16 +46,12 @@ def add_worktree(version: str, linux_dir: Path):
     system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {version}")
 
 
-def set_current_linux(linux_name: str):
-    linux_dir = LINUX_ROOT_DIR / linux_name
-    LINUX_CURR_DIR.unlink(missing_ok=True)
-    LINUX_CURR_DIR.symlink_to(linux_dir)
-    logging.info(f"{fmt_path(LINUX_CURR_DIR)} now points to {fmt_path(linux_dir)}")
-
-    # build_dir = BUILD_DIR / linux_name
-    # BUILD_CURR_DIR.unlink(missing_ok=True)
-    # BUILD_CURR_DIR.symlink_to(build_dir)
-    # logging.info(f"{fmt_path(BUILD_CURR_DIR)} now points to {fmt_path(build_dir)}")
+def set_current_build(name: str):
+    target = build_dir(name)
+    BUILD_CURR_DIR.parent.mkdir(parents=True, exist_ok=True)
+    BUILD_CURR_DIR.unlink(missing_ok=True)
+    BUILD_CURR_DIR.symlink_to(target)
+    logging.info(f"{fmt_path(BUILD_CURR_DIR)} now points to {fmt_path(target)}")
 
 
 def get_download_url(version: str) -> str:
@@ -78,16 +71,17 @@ def patch_linux(linux_dir: Path, patch: Path):
 
 def checkout(
     version: str,
-    linux_name: str,
+    name: str,
     patch: Path | None = None,
     tarball: bool = False,
 ):
-    linux_dir = LINUX_ROOT_DIR / linux_name
+    linux_dir = build_dir(name) / "linux"
     if linux_dir.exists():
         logging.info(f"{fmt_path(linux_dir)} already exists")
     else:
+        linux_dir.parent.mkdir(parents=True, exist_ok=True)
         if tarball:
-            tarball_path = DOWNLOAD_DIR / f"{version}.tar.xz"
+            tarball_path = build_dir(name) / f"{version}.tar.xz"
             url = get_download_url(version)
             download(url, tarball_path)
             decompress(tarball_path, linux_dir)
@@ -97,14 +91,14 @@ def checkout(
 
         if patch:
             patch_linux(linux_dir, patch)
-    set_current_linux(linux_name)
+    set_current_build(name)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("version", type=str, nargs="?", default="v6.14")
     parser.add_argument(
-        "linux_name",
+        "name",
         type=str,
         nargs="?",
         default=None,
@@ -116,7 +110,7 @@ if __name__ == "__main__":
 
     checkout(
         version=args.version,
-        linux_name=args.linux_name if args.linux_name else args.version,
+        name=args.name if args.name else args.version,
         tarball=args.tarball,
         patch=args.patch,
     )

@@ -42,7 +42,7 @@ class FuzzManager:
         self,
         n_workers: int,
         driver: Driver,
-        linux_name: str,
+        name: str,
         steps: int,
         fresh_ratio: float,
         mutate_ratio: float = 0.35,
@@ -56,7 +56,7 @@ class FuzzManager:
     ) -> None:
         self.n_workers = n_workers
         self.driver = driver
-        self.linux_name = linux_name
+        self.name = name
         self.steps = steps
         self.fresh_ratio = fresh_ratio
         self.mutate_ratio = mutate_ratio
@@ -122,7 +122,7 @@ class FuzzManager:
         target_dir.mkdir(exist_ok=True)
 
         ops_data = {
-            "linux_name": self.linux_name,
+            "name": self.name,
             "mode": result.mode,
             "seed_id": result.seed_id,
             "ops": result.ops,
@@ -287,7 +287,7 @@ class FuzzManager:
                     self.task_queue,
                     self.result_queue,
                     self.driver,
-                    self.linux_name,
+                    self.name,
                     self.cross_scheduler,
                     self.enable_kthreads,
                     self.enable_task_freeze,
@@ -350,7 +350,7 @@ class FuzzManager:
             return
 
         signal_records = cov_parse(paths.cov_file)
-        self.corpus.update_pc_symbolize(signal_records, self.linux_name)
+        self.corpus.update_pc_symbolize(signal_records, self.name)
 
         seq = InputSeq()
         for op_tuple in result.ops:
@@ -363,7 +363,7 @@ class FuzzManager:
         new_signal_info = self.corpus.analyze_new_signals(
             seq=seq,
             signal_records=signal_records,
-            linux_name=self.linux_name,
+            name=self.name,
             output_path=FUZZ_CORPUS_DIR / f"{seed_id}.json",
         )
         if new_signal_info:
@@ -373,7 +373,7 @@ class FuzzManager:
                 seq=seq,
                 signal_records=signal_records,
                 new_signals=set(new_signals),
-                linux_name=self.linux_name,
+                name=self.name,
                 output_path=FUZZ_CORPUS_DIR / f"{seed_id}_per_action.json",
             )
 
@@ -581,7 +581,7 @@ class FuzzManager:
 def run_manager(
     n_workers: int,
     driver: Driver,
-    linux_name: str,
+    name: str,
     steps: int,
     fresh_ratio: float,
     mutate_ratio: float = 0.35,
@@ -596,7 +596,7 @@ def run_manager(
     manager = FuzzManager(
         n_workers=n_workers,
         driver=driver,
-        linux_name=linux_name,
+        name=name,
         steps=steps,
         fresh_ratio=fresh_ratio,
         mutate_ratio=mutate_ratio,
