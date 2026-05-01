@@ -20,7 +20,7 @@ runs:
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      run: ./checkout.py ${{ inputs.version }} --tarball
+      run: ./checkout.py ${{ inputs.version }} --tar
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash

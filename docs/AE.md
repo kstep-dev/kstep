@@ -61,20 +61,3 @@ Note: each command checks out and compiles both the buggy and fixed versions of 
 ./reproduce.py even_idle_cpu
 ```
 Similarly, the result is saved at ``~/project/kstep/results/repro_even_idle_cpu/plot.pdf``.
-
-## Directory Structure
-
-- **kmod/**: Kernel module (`kstep.ko`) loaded at boot
-  - `driver.c` + `driver/*.c`: Bug-specific drivers that setup and run test cases
-  - `driver.h`: Public API for drivers (task creation, ticking, sleeping, cgroups, etc.)
-  - `internal.h` and other `*.c` files: Framework primitives and utilities
-
-- **user/**: Minimal userspace (`init.c`) that mounts filesystems and loads `kstep.ko`
-
-- **linux/**: Git worktrees of Linux source
-  - `linux/{bug_name}_buggy/fixed`: the buggy and fixed versions to reproduce each bug
-  - `linux/master`: Main clone of Linux kernel
-  - `linux/current`: Symlink to active kernel version
-  - `linux/*.patch`: Fixes for specific bugs
-
-- **scripts/**: Python utilities for parsing logs and plotting results

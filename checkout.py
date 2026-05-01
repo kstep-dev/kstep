@@ -104,7 +104,11 @@ if __name__ == "__main__":
         default=None,
         help="Name of the directory (default: <version>)",
     )
-    parser.add_argument("--tarball", action="store_true", default=False)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--tar", dest="tarball", action="store_true",
+                        help="Download via kernel.org/GitHub tarball")
+    source.add_argument("--git", dest="tarball", action="store_false",
+                        help="Add a worktree from the master git clone")
     parser.add_argument("--patch", type=Path, default=None)
     args = parser.parse_args()
 
