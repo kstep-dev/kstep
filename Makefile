@@ -69,26 +69,19 @@ else
 endif
 
 .PHONY: linux
-linux: linux-config linux-patch
+linux $(BUILD_DIR)/kernel: $(LINUX_DIR)/.config
 	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) -j$(shell nproc) LOCALVERSION=-$(NAME) WERROR=0 HOSTCFLAGS=-Wno-error
 	cp $(LINUX_IMAGE) $(BUILD_DIR)/kernel
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
 
-$(BUILD_DIR)/kernel:
-	$(MAKE) linux
-
 KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
 KSTEP_EXTRA_CONFIG ?=
 
-.PHONY: linux-config
-linux-config: $(LINUX_DIR)/.config
-$(LINUX_DIR)/.config: $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH) $(KSTEP_EXTRA_CONFIG)
+$(LINUX_DIR)/.config: $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH) $(KSTEP_EXTRA_CONFIG) | $(LINUX_DIR)/kernel/sched/cov.c
 	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $(abspath $^) && touch $@
 
-.PHONY: linux-patch
-linux-patch: $(LINUX_DIR)/kernel/sched/cov.c
 $(LINUX_DIR)/kernel/sched/cov.c: $(PROJ_DIR)/linux/cov.c $(PROJ_DIR)/linux/Kconfig.kstep $(PROJ_DIR)/linux/Makefile.kstep
-	ln -sft $(LINUX_DIR)/kernel/sched/ $(PROJ_DIR)/linux/cov.c $(PROJ_DIR)/linux/Kconfig.kstep $(PROJ_DIR)/linux/Makefile.kstep
+	ln -sft $(LINUX_DIR)/kernel/sched/ $^
 	echo 'include $$(src)/Makefile.kstep' >> $(LINUX_DIR)/kernel/sched/Makefile
 	echo 'source "kernel/sched/Kconfig.kstep"' >> $(LINUX_DIR)/init/Kconfig
 
