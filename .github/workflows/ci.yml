@@ -60,7 +60,7 @@ jobs:
 
       - name: "[Run] Show driver output"
         if: ${{ ! matrix.fuzz }}
-        run: cat data/latest.jsonl
+        run: cat results/latest/kstep.jsonl
 
       - name: "[Fuzz] Execute workers"
         if: ${{ matrix.fuzz }}
@@ -74,12 +74,12 @@ jobs:
 
       - name: "[Fuzz] Show fresh-mode log"
         if: ${{ matrix.fuzz }}
-        run: cat data/fuzz/fresh/worker.debug.log
+        run: cat results/fuzz/fresh/worker.debug.log
 
       - name: "[Fuzz] Show replay-mode log"
         if: ${{ matrix.fuzz }}
-        run: cat data/fuzz/replay/worker.debug.log
+        run: cat results/fuzz/replay/worker.debug.log
 
       - name: "[Fuzz] Show mutation-mode log"
         if: ${{ matrix.fuzz }}
-        run: cat data/fuzz/mutation/worker.debug.log
+        run: cat results/fuzz/mutation/worker.debug.log
