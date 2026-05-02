@@ -54,7 +54,7 @@ $(BUILD_DIR)/rootfs.cpio: $(KMOD_OUT_DIR)/kmod.ko $(BUILD_DIR)/user
 	rm -rf $(ROOTFS_DIR)
 	mkdir -p $(ROOTFS_DIR)
 	cp -p $^ $(ROOTFS_DIR)/
-	touch -d @0 $(ROOTFS_DIR)/*
+	touch -d @0 $(ROOTFS_DIR) $(ROOTFS_DIR)/*
 	cd $(ROOTFS_DIR) && find . | sort | cpio -o --format=newc --reproducible --quiet > $@
 
 # ========= linux =========

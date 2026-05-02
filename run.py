@@ -216,7 +216,7 @@ def run_gdb(name: str):
 def make_kstep(name: str, log: bool = False):
     cmd = f"make kstep NAME={name}"
     if log:
-        cmd += f" > {get_build_dir(name) / 'kstep.log'}"
+        cmd += f" >> {get_build_dir(name) / 'build.log'}"
     system(cmd)
 
 
@@ -225,7 +225,7 @@ def make_linux(name: str, config: Optional[Path] = None, log: bool = False):
     if config:
         cmd += f" KSTEP_EXTRA_CONFIG={config}"
     if log:
-        cmd += f" > {get_build_dir(name) / 'linux.log'}"
+        cmd += f" >> {get_build_dir(name) / 'build.log'}"
     system(cmd)
 
 
