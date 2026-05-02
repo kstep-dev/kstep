@@ -35,7 +35,7 @@ KMOD_OUT_DIR := $(BUILD_DIR)/kmod
 .PHONY: kmod
 kmod: $(KMOD_OUT_DIR)/kmod.ko
 
-$(KMOD_OUT_DIR)/kmod.ko: $(shell find $(KMOD_SRC_DIR) -type f -not -name compile_commands.json) $(BUILD_DIR)/kernel
+$(KMOD_OUT_DIR)/kmod.ko: $(shell find $(KMOD_SRC_DIR) -type f) $(BUILD_DIR)/kernel
 	mkdir -p $(dir $@)
 	find $(KMOD_OUT_DIR) -type l -delete
 	cp -rs $(KMOD_SRC_DIR)/* $(KMOD_OUT_DIR)
@@ -47,7 +47,6 @@ ROOTFS_DIR := $(BUILD_DIR)/rootfs
 
 .PHONY: kstep
 kstep: $(BUILD_DIR)/rootfs.cpio
-
 $(BUILD_DIR)/rootfs.cpio: $(KMOD_OUT_DIR)/kmod.ko $(BUILD_DIR)/user
 	rm -rf $(ROOTFS_DIR)
 	mkdir -p $(ROOTFS_DIR)
