@@ -8,7 +8,6 @@ all:
 # ========= common =========
 
 PROJ_DIR := $(CURDIR)
-MAKEFLAGS := $(MAKEFLAGS) $(if $(findstring -j,$(MAKEFLAGS)),,-j$(shell nproc))
 BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.json --,)
 
 NAME ?= $(notdir $(realpath $(PROJ_DIR)/build/current))
@@ -24,10 +23,9 @@ BUILD_DIR := $(PROJ_DIR)/build/$(NAME)
 .PHONY: user
 user: $(BUILD_DIR)/user
 
-$(BUILD_DIR)/user: $(wildcard $(PROJ_DIR)/user/*)
+$(BUILD_DIR)/user: $(PROJ_DIR)/user/user.c $(PROJ_DIR)/user/user.h
 	mkdir -p $(dir $@)
-	musl-gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ \
-	    $(filter %.c, $^)
+	musl-gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ $<
 
 # ========= kmod =========
 
@@ -41,7 +39,7 @@ $(KMOD_OUT_DIR)/kmod.ko: $(shell find $(KMOD_SRC_DIR) -type f -not -name compile
 	mkdir -p $(dir $@)
 	find $(KMOD_OUT_DIR) -type l -delete
 	cp -rs $(KMOD_SRC_DIR)/* $(KMOD_OUT_DIR)
-	cd $(BUILD_DIR) && $(BEAR_CMD) $(MAKE) -C $(LINUX_DIR) M=$(KMOD_OUT_DIR) modules
+	cd $(BUILD_DIR) && $(BEAR_CMD) $(MAKE) -j$(shell nproc) -C $(LINUX_DIR) M=$(KMOD_OUT_DIR) modules
 
 # ========= kstep =========
 
@@ -72,7 +70,7 @@ endif
 
 .PHONY: linux
 linux: linux-config linux-patch
-	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(NAME) WERROR=0 HOSTCFLAGS=-Wno-error
+	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) -j$(shell nproc) LOCALVERSION=-$(NAME) WERROR=0 HOSTCFLAGS=-Wno-error
 	cp $(LINUX_IMAGE) $(BUILD_DIR)/kernel
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
 
