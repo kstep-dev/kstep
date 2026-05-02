@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
-from consts import RESULTS_DIR
+from utils import ResultDir
 from parse_log import parse_jsonl
 from plot_utils import save_fig
 
@@ -106,8 +106,8 @@ def plot_legend(fig, driver, cmap):
 
 
 def main(driver: str):
-    out_file_buggy = RESULTS_DIR / f"repro_{driver}" / "buggy.jsonl"
-    out_file_fixed = RESULTS_DIR / f"repro_{driver}" / "fixed.jsonl"
+    out_file_buggy = ResultDir(f"repro_{driver}/buggy").output
+    out_file_fixed = ResultDir(f"repro_{driver}/fixed").output
 
     nr_running_buggy = parse_nr_running(out_file_buggy)
     nr_running_fixed = parse_nr_running(out_file_fixed)

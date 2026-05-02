@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from consts import RESULTS_DIR
+from utils import RESULTS_DIR
 from matplotlib.figure import Figure
 
 

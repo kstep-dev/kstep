@@ -45,13 +45,17 @@ $(KMOD_OUT_DIR)/kmod.ko: $(shell find $(KMOD_SRC_DIR) -type f -not -name compile
 
 # ========= kstep =========
 
+ROOTFS_DIR := $(BUILD_DIR)/rootfs
+
 .PHONY: kstep
 kstep: $(BUILD_DIR)/rootfs.cpio
 
 $(BUILD_DIR)/rootfs.cpio: $(KMOD_OUT_DIR)/kmod.ko $(BUILD_DIR)/user
-	touch -d @0 $^
-	cd $(KMOD_OUT_DIR) && echo kmod.ko | cpio -o --format=newc --reproducible > $@
-	cd $(BUILD_DIR) && echo user | cpio -o --format=newc --reproducible >> $@
+	rm -rf $(ROOTFS_DIR)
+	mkdir -p $(ROOTFS_DIR)
+	cp -p $^ $(ROOTFS_DIR)/
+	touch -d @0 $(ROOTFS_DIR)/*
+	cd $(ROOTFS_DIR) && find . | sort | cpio -o --format=newc --reproducible --quiet > $@
 
 # ========= linux =========
 

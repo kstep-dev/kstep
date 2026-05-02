@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from run import Driver
-from scripts.fuzz_common import WorkItem, worker_paths
+from scripts.fuzz_common import WorkItem, worker_dir
 from scripts.fuzz_worker import FuzzWorker
 
 
@@ -89,10 +89,10 @@ def replay_crash(
     result = result_queue.get(timeout=5)
     print(f"replay error: {result.error_category}: {result.error}")
 
-    paths = worker_paths(0, base_dir=rerun_dir)
+    wdir = worker_dir(0, base_dir=rerun_dir)
 
-    if paths.sock_file.exists():
-        paths.sock_file.unlink(missing_ok=True)
+    if wdir.sock.exists():
+        wdir.sock.unlink(missing_ok=True)
 
     return ReplayResult(
         crash_dir=crash_dir,

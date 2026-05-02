@@ -1,7 +1,4 @@
 # Data files
-/data/logs/*
-!/data/logs/README.md
-/data/latest.*
 /data/reproduce.*
 /data/fuzz*/*
 /data/corpus/*.json

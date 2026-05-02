@@ -2,7 +2,7 @@ import json
 from typing import Iterator, Optional
 from pathlib import Path
 from collections import defaultdict
-from .consts import CORPUS_DIR
+from .utils import CORPUS_DIR
 from .gen_input_ops import OP_NAME_TO_TYPE, OP_TYPE_TO_NAME
 from .input_seq import InputSeq
 

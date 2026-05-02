@@ -6,10 +6,10 @@ import multiprocessing as mp
 from checkout import Linux, checkout
 from run import Driver, make_kstep, make_linux
 from scripts import GLOBAL_SIGNAL_CORPUS, cov_parse
-from scripts.fuzz_common import WorkItem, worker_paths
+from scripts.fuzz_common import WorkItem, worker_dir
 from scripts.fuzz_worker import FuzzWorker
 from scripts.input_seq import InputSeq, input_seq_from_log
-from scripts.consts import LOGS_DIR
+from scripts.utils import ResultDir
     
 def run_test(
     linux: Linux,
@@ -39,7 +39,7 @@ def run_test(
         driver = driver,
         name = name,
         rng_seed = seed,
-        base_dir = LOGS_DIR
+        base_dir = ResultDir.create().path
     )
     worker.run()
 
@@ -47,15 +47,15 @@ def run_test(
     if result.error:
         raise RuntimeError(f"worker failed: {result.error_category}: {result.error}")
 
-    paths = worker_paths(0)
+    wdir = worker_dir(0)
     seq = InputSeq()
     for op in result.ops:
         seq.append(op)
-    seq2 = input_seq_from_log(paths.log_file)
+    seq2 = input_seq_from_log(wdir.log)
     assert seq == seq2
 
     # Parse the signal file and get the signal records and list
-    signal_records = cov_parse(paths.cov_file)
+    signal_records = cov_parse(wdir.cov)
 
     # Symbolize the pcs
     GLOBAL_SIGNAL_CORPUS.update_pc_symbolize(

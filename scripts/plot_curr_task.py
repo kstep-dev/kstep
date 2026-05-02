@@ -8,15 +8,14 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
-from consts import RESULTS_DIR
+from utils import ResultDir
 from matplotlib import colors
 from parse_log import parse_jsonl
 from plot_utils import save_fig
 
 
 def parse_curr_task(path: Path, type: str) -> pd.DataFrame:
-    out_path = path.with_suffix(".jsonl")
-    df = parse_jsonl(out_path, type="curr_task")
+    df = parse_jsonl(path, type="curr_task")
     df["type"] = type
     return df
 
@@ -63,15 +62,15 @@ def plot_color_matrix(
 
 
 def plot_curr_task(
-    log_file_buggy: Path,
-    log_file_fixed: Path,
+    output_buggy: Path,
+    output_fixed: Path,
     title_buggy: str,
     title_fixed: str,
     color_map: dict[int, str],
     name_map: dict[int, str],
 ):
-    df_buggy = parse_curr_task(log_file_buggy, "buggy")
-    df_fixed = parse_curr_task(log_file_fixed, "fixed")
+    df_buggy = parse_curr_task(output_buggy, "buggy")
+    df_fixed = parse_curr_task(output_fixed, "fixed")
 
     df = pd.concat([df_buggy, df_fixed])
     matrix_buggy = build_matrix(df, "buggy", color_map)
@@ -174,8 +173,8 @@ def main(driver: str):
         title_fixed = "Fixed"
 
     fig = plot_curr_task(
-        log_file_buggy=RESULTS_DIR / f"repro_{driver}" / "buggy.log",
-        log_file_fixed=RESULTS_DIR / f"repro_{driver}" / "fixed.log",
+        output_buggy=ResultDir(f"repro_{driver}/buggy").output,
+        output_fixed=ResultDir(f"repro_{driver}/fixed").output,
         title_buggy=title_buggy,
         title_fixed=title_fixed,
         color_map=COLOR_MAPS.get(driver, {}),

@@ -25,12 +25,12 @@ from scripts.fuzz_common import (
     SeedPool,
     WorkItem,
     WorkResult,
-    worker_paths,
+    worker_dir,
 )
 from scripts.fuzz_mutate import bottleneck_signal
 from scripts.fuzz_worker import worker_main
 from scripts.input_seq import InputSeq
-from scripts.consts import FUZZ_CORPUS_DIR, FUZZ_ERROR_DIR, FUZZ_SUCCESS_DIR, fuzz_mode_dir
+from scripts.utils import FUZZ_CORPUS_DIR, FUZZ_ERROR_DIR, FUZZ_SUCCESS_DIR, fuzz_mode_dir
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Manager
@@ -131,16 +131,16 @@ class FuzzManager:
         }
         (target_dir / "ops.json").write_text(json.dumps(ops_data, indent=2))
 
-        paths = worker_paths(result.worker_id)
+        wdir = worker_dir(result.worker_id)
 
         # The worker may fail before all artifacts are produced, so keep crash
         # preservation best-effort and copy only the files that exist.
-        if paths.log_file and paths.log_file.exists():
-            shutil.copy2(paths.log_file, target_dir / "worker.log")
-        if paths.debug_log_file and paths.debug_log_file.exists():
-            shutil.copy2(paths.debug_log_file, target_dir / "worker.debug.log")
-        if paths.output_file and paths.output_file.exists():
-            shutil.copy2(paths.output_file, target_dir / "worker.jsonl")
+        if wdir.log.exists():
+            shutil.copy2(wdir.log, target_dir / "worker.log")
+        if wdir.debug_log.exists():
+            shutil.copy2(wdir.debug_log, target_dir / "worker.debug.log")
+        if wdir.output.exists():
+            shutil.copy2(wdir.output, target_dir / "worker.jsonl")
 
         return target_dir
 
@@ -341,15 +341,15 @@ class FuzzManager:
     # Parse coverage from one successful execution and add new seeds to the pool.
     def _handle_success_result(self, result: WorkResult) -> None:
         self._save_test(result)
-        paths = worker_paths(result.worker_id)
+        wdir = worker_dir(result.worker_id)
 
         # Successful executions can still produce no coverage, for example when
         # QEMU exits early or the cov stream stays empty.
-        if not (paths.cov_file.exists() and paths.cov_file.stat().st_size > 0):
+        if not (wdir.cov.exists() and wdir.cov.stat().st_size > 0):
             logging.warning("Success test does not have cov file")
             return
 
-        signal_records = cov_parse(paths.cov_file)
+        signal_records = cov_parse(wdir.cov)
         self.corpus.update_pc_symbolize(signal_records, self.name)
 
         seq = InputSeq()
