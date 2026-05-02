@@ -68,10 +68,13 @@ else
 endif
 
 .PHONY: linux
-linux $(BUILD_DIR)/kernel: $(LINUX_DIR)/.config
+linux: $(LINUX_DIR)/.config
 	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) -j$(shell nproc) LOCALVERSION=-$(NAME) WERROR=0 HOSTCFLAGS=-Wno-error
 	cp $(LINUX_IMAGE) $(BUILD_DIR)/kernel
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
+
+$(BUILD_DIR)/kernel:
+	$(MAKE) linux
 
 KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
 KSTEP_EXTRA_CONFIG ?=
