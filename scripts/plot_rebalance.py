@@ -8,7 +8,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from consts import RESULTS_DIR
+from utils import ResultDir
 from parse_log import parse_jsonl
 from plot_utils import save_fig
 
@@ -45,8 +45,8 @@ def plot_rebalance_comparison(buggy_df, fixed_df):
 
 def main(driver: str):
     target_cpu = 2
-    buggy_df = parse_log_file(RESULTS_DIR / f"repro_{driver}" / "buggy.jsonl", target_cpu)
-    fixed_df = parse_log_file(RESULTS_DIR / f"repro_{driver}" / "fixed.jsonl", target_cpu)
+    buggy_df = parse_log_file(ResultDir(f"repro_{driver}/buggy").output, target_cpu)
+    fixed_df = parse_log_file(ResultDir(f"repro_{driver}/fixed").output, target_cpu)
 
     fig = plot_rebalance_comparison(buggy_df, fixed_df)
     save_fig(fig, driver)

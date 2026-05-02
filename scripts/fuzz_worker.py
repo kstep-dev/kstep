@@ -15,8 +15,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import BinaryIO, Optional
 
-from run import Driver, start_qemu
-from scripts.fuzz_common import Ops, WorkItem, WorkResult, worker_paths
+from run import Driver, build_qemu_cmd
+from scripts.fuzz_common import Ops, WorkItem, WorkResult, worker_dir
 from scripts.gen_input_core import (
     _op_matches_task_state,
     generate_next_command,
@@ -232,10 +232,10 @@ class FuzzWorker:
         self.enable_task_freeze = enable_task_freeze
         self.qemu_cpus = qemu_cpus
         self.io_timeout_sec = io_timeout_sec
-        self.paths = (
-            worker_paths(worker_id, base_dir=base_dir)
+        self.result_dir = (
+            worker_dir(worker_id, base_dir=base_dir)
             if base_dir is not None
-            else worker_paths(worker_id)
+            else worker_dir(worker_id)
         )
 
         seed = rng_seed if rng_seed is not None else (os.getpid() ^ (worker_id + 1) * 0x9E3779B9)
@@ -249,7 +249,7 @@ class FuzzWorker:
         logger.propagate = False
         logger.handlers.clear()
 
-        handler = logging.FileHandler(self.paths.debug_log_file, mode="w")
+        handler = logging.FileHandler(self.result_dir.debug_log, mode="w")
         handler.setFormatter(logging.Formatter("%(asctime)s %(message)s"))
         logger.addHandler(handler)
         return logger, handler
@@ -261,15 +261,15 @@ class FuzzWorker:
 
     # Start QEMU, connect to kmod, and initialize generator state for this work item.
     def _start_session(self, work: WorkItem) -> FuzzWorkerSession:
-        proc = start_qemu(
+        cmd = build_qemu_cmd(
             driver=self.driver,
             name=self.name,
-            log_file=self.paths.log_file,
-            sock_file=self.paths.sock_file,
-            quiet=True,
+            result_dir=self.result_dir,
+            use_sock=True,
+            headless=True,
             cpu_affinity=self.qemu_cpus,
-            if_update_latest=False
         )
+        proc = subprocess.Popen(cmd, shell=True)
 
         gen_seed = 0 if work.mode in ("replay") else self.rng.randint(0, 2**32 - 1)
         kstep_cpus = self.driver.num_cpus - 1
@@ -287,7 +287,7 @@ class FuzzWorker:
             enable_task_freeze=self.enable_task_freeze,
         )
 
-        session = FuzzWorkerSession(gen, proc, self.paths.sock_file, self.logger, self.io_timeout_sec)
+        session = FuzzWorkerSession(gen, proc, self.result_dir.sock, self.logger, self.io_timeout_sec)
 
         if session.read_kmod_state() is None:
             session.kill()
@@ -443,20 +443,20 @@ class FuzzWorker:
             self.logger.error(f"Worker {self.worker_id}: {error}")
             return error
 
-        if not _has_kstep_start_marker(self.paths.log_file):
+        if not _has_kstep_start_marker(self.result_dir.log):
             self.logger.error(
                 f"Worker {self.worker_id}: Missing kSTEP start marker "
                 f"{_KSTEP_START_MARKER.decode('utf-8', errors='ignore')!r} in log file."
             )
             return "bootfail: missing kstep start marker"
 
-        if _check_for_crash(self.paths.log_file):
+        if _check_for_crash(self.result_dir.log):
             return "errorlog: error log"
         return None
 
     # Run one work item end-to-end and package the resulting execution record.
     def _run_one(self, work: WorkItem) -> WorkResult:
-        self.paths.sock_file.unlink(missing_ok=True)
+        self.result_dir.sock.unlink(missing_ok=True)
         self._reset_debug_log()
 
         t0 = time.monotonic()
@@ -483,9 +483,9 @@ class FuzzWorker:
         except Exception as exc:
             session.kill(kill_proc=True)
             self.logger.error(f"Worker {self.worker_id}: {exc}")
-            if _check_for_crash(self.paths.log_file):
+            if _check_for_crash(self.result_dir.log):
                 error = "qemucrash: qemucrash"
-            elif not _has_kstep_start_marker(self.paths.log_file):
+            elif not _has_kstep_start_marker(self.result_dir.log):
                 error = "bootfail: missing kstep start marker"
             else:
                 error = str(exc)

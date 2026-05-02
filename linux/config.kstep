@@ -87,3 +87,8 @@ CONFIG_FUNCTION_TRACER=y
 CONFIG_BUG=y
 CONFIG_DEBUG_BUGVERBOSE=y
 CONFIG_DEBUG_KERNEL=y
+
+#
+# kSTEP (overridden to =y by config.kstep.cov for fuzzing)
+#
+# CONFIG_KSTEP_COV is not set

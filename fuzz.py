@@ -27,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from run import Driver, make_kstep, make_linux
-from scripts.consts import FUZZ_DIR, LINUX_ROOT_DIR
+from scripts.utils import FUZZ_DIR, LINUX_ROOT_DIR
 from scripts.fuzz_manager import run_manager
 
 
@@ -114,6 +114,12 @@ def main() -> None:
         action="store_true",
         help="Run a bounded CI smoke test: exactly 3 executions in fresh, replay, then mutate mode",
     )
+    parser.add_argument(
+        "--rebuild_linux",
+        action="store_true",
+        default=False,
+        help="Rebuild the Linux kernel before fuzzing.",
+    )
     args = parser.parse_args()
 
     FUZZ_DIR.mkdir(parents=True, exist_ok=True)
@@ -126,7 +132,7 @@ def main() -> None:
     logging.getLogger().addHandler(file_handler)
     logging.info(f"Logging to {log_path}")
 
-    if not args.ci_mode:
+    if args.rebuild_linux:
         make_linux(args.name, config=LINUX_ROOT_DIR / "config.kstep.cov")
     make_kstep(args.name)
 

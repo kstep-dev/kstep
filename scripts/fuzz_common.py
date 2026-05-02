@@ -6,27 +6,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import random
 from typing import Mapping, Optional
-from scripts.consts import FUZZ_DIR
+from scripts.utils import FUZZ_DIR, RESULTS_DIR, ResultDir
 
 Ops = list[tuple[int, int, int, int]]
 
-@dataclass(frozen=True)
-class WorkerPaths:
-    log_file: Path
-    sock_file: Path
-    debug_log_file: Path
-    output_file: Path
-    cov_file: Path
 
-
-def worker_paths(worker_id: int, base_dir: Path = FUZZ_DIR) -> WorkerPaths:
-    return WorkerPaths(
-        log_file = base_dir / f"worker_{worker_id}.log",
-        sock_file = base_dir / f"worker_{worker_id}.sock",
-        debug_log_file = base_dir / f"worker_{worker_id}.debug.log",
-        output_file = base_dir / f"worker_{worker_id}.jsonl",
-        cov_file = base_dir / f"worker_{worker_id}.cov",
-    )
+def worker_dir(worker_id: int, base_dir: Path = FUZZ_DIR) -> ResultDir:
+    name = str((base_dir / f"worker_{worker_id}").relative_to(RESULTS_DIR))
+    return ResultDir.create(name, set_latest=False)
 
 @dataclass
 class MutationPivot:

@@ -8,7 +8,6 @@ all:
 # ========= common =========
 
 PROJ_DIR := $(CURDIR)
-MAKEFLAGS := $(MAKEFLAGS) $(if $(findstring -j,$(MAKEFLAGS)),,-j$(shell nproc))
 BEAR_CMD := $(if $(shell which bear),bear --append --output compile_commands.json --,)
 
 NAME ?= $(notdir $(realpath $(PROJ_DIR)/build/current))
@@ -24,10 +23,9 @@ BUILD_DIR := $(PROJ_DIR)/build/$(NAME)
 .PHONY: user
 user: $(BUILD_DIR)/user
 
-$(BUILD_DIR)/user: $(wildcard $(PROJ_DIR)/user/*)
+$(BUILD_DIR)/user: $(PROJ_DIR)/user/user.c $(PROJ_DIR)/user/user.h
 	mkdir -p $(dir $@)
-	musl-gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ \
-	    $(filter %.c, $^)
+	musl-gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o $@ $<
 
 # ========= kmod =========
 
@@ -37,21 +35,24 @@ KMOD_OUT_DIR := $(BUILD_DIR)/kmod
 .PHONY: kmod
 kmod: $(KMOD_OUT_DIR)/kmod.ko
 
-$(KMOD_OUT_DIR)/kmod.ko: $(shell find $(KMOD_SRC_DIR) -type f -not -name compile_commands.json) $(BUILD_DIR)/kernel
+$(KMOD_OUT_DIR)/kmod.ko: $(shell find $(KMOD_SRC_DIR) -type f) $(BUILD_DIR)/kernel
 	mkdir -p $(dir $@)
 	find $(KMOD_OUT_DIR) -type l -delete
 	cp -rs $(KMOD_SRC_DIR)/* $(KMOD_OUT_DIR)
-	cd $(BUILD_DIR) && $(BEAR_CMD) $(MAKE) -C $(LINUX_DIR) M=$(KMOD_OUT_DIR) modules
+	cd $(BUILD_DIR) && $(BEAR_CMD) $(MAKE) -j$(shell nproc) -C $(LINUX_DIR) M=$(KMOD_OUT_DIR) modules
 
 # ========= kstep =========
 
+ROOTFS_DIR := $(BUILD_DIR)/rootfs
+
 .PHONY: kstep
 kstep: $(BUILD_DIR)/rootfs.cpio
-
 $(BUILD_DIR)/rootfs.cpio: $(KMOD_OUT_DIR)/kmod.ko $(BUILD_DIR)/user
-	touch -d @0 $^
-	cd $(KMOD_OUT_DIR) && echo kmod.ko | cpio -o --format=newc --reproducible > $@
-	cd $(BUILD_DIR) && echo user | cpio -o --format=newc --reproducible >> $@
+	rm -rf $(ROOTFS_DIR)
+	mkdir -p $(ROOTFS_DIR)
+	cp -p $^ $(ROOTFS_DIR)/
+	touch -d @0 $(ROOTFS_DIR) $(ROOTFS_DIR)/*
+	cd $(ROOTFS_DIR) && find . | sort | cpio -o --format=newc --reproducible --quiet > $@
 
 # ========= linux =========
 
@@ -67,8 +68,8 @@ else
 endif
 
 .PHONY: linux
-linux: linux-config linux-patch
-	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) LOCALVERSION=-$(NAME) WERROR=0 HOSTCFLAGS=-Wno-error
+linux: $(LINUX_DIR)/.config
+	cd $(LINUX_DIR) && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) -j$(shell nproc) LOCALVERSION=-$(NAME) WERROR=0 HOSTCFLAGS=-Wno-error
 	cp $(LINUX_IMAGE) $(BUILD_DIR)/kernel
 	cp $(LINUX_DIR)/vmlinux $(BUILD_DIR)/vmlinux
 
@@ -78,15 +79,11 @@ $(BUILD_DIR)/kernel:
 KSTEP_CONFIG := $(PROJ_DIR)/linux/config.kstep
 KSTEP_EXTRA_CONFIG ?=
 
-.PHONY: linux-config
-linux-config: $(LINUX_DIR)/.config
-$(LINUX_DIR)/.config: $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH) $(KSTEP_EXTRA_CONFIG)
+$(LINUX_DIR)/.config: $(KSTEP_CONFIG) $(KSTEP_CONFIG).$(ARCH) $(KSTEP_EXTRA_CONFIG) | $(LINUX_DIR)/kernel/sched/cov.c
 	cd $(LINUX_DIR) && ./scripts/kconfig/merge_config.sh -n $(abspath $^) && touch $@
 
-.PHONY: linux-patch
-linux-patch: $(LINUX_DIR)/kernel/sched/cov.c
 $(LINUX_DIR)/kernel/sched/cov.c: $(PROJ_DIR)/linux/cov.c $(PROJ_DIR)/linux/Kconfig.kstep $(PROJ_DIR)/linux/Makefile.kstep
-	ln -sft $(LINUX_DIR)/kernel/sched/ $(PROJ_DIR)/linux/cov.c $(PROJ_DIR)/linux/Kconfig.kstep $(PROJ_DIR)/linux/Makefile.kstep
+	ln -sft $(LINUX_DIR)/kernel/sched/ $^
 	echo 'include $$(src)/Makefile.kstep' >> $(LINUX_DIR)/kernel/sched/Makefile
 	echo 'source "kernel/sched/Kconfig.kstep"' >> $(LINUX_DIR)/init/Kconfig
 

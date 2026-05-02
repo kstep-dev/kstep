@@ -9,9 +9,10 @@ from scripts import (
     BUILD_CURR_DIR,
     LINUX_MASTER_DIR,
     PROJ_DIR,
-    build_dir,
     decompress,
     download,
+    get_build_dir,
+    get_linux_dir,
     system,
 )
 
@@ -47,11 +48,9 @@ def add_worktree(version: str, linux_dir: Path):
 
 
 def set_current_build(name: str):
-    target = build_dir(name)
     BUILD_CURR_DIR.parent.mkdir(parents=True, exist_ok=True)
     BUILD_CURR_DIR.unlink(missing_ok=True)
-    BUILD_CURR_DIR.symlink_to(target)
-    logging.info(f"{fmt_path(BUILD_CURR_DIR)} now points to {fmt_path(target)}")
+    BUILD_CURR_DIR.symlink_to(get_build_dir(name))
 
 
 def get_download_url(version: str) -> str:
@@ -75,13 +74,11 @@ def checkout(
     patch: Path | None = None,
     tarball: bool = False,
 ):
-    linux_dir = build_dir(name) / "linux"
-    if linux_dir.exists():
-        logging.info(f"{fmt_path(linux_dir)} already exists")
-    else:
+    linux_dir = get_linux_dir(name)
+    if not linux_dir.exists():
         linux_dir.parent.mkdir(parents=True, exist_ok=True)
         if tarball:
-            tarball_path = build_dir(name) / f"{version}.tar.xz"
+            tarball_path = get_build_dir(name) / f"{version}.tar.xz"
             url = get_download_url(version)
             download(url, tarball_path)
             decompress(tarball_path, linux_dir)
@@ -92,6 +89,7 @@ def checkout(
         if patch:
             patch_linux(linux_dir, patch)
     set_current_build(name)
+    logging.info(f"Checked out Linux {version} to {fmt_path(linux_dir)}")
 
 
 if __name__ == "__main__":

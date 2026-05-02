@@ -5,12 +5,10 @@ import json
 from pathlib import Path
 
 import pandas as pd
-from consts import LATEST_LOG
-from utils import parse_line
+from utils import ResultDir, parse_line
 
 
 def parse_jsonl(path: Path, type: str) -> pd.DataFrame:
-    print(f'Parsing {path} with type "{type}"')
     rows = []
     with open(path) as f:
         for line in f:
@@ -37,7 +35,7 @@ def parse_log(path: Path, prefix: str) -> pd.DataFrame:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("path", type=Path, default=LATEST_LOG, nargs="?")
+    parser.add_argument("path", type=Path, default=ResultDir("latest").log, nargs="?")
     parser.add_argument(
         "--prefixes",
         type=str,

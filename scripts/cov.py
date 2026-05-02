@@ -4,7 +4,7 @@ import subprocess
 from collections import defaultdict
 from pathlib import Path
 
-from .consts import build_dir
+from .utils import get_build_dir, get_linux_dir
 
 COV_RECORD_SIZE = 16  # u32 pid + u32 cmd_id + u64 pc
 
@@ -26,7 +26,7 @@ def cov_parse(cov_file: Path) -> dict[int, dict[int, list[int]]]:
     return records
 
 def symbolize_pcs(pcs: list[int], name: str) -> dict[int, tuple[str, str]]:
-    vmlinux_path = build_dir(name) / "vmlinux"
+    vmlinux_path = get_build_dir(name) / "vmlinux"
     if not vmlinux_path.exists():
         raise RuntimeError(f"Missing vmlinux: {vmlinux_path}")
 
@@ -58,7 +58,7 @@ def symbolize_pcs(pcs: list[int], name: str) -> dict[int, tuple[str, str]]:
 
         # Keep only the path relative to the linux source directory.
         loc_path, sep, loc_suffix = loc.partition(":")
-        linux_prefix = f"{build_dir(name) / "linux"}/"
+        linux_prefix = f"{get_linux_dir(name)}/"
         if linux_prefix in loc_path:
             loc_path = loc_path.rsplit(linux_prefix, 1)[1]
         loc = f"{loc_path}{sep}{loc_suffix}" if sep else loc_path

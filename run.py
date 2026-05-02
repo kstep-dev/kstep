@@ -4,23 +4,16 @@ import argparse
 import dataclasses
 import logging
 import os
-import shutil
-import subprocess
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
 
 from scripts import (
     BUILD_CURR_DIR,
-    LATEST_COV,
-    LATEST_LOG,
-    LATEST_OUTPUT,
-    LOGS_DIR,
-    PROJ_DIR,
-    build_dir,
+    ResultDir,
+    get_build_dir,
+    get_linux_dir,
     system,
-    update_latest,
 )
 from scripts.corpus import GLOBAL_SIGNAL_CORPUS
 from scripts.cov import cov_parse
@@ -41,47 +34,28 @@ class Driver:
     capacity: Optional[str] = None
 
 
-def get_qemu_path() -> Path:
-    name = f"qemu-system-{ARCH}"
-    path = shutil.which(name)
-    if path is None:
-        raise RuntimeError(f"QEMU executable not found: {name}")
-    return Path(path)
-
-
-def start_qemu(
+def build_qemu_cmd(
     driver: Driver,
     name: str,
-    log_file: Optional[Path] = None,
-    sock_file: Optional[Path] = None,
+    result_dir: ResultDir,
+    use_sock: bool = False,
     debug: bool = False,
-    quiet: bool = False,
+    headless: bool = False,
     cpu_affinity: Optional[str] = None,
-    if_update_latest = True
-) -> subprocess.Popen:
-    """Start QEMU in the background. Returns the process handle."""
+) -> str:
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
 
-    qemu_path = get_qemu_path()
-    kernel_img = build_dir(name) / "kernel"
-    rootfs_img = build_dir(name) / "rootfs.cpio"
-
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = log_file or LOGS_DIR / f"log-{timestamp}.log"
-    output_file = log_file.with_suffix(".jsonl")
-    cov_file = log_file.with_suffix(".cov")
-    if if_update_latest:
-        update_latest(LATEST_LOG, log_file)
-        update_latest(LATEST_OUTPUT, output_file)
-        update_latest(LATEST_COV, cov_file)
+    build = get_build_dir(name)
+    kernel_img = build / "kernel"
+    rootfs_img = build / "rootfs.cpio"
 
     isol_cpus = f"1-{driver.num_cpus - 1}" if driver.num_cpus > 2 else "1"
     boot_args = [
         "rw",
         "nokaslr",
-        "loglevel=7",   # print up to KERN_DEBUG; ensures KERN_WARNING (4) always appears
+        "loglevel=7",  # print up to KERN_DEBUG; ensures KERN_WARNING (4) always appears
         "sched_verbose",
         f"isolcpus=nohz,managed_irq,{isol_cpus}",
         "irqaffinity=0",
@@ -115,7 +89,7 @@ def start_qemu(
         return f"-serial chardev:{name}"
 
     cmd = [
-        str(qemu_path),
+        f"qemu-system-{ARCH}",
         f"-smp {driver.num_cpus}",
         "-cpu max",
         f"-m {driver.mem_mb}M",
@@ -127,22 +101,29 @@ def start_qemu(
         # Prevent automatic reboot after panic
         "-no-reboot",
         # log file
-        f"-chardev stdio,id=char0,mux=on,logfile={log_file},signal=off",
-        "-mon chardev=char0",
         serial_device("char0"),
         # input and output files
-        f"-chardev file,id=char1,path={output_file}",
+        f"-chardev file,id=char1,path={result_dir.output}",
         serial_device("char1"),
         # cov file
-        f"-chardev file,id=char2,path={cov_file}",
+        f"-chardev file,id=char2,path={result_dir.cov}",
         serial_device("char2"),
         # acceleration
         f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]
 
-    if sock_file is not None:
+    
+    if headless:
+        cmd += [f"-chardev file,id=char0,path={result_dir.log}"]
+    else:
         cmd += [
-            f"-chardev socket,id=char3,path={sock_file},server=on,wait=on",
+            f"-chardev stdio,id=char0,mux=on,logfile={result_dir.log},signal=off",
+            "-mon chardev=char0",
+        ]
+
+    if use_sock:
+        cmd += [
+            f"-chardev socket,id=char3,path={result_dir.sock},server=on,wait=on",
             serial_device("char3"),
         ]
 
@@ -155,34 +136,29 @@ def start_qemu(
     cmd_str = " ".join(cmd)
     if cpu_affinity is not None:
         cmd_str = f"taskset -c {cpu_affinity} {cmd_str}"
-    devnull = subprocess.DEVNULL if quiet else None
-    return subprocess.Popen(cmd_str, shell=True, stdout=devnull, stderr=devnull)
+    return cmd_str
+
 
 def run_qemu(
     driver: Driver,
     name: str,
-    log_file: Optional[Path] = None,
-    sock_file: Optional[Path] = None,
+    result_dir: ResultDir,
+    use_sock: bool = False,
     debug: bool = False,
-    quiet: bool = False,
+    headless: bool = False,
 ):
-    proc = start_qemu(driver, name, log_file, sock_file, debug, quiet)
-    proc.wait()
+    system(build_qemu_cmd(driver, name, result_dir, use_sock, debug, headless))
 
-def print_run_results(
-    name: str,
-    log_file=LATEST_LOG,
-    output_file=LATEST_OUTPUT,
-    cov_file=LATEST_COV,
-):
-    print(f"Log: {log_file}")
-    print(f"Output: {output_file}")
-    print(f"Cov: {cov_file}")
+
+def print_run_results(name: str, result_dir: Optional[ResultDir] = None):
+    if result_dir is None:
+        result_dir = ResultDir("latest")
+    print(f"Results saved to {result_dir}")
 
     # check if cov is empty and call analyze_new_signals and analyze_per_action_signals if it is not
-    if cov_file.exists() and cov_file.stat().st_size != 0:
+    if result_dir.cov.exists() and result_dir.cov.stat().st_size != 0:
         # Parse the signal file and get the signal records and list
-        signal_records = cov_parse(cov_file)
+        signal_records = cov_parse(result_dir.cov)
 
         # Symbolize the pcs
         GLOBAL_SIGNAL_CORPUS.update_pc_symbolize(
@@ -191,7 +167,7 @@ def print_run_results(
         )
 
         # Parse the input sequence from the log file
-        seq = input_seq_from_log(log_file=log_file)
+        seq = input_seq_from_log(log_file=result_dir.log)
 
         print(signal_records.keys())
 
@@ -200,7 +176,7 @@ def print_run_results(
             seq=seq,
             signal_records=signal_records,
             name=name,
-            output_path=LOGS_DIR / f"{cov_file}.new_edges.json",
+            output_path=result_dir.path / "kstep.cov.new_edges.json",
         )
 
         # Analyze the per-action signals for the test if there are new signals
@@ -211,7 +187,7 @@ def print_run_results(
                 signal_records=signal_records,
                 new_signals=new_signals,
                 name=name,
-                output_path=LOGS_DIR / f"{cov_file}.json",
+                output_path=result_dir.path / "kstep.cov.json",
             )
 
 
@@ -225,7 +201,7 @@ def is_port_free(port: int) -> bool:
 def run_gdb(name: str):
     import signal
 
-    linux_dir = build_dir(name) / "linux"
+    linux_dir = get_linux_dir(name)
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     args = [
         "-iex 'set pagination off'",
@@ -237,13 +213,20 @@ def run_gdb(name: str):
     system(f"gdb {linux_dir}/vmlinux " + " ".join(args))
 
 
-def make_kstep(name: str):
-    system(f"make -C {PROJ_DIR} kstep NAME={name}")
+def make_kstep(name: str, log: bool = False):
+    cmd = f"make kstep NAME={name}"
+    if log:
+        cmd += f" >> {get_build_dir(name) / 'build.log'}"
+    system(cmd)
 
 
-def make_linux(name: str, config: Optional[Path] = None):
-    extra = f" KSTEP_EXTRA_CONFIG={config}" if config else ""
-    system(f"make -C {PROJ_DIR} linux NAME={name}{extra}")
+def make_linux(name: str, config: Optional[Path] = None, log: bool = False):
+    cmd = f"make linux NAME={name}"
+    if config:
+        cmd += f" KSTEP_EXTRA_CONFIG={config}"
+    if log:
+        cmd += f" >> {get_build_dir(name) / 'build.log'}"
+    system(cmd)
 
 
 def resolve_name(name: Optional[str] = None) -> str:
@@ -257,8 +240,9 @@ def resolve_name(name: Optional[str] = None) -> str:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", type=str, default=None)
-    parser.add_argument("--log_file", type=Path, default=None)
+    parser.add_argument("--result_name", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
+    parser.add_argument("--rebuild_linux", action="store_true", default=False)
     # See driver config
     parser.add_argument("name", type=str, default=None, nargs="?")
     parser.add_argument("--num_cpus", type=int, default=None)
@@ -275,21 +259,22 @@ def main():
         logging.info("Port 1234 is already in use, running GDB...")
         run_gdb(name=name)
     else:
+        if args.rebuild_linux:
+            make_linux(name=name)
         make_kstep(name=name)
-        driver = Driver(
-            **{
-                field.name: value
-                for field in dataclasses.fields(Driver)
-                if (value := getattr(args, field.name)) is not None
-            }
-        )
+        driver = Driver(**{
+            field.name: value
+            for field in dataclasses.fields(Driver)
+            if (value := getattr(args, field.name)) is not None
+        })
+        result_dir = ResultDir.create(args.result_name)
         run_qemu(
             driver=driver,
             name=name,
             debug=args.debug,
-            log_file=args.log_file,
+            result_dir=result_dir,
         )
-        print_run_results(name=name)
+        print_run_results(name=name, result_dir=result_dir)
 
 
 if __name__ == "__main__":

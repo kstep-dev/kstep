@@ -1,9 +1,82 @@
+import json
 import logging
 import subprocess
+from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-import json
-from typing import TextIO
+from typing import Optional
+
+PROJ_DIR = Path(__file__).parent.parent.resolve()
+
+LINUX_ROOT_DIR = PROJ_DIR / "linux"
+LINUX_CONFIG = LINUX_ROOT_DIR / "config"
+
+RESULTS_DIR = PROJ_DIR / "results"
+DATA_DIR = PROJ_DIR / "data"
+BUILD_DIR = PROJ_DIR / "build"
+BUILD_CURR_DIR = BUILD_DIR / "current"
+LINUX_MASTER_DIR = BUILD_DIR / "master"
+
+CORPUS_DIR = DATA_DIR / "corpus"
+
+ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+FUZZ_DIR = RESULTS_DIR / f"fuzz_{ts}"
+FUZZ_SUCCESS_DIR = FUZZ_DIR / "success"
+FUZZ_ERROR_DIR = FUZZ_DIR / "error"
+FUZZ_CORPUS_DIR = FUZZ_DIR / "corpus"
+
+
+def get_build_dir(name: str) -> Path:
+    return BUILD_DIR / name
+
+
+def get_linux_dir(name: str) -> Path:
+    return get_build_dir(name) / "linux"
+
+
+def fuzz_mode_dir(mode: str) -> Path:
+    name = {
+        "fresh": "fresh",
+        "replay": "replay",
+        "mutate": "mutation",
+    }.get(mode, mode)
+    return RESULTS_DIR / "fuzz" / name
+
+
+@dataclass(frozen=True)
+class ResultDir:
+    """A per-run directory under RESULTS_DIR with stable child file names."""
+    name: str
+
+    @classmethod
+    def create(cls, name: Optional[str] = None, set_latest: bool = True) -> "ResultDir":
+        """Create `results/<name>/` (defaults to `tmp_<ts>`); optionally point `results/latest` at it."""
+        if name is None:
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            name = f"tmp_{ts}"
+        out = cls(name)
+        out.path.mkdir(parents=True, exist_ok=True)
+        if set_latest:
+            latest = RESULTS_DIR / "latest"
+            latest.unlink(missing_ok=True)
+            latest.symlink_to(name)
+        return out
+
+    def __str__(self) -> str: return str(self.path)
+
+    @property
+    def path(self) -> Path: return RESULTS_DIR / self.name
+    @property
+    def log(self) -> Path: return self.path / "qemu.log"
+    @property
+    def output(self) -> Path: return self.path / "kstep.jsonl"
+    @property
+    def cov(self) -> Path: return self.path / "kstep.cov"
+    @property
+    def sock(self) -> Path: return self.path / "qemu.sock"
+    @property
+    def debug_log(self) -> Path: return self.path / "debug.log"
 
 
 class TermColor(StrEnum):
@@ -18,52 +91,9 @@ class TermColor(StrEnum):
     RESET = "\033[0m"
 
 
-_COMMAND_LOG_PATH: Path | None = None
-
-
-def set_command_log_path(path: Path | None):
-    global _COMMAND_LOG_PATH
-    _COMMAND_LOG_PATH = path
-
-
-def get_command_log_path() -> Path | None:
-    return _COMMAND_LOG_PATH
-
-
-def append_log_line(line: str):
-    if _COMMAND_LOG_PATH is None:
-        return
-    _COMMAND_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with _COMMAND_LOG_PATH.open("a", encoding="utf-8") as f:
-        f.write(line)
-        if not line.endswith("\n"):
-            f.write("\n")
-
-def _open_command_log() -> TextIO | None:
-    if _COMMAND_LOG_PATH is None:
-        return None
-    _COMMAND_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    return _COMMAND_LOG_PATH.open("a", encoding="utf-8")
-
-
 def system(cmd: str):
-    logging.info(f"Running: `{TermColor.BLUE}{cmd}{TermColor.RESET}`")
-
-    log_file = _open_command_log()
-    if log_file is None:
-        subprocess.run(cmd, shell=True, check=True)
-    else:
-        log_file.write(f"$ {cmd}\n")
-        log_file.flush()
-        subprocess.run(
-            cmd,
-            shell=True,
-            check=True,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-        )
-        log_file.write("\n")
-        log_file.flush()
+    logging.info(f"$ {TermColor.BLUE}{cmd}{TermColor.RESET}")
+    subprocess.run(cmd, shell=True, check=True, cwd=PROJ_DIR)
 
 
 def download(url: str, output_path: Path):
@@ -80,7 +110,9 @@ def decompress(tarball_path: Path, output_dir: Path):
     system(f"mkdir -p {output_dir}")
     system(f"tar -xf {tarball_path} -C {output_dir} --strip-components=1")
 
+
 TIMESTAMP_LEN = 14
+
 
 # Parse a line from the log file
 def parse_line(line: str, prefix: str) -> dict | None:
