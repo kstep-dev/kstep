@@ -19,7 +19,7 @@ If you are **not** an OSDI'26 AE reviewer, continue here.
 #### 📦 Clone the repository
 
 ```sh
-git clone https://github.com/kstep-dev/kstep
+git clone --recurse-submodules https://github.com/kstep-dev/kstep
 ```
 
 #### 💾 Install dependencies
