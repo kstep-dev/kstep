@@ -26,4 +26,4 @@ runs:
       shell: bash
       run: |
         make linux KSTEP_EXTRA_CONFIG=${{ inputs.cov == 'true' && 'linux/config.kstep.cov' || '' }}
-        make clean-linux
+        make clean-all
