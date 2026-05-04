@@ -1,7 +1,7 @@
 // Replay driver for data/fuzz_20260406_205141/error/cfs_util_decay/w0_20260406_205539
 #include "driver.h"
 #include "internal.h"
-#include "op_handler.h"
+#include "fuzz/handler.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
 struct replay_op {

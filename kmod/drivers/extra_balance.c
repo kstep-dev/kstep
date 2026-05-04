@@ -1,7 +1,7 @@
 // https://github.com/torvalds/linux/commit/6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3
 
 #include "driver.h"
-#include "op_handler.h"
+#include "fuzz/checker.h"
 
 static struct task_struct *tasks[5];
 

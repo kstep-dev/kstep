@@ -1,7 +1,7 @@
 #include <linux/cgroup.h>
 #include <linux/kernel.h>
 
-#include "op_handler_internal.h"
+#include "handler_internal.h"
 
 bool kstep_op_cgroup_is_leaf(int id) {
   for (int i = 0; i < MAX_CGROUPS; i++) {

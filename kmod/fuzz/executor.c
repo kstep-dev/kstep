@@ -5,7 +5,8 @@
 #include <linux/ctype.h> // isdigit or alpha
 #include "driver.h"
 #include "internal.h"
-#include "op_handler.h"
+#include "checker.h"
+#include "handler.h"
 
 #define MAX_LINE_LENGTH 1024
 struct console_parse_state {
