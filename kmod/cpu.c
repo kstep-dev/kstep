@@ -151,30 +151,39 @@ static void topo_init(void) {
   }
 }
 
-/* Parse "cpus/cpus/..." (mutates via strsep) and apply to the given level. */
+/* Parse "group|group|..." (each a cpulist) and assign every CPU in a group
+ * the same mask at this level. Every online CPU must belong to exactly one
+ * group. */
 static void topo_set_level(enum kstep_topo_level level, char *spec) {
-  const char *cpulists[NR_CPUS];
-  int n = 0;
-  char *tok;
-  while ((tok = strsep(&spec, "/")) != NULL) {
-    if (n >= NR_CPUS)
-      panic("Too many cpulists for level %d", level);
-    cpulists[n++] = tok;
-  }
-  if (n != num_online_cpus())
-    panic("Level %d: %d cpulists, expected %d", level, n, num_online_cpus());
+  struct cpumask seen;
+  cpumask_clear(&seen);
 
-  for (int i = 0; i < n; i++)
-    if (cpulist_parse(cpulists[i], &kstep_masks[level][i]) < 0)
-      panic("Failed to parse cpulist '%s' for level %d", cpulists[i], level);
+  char *group;
+  while ((group = strsep(&spec, "|")) != NULL) {
+    struct cpumask gmask;
+    if (cpulist_parse(group, &gmask) < 0)
+      panic("Failed to parse group '%s'", group);
+
+    int cpu;
+    for_each_cpu(cpu, &gmask) {
+      if (cpumask_test_cpu(cpu, &seen))
+        panic("CPU %d in multiple groups for level %d", cpu, level);
+      cpumask_copy(&kstep_masks[level][cpu], &gmask);
+    }
+    cpumask_or(&seen, &seen, &gmask);
+  }
+
+  if (!cpumask_equal(&seen, cpu_online_mask))
+    panic("Not every online CPU is assigned a group for level %d", level);
 
   if (level == KSTEP_TOPO_SMT) {
     // Also update cpu_sibling_map so that cpu_smt_mask() / is_core_idle()
     // reflect the new SMT topology.
     KSYM_IMPORT_TYPED(cpumask_var_t, cpu_sibling_map);
-    for (int i = 0; i < n; i++)
-      cpumask_copy(*per_cpu_ptr(KSYM_cpu_sibling_map, i),
-                   &kstep_masks[KSTEP_TOPO_SMT][i]);
+    int cpu;
+    for_each_cpu(cpu, cpu_online_mask)
+      cpumask_copy(*per_cpu_ptr(KSYM_cpu_sibling_map, cpu),
+                   &kstep_masks[KSTEP_TOPO_SMT][cpu]);
   }
 }
 
@@ -202,8 +211,8 @@ void kstep_topo_set(const char *spec) {
   cursor = buf;
 
   topo_init();
-  while ((level = strsep(&cursor, "+")) != NULL) {
-    char *name = strsep(&level, ":");
+  while ((level = strsep(&cursor, ";")) != NULL) {
+    char *name = strsep(&level, "=");
     if (!name || !*name || !level || !*level)
       panic("Invalid level spec in '%s'", spec);
     topo_set_level(get_topo_level(name), level);

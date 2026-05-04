@@ -4,7 +4,7 @@ static struct task_struct *tasks[4];
 
 static void setup(void) {
   kstep_cap_set("2=512,4=512");
-  kstep_topo_set("CLS:0/1-2/1-2/3-4/3-4");
+  kstep_topo_set("CLS=0|1-2|3-4");
 
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();

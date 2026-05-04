@@ -7,7 +7,7 @@ static struct task_struct *tasks[5];
 
 static void setup(void) {
   // SMT pairs: [1,2] [3,4], MC: [1-4]
-  kstep_topo_set("SMT:0/1-2/1-2/3-4/3-4+CLS:0/1-2/1-2/3-4/3-4");
+  kstep_topo_set("SMT=0|1-2|3-4;CLS=0|1-2|3-4");
 
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();

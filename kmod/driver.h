@@ -114,8 +114,10 @@ enum kstep_kthread_state kstep_kthread_get_state(struct task_struct *p);
 // cpu.c
 #define CPU_SPEC_LEN 512
 // String-spec API (parses spec, applies, rebuilds sched-domains as needed).
-//   topo: "<level>:<cpus>/<cpus>/...[+<level>:<cpus>/...]" — levels applied in order
-//         e.g. "SMT:0/1-2/1-2/3-4/3-4+CLS:0/1-2/1-2/3-4/3-4"
+//   topo: "<level>=<group>|<group>|...[;<level>=<group>|<group>|...]"
+//         each <group> is a cpulist; every online CPU must belong to one group
+//         per level. Levels applied in order.
+//         e.g. "SMT=0|1-2|3-4;CLS=0|1-2|3-4"
 //   cap:  "<cpu>=<scale>[,<cpu>=<scale>...]" — sparse; unspecified defaults to
 //         SCHED_CAPACITY_SCALE. e.g. "2=512,4=512"
 //   freq: same format as cap
