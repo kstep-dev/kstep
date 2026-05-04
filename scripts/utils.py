@@ -27,14 +27,6 @@ FUZZ_ERROR_DIR = FUZZ_DIR / "error"
 FUZZ_CORPUS_DIR = FUZZ_DIR / "corpus"
 
 
-def get_build_dir(name: str) -> Path:
-    return BUILD_DIR / name
-
-
-def get_linux_dir(name: str) -> Path:
-    return get_build_dir(name) / "linux"
-
-
 def fuzz_mode_dir(mode: str) -> Path:
     name = {
         "fresh": "fresh",

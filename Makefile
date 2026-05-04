@@ -1,13 +1,13 @@
 # ========= common =========
 .DEFAULT_GOAL := kstep
 
-NAME ?= $(notdir $(realpath $(CURDIR)/build/current))
-ifeq ($(NAME),)
-    $(error NAME is unset and build/current is missing; run ./checkout.py <version> first, or pass NAME=<version> explicitly)
+KERNEL ?= $(notdir $(realpath $(CURDIR)/build/current))
+ifeq ($(KERNEL),)
+    $(error KERNEL unset; run ./checkout.py or pass KERNEL=<name>)
 endif
-$(info ======= NAME: $(NAME) =======)
+$(info ======= KERNEL: $(KERNEL) =======)
 
-BUILD := $(CURDIR)/build/$(NAME)
+BUILD := $(CURDIR)/build/$(KERNEL)
 BEAR := $(if $(shell which bear),bear --append --output $(BUILD)/compile_commands.json --,)
 
 # ========= user =========
@@ -54,7 +54,7 @@ LINUX_IMAGE := $(or $(LINUX_IMAGE-$(ARCH)),$(error Unsupported architecture: $(A
 
 .PHONY: linux
 linux: $(BUILD)/linux/.config
-	cd $(BUILD)/linux && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) -j$(shell nproc) LOCALVERSION=-$(NAME) WERROR=0 HOSTCFLAGS=-Wno-error
+	cd $(BUILD)/linux && KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION='1' $(MAKE) -j$(shell nproc) LOCALVERSION=-$(KERNEL) WERROR=0 HOSTCFLAGS=-Wno-error
 	cp $(LINUX_IMAGE) $(BUILD)/kernel
 	cp $(BUILD)/linux/vmlinux $(BUILD)/vmlinux
 
