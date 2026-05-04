@@ -4,6 +4,7 @@
 [![v6.6](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v6.6)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
 [![v6.12](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v6.12)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
 [![v6.18](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v6.18)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
+[![v7.0](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v7.0)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
 
 
 kSTEP is a framework for reproducing and testing Linux kernel scheduler bugs.
@@ -81,7 +82,7 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 #### 🛠️ Build kSTEP
 ```sh
 make [KERNEL=<name>]  # Build kSTEP rootfs (kmod + user). Trigger `make linux` on first build.
-make linux [KERNEL=<name>]  # Full kernel build. Required on kernel change.
+make linux [KERNEL=<name>]  # Full kernel build. Run this after Linux file changes.
 ```
 
 - `[KERNEL=<name>]`: build directory name under `build/`; defaults to whatever `build/current` points to.

@@ -36,7 +36,7 @@ def fmt_path(path: Path) -> str:
 
 def add_worktree(ref: str, linux_dir: Path):
     if not LINUX_MASTER_DIR.exists():
-        system(f"git clone {LINUX_MASTER_URL} {LINUX_MASTER_DIR}")
+        system(f"git clone --filter=blob:none {LINUX_MASTER_URL} {LINUX_MASTER_DIR}")
     system(f"cd {LINUX_MASTER_DIR} && git fetch")
     system(f"cd {LINUX_MASTER_DIR} && git worktree prune -v")
     system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {ref}")
