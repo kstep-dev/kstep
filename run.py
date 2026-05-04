@@ -10,9 +10,8 @@ from typing import Iterable, Optional
 
 from scripts import (
     BUILD_CURR_DIR,
+    BUILD_DIR,
     ResultDir,
-    get_build_dir,
-    get_linux_dir,
     system,
 )
 from scripts.corpus import GLOBAL_SIGNAL_CORPUS
@@ -36,7 +35,7 @@ class Driver:
 
 def build_qemu_cmd(
     driver: Driver,
-    name: str,
+    kernel: str,
     result_dir: ResultDir,
     use_sock: bool = False,
     debug: bool = False,
@@ -47,7 +46,7 @@ def build_qemu_cmd(
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
 
-    build = get_build_dir(name)
+    build = BUILD_DIR / kernel
     kernel_img = build / "kernel"
     rootfs_img = build / "rootfs.cpio"
 
@@ -112,7 +111,6 @@ def build_qemu_cmd(
         f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
     ]
 
-    
     if headless:
         cmd += [f"-chardev file,id=char0,path={result_dir.log}"]
     else:
@@ -141,16 +139,16 @@ def build_qemu_cmd(
 
 def run_qemu(
     driver: Driver,
-    name: str,
+    kernel: str,
     result_dir: ResultDir,
     use_sock: bool = False,
     debug: bool = False,
     headless: bool = False,
 ):
-    system(build_qemu_cmd(driver, name, result_dir, use_sock, debug, headless))
+    system(build_qemu_cmd(driver, kernel, result_dir, use_sock, debug, headless))
 
 
-def print_run_results(name: str, result_dir: Optional[ResultDir] = None):
+def print_run_results(kernel: str, result_dir: Optional[ResultDir] = None):
     if result_dir is None:
         result_dir = ResultDir("latest")
     print(f"Results saved to {result_dir}")
@@ -163,7 +161,7 @@ def print_run_results(name: str, result_dir: Optional[ResultDir] = None):
         # Symbolize the pcs
         GLOBAL_SIGNAL_CORPUS.update_pc_symbolize(
             signal_records=signal_records,
-            name=name,
+            kernel=kernel,
         )
 
         # Parse the input sequence from the log file
@@ -175,7 +173,7 @@ def print_run_results(name: str, result_dir: Optional[ResultDir] = None):
         new_signal_info = GLOBAL_SIGNAL_CORPUS.analyze_new_signals(
             seq=seq,
             signal_records=signal_records,
-            name=name,
+            kernel=kernel,
             output_path=result_dir.path / "kstep.cov.new_edges.json",
         )
 
@@ -186,7 +184,7 @@ def print_run_results(name: str, result_dir: Optional[ResultDir] = None):
                 seq=seq,
                 signal_records=signal_records,
                 new_signals=new_signals,
-                name=name,
+                kernel=kernel,
                 output_path=result_dir.path / "kstep.cov.json",
             )
 
@@ -198,10 +196,10 @@ def is_port_free(port: int) -> bool:
         return s.connect_ex(("localhost", port)) != 0
 
 
-def run_gdb(name: str):
+def run_gdb(kernel: str):
     import signal
 
-    linux_dir = get_linux_dir(name)
+    linux_dir = BUILD_DIR / kernel / "linux"
     signal.signal(signal.SIGINT, signal.SIG_IGN)
     args = [
         "-iex 'set pagination off'",
@@ -213,38 +211,38 @@ def run_gdb(name: str):
     system(f"gdb {linux_dir}/vmlinux " + " ".join(args))
 
 
-def make_kstep(name: str, log: bool = False):
-    cmd = f"make kstep NAME={name}"
+def make_kstep(kernel: str, log: bool = False):
+    cmd = f"make kstep KERNEL={kernel}"
     if log:
-        cmd += f" >> {get_build_dir(name) / 'build.log'}"
+        cmd += f" >> {BUILD_DIR / kernel / 'build.log'}"
     system(cmd)
 
 
-def make_linux(name: str, config: Optional[Path] = None, log: bool = False):
-    cmd = f"make linux NAME={name}"
+def make_linux(kernel: str, config: Optional[Path] = None, log: bool = False):
+    cmd = f"make linux KERNEL={kernel}"
     if config:
         cmd += f" KSTEP_EXTRA_CONFIG={config}"
     if log:
-        cmd += f" >> {get_build_dir(name) / 'build.log'}"
+        cmd += f" >> {BUILD_DIR / kernel / 'build.log'}"
     system(cmd)
 
 
-def resolve_name(name: Optional[str] = None) -> str:
-    if name is not None:
-        return name
-    name = BUILD_CURR_DIR.resolve().name
-    logging.info(f"Using name={name} (from build/current)")
-    return name
+def resolve_kernel(kernel: Optional[str] = None) -> str:
+    if kernel is not None:
+        return kernel
+    kernel = BUILD_CURR_DIR.resolve().name
+    logging.info(f"Using kernel={kernel} (from build/current)")
+    return kernel
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--name", type=str, default=None)
+    parser.add_argument("--kernel", type=str, default=None)
     parser.add_argument("--result_name", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--rebuild_linux", action="store_true", default=False)
     # See driver config
-    parser.add_argument("name", type=str, default=None, nargs="?")
+    parser.add_argument("name", type=str, default=None, nargs="?", help="Driver name")
     parser.add_argument("--num_cpus", type=int, default=None)
     parser.add_argument("--mem_mb", type=int, default=None)
     parser.add_argument("--topology", type=str, default=None)
@@ -253,15 +251,15 @@ def main():
     parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 
-    name = resolve_name(args.name)
+    kernel = resolve_kernel(args.kernel)
 
     if args.debug and not is_port_free(1234):
         logging.info("Port 1234 is already in use, running GDB...")
-        run_gdb(name=name)
+        run_gdb(kernel=kernel)
     else:
         if args.rebuild_linux:
-            make_linux(name=name)
-        make_kstep(name=name)
+            make_linux(kernel=kernel)
+        make_kstep(kernel=kernel)
         driver = Driver(**{
             field.name: value
             for field in dataclasses.fields(Driver)
@@ -270,11 +268,11 @@ def main():
         result_dir = ResultDir.create(args.result_name)
         run_qemu(
             driver=driver,
-            name=name,
+            kernel=kernel,
             debug=args.debug,
             result_dir=result_dir,
         )
-        print_run_results(name=name, result_dir=result_dir)
+        print_run_results(kernel=kernel, result_dir=result_dir)
 
 
 if __name__ == "__main__":

@@ -15,7 +15,10 @@ runs:
     - id: cache
       uses: actions/cache@v5
       with:
-        path: build
+        path: |
+          build/${{ inputs.version }}/kernel
+          build/${{ inputs.version }}/vmlinux
+          build/${{ inputs.version }}/linux
         key: ${{ inputs.version }}${{ inputs.cov == 'true' && '-cov' || '' }}-${{ hashFiles('linux/config.kstep*', 'linux/cov.c', 'linux/*.kstep') }}
 
     - if: steps.cache.outputs.cache-hit != 'true'
@@ -26,4 +29,4 @@ runs:
       shell: bash
       run: |
         make linux KSTEP_EXTRA_CONFIG=${{ inputs.cov == 'true' && 'linux/config.kstep.cov' || '' }}
-        make clean-linux
+        make clean-all

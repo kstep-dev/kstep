@@ -213,7 +213,7 @@ class FuzzWorker:
         task_queue: "mp.Queue[Optional[WorkItem]]",
         result_queue: "mp.Queue[WorkResult]",
         driver: Driver,
-        name: str,
+        kernel: str,
         cross_scheduler: bool = False,
         enable_kthreads: bool = False,
         enable_task_freeze: bool = True,
@@ -226,7 +226,7 @@ class FuzzWorker:
         self.task_queue = task_queue
         self.result_queue = result_queue
         self.driver = driver
-        self.name = name
+        self.kernel = kernel
         self.cross_scheduler = cross_scheduler
         self.enable_kthreads = enable_kthreads
         self.enable_task_freeze = enable_task_freeze
@@ -263,7 +263,7 @@ class FuzzWorker:
     def _start_session(self, work: WorkItem) -> FuzzWorkerSession:
         cmd = build_qemu_cmd(
             driver=self.driver,
-            name=self.name,
+            kernel=self.kernel,
             result_dir=self.result_dir,
             use_sock=True,
             headless=True,
@@ -519,7 +519,7 @@ def worker_main(
     task_queue: "mp.Queue[Optional[WorkItem]]",
     result_queue: "mp.Queue[WorkResult]",
     driver: Driver,
-    name: str,
+    kernel: str,
     cross_scheduler: bool = False,
     enable_kthreads: bool = False,
     enable_task_freeze: bool = True,
@@ -530,7 +530,7 @@ def worker_main(
         task_queue=task_queue,
         result_queue=result_queue,
         driver=driver,
-        name=name,
+        kernel=kernel,
         cross_scheduler=cross_scheduler,
         enable_kthreads=enable_kthreads,
         enable_task_freeze=enable_task_freeze,

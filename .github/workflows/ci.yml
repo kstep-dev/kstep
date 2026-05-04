@@ -51,12 +51,12 @@ jobs:
           cov: ${{ matrix.fuzz }}
 
       - name: Build kSTEP
-        run: make kstep NAME=${{ matrix.version }}
+        run: make kstep KERNEL=${{ matrix.version }}
 
       - name: "[Run] Execute driver"
         if: ${{ ! matrix.fuzz }}
         timeout-minutes: 1
-        run: ./run.py --name ${{ matrix.version }}
+        run: ./run.py --kernel ${{ matrix.version }}
 
       - name: "[Run] Show driver output"
         if: ${{ ! matrix.fuzz }}
@@ -67,7 +67,7 @@ jobs:
         timeout-minutes: 5
         run: |
           ./fuzz.py \
-            --name ${{ matrix.version }} \
+            --kernel ${{ matrix.version }} \
             --workers 1 \
             --steps 10 \
             --ci_mode

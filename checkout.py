@@ -7,22 +7,21 @@ from pathlib import Path
 
 from scripts import (
     BUILD_CURR_DIR,
+    BUILD_DIR,
     LINUX_MASTER_DIR,
     PROJ_DIR,
     decompress,
     download,
-    get_build_dir,
-    get_linux_dir,
     system,
 )
 
 
 @dataclass(frozen=True)
 class Linux:
-    # A descriptive name for the Linux version
+    # A descriptive name for the Linux build
     name: str
-    # The version/commit of the kernel to use
-    version: str
+    # Git ref (tag/branch/commit) of the kernel to use
+    ref: str
     # The patch to apply to the kernel
     patch: Path | None = None
     # Extra kernel config fragment to merge
@@ -41,27 +40,25 @@ def clone_master():
     system(f"git clone https://github.com/torvalds/linux.git {LINUX_MASTER_DIR}")
 
 
-def add_worktree(version: str, linux_dir: Path):
+def add_worktree(ref: str, linux_dir: Path):
     system(f"cd {LINUX_MASTER_DIR} && git fetch")
     system(f"cd {LINUX_MASTER_DIR} && git worktree prune -v")
-    system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {version}")
+    system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {ref}")
 
 
-def set_current_build(name: str):
+def set_current_build(kernel: str):
     BUILD_CURR_DIR.parent.mkdir(parents=True, exist_ok=True)
     BUILD_CURR_DIR.unlink(missing_ok=True)
-    BUILD_CURR_DIR.symlink_to(get_build_dir(name))
+    BUILD_CURR_DIR.symlink_to(BUILD_DIR / kernel)
 
 
-def get_download_url(version: str) -> str:
-    if "." in version:
-        version = version.removeprefix("v")
-        major = version.split(".", 1)[0]
-        return (
-            f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{version}.tar.xz"
-        )
+def get_download_url(ref: str) -> str:
+    if "." in ref:
+        ref = ref.removeprefix("v")
+        major = ref.split(".", 1)[0]
+        return f"https://cdn.kernel.org/pub/linux/kernel/v{major}.x/linux-{ref}.tar.xz"
     else:
-        return f"https://github.com/torvalds/linux/tarball/{version}"
+        return f"https://github.com/torvalds/linux/archive/{ref}.tar.gz"
 
 
 def patch_linux(linux_dir: Path, patch: Path):
@@ -69,50 +66,42 @@ def patch_linux(linux_dir: Path, patch: Path):
 
 
 def checkout(
-    version: str,
-    name: str,
+    ref: str,
+    kernel: str,
     patch: Path | None = None,
     tarball: bool = False,
 ):
-    linux_dir = get_linux_dir(name)
+    linux_dir = BUILD_DIR / kernel / "linux"
     if not linux_dir.exists():
         linux_dir.parent.mkdir(parents=True, exist_ok=True)
         if tarball:
-            tarball_path = get_build_dir(name) / f"{version}.tar.xz"
-            url = get_download_url(version)
+            tarball_path = BUILD_DIR / kernel / f"{ref}.tar.xz"
+            url = get_download_url(ref)
             download(url, tarball_path)
             decompress(tarball_path, linux_dir)
         else:
             clone_master()
-            add_worktree(version, linux_dir)
+            add_worktree(ref, linux_dir)
 
         if patch:
             patch_linux(linux_dir, patch)
-    set_current_build(name)
-    logging.info(f"Checked out Linux {version} to {fmt_path(linux_dir)}")
+    set_current_build(kernel)
+    logging.info(f"Checked out Linux {ref} to {fmt_path(linux_dir)}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("version", type=str, nargs="?", default="v6.14")
-    parser.add_argument(
-        "name",
-        type=str,
-        nargs="?",
-        default=None,
-        help="Name of the directory (default: <version>)",
-    )
+    parser.add_argument("ref", type=str, nargs="?", default="v6.14")
+    parser.add_argument("kernel", type=str, nargs="?", default=None)
     source = parser.add_mutually_exclusive_group()
-    source.add_argument("--tar", dest="tarball", action="store_true", default=True,
-                        help="Download via kernel.org/GitHub tarball (default)")
-    source.add_argument("--git", dest="tarball", action="store_false",
-                        help="Add a worktree from the master git clone")
+    source.add_argument("--tar", dest="tarball", action="store_true", default=True)
+    source.add_argument("--git", dest="tarball", action="store_false")
     parser.add_argument("--patch", type=Path, default=None)
     args = parser.parse_args()
 
     checkout(
-        version=args.version,
-        name=args.name if args.name else args.version,
+        ref=args.ref,
+        kernel=args.kernel if args.kernel else args.ref,
         tarball=args.tarball,
         patch=args.patch,
     )

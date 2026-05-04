@@ -20,8 +20,8 @@ class Bug:
     name: str
     # Commit-based: buggy = fix~1, fixed = fix
     fix: str | None = None
-    # Patch-based: buggy = version, fixed = version + patch
-    version: str | None = None
+    # Patch-based: buggy = ref, fixed = ref + patch
+    ref: str | None = None
     patch: str | None = None
     # Extra kernel config fragment to merge
     config: Path | None = None
@@ -38,29 +38,29 @@ class Bug:
     def linux(self) -> list[Linux]:
         if self.fix:
             return [
-                Linux(name="buggy", version=f"{self.fix}~1", config=self.config),
-                Linux(name="fixed", version=self.fix, config=self.config),
+                Linux(name="buggy", ref=f"{self.fix}~1", config=self.config),
+                Linux(name="fixed", ref=self.fix, config=self.config),
             ]
-        elif self.version and self.patch:
+        elif self.ref and self.patch:
             patch_path = LINUX_ROOT_DIR / self.patch
             return [
-                Linux(name="buggy", version=self.version, config=self.config),
+                Linux(name="buggy", ref=self.ref, config=self.config),
                 Linux(
                     name="fixed",
-                    version=self.version,
+                    ref=self.ref,
                     patch=patch_path,
                     config=self.config,
                 ),
             ]
         else:
             raise ValueError(
-                f"Bug '{self.name}': specify either 'fix' or 'version'+'patch'"
+                f"Bug '{self.name}': specify either 'fix' or 'ref'+'patch'"
             )
 
 
 # fmt: off
 BUGS = [
-    Bug("sync_wakeup", version="v6.14", patch="sync_wakeup.patch", num_cpus=3, plot_format="curr_task"),
+    Bug("sync_wakeup", ref="v6.14", patch="sync_wakeup.patch", num_cpus=3, plot_format="curr_task"),
     Bug("vruntime_overflow", fix="bbce3de72be56e4b5f68924b7da9630cc89aa1a8", plot_format="curr_task"),
     Bug("freeze", fix="cd9626e9ebc77edec33023fe95dab4b04ffc819d", plot_format="curr_task"),
     Bug("extra_balance", fix="6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3", num_cpus=5, plot_format="lb_nr_running"),
@@ -79,11 +79,11 @@ BUGS = [
     Bug("zero_vruntime", fix="b3d99f43c72b56cf7a104a364e7fb34b0702828b"),
 ]
 BUGS_EXTRA = [
-    Bug("even_idle_cpu", version="v6.17", patch="even_idle_cpu.patch", num_cpus=5, plot_format="lb_nr_running"),
-    
+    Bug("even_idle_cpu", ref="v6.17", patch="even_idle_cpu.patch", num_cpus=5, plot_format="lb_nr_running"),
+
     Bug(
         "local_group_imbalance",
-        version="c369299895a591d96745d6492d4888259b004a9e",
+        ref="c369299895a591d96745d6492d4888259b004a9e",
         patch="fix_local_group_imbalanced.patch",
         num_cpus=5,
         plot_format="lb_nr_running",
@@ -91,7 +91,7 @@ BUGS_EXTRA = [
 
     Bug(
         "util_avg_jump",
-        version="c369299895a591d96745d6492d4888259b004a9e",
+        ref="c369299895a591d96745d6492d4888259b004a9e",
         patch="fix_util_avg_jump.patch",
         num_cpus=2,
         plot_format="val",
@@ -108,23 +108,23 @@ def plot_data(python_script: str, driver: str):
 
 
 def reproduce(linux: Linux, driver: Driver, rebuild_linux: bool):
-    name = f"{driver.name}_{linux.name}"
+    kernel = f"{driver.name}_{linux.name}"
 
-    step(name, "Checkout Linux")
-    checkout(linux.version, name=name, patch=linux.patch, tarball=True)
+    step(kernel, "Checkout Linux")
+    checkout(linux.ref, kernel=kernel, patch=linux.patch, tarball=True)
 
     if rebuild_linux:
-        step(name, "Build Linux")
-        make_linux(name=name, config=linux.config, log=True)
+        step(kernel, "Build Linux")
+        make_linux(kernel=kernel, config=linux.config, log=True)
 
-    step(name, "Build kSTEP")
-    make_kstep(name=name, log=True)
+    step(kernel, "Build kSTEP")
+    make_kstep(kernel=kernel, log=True)
 
     result_dir = ResultDir.create(f"repro_{driver.name}/{linux.name}")
-    step(name, "Run kSTEP")
-    step(name, f"QEMU Log: {result_dir.log}")
-    step(name, f"kSTEP Output: {result_dir.output}")
-    run_qemu(name=name, driver=driver, result_dir=result_dir, headless=True)
+    step(kernel, "Run kSTEP")
+    step(kernel, f"QEMU Log: {result_dir.log}")
+    step(kernel, f"kSTEP Output: {result_dir.output}")
+    run_qemu(kernel=kernel, driver=driver, result_dir=result_dir, headless=True)
 
 
 def main(bug: Bug, runs: list[str], rebuild_linux: bool):
@@ -136,7 +136,7 @@ def main(bug: Bug, runs: list[str], rebuild_linux: bool):
     for r in runs:
         if r == "plot":
             continue
-        linux = linux_map.get(r, Linux(name=r, version=r))
+        linux = linux_map.get(r, Linux(name=r, ref=r))
         reproduce(linux, bug.driver, rebuild_linux)
 
     if "plot" in runs:
