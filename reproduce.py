@@ -7,7 +7,6 @@ from pathlib import Path
 from checkout import Linux, checkout
 from run import Driver, make_kstep, make_linux, run_qemu
 from scripts import (
-    LINUX_ROOT_DIR,
     PROJ_DIR,
     ResultDir,
     TermColor,
@@ -42,7 +41,7 @@ class Bug:
                 Linux(name="fixed", ref=self.fix, config=self.config),
             ]
         elif self.ref and self.patch:
-            patch_path = LINUX_ROOT_DIR / self.patch
+            patch_path = PROJ_DIR / "linux" / self.patch
             return [
                 Linux(name="buggy", ref=self.ref, config=self.config),
                 Linux(

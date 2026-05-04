@@ -9,19 +9,12 @@ from typing import Optional
 
 PROJ_DIR = Path(__file__).parent.parent.resolve()
 
-LINUX_ROOT_DIR = PROJ_DIR / "linux"
-LINUX_CONFIG = LINUX_ROOT_DIR / "config"
-
 RESULTS_DIR = PROJ_DIR / "results"
-DATA_DIR = PROJ_DIR / "data"
 BUILD_DIR = PROJ_DIR / "build"
 BUILD_CURR_DIR = BUILD_DIR / "current"
-LINUX_MASTER_DIR = BUILD_DIR / "master"
-
-CORPUS_DIR = DATA_DIR / "corpus"
 
 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-FUZZ_DIR = RESULTS_DIR / f"fuzz_{ts}"
+FUZZ_DIR = RESULTS_DIR / f"tmp_{ts}"
 FUZZ_SUCCESS_DIR = FUZZ_DIR / "success"
 FUZZ_ERROR_DIR = FUZZ_DIR / "error"
 FUZZ_CORPUS_DIR = FUZZ_DIR / "corpus"
@@ -39,26 +32,26 @@ def fuzz_mode_dir(mode: str) -> Path:
 @dataclass(frozen=True)
 class ResultDir:
     """A per-run directory under RESULTS_DIR with stable child file names."""
-    name: str
+    label: str
 
     @classmethod
-    def create(cls, name: Optional[str] = None, set_latest: bool = True) -> "ResultDir":
-        """Create `results/<name>/` (defaults to `tmp_<ts>`); optionally point `results/latest` at it."""
-        if name is None:
+    def create(cls, label: Optional[str] = None, set_latest: bool = True) -> "ResultDir":
+        """Create `results/<label>/` (defaults to `tmp_<ts>`); optionally point `results/latest` at it."""
+        if label is None:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            name = f"tmp_{ts}"
-        out = cls(name)
+            label = f"tmp_{ts}"
+        out = cls(label)
         out.path.mkdir(parents=True, exist_ok=True)
         if set_latest:
             latest = RESULTS_DIR / "latest"
             latest.unlink(missing_ok=True)
-            latest.symlink_to(name)
+            latest.symlink_to(label)
         return out
 
     def __str__(self) -> str: return str(self.path)
 
     @property
-    def path(self) -> Path: return RESULTS_DIR / self.name
+    def path(self) -> Path: return RESULTS_DIR / self.label
     @property
     def log(self) -> Path: return self.path / "qemu.log"
     @property

@@ -227,18 +227,10 @@ def make_linux(kernel: str, config: Optional[Path] = None, log: bool = False):
     system(cmd)
 
 
-def resolve_kernel(kernel: Optional[str] = None) -> str:
-    if kernel is not None:
-        return kernel
-    kernel = BUILD_CURR_DIR.resolve().name
-    logging.info(f"Using kernel={kernel} (from build/current)")
-    return kernel
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--kernel", type=str, default=None)
-    parser.add_argument("--result_name", type=str, default=None)
+    parser.add_argument("--label", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--rebuild_linux", action="store_true", default=False)
     # See driver config
@@ -251,7 +243,7 @@ def main():
     parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 
-    kernel = resolve_kernel(args.kernel)
+    kernel = args.kernel or BUILD_CURR_DIR.resolve().name
 
     if args.debug and not is_port_free(1234):
         logging.info("Port 1234 is already in use, running GDB...")
@@ -265,7 +257,7 @@ def main():
             for field in dataclasses.fields(Driver)
             if (value := getattr(args, field.name)) is not None
         })
-        result_dir = ResultDir.create(args.result_name)
+        result_dir = ResultDir.create(args.label)
         run_qemu(
             driver=driver,
             kernel=kernel,

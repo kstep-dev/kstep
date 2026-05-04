@@ -1,19 +1,18 @@
 import json
-from typing import Iterator, Optional
+from typing import Iterator
 from pathlib import Path
 from collections import defaultdict
-from .utils import CORPUS_DIR
 from .gen_input_ops import OP_NAME_TO_TYPE, OP_TYPE_TO_NAME
 from .input_seq import InputSeq
 
 from .cov import symbolize_pcs
 
 def pc_hash(pc: int) -> int:
-    a = (pc ^ 61) ^ (pc >> 16);
-    a = a + (a << 3);
-    a = a ^ (a >> 4);
-    a = a * 0x27d4eb2d;
-    a = a ^ (a >> 15);
+    a = (pc ^ 61) ^ (pc >> 16)
+    a = a + (a << 3)
+    a = a ^ (a >> 4)
+    a = a * 0x27d4eb2d
+    a = a ^ (a >> 15)
     return a
 
 class SignalCorpus:
@@ -24,45 +23,11 @@ class SignalCorpus:
         self.signal_test_counts: dict[int, int] = defaultdict(int)
         self.signal_hit_counts: dict[int, int] = defaultdict(int)
         self.signal_edges: dict[int, set[tuple[int, int]]] = defaultdict(set)
-        CORPUS_DIR.mkdir(parents=True, exist_ok=True)
 
     def _symbolized_pc(self, pc: int) -> tuple[str, str]:
         if pc == 0:
             return "", ""
         return self.seen_pcs.get(pc, (f"?{pc:x}", f"?{pc:x}"))
-
-    def _write_signal_frequency(self) -> None:
-        signals = []
-        for sig, test_count in self.signal_test_counts.items():
-            edges = []
-            for prev_pc, curr_pc in sorted(self.signal_edges.get(sig, set())):
-                prev_fn, prev_loc = self._symbolized_pc(prev_pc)
-                curr_fn, curr_loc = self._symbolized_pc(curr_pc)
-                edges.append({
-                    "prev_loc": f"{prev_loc}:{prev_fn}",
-                    "curr_loc": f"{curr_loc}:{curr_fn}",
-                })
-
-            signals.append({
-                "signal_id": sig,
-                "test_count": test_count,
-                "test_frequency": test_count / max(self.total_covered_tests, 1),
-                "hit_count": self.signal_hit_counts.get(sig, 0),
-                "edges": edges,
-            })
-
-        signals.sort(key=lambda entry: (
-            entry["test_count"],
-            entry["hit_count"],
-            entry["signal_id"],
-        ))
-
-        output_path = CORPUS_DIR / "signal_frequency.json"
-        with open(output_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "total_covered_tests": self.total_covered_tests,
-                "signals": signals,
-            }, f, indent=2)
 
     def iter_signals(
         self,
@@ -90,8 +55,6 @@ class SignalCorpus:
         for sig in signal_set:
             self.signal_test_counts[sig] += 1
 
-        self._write_signal_frequency()
-
         return signal_set
 
     def update_pc_symbolize(self,
@@ -117,7 +80,7 @@ class SignalCorpus:
         seq: InputSeq,
         signal_records: dict[int, dict[int, list[int]]],
         kernel: str,
-        output_path: Optional[Path] = None,
+        output_path: Path,
     ) -> tuple[set[int], int] | None:
         signal_set = self.observe_signal_records(signal_records)
         distinct_signals = len(signal_set)
@@ -135,8 +98,6 @@ class SignalCorpus:
             "kernel": kernel,
         }
 
-        if output_path is None:
-            output_path = CORPUS_DIR / f"{seq.digest()}.json"
         print(f"Wrote {len(new)} new edges to {output_path}")
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -152,7 +113,7 @@ class SignalCorpus:
         signal_records: dict[int, dict[int, list[int]]], # each entry is a signal record, cmd_id -> pid -> list of pcs
         new_signals: set[int],
         kernel: str,
-        output_path: Optional[Path] = None,
+        output_path: Path,
     ) -> list[dict]:
         tick_repeat = OP_NAME_TO_TYPE["TICK_REPEAT"]
         cmd_meta: list[dict] = []
@@ -194,9 +155,6 @@ class SignalCorpus:
                     )
                 new_signals.remove(sig)
 
-        # Dump the per-action new signals to the corpus directory
-        if output_path is None:
-            output_path = CORPUS_DIR / f"{seq.digest()}_per_action.json" 
         print(f"Wrote {len(cmd_meta)} per-action new edges to {output_path}")
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump({"kernel": kernel, "cmd_meta": cmd_meta}, f, indent=2)
