@@ -27,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from run import Driver, make_kstep, make_linux
-from scripts.utils import FUZZ_DIR, LINUX_ROOT_DIR
+from scripts.utils import FUZZ_DIR, PROJ_DIR
 from scripts.fuzz_manager import run_manager
 
 
@@ -133,7 +133,7 @@ def main() -> None:
     logging.info(f"Logging to {log_path}")
 
     if args.rebuild_linux:
-        make_linux(args.kernel, config=LINUX_ROOT_DIR / "config.kstep.cov")
+        make_linux(args.kernel, config=PROJ_DIR / "linux" / "config.kstep.cov")
     make_kstep(args.kernel)
 
     driver = Driver(

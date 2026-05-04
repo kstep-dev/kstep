@@ -1,8 +1,3 @@
-# Data files
-/data/reproduce.*
-/data/fuzz*/*
-/data/corpus/*.json
-
 # Python
 __pycache__
 

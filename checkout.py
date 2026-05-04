@@ -8,12 +8,14 @@ from pathlib import Path
 from scripts import (
     BUILD_CURR_DIR,
     BUILD_DIR,
-    LINUX_MASTER_DIR,
     PROJ_DIR,
     decompress,
     download,
     system,
 )
+
+LINUX_MASTER_DIR = BUILD_DIR / "master"
+LINUX_MASTER_URL = "https://github.com/gregkh/linux.git"
 
 
 @dataclass(frozen=True)
@@ -32,15 +34,9 @@ def fmt_path(path: Path) -> str:
     return f"`{path.relative_to(PROJ_DIR)}`"
 
 
-def clone_master():
-    if LINUX_MASTER_DIR.exists():
-        logging.info(f"Linux master already cloned to {fmt_path(LINUX_MASTER_DIR)}")
-        return
-
-    system(f"git clone https://github.com/torvalds/linux.git {LINUX_MASTER_DIR}")
-
-
 def add_worktree(ref: str, linux_dir: Path):
+    if not LINUX_MASTER_DIR.exists():
+        system(f"git clone --filter=blob:none {LINUX_MASTER_URL} {LINUX_MASTER_DIR}")
     system(f"cd {LINUX_MASTER_DIR} && git fetch")
     system(f"cd {LINUX_MASTER_DIR} && git worktree prune -v")
     system(f"cd {LINUX_MASTER_DIR} && git worktree add {linux_dir} {ref}")
@@ -80,7 +76,6 @@ def checkout(
             download(url, tarball_path)
             decompress(tarball_path, linux_dir)
         else:
-            clone_master()
             add_worktree(ref, linux_dir)
 
         if patch:
