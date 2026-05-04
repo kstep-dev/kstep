@@ -26,7 +26,7 @@ static int __init kstep_main(void) {
   kstep_cgroup_init();
   kstep_trace_sched_group_alloc(); // also sets min_vruntime
   kstep_driver->setup();
-  kstep_topo_print();
+  kstep_cpu_print();
 
   // Control timer ticks and clock
   kstep_tick_init();

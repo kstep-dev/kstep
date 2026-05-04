@@ -1,18 +1,10 @@
 #include "driver.h"
-#include "internal.h" // cpu_rq
 
 static struct task_struct *tasks[4];
 
 static void setup(void) {
-  kstep_cpu_set_capacity(1, SCHED_CAPACITY_SCALE);
-  kstep_cpu_set_capacity(2, SCHED_CAPACITY_SCALE / 2);
-  kstep_cpu_set_capacity(3, SCHED_CAPACITY_SCALE);
-  kstep_cpu_set_capacity(4, SCHED_CAPACITY_SCALE / 2);
-
-  kstep_topo_init();
-  const char *cls[] = {"0", "1-2", "1-2", "3-4", "3-4"};
-  kstep_topo_set_cls(cls, ARRAY_SIZE(cls));
-  kstep_topo_apply();
+  kstep_cap_set("2=512,4=512");
+  kstep_topo_set("CLS=0|1-2|3-4");
 
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();

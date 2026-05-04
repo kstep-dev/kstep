@@ -1,5 +1,6 @@
 #include <linux/fs.h> // filp_open, filp_close
 #include <linux/kernel.h> // printk
+#include <linux/moduleparam.h> // module_param_string
 #include <linux/string.h> // strstr, strchr, strpbrk
 #include <linux/types.h> // ssize_t
 #include <linux/ctype.h> // isdigit or alpha
@@ -7,6 +8,15 @@
 #include "internal.h"
 #include "checker.h"
 #include "handler.h"
+
+static char executor_topology[CPU_SPEC_LEN] = "";
+module_param_string(topology, executor_topology, CPU_SPEC_LEN, 0644);
+
+static char executor_capacity[CPU_SPEC_LEN] = "";
+module_param_string(capacity, executor_capacity, CPU_SPEC_LEN, 0644);
+
+static char executor_frequency[CPU_SPEC_LEN] = "";
+module_param_string(frequency, executor_frequency, CPU_SPEC_LEN, 0644);
 
 #define MAX_LINE_LENGTH 1024
 struct console_parse_state {
@@ -68,19 +78,15 @@ static bool process_console_chunk(const char *buf, ssize_t nread,
 }
 
 static void setup(void) {
-  bool capacity_applied;
-  bool topology_applied;
-
   console = filp_open("/dev/ttyS1", O_RDONLY, 0);
   sock = filp_open("/dev/ttyS3", O_RDWR, 0);
 
-  capacity_applied = kstep_capacity_param_apply();
-  topology_applied = kstep_topo_param_apply();
-  if (capacity_applied && !topology_applied) {
-    TRACE_INFO("executor: rebuilding sched domains for custom capacity");
-    kstep_topo_apply();
-  }
-  kstep_freq_param_apply();
+  if (executor_capacity[0])
+    kstep_cap_set(executor_capacity);
+  if (executor_topology[0])
+    kstep_topo_set(executor_topology);
+  if (executor_frequency[0])
+    kstep_freq_set(executor_frequency);
   kstep_cov_init();
 }
 
