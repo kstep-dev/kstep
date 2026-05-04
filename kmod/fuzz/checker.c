@@ -3,8 +3,8 @@
 #include "checker.h"
 #include "driver.h"
 #include "linux/cpumask.h"
-#include "op_handler.h"
-#include "op_state.h"
+#include "handler.h"
+#include "state.h"
 
 #define for_each_leaf_cfs_rq_safe(rq, cfs_rq, pos)                        \
   list_for_each_entry_safe(cfs_rq, pos, &rq->leaf_cfs_rq_list,            \

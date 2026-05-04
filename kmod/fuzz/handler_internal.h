@@ -1,8 +1,8 @@
 #ifndef KSTEP_OP_HANDLER_INTERNAL_H
 #define KSTEP_OP_HANDLER_INTERNAL_H
 
-#include "op_handler.h"
-#include "op_state.h"
+#include "handler.h"
+#include "state.h"
 
 bool kstep_op_is_valid_task_id(int id);
 bool kstep_op_is_valid_cgroup_id(int id);

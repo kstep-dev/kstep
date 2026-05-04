@@ -1,7 +1,7 @@
 #include <linux/kernel.h>
 
 #include "checker.h"
-#include "op_handler_internal.h"
+#include "handler_internal.h"
 #include "linux/sched.h"
 
 struct kstep_task kstep_tasks[MAX_TASKS];

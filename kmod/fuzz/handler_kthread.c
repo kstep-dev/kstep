@@ -1,7 +1,7 @@
 #include <linux/kernel.h>
 
 #include "linux/cpumask.h"
-#include "op_handler_internal.h"
+#include "handler_internal.h"
 
 enum kstep_kthread_state kstep_op_kthread_state(int id) {
   if (!kstep_op_is_valid_kthread_id(id) || !kstep_kthreads[id].p)

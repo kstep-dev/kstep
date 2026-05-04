@@ -1,7 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/sched/signal.h>
 
-#include "op_handler_internal.h"
+#include "handler_internal.h"
 
 static bool pid_known(pid_t pid) {
   for (int i = 0; i < MAX_TASKS; i++) {
