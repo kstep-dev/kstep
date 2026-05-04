@@ -42,7 +42,7 @@ static const struct replay_op ops[] = {
 
 
 static void setup(void) {
-  kstep_cpu_set_freq(1, 512);
+  kstep_freq_set("1=512");
   kstep_cov_init();
 }
 

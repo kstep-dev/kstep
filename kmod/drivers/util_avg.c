@@ -16,7 +16,7 @@ static void run(void) {
   kstep_task_wakeup(tasks[0]);
 
   // fake the frequency of cpu 1 to 50% of the base frequency
-  kstep_cpu_set_freq(1, SCHED_CAPACITY_SCALE >> 1);
+  kstep_freq_set("1=512");
 
   // tick until the util_avg becomes 100%
   kstep_tick_repeat(600);

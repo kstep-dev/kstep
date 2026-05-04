@@ -111,19 +111,17 @@ void kstep_kthread_block(struct task_struct *p);
 void kstep_kthread_yield(struct task_struct *p);
 enum kstep_kthread_state kstep_kthread_get_state(struct task_struct *p);
 
-// topo.c
-void kstep_topo_init(void);
-void kstep_topo_set_smt(const char *cpulists[], int size);
-void kstep_topo_set_cls(const char *cpulists[], int size);
-void kstep_topo_set_mc(const char *cpulists[], int size);
-void kstep_topo_set_pkg(const char *cpulists[], int size);
-void kstep_topo_set_node(const char *cpulists[], int size);
-void kstep_topo_apply(void);
-bool kstep_topo_param_apply(void);
-bool kstep_capacity_param_apply(void);
-void kstep_freq_param_apply(void);
-void kstep_topo_print(void);
-void kstep_cpu_set_freq(int cpu, int scale);
-void kstep_cpu_set_capacity(int cpu, int scale);
+// cpu.c
+#define CPU_SPEC_LEN 512
+// String-spec API (parses spec, applies, rebuilds sched-domains as needed).
+//   topo: "<level>:<cpus>/<cpus>/...[+<level>:<cpus>/...]" — levels applied in order
+//         e.g. "SMT:0/1-2/1-2/3-4/3-4+CLS:0/1-2/1-2/3-4/3-4"
+//   cap:  "<cpu>=<scale>[,<cpu>=<scale>...]" — sparse; unspecified defaults to
+//         SCHED_CAPACITY_SCALE. e.g. "2=512,4=512"
+//   freq: same format as cap
+void kstep_topo_set(const char *spec);
+void kstep_cap_set(const char *spec);
+void kstep_freq_set(const char *spec);
+void kstep_cpu_print(void);
 
 #endif
