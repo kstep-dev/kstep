@@ -6,16 +6,9 @@
 [![v6.18](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v6.18)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
 [![v7.0](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v7.0)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
 
-
 kSTEP is a framework for reproducing and testing Linux kernel scheduler bugs.
 
-> [!IMPORTANT]
-> **OSDI'26 AE reviewers:** start with [AE.md](docs/AE.md), not the general getting-started instructions below.
-> `docs/AE.md` contains the reviewer-specific instructions for accessing our reserved machines and reproducing the paper figures.
-
 ## 🚀 Getting Started
-
-If you are **not** an OSDI'26 AE reviewer, continue here.
 
 #### 📦 Clone the repository
 
