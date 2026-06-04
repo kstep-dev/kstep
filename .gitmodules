@@ -6,3 +6,11 @@
 	path = build
 	url = https://github.com/kstep-dev/build.git
 	branch = main
+[submodule "docs/study"]
+	path = docs/study
+	url = https://github.com/kstep-dev/study.git
+	branch = master
+[submodule "docs/website"]
+	path = docs/website
+	url = https://github.com/kstep-dev/kstep-dev.github.io.git
+	branch = main
