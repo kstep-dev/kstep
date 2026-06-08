@@ -31,7 +31,7 @@ static void setup(void) {
   kstep_cgroup_create("uclamp");
   kstep_cgroup_write("uclamp", "cpu.uclamp.min", "0.00");
   kstep_cgroup_write("uclamp", "cpu.uclamp.max", "20.00");
-  kstep_cgroup_add_task("uclamp", task->pid);
+  kstep_cgroup_move_task("uclamp", task->pid);
 
   set_task_uclamp(task, SCHED_CAPACITY_SCALE * 80 / 100,
                   SCHED_CAPACITY_SCALE * 100 / 100);

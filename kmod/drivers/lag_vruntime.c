@@ -15,7 +15,7 @@ static void setup(void) {
 
 static void run(void) {
   kstep_cgroup_create("g0");
-  kstep_cgroup_add_task("g0", target_task->pid);
+  kstep_cgroup_move_task("g0", target_task->pid);
   kstep_task_set_prio(other_task, 19);
 
   kstep_task_wakeup(other_task);

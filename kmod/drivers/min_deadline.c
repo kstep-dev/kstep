@@ -81,7 +81,7 @@ static void run(void)
   }
 
   // Move the last task into cgroup g0
-  kstep_cgroup_add_task("g0", tasks[NUM_TASKS - 1]->pid);
+  kstep_cgroup_move_task("g0", tasks[NUM_TASKS - 1]->pid);
 
   // Tick to establish vruntimes and deadlines
   kstep_tick_repeat(10);

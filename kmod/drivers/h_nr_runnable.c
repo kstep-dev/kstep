@@ -18,8 +18,8 @@ static void setup(void) {
   target_task = kstep_task_create();
   other_task = kstep_task_create();
 
-  kstep_cgroup_add_task("g0", target_task->pid);
-  kstep_cgroup_add_task("g1", other_task->pid);
+  kstep_cgroup_move_task("g0", target_task->pid);
+  kstep_cgroup_move_task("g1", other_task->pid);
 }
 
 static void *group_ineligible(void) {

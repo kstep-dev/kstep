@@ -16,8 +16,8 @@ static void setup(void) {
   starved_task = kstep_task_create();
   other_task = kstep_task_create();
 
-  kstep_cgroup_add_task("g0/g2", special_task->pid);
-  kstep_cgroup_add_task("g0/g1", other_task->pid);
+  kstep_cgroup_move_task("g0/g2", special_task->pid);
+  kstep_cgroup_move_task("g0/g1", other_task->pid);
 }
 
 static void *ineligible_group_with_eligible_tasks(void) {
@@ -37,9 +37,9 @@ static void run(void) {
   kstep_tick_repeat(10);
   kstep_tick_until(ineligible_group_with_eligible_tasks);
 
-  kstep_cgroup_add_task("", special_task->pid);
+  kstep_cgroup_move_task("", special_task->pid);
 
-  kstep_cgroup_add_task("", other_task->pid);
+  kstep_cgroup_move_task("", other_task->pid);
 
   kstep_cgroup_set_weight("g0", 105);
 
@@ -47,7 +47,7 @@ static void run(void) {
 
   kstep_cgroup_set_weight("g0", 106);
 
-  kstep_cgroup_add_task("g0/g1", starved_task->pid);
+  kstep_cgroup_move_task("g0/g1", starved_task->pid);
 
   kstep_tick_repeat(20);
 }

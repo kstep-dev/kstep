@@ -18,9 +18,9 @@ static void run(void) {
     kstep_tick();
   }
 
-  kstep_cgroup_add_task("g0", tasks[0]->pid);
+  kstep_cgroup_move_task("g0", tasks[0]->pid);
 
-  kstep_cgroup_add_task("", tasks[0]->pid);
+  kstep_cgroup_move_task("", tasks[0]->pid);
 }
 
 static void on_tick_begin(void) {

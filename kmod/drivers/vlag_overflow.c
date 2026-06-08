@@ -38,7 +38,7 @@ static void setup(void) {
     kstep_cgroup_create(names[i]);
     kstep_cgroup_set_weight(names[i], 10000);
     tasks[i] = kstep_task_create();
-    kstep_cgroup_add_task(names[i], tasks[i]->pid);
+    kstep_cgroup_move_task(names[i], tasks[i]->pid);
     kstep_task_pin(tasks[i], 1, 1);
   }
 }

@@ -41,7 +41,7 @@ void kstep_op_cgroup_move_tasks_to_root(int id) {
 
     TRACE_INFO("Moving task %d from cgroup %d to root",
                kstep_tasks[i].p->pid, id);
-    kstep_cgroup_add_task("", kstep_tasks[i].p->pid);
+    kstep_cgroup_move_task("", kstep_tasks[i].p->pid);
     kstep_task_pin(kstep_tasks[i].p, 1, num_online_cpus() - 1);
     kstep_tasks[i].cgroup_id = -1;
   }
@@ -53,7 +53,7 @@ void kstep_op_move_task_to_root(int task_id) {
 
   TRACE_INFO("Moving task %d from cgroup %d to root",
              kstep_tasks[task_id].p->pid, kstep_tasks[task_id].cgroup_id);
-  kstep_cgroup_add_task("", kstep_tasks[task_id].p->pid);
+  kstep_cgroup_move_task("", kstep_tasks[task_id].p->pid);
   kstep_task_pin(kstep_tasks[task_id].p, 1, num_online_cpus() - 1);
   kstep_tasks[task_id].cgroup_id = -1;
 }
@@ -133,7 +133,7 @@ u8 kstep_op_cgroup_add_task(int a, int b, int c) {
   if (kstep_tasks[b].p->policy != 0)
     kstep_task_cfs(kstep_tasks[b].p);
 
-  kstep_cgroup_add_task(name, kstep_tasks[b].p->pid);
+  kstep_cgroup_move_task(name, kstep_tasks[b].p->pid);
   kstep_tasks[b].cgroup_id = a;
   return 1;
 }

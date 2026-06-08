@@ -27,11 +27,11 @@ static void setup(void) {
 static void run(void) {
   for (int i = 0; i < NUM_TASKS; i++) {
     kstep_task_pin(tasks[i], 1, 1);
-    kstep_cgroup_add_task("A/B/C", tasks[i]->pid);
+    kstep_cgroup_move_task("A/B/C", tasks[i]->pid);
     kstep_task_wakeup(tasks[i]);
   }
   kstep_task_pin(helper, 2, 2);
-  kstep_cgroup_add_task("A/B/C", helper->pid);
+  kstep_cgroup_move_task("A/B/C", helper->pid);
 
   // A: 5ms quota, 100ms period. C: 100ms quota, 100ms period.
   kstep_cgroup_write("A", "cpu.max", "5000 100000");

@@ -321,7 +321,7 @@ void kstep_cgroup_set_weight(const char *name, int weight) {
   kstep_sleep();
 }
 
-void kstep_cgroup_add_task(const char *name, int pid) {
+void kstep_cgroup_move_task(const char *name, int pid) {
   kstep_cgroup_write(name, "cgroup.procs", "%d", pid);
   kstep_sleep();
 }
