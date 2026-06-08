@@ -53,8 +53,6 @@ static op_handler_fn op_handlers[OP_TYPE_NR] = {
     [OP_CGROUP_SET_CPUSET] = kstep_op_cgroup_set_cpuset,
     [OP_CGROUP_SET_WEIGHT] = kstep_op_cgroup_set_weight,
     [OP_CGROUP_ADD_TASK] = kstep_op_cgroup_add_task,
-    [OP_CPU_SET_FREQ] = NULL,
-    [OP_CPU_SET_CAPACITY] = NULL,
     [OP_CGROUP_DESTROY] = kstep_op_cgroup_destroy,
     [OP_CGROUP_MOVE_TASK_ROOT] = kstep_op_cgroup_move_task_root,
     [OP_KTHREAD_CREATE] = kstep_op_kthread_create,
@@ -81,8 +79,6 @@ static const char op_strs[OP_TYPE_NR][30] = {
   [OP_CGROUP_SET_CPUSET] = "CGROUP_SET_CPUSET",
   [OP_CGROUP_SET_WEIGHT] = "CGROUP_SET_WEIGHT",
   [OP_CGROUP_ADD_TASK] = "CGROUP_ADD_TASK",
-  [OP_CPU_SET_FREQ] = "CPU_SET_FREQ",
-  [OP_CPU_SET_CAPACITY] = "CPU_SET_CAPACITY",
   [OP_CGROUP_DESTROY] = "CGROUP_DESTROY",
   [OP_CGROUP_MOVE_TASK_ROOT] = "CGROUP_MOVE_TASK_ROOT",
   [OP_KTHREAD_CREATE] = "KTHREAD_CREATE",
@@ -198,13 +194,10 @@ static u8 execute_one_op(enum kstep_op_type type, int a, int b, int c) {
     kstep_cov_enable();
   pr_info("EXECOP: {\"op\": %d, \"a\": %d, \"b\": %d, \"c\": %d}\n", type, a, b, c);
   executed_steps = op_handlers[type](a, b, c);
-  if (executed_steps == 0) {
-    if (collect_cov)
-      kstep_cov_disable();
-    return 0;
-  }
   if (collect_cov)
     kstep_cov_disable();
+  if (executed_steps == 0)
+    return 0;
   kstep_cov_dump();
   kstep_cov_cmd_id_inc();
   print_state();

@@ -177,7 +177,6 @@ void kstep_kthread_yield(struct task_struct *p) {
   kt->action = do_yield;
   kt->state = KSTEP_KTHREAD_YIELD;
   atomic_set(&kt->action_updated, 1);
-  printk("here");
   kstep_sleep();
 }
 

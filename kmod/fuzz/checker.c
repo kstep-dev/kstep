@@ -167,9 +167,6 @@ void kstep_check_before_op(struct kstep_check_state *check) {
  * for unexpectedly large util drops caused by the op. */
 void kstep_check_after_op(struct kstep_check_state *check,
                           enum kstep_op_type type, int a, int b, int c) {
-  (void)b;
-  (void)c;
-
   for (int i = 0; i < MAX_TASKS; i++) {
     struct task_struct *p = kstep_tasks[i].p;
 

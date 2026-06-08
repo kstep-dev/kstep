@@ -12,8 +12,6 @@ enum kstep_kthread_state kstep_op_kthread_state(int id) {
 u8 kstep_op_kthread_create(int a, int b, int c) {
   char name[16];
 
-  (void)b;
-  (void)c;
   if (!kstep_op_is_valid_kthread_id(a) || kstep_kthreads[a].p)
     return 0;
 
@@ -40,9 +38,6 @@ u8 kstep_op_kthread_bind(int a, int b, int c) {
 }
 
 u8 kstep_op_kthread_start(int a, int b, int c) {
-  (void)b;
-  (void)c;
-
   if (!kstep_op_is_valid_kthread_id(a) || !kstep_kthreads[a].p)
     return 0;
   if (kstep_op_kthread_state(a) != KSTEP_KTHREAD_CREATED)
@@ -54,8 +49,6 @@ u8 kstep_op_kthread_start(int a, int b, int c) {
 u8 kstep_op_kthread_yield(int a, int b, int c) {
   enum kstep_kthread_state state;
 
-  (void)b;
-  (void)c;
   if (!kstep_op_is_valid_kthread_id(a) || !kstep_kthreads[a].p)
     return 0;
   state = kstep_op_kthread_state(a);
@@ -68,8 +61,6 @@ u8 kstep_op_kthread_yield(int a, int b, int c) {
 u8 kstep_op_kthread_block(int a, int b, int c) {
   enum kstep_kthread_state state;
 
-  (void)b;
-  (void)c;
   if (!kstep_op_is_valid_kthread_id(a) || !kstep_kthreads[a].p)
     return 0;
   state = kstep_op_kthread_state(a);
@@ -83,7 +74,6 @@ u8 kstep_op_kthread_syncwake(int a, int b, int c) {
   enum kstep_kthread_state waker_state;
   enum kstep_kthread_state wakee_state;
 
-  (void)c;
   if (!kstep_op_is_valid_kthread_id(a) || !kstep_op_is_valid_kthread_id(b))
     return 0;
   if (a == b)

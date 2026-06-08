@@ -29,17 +29,15 @@ OP_NAME_TO_TYPE = {
     "CGROUP_SET_CPUSET": 11,
     "CGROUP_SET_WEIGHT": 12,
     "CGROUP_ADD_TASK": 13,
-    "CPU_SET_FREQ": 14,
-    "CPU_SET_CAPACITY": 15,
-    "CGROUP_DESTROY": 16,
-    "CGROUP_MOVE_TASK_ROOT": 17,
-    "KTHREAD_CREATE": 18,
-    "KTHREAD_BIND": 19,
-    "KTHREAD_START": 20,
-    "KTHREAD_YIELD": 21,
-    "KTHREAD_BLOCK": 22,
-    "KTHREAD_SYNCWAKE": 23,
-    "TASK_FREEZE": 24,
+    "CGROUP_DESTROY": 14,
+    "CGROUP_MOVE_TASK_ROOT": 15,
+    "KTHREAD_CREATE": 16,
+    "KTHREAD_BIND": 17,
+    "KTHREAD_START": 18,
+    "KTHREAD_YIELD": 19,
+    "KTHREAD_BLOCK": 20,
+    "KTHREAD_SYNCWAKE": 21,
+    "TASK_FREEZE": 22,
 }
 OP_TYPE_TO_NAME = {v: k for k, v in OP_NAME_TO_TYPE.items()}
 
@@ -262,18 +260,6 @@ def op_cgroup_move_task_root(m: GenState):
     return (OP_NAME_TO_TYPE["CGROUP_MOVE_TASK_ROOT"], cgroup_id, tid, 0)
 
 
-def op_cpu_set_freq(m: GenState):
-    cpu = m.choose_cpu()
-    scale = m.rnd.randint(1, 1024)
-    return (OP_NAME_TO_TYPE["CPU_SET_FREQ"], cpu, scale, 0)
-
-
-def op_cpu_set_capacity(m: GenState):
-    cpu = m.choose_cpu()
-    scale = m.rnd.randint(1, 1024)
-    return (OP_NAME_TO_TYPE["CPU_SET_CAPACITY"], cpu, scale, 0)
-
-
 # Replay functions: apply GenState side-effects from a replayed op's known args (a, b, c).
 # Only ops whose emit() mutates state beyond task_state (which update_from_kmod handles) need one.
 
@@ -349,8 +335,6 @@ def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op
         "CGROUP_ADD_TASK": 3,
         "CGROUP_DESTROY": 1,
         "CGROUP_MOVE_TASK_ROOT": 2,
-        "CPU_SET_FREQ": 0,
-        "CPU_SET_CAPACITY": 0,
         "KTHREAD_CREATE": enable_kthread_ops(2),
         "KTHREAD_BIND": enable_kthread_ops(2),
         "KTHREAD_START": enable_kthread_ops(2),
@@ -549,19 +533,5 @@ def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op
             requires=[RESOURCE_CGROUP, RESOURCE_TASK],
             arg_types=[ARG_CGROUP, ARG_TASK, None],
             replay=replay_cgroup_move_task_root,
-        ),
-        Op(
-            name="CPU_SET_FREQ",
-            weight=weights["CPU_SET_FREQ"],
-            is_applicable=lambda m: m.cpus >= 2,
-            emit=op_cpu_set_freq,
-            arg_types=[ARG_CPU, ARG_INT, None],
-        ),
-        Op(
-            name="CPU_SET_CAPACITY",
-            weight=weights["CPU_SET_CAPACITY"],
-            is_applicable=lambda m: m.cpus >= 2,
-            emit=op_cpu_set_capacity,
-            arg_types=[ARG_CPU, ARG_INT, None],
         ),
     ]

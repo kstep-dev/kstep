@@ -1,9 +1,6 @@
 #include "handler_internal.h"
 
 u8 kstep_op_tick(int a, int b, int c) {
-  (void)a;
-  (void)b;
-  (void)c;
   kstep_tick();
   return 1;
 }
@@ -33,8 +30,6 @@ static u64 count_ineligible_cgroup_se(void) {
 u8 kstep_op_tick_repeat(int a, int b, int c) {
   u8 executed_steps = 0;
 
-  (void)b;
-  (void)c;
   for (int i = 0; i < a; i++) {
     kstep_execute_op(OP_TICK, 0, 0, 0);
 

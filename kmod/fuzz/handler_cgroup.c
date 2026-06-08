@@ -63,7 +63,6 @@ u8 kstep_op_cgroup_create(int a, int b, int c) {
   int child_id = b;
   char name[MAX_CGROUP_NAME_LEN];
 
-  (void)c;
   if (!kstep_op_is_valid_cgroup_id(child_id) || kstep_cgroups[child_id].exists)
     return 0;
   if (parent_id != -1 && (!kstep_op_is_valid_cgroup_id(parent_id) ||
@@ -107,7 +106,6 @@ u8 kstep_op_cgroup_set_cpuset(int a, int b, int c) {
 u8 kstep_op_cgroup_set_weight(int a, int b, int c) {
   char name[MAX_CGROUP_NAME_LEN];
 
-  (void)c;
   if (!kstep_op_is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
     return 0;
   if (!kstep_build_cgroup_name(a, name))
@@ -122,7 +120,6 @@ u8 kstep_op_cgroup_set_weight(int a, int b, int c) {
 u8 kstep_op_cgroup_add_task(int a, int b, int c) {
   char name[MAX_CGROUP_NAME_LEN];
 
-  (void)c;
   if (!kstep_op_is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
     return 0;
   if (!kstep_build_cgroup_name(a, name))
@@ -141,8 +138,6 @@ u8 kstep_op_cgroup_add_task(int a, int b, int c) {
 u8 kstep_op_cgroup_destroy(int a, int b, int c) {
   char name[MAX_CGROUP_NAME_LEN];
 
-  (void)b;
-  (void)c;
   if (!kstep_op_is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
     return 0;
   if (!kstep_op_cgroup_is_leaf(a))
@@ -159,8 +154,6 @@ u8 kstep_op_cgroup_destroy(int a, int b, int c) {
 }
 
 u8 kstep_op_cgroup_move_task_root(int a, int b, int c) {
-  (void)c;
-
   if (!kstep_op_is_valid_cgroup_id(a) || !kstep_cgroups[a].exists)
     return 0;
   if (!kstep_op_is_valid_task_id(b) || !kstep_tasks[b].p)
