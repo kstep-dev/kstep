@@ -6,7 +6,8 @@
 [![v6.18](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v6.18)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
 [![v7.0](https://img.shields.io/badge/github-passing-34D058?logo=github&label=v7.0)](https://github.com/ShawnZhong/kSTEP/actions/workflows/ci.yml)
 
-kSTEP is a framework for reproducing and testing Linux kernel scheduler bugs.
+Source code for paper **kSTEP: Characterization and Deterministic Testing of Linux CPU Scheduler Bugs.** (OSDI '26). 
+*Tingjia Cao, Shawn Wanxiang Zhong, Caeden Whitaker, Ke Han, Andrea Arpaci-Dusseau, and Remzi Arpaci-Dusseau*
 
 ## 🚀 Getting Started
 
