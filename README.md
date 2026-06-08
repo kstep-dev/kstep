@@ -10,33 +10,24 @@ kSTEP is a framework for reproducing and testing Linux kernel scheduler bugs.
 
 ## 🚀 Getting Started
 
-#### 📦 Clone the repository
-
 ```sh
+# 📦 Clone the repository
 git clone --recurse-submodules https://github.com/kstep-dev/kstep
 ```
 
-#### 💾 Install dependencies
-
 ```sh
+# 💾 Install dependencies
 ./install_deps.sh
 ```
 
-
-#### 🐞 Reproduce known bugs
-
 ```sh
+# 🐞 Reproduce bugs
 ./reproduce.py <name|all> [--run <buggy|fixed|plot>]
 ```
 
 - `<name|all>`: Name of the bug to reproduce (see [`reproduce.py`](reproduce.py)), or `all` to reproduce all bugs.
 
-- `--run`: Choose which version or action to run (`buggy`, `fixed`, or generate a `plot`), default to all.
-
-- **Example:** `./reproduce.py sync_wakeup` checks out both the buggy and fixed kernels, builds kSTEP, runs the `sync_wakeup` driver, and plots the results.
-
-> [!NOTE]
-> Reproducing all bugs will require at least 64GB of available disk space.
+- **Example:** `./reproduce.py sync_wakeup` checks out both the buggy and fixed kernels, builds kSTEP, and runs the `sync_wakeup` driver.
 
 ## 📊 Results
 
