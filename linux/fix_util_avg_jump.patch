@@ -4,39 +4,8 @@ Date: Fri, 10 Apr 2026 14:56:14 -0500
 Subject: [PATCH] fix_util_avg_jump
 
 ---
- kernel/Makefile       |  1 +
- kernel/cov.c          |  1 +
- kernel/sched/Makefile |  1 +
- kernel/sched/pelt.h   | 29 ++++++++++++++++++++---------
- 4 files changed, 23 insertions(+), 9 deletions(-)
- create mode 120000 kernel/cov.c
-
-diff --git a/kernel/Makefile b/kernel/Makefile
-index 6785982013dc..60e1a8fd7d82 100644
---- a/kernel/Makefile
-+++ b/kernel/Makefile
-@@ -207,3 +207,4 @@ $(obj)/kheaders.md5: $(obj)/kheaders-srclist FORCE
- 	$(call filechk,kheaders_md5sum)
- 
- clean-files := kheaders.md5 kheaders-srclist kheaders-objlist
-+obj-y += cov.o
-diff --git a/kernel/cov.c b/kernel/cov.c
-new file mode 120000
-index 000000000000..c10ca564a3ef
---- /dev/null
-+++ b/kernel/cov.c
-@@ -0,0 +1 @@
-+/users/Tingjia/project/kSTEP/linux/cov.c
-\ No newline at end of file
-diff --git a/kernel/sched/Makefile b/kernel/sched/Makefile
-index b1f1a367034f..b9547f594d2b 100644
---- a/kernel/sched/Makefile
-+++ b/kernel/sched/Makefile
-@@ -40,3 +40,4 @@ obj-y += core.o
- obj-y += fair.o
- obj-y += build_policy.o
- obj-y += build_utility.o
-+ccflags-y += -fsanitize-coverage=trace-pc
+ kernel/sched/pelt.h | 29 ++++++++++++++++++++---------
+ 1 file changed, 20 insertions(+), 9 deletions(-)
 diff --git a/kernel/sched/pelt.h b/kernel/sched/pelt.h
 index f921302dc40f..0134883b0676 100644
 --- a/kernel/sched/pelt.h

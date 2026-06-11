@@ -1,60 +1,39 @@
-// Replay driver for data/fuzz_20260406_205141/error/cfs_util_decay/w0_20260406_205539
+// Replay of fuzz_20260406_205141/error/cfs_util_decay/w0_20260406_205539
+//
+// An RT (fifo) task runs on cpu 1 at half frequency, then alternates short
+// sleeps with long busy windows. The brief idle gaps make the rq's util_avg
+// jump rather than decay smoothly.
+
 #include "driver.h"
 #include "internal.h"
-#include "fuzz/handler.h"
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
-struct replay_op {
-  enum kstep_op_type type;
-  int a;
-  int b;
-  int c;
-};
 
-#define wake_interval 200
-#define sleep_interval 1
+#define WAKE_TICKS 200
+#define SLEEP_TICKS 1
+#define CYCLES 10
 
-static const struct replay_op ops[] = {
-  {OP_TASK_CREATE, 0, 0, 0},
-  {OP_TASK_WAKEUP, 0, 0, 0},
-  {OP_TASK_FIFO, 0, 0, 0},
-  {OP_TICK_REPEAT, 200, 0, 0},
-  {OP_TASK_PAUSE, 0, 0, 0},
-  {OP_TICK_REPEAT, sleep_interval, 0, 0},
-  {OP_TASK_WAKEUP, 0, 0, 0},
-  {OP_TICK_REPEAT, wake_interval, 0, 0},
-  {OP_TASK_PAUSE, 0, 0, 0},
-  {OP_TICK_REPEAT, sleep_interval, 0, 0},
-  {OP_TASK_WAKEUP, 0, 0, 0},
-  {OP_TICK_REPEAT, wake_interval, 0, 0},
-  {OP_TASK_PAUSE, 0, 0, 0},
-  {OP_TICK_REPEAT, sleep_interval, 0, 0},
-  {OP_TASK_WAKEUP, 0, 0, 0},
-  {OP_TICK_REPEAT, wake_interval, 0, 0},
-  {OP_TASK_PAUSE, 0, 0, 0},
-  {OP_TICK_REPEAT, sleep_interval, 0, 0},
-  {OP_TASK_WAKEUP, 0, 0, 0},
-  {OP_TICK_REPEAT, wake_interval, 0, 0},
-  {OP_TASK_PAUSE, 0, 0, 0},
-  {OP_TICK_REPEAT, sleep_interval, 0, 0},
-  {OP_TASK_WAKEUP, 0, 0, 0},
-};
-
+static struct task_struct *task;
 
 static void setup(void) {
+  task = kstep_task_create();
+  // fake the frequency of cpu 1 to 50% of the base frequency
   kstep_freq_set("1=512");
-  kstep_cov_init();
 }
 
 static void run(void) {
-  int i;
+  // start the fifo task and let it run for a long busy window
+  kstep_task_fifo(task);
+  kstep_task_wakeup(task);
+  kstep_tick_repeat(WAKE_TICKS);
 
-  TRACE_INFO("Replaying %zu ops from fuzz_20260406_205141/error/cfs_util_decay/w0_20260406_205539",
-             ARRAY_SIZE(ops));
-
-  for (i = 0; i < ARRAY_SIZE(ops); i++) {
-    while (!kstep_execute_op(ops[i].type, ops[i].a, ops[i].b, ops[i].c))
-      continue;
+  // alternate brief sleeps with long busy windows to drive the util_avg jump
+  for (int i = 0; i < CYCLES; i++) {
+    kstep_task_pause(task);
+    kstep_tick_repeat(SLEEP_TICKS);
+    kstep_task_wakeup(task);
+    if (i < CYCLES - 1)
+      kstep_tick_repeat(WAKE_TICKS);
   }
 }
 
