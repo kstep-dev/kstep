@@ -4,9 +4,10 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
-from checkout import Linux, checkout
+from checkout import Linux, checkout, set_current_build
 from run import Driver, make_kstep, make_linux, run_qemu
 from scripts import (
+    BUILD_DIR,
     PROJ_DIR,
     ResultDir,
     TermColor,
@@ -66,20 +67,13 @@ BUGS = [
     Bug("util_avg", fix="17e3e88ed0b6318fde0d1c14df1a804711cab1b5", plot_format="val"),
     Bug("long_balance", fix="2feab2492deb2f14f9675dd6388e9e2bf669c27a", num_cpus=3, mem_mb=4096, plot_format="rebalance"),
     Bug("lag_vruntime", fix="5068d84054b766efe7c6202fc71b2350d1c326f1", plot_format="min_vruntime"),
-    Bug("rt_runtime_toggle", fix="9b58e976b3b391c0cf02e038d53dd0478ed3013c", plot_format="curr_task"),
-    Bug("uclamp_inversion", fix="0213b7083e81f4acd69db32cb72eb4e5f220329a", plot_format="val"),
-    Bug("h_nr_runnable", fix="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734", plot_format="val"),
-    Bug("vlag_overflow", fix="1560d1f6eb6b398bddd80c16676776c0325fe5fe", num_cpus=3),
-    Bug("throttled_limbo_list", fix="956dfda6a70885f18c0f8236a461aa2bc4f556ad", num_cpus=3),
-    Bug("over_schedule", fix="d4ac164bde7a12ec0a238a7ead5aa26819bbb1c1"),
-    Bug("slice_update", fix="2f2fc17bab0011430ceb6f2dc1959e7d1f981444"),
-    Bug("avg_vruntime_ceil", fix="650cad561cce04b62a8c8e0446b685ef171bc3bb"),
-    Bug("min_deadline", fix="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c"),
-    Bug("zero_vruntime", fix="b3d99f43c72b56cf7a104a364e7fb34b0702828b"),
-]
-BUGS_EXTRA = [
-    Bug("even_idle_cpu", ref="v6.17", patch="even_idle_cpu.patch", num_cpus=5, plot_format="lb_nr_running"),
-
+    Bug(
+        "even_idle_cpu",
+        ref="v6.17",
+        patch="even_idle_cpu.patch",
+        num_cpus=5,
+        plot_format="lb_nr_running",
+    ),
     Bug(
         "local_group_imbalance",
         ref="c369299895a591d96745d6492d4888259b004a9e",
@@ -87,46 +81,68 @@ BUGS_EXTRA = [
         num_cpus=5,
         plot_format="lb_nr_running",
     ),
-
     Bug(
         "util_avg_jump",
         ref="c369299895a591d96745d6492d4888259b004a9e",
         patch="fix_util_avg_jump.patch",
         num_cpus=2,
         plot_format="val",
-    )
+    ),
 ]
+BUGS_EXTRA = [
+    Bug("rt_runtime_toggle", fix="9b58e976b3b391c0cf02e038d53dd0478ed3013c", plot_format="curr_task"),
+    Bug("uclamp_inversion", fix="0213b7083e81f4acd69db32cb72eb4e5f220329a", plot_format="val"),
+    Bug("h_nr_runnable", fix="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734", plot_format="val"),
+    Bug("vlag_overflow", fix="1560d1f6eb6b398bddd80c16676776c0325fe5fe", num_cpus=3),
+    Bug("throttled_limbo_list", fix="956dfda6a70885f18c0f8236a461aa2bc4f556ad", num_cpus=3),
+    Bug("slice_update", fix="2f2fc17bab0011430ceb6f2dc1959e7d1f981444"),
+    Bug("avg_vruntime_ceil", fix="650cad561cce04b62a8c8e0446b685ef171bc3bb"),
+    Bug("min_deadline", fix="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c"),
+    Bug("zero_vruntime", fix="b3d99f43c72b56cf7a104a364e7fb34b0702828b"),
+]
+# fmt: on
 
-def step(prefix: str, message: str):
+
+def log_step(prefix: str, message: str):
     print(f"{TermColor.GREEN}{prefix}{TermColor.RESET}: {message}", flush=True)
 
 
 def plot_data(python_script: str, driver: str):
-    step(driver, "Plotting data")
+    log_step(driver, "Plotting data")
     system(f"{PROJ_DIR}/scripts/plot_{python_script}.py {driver}")
 
 
-def reproduce(linux: Linux, driver: Driver, rebuild_linux: bool):
+def reproduce(linux: Linux, driver: Driver, build: bool):
     kernel = f"{driver.name}_{linux.name}"
 
-    step(kernel, "Checkout Linux")
-    checkout(linux.ref, kernel=kernel, patch=linux.patch, tarball=True)
+    # Committed run artifacts: a bootable kernel + initramfs is all QEMU needs.
+    kernel_img = BUILD_DIR / kernel / "kernel"
+    rootfs_img = BUILD_DIR / kernel / "rootfs.cpio"
+    prebuilt = kernel_img.exists() and rootfs_img.exists()
 
-    if rebuild_linux:
-        step(kernel, "Build Linux")
+    if build or not prebuilt:
+        if not build:
+            log_step(kernel, "No prebuilt artifacts found — building from source")
+        log_step(kernel, "Checkout Linux")
+        checkout(linux.ref, kernel=kernel, patch=linux.patch, tarball=True)
+        log_step(kernel, "Build Linux")
         make_linux(kernel=kernel, config=linux.config, log=True)
-
-    step(kernel, "Build kSTEP")
-    make_kstep(kernel=kernel, log=True)
+        log_step(kernel, "Build kSTEP")
+        make_kstep(kernel=kernel, log=True)
+    else:
+        log_step(
+            kernel, "Using prebuilt artifacts (pass --build to rebuild from source)"
+        )
+        set_current_build(kernel)
 
     result_dir = ResultDir.create(f"repro_{driver.name}/{linux.name}")
-    step(kernel, "Run kSTEP")
-    step(kernel, f"QEMU Log: {result_dir.log}")
-    step(kernel, f"kSTEP Output: {result_dir.output}")
+    log_step(kernel, "Run kSTEP")
+    log_step(kernel, f"QEMU Log: {result_dir.log}")
+    log_step(kernel, f"kSTEP Output: {result_dir.output}")
     run_qemu(kernel=kernel, driver=driver, result_dir=result_dir, headless=True)
 
 
-def main(bug: Bug, runs: list[str], rebuild_linux: bool):
+def main(bug: Bug, runs: list[str], build: bool):
     print("=" * 80, flush=True)
     print(f" {bug.driver.name} ".center(80, "="), flush=True)
     print("=" * 80, flush=True)
@@ -136,7 +152,7 @@ def main(bug: Bug, runs: list[str], rebuild_linux: bool):
         if r == "plot":
             continue
         linux = linux_map.get(r, Linux(name=r, ref=r))
-        reproduce(linux, bug.driver, rebuild_linux)
+        reproduce(linux, bug.driver, build)
 
     if "plot" in runs:
         if bug.plot_format:
@@ -151,7 +167,7 @@ if __name__ == "__main__":
         "name",
         type=str,
         default="all",
-        choices=["all", "ae", *[bug.driver.name for bug in BUGS + BUGS_EXTRA]],
+        choices=["all", "extra", *[bug.driver.name for bug in BUGS + BUGS_EXTRA]],
         help="The name of the bug to reproduce, or 'all' to reproduce all BUGS.",
     )
     parser.add_argument(
@@ -161,23 +177,27 @@ if __name__ == "__main__":
         nargs="+",
     )
     parser.add_argument(
-        "--rebuild_linux",
+        "--build",
         action="store_true",
         default=False,
-        help="Rebuild the Linux kernel before reproducing.",
+        help="Build from source (checkout + compile kernel and kmod) instead of "
+        "using the committed prebuilt artifacts. Builds automatically when no "
+        "prebuilt artifacts are present.",
     )
     args = parser.parse_args()
 
     if args.name == "all":
         selected_bugs = BUGS
-    elif args.name == "ae":
-        selected_bugs = BUGS[: 7] + BUGS_EXTRA[: 1]
+    elif args.name == "extra":
+        selected_bugs = BUGS_EXTRA
     else:
-        bug = next((bug for bug in BUGS + BUGS_EXTRA if bug.driver.name == args.name), None)
+        bug = next(
+            (bug for bug in BUGS + BUGS_EXTRA if bug.driver.name == args.name), None
+        )
         if not bug:
             raise ValueError(f"Bug '{args.name}' not found.")
         selected_bugs = [bug]
 
     print(f"running {len(selected_bugs)} bug(s)")
     for bug in selected_bugs:
-        main(bug=bug, runs=args.run, rebuild_linux=args.rebuild_linux)
+        main(bug=bug, runs=args.run, build=args.build)
