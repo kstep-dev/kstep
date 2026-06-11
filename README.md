@@ -15,16 +15,10 @@ Source code for **kSTEP: Characterization and Deterministic Testing of Linux CPU
 ## 🚀 Getting Started
 
 ```sh
-# 📦 Clone the repository
+# 📦 Clone the repository (add `--branch osdi26` to reproduce the paper exactly)
 git clone --recurse-submodules https://github.com/kstep-dev/kstep &&
 cd kstep
 ```
-
-> 📌 **Reproducing the paper:** the [`osdi26`](https://github.com/kstep-dev/kstep/releases/tag/osdi26) tag pins the exact code released with the OSDI '26 paper. To reproduce the published results, check it out after cloning:
->
-> ```sh
-> git checkout osdi26 && git submodule update --init --recursive
-> ```
 
 ```sh
 # 💾 Install dependencies
