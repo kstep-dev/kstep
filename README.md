@@ -10,7 +10,7 @@ Source code for **kSTEP: Characterization and Deterministic Testing of Linux CPU
 
 *Tingjia Cao, Shawn Wanxiang Zhong, Caeden Whitaker, Ke Han, Andrea Arpaci-Dusseau, and Remzi Arpaci-Dusseau*
 
-📄 [Read the paper (PDF)](https://kstep-dev.github.io/assets/paper-osdi26.pdf)
+📄 [Paper](https://kstep-dev.github.io/assets/paper-osdi26.pdf) &nbsp;·&nbsp; 🌐 [Website](https://kstep-dev.github.io/) &nbsp;·&nbsp; 📚 [Study](https://github.com/kstep-dev/study) &nbsp;·&nbsp; 📊 [Results](https://github.com/kstep-dev/results)
 
 ## 🚀 Getting Started
 
