@@ -14,7 +14,8 @@ Source code for **kSTEP: Characterization and Deterministic Testing of Linux CPU
 
 ```sh
 # 📦 Clone the repository
-git clone --recurse-submodules https://github.com/kstep-dev/kstep
+git clone --recurse-submodules https://github.com/kstep-dev/kstep &&
+cd kstep
 ```
 
 ```sh
@@ -24,12 +25,12 @@ git clone --recurse-submodules https://github.com/kstep-dev/kstep
 
 ```sh
 # 🐞 Reproduce bugs
-./reproduce.py <name|all> [--run <buggy|fixed|plot>]
+# ./reproduce.py <name|all> [--run <buggy|fixed|plot>]
+#   1. Checks out the buggy and/or fixed kernels
+#   2. Builds and runs the specified driver (or all drivers)
+#   3. Plots the results
+./reproduce.py sync_wakeup
 ```
-
-- `<name|all>`: Name of the bug to reproduce (see [`reproduce.py`](reproduce.py)), or `all` to reproduce all bugs.
-
-- **Example:** `./reproduce.py sync_wakeup` checks out both the buggy and fixed kernels, builds kSTEP, and runs the `sync_wakeup` driver.
 
 ## 📊 Results
 
