@@ -10,6 +10,8 @@ Source code for **kSTEP: Characterization and Deterministic Testing of Linux CPU
 
 *Tingjia Cao, Shawn Wanxiang Zhong, Caeden Whitaker, Ke Han, Andrea Arpaci-Dusseau, and Remzi Arpaci-Dusseau*
 
+📄 [Read the paper](https://kstep-dev.github.io/)
+
 ## 🚀 Getting Started
 
 ```sh
