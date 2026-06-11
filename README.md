@@ -16,8 +16,7 @@ Source code for **kSTEP: Characterization and Deterministic Testing of Linux CPU
 
 ```sh
 # 📦 Clone the repository (add `--branch osdi26` to reproduce the paper exactly)
-git clone --recurse-submodules https://github.com/kstep-dev/kstep &&
-cd kstep
+git clone --recurse-submodules https://github.com/kstep-dev/kstep && cd kstep
 ```
 
 ```sh
