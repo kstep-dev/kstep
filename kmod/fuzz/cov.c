@@ -15,7 +15,6 @@ enum kstep_cov_mode {
 
 static unsigned int cov_mode = COV_DISABLED;
 
-
 // Record the coverage for each command and each pid
 struct cov_entry {
   u32 cmd_id;
@@ -27,7 +26,6 @@ static struct cov_entry cov_buffer[NR_CPUS][COV_BUFFER_SIZE];
 static int cov_counter[NR_CPUS] = {0}; // no need to be atomic with serialized sched calls per CPU
 static struct file *cov_file = NULL;
 static u32 cov_cmd_id = 0;
-
 
 // Hash map to track the previous PC and signals for each PID under this command
 #define PID_MAP_SIZE 2048
@@ -49,13 +47,13 @@ static void kstep_cov_reset(void) {
   }
 }
 
-__always_inline bool kstep_cov_mode_check(enum kstep_cov_mode mode) {
+static __always_inline bool kstep_cov_mode_check(enum kstep_cov_mode mode) {
   unsigned int mode_current = READ_ONCE(cov_mode);
   barrier();
   return mode_current == mode;
 }
 
-__always_inline void kstep_cov_mode_set(enum kstep_cov_mode mode) {
+static __always_inline void kstep_cov_mode_set(enum kstep_cov_mode mode) {
   barrier();
   WRITE_ONCE(cov_mode, mode);
   barrier();
@@ -71,7 +69,7 @@ static void kstep_cov_record(u64 ip) {
   if (cpu == 0 &&
       (current->pid != 1 || !kstep_cov_mode_check(COV_ENABLED_WITH_CONTROLLER)))
     return;
-  
+
   if (cov_counter[cpu] >= COV_BUFFER_SIZE)
     panic("cov_buffer[%d] overflow", cpu);
 
@@ -140,8 +138,7 @@ static u32 kstep_cov_cmd_id_get(void) {
   return current_cmd_id;
 }
 
-
-// Get an slot in the hash map for the given PID
+// Get a slot in the hash map for the given PID
 static __always_inline int get_slot_by_pid(u32 pid) {
   u32 idx = pid & (PID_MAP_SIZE - 1);
   for (u32 i = 0; i < PID_MAP_SIZE; i++) {

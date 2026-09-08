@@ -14,7 +14,6 @@ import signal
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from run import Driver
 from scripts.corpus import SignalCorpus
@@ -30,7 +29,12 @@ from scripts.fuzz_common import (
 from scripts.fuzz_mutate import bottleneck_signal
 from scripts.fuzz_worker import worker_main
 from scripts.input_seq import InputSeq
-from scripts.utils import FUZZ_CORPUS_DIR, FUZZ_ERROR_DIR, FUZZ_SUCCESS_DIR, fuzz_mode_dir
+from scripts.utils import (
+    FUZZ_CORPUS_DIR,
+    FUZZ_ERROR_DIR,
+    FUZZ_SUCCESS_DIR,
+    fuzz_mode_dir,
+)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Manager
@@ -51,7 +55,7 @@ class FuzzManager:
         cross_scheduler: bool = False,
         enable_kthreads: bool = False,
         enable_task_freeze: bool = True,
-        pin_cpus: Optional[str] = None,
+        pin_cpus: str | None = None,
         ci_mode: bool = False,
     ) -> None:
         self.n_workers = n_workers
@@ -68,10 +72,10 @@ class FuzzManager:
         self.pin_cpus = pin_cpus
         self.ci_mode = ci_mode
 
-        self.task_queue: "mp.Queue[Optional[WorkItem]]" = mp.Queue(maxsize=n_workers * 4)
-        self.result_queue: "mp.Queue[WorkResult]" = mp.Queue()
+        self.task_queue: mp.Queue[WorkItem | None] = mp.Queue(maxsize=n_workers * 4)
+        self.result_queue: mp.Queue[WorkResult] = mp.Queue()
         self.shutdown_event = mp.Event()
-        self.qemu_cpu_lists: list[Optional[str]] = [None] * n_workers
+        self.qemu_cpu_lists: list[str | None] = [None] * n_workers
         self.procs: list[mp.Process] = []
 
         self.corpus = SignalCorpus()
@@ -144,13 +148,13 @@ class FuzzManager:
 
         return target_dir
 
-    def _pick_replay_seed(self) -> Optional[Seed]:
+    def _pick_replay_seed(self) -> Seed | None:
         seed = self.pool.pick_seed(self.rng)
         if seed is None:
             seed = self.special_pool.pick_seed(self.rng)
         return seed
 
-    def _pick_mutation_target(self) -> Optional[tuple[str, Seed, MutationPivot]]:
+    def _pick_mutation_target(self) -> tuple[str, Seed, MutationPivot] | None:
         prefer_special = (
             len(self.special_pool) > 0
             and self.rng.random() < self.special_mutate_ratio
@@ -224,7 +228,7 @@ class FuzzManager:
         target = self._pick_mutation_target()
         if target is not None:
             return self._make_mutation_work(*target)
-        
+
         raise RuntimeError("ci_mode: no pivot available for mutation")
 
 
@@ -300,17 +304,17 @@ class FuzzManager:
             logging.info(f"Spawned worker {wid} (pid={proc.pid})")
 
     # Enqueue one work item unless shutdown has already stopped normal scheduling.
-    def _put_task(self, item: Optional[WorkItem]) -> bool:
+    def _put_task(self, item: WorkItem | None) -> bool:
         # `None` is the poison pill used during shutdown, so it must still be
         # enqueueable after `shutdown_event` is set.
         if item is None or not self.shutdown_event.is_set():
             try:
                 self.task_queue.put(item, timeout=0.5)
                 return True
-            except queue.Full:
-                raise RuntimeError("Shutdown: task_queue is full")
-            except (BrokenPipeError, EOFError, OSError):
-                raise RuntimeError("Shutdown: error when pushing task into queue")
+            except queue.Full as e:
+                raise RuntimeError("Shutdown: task_queue is full") from e
+            except (BrokenPipeError, EOFError, OSError) as e:
+                raise RuntimeError("Shutdown: error when pushing task into queue") from e
         return False
 
     # Update aggregate execution counters for the finished result's mode.
@@ -450,7 +454,7 @@ class FuzzManager:
         )
 
     # Route one worker result through success or error handling.
-    def _process_result(self, result: Optional[WorkResult]) -> None:
+    def _process_result(self, result: WorkResult | None) -> None:
         assert result is not None
 
         self._record_result_mode(result)
@@ -590,7 +594,7 @@ def run_manager(
     cross_scheduler: bool = False,
     enable_kthreads: bool = False,
     enable_task_freeze: bool = True,
-    pin_cpus: Optional[str] = None,
+    pin_cpus: str | None = None,
     ci_mode: bool = False,
 ) -> None:
     manager = FuzzManager(

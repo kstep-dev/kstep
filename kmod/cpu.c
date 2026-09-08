@@ -227,7 +227,7 @@ void kstep_topo_set(const char *spec) {
     if (!name || !*name || !level || !*level)
       panic("Invalid level spec in '%s'", spec);
     topo_set_level(get_topo_level(name), level);
-    TRACE_INFO("applied topology %s\n", name);
+    TRACE_INFO("applied topology %s", name);
   }
   topo_apply();
 }
@@ -260,13 +260,11 @@ static void apply_per_cpu_param(const char *spec,
 
   for (int cpu = 1; cpu < nr_cpus; cpu++) {
     set(cpu, values[cpu]);
-    TRACE_INFO("cpu=%d scale=%d\n", cpu, values[cpu]);
+    TRACE_INFO("cpu=%d scale=%d", cpu, values[cpu]);
   }
 }
 
 static void set_freq(int cpu, int scale) {
-  if (cpu < 0 || cpu >= num_online_cpus())
-    panic("cpu %d out of range", cpu);
   // x86:
   // https://elixir.bootlin.com/linux/v6.14.11/source/arch/x86/include/asm/topology.h#L287-L293
   // generic:
@@ -276,8 +274,6 @@ static void set_freq(int cpu, int scale) {
 }
 
 static void set_cap(int cpu, int scale) {
-  if (cpu < 0 || cpu >= num_online_cpus())
-    panic("cpu %d out of range", cpu);
 #ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
   // https://elixir.bootlin.com/linux/v6.17.8/source/include/linux/topology.h#L332-L339
   per_cpu(cpu_scale, cpu) = scale;

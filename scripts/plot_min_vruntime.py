@@ -6,9 +6,9 @@ Plot min_vruntime and avg_vruntime for CPU 2 over time from log files
 import argparse
 
 import matplotlib.pyplot as plt
-from utils import ResultDir
 from parse_log import parse_jsonl
 from plot_utils import save_fig
+from utils import ResultDir
 
 
 def plot_min_vruntime(buggy_df, fixed_df):

@@ -8,12 +8,12 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from utils import ResultDir
 from parse_log import parse_jsonl
 from plot_utils import save_fig
+from utils import ResultDir
 
 
-def parse_log_file(path: Path, target_cpu: int):    
+def parse_log_file(path: Path, target_cpu: int):
     df = parse_jsonl(path, type="sched_softirq")
     df["lat_ms"] = df["lat_us"] / 1000.0
     df = df[df["cpu"] == target_cpu]

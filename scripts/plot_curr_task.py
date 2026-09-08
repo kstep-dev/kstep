@@ -8,10 +8,10 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
-from utils import ResultDir
 from matplotlib import colors
 from parse_log import parse_jsonl
 from plot_utils import save_fig
+from utils import ResultDir
 
 
 def parse_curr_task(path: Path, type: str) -> pd.DataFrame:

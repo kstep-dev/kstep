@@ -4,9 +4,9 @@ import argparse
 import dataclasses
 import logging
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Optional
 
 from scripts import (
     BUILD_CURR_DIR,
@@ -28,9 +28,9 @@ class Driver:
     params: Iterable[str] = ()
     num_cpus: int = 2
     mem_mb: int = 512
-    topology: Optional[str] = None
-    frequency: Optional[str] = None
-    capacity: Optional[str] = None
+    topology: str | None = None
+    frequency: str | None = None
+    capacity: str | None = None
 
 
 def build_qemu_cmd(
@@ -40,7 +40,7 @@ def build_qemu_cmd(
     use_sock: bool = False,
     debug: bool = False,
     headless: bool = False,
-    cpu_affinity: Optional[str] = None,
+    cpu_affinity: str | None = None,
 ) -> str:
     kvm_path = Path("/dev/kvm")
     if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
@@ -148,7 +148,7 @@ def run_qemu(
     system(build_qemu_cmd(driver, kernel, result_dir, use_sock, debug, headless))
 
 
-def print_run_results(kernel: str, result_dir: Optional[ResultDir] = None):
+def print_run_results(kernel: str, result_dir: ResultDir | None = None):
     if result_dir is None:
         result_dir = ResultDir("latest")
     print(f"Results saved to {result_dir}")
@@ -218,7 +218,7 @@ def make_kstep(kernel: str, log: bool = False):
     system(cmd)
 
 
-def make_linux(kernel: str, config: Optional[Path] = None, log: bool = False):
+def make_linux(kernel: str, config: Path | None = None, log: bool = False):
     cmd = f"make linux KERNEL={kernel}"
     if config:
         cmd += f" KSTEP_EXTRA_CONFIG={config}"

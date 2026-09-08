@@ -68,7 +68,7 @@ static bool process_console_chunk(const char *buf, ssize_t nread,
         parse_console_input(state->line_buf);
       }
       state->line_len = 0;
-    } else if (state->line_len + 1 < MAX_LINE_LENGTH && 
+    } else if (state->line_len + 1 < MAX_LINE_LENGTH &&
                (isdigit(ch) || isalpha(ch) || ch == ',' || ch == '-')) {
       state->line_buf[state->line_len++] = ch;
     }

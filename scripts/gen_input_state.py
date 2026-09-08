@@ -1,6 +1,5 @@
 import random
 from dataclasses import dataclass, field
-from typing import List, Optional
 
 # Cgroup constants
 CGROUP_ROOT = "cgroot"
@@ -40,9 +39,9 @@ class GenState:
     enable_task_freeze: bool = False
 
     # Generator state: changed by operations that produce resources or consume resources
-    tasks: List[int] = field(default_factory=list) # list of task ids
+    tasks: list[int] = field(default_factory=list) # list of task ids
     task_state: dict[int, str] = field(default_factory=dict) # key: task id, value: state
-    kthreads: List[int] = field(default_factory=list) # list of kthread ids
+    kthreads: list[int] = field(default_factory=list) # list of kthread ids
     kthread_state: dict[int, str] = field(default_factory=dict) # key: kthread id, value: state
     cgroups: dict = field(default_factory=dict) # key: cgroup id, value: Cgroup
     leaf_cgroups: list[int] = field(default_factory=list) # list of leaf cgroup ids
@@ -66,7 +65,7 @@ class GenState:
         choices = [tid for tid in self.tasks if self.task_state[tid] == state]
         return self.rnd.choice(choices)
 
-    def next_task_id(self) -> Optional[int]:
+    def next_task_id(self) -> int | None:
         for i in range(self.max_tasks):
             if i not in self.tasks:
                 return i
@@ -96,7 +95,7 @@ class GenState:
         choices = [ktid for ktid in self.kthreads if self.kthread_state.get(ktid) in states]
         return self.rnd.choice(choices)
 
-    def next_kthread_id(self) -> Optional[int]:
+    def next_kthread_id(self) -> int | None:
         for i in range(self.max_kthreads):
             if i not in self.kthreads:
                 return i
@@ -186,7 +185,7 @@ class GenState:
         for child_id, child in self.cgroups.items():
             if child.parent_id == cgroup_id:
                 self._refresh_effective_cpuset(child_id)
-    
+
     def choose_cpuset_cgroup(self, cgroup_id: int) -> tuple[int, int]:
         begin, end = self.choose_cpuset_subset(1, self.cpus - 1)
         return begin, end
@@ -215,7 +214,7 @@ class GenState:
     def choose_task_in_cgroup(self) -> tuple[int, int]:
         task_id = self.rnd.choice(list(self.task2cgroups.keys()))
         return self.task2cgroups[task_id], task_id
-    
+
     def choose_leaf_cgroup(self) -> int:
         if not self.leaf_cgroups:
             return self.choose_cgroup()
@@ -227,7 +226,7 @@ class GenState:
     def choose_destroyable_leaf_cgroup(self) -> int:
         return self.rnd.choice(self.destroyable_leaf_cgroups())
 
-    def next_cgroup_id(self) -> Optional[int]:
+    def next_cgroup_id(self) -> int | None:
         for i in range(self.max_cgroups):
             if i not in self.cgroups:
                 return i

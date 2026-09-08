@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import random
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-import random
-from typing import Mapping, Optional
+
+from scripts.input_seq import OpTuple
 from scripts.utils import FUZZ_DIR, RESULTS_DIR, ResultDir
 
-Ops = list[tuple[int, int, int, int]]
+Ops = list[OpTuple]
 
 
 def worker_dir(worker_id: int, base_dir: Path = FUZZ_DIR) -> ResultDir:
@@ -43,18 +45,14 @@ class Seed:
     times_selected: int = 0
     productive_pivots: list[MutationPivot] = field(default_factory=list)
 
-    @property
-    def productive_cmd_ids(self) -> list[int]:
-        return [pivot.cmd_id for pivot in self.productive_pivots]
-
 
 @dataclass
 class WorkItem:
     mode: str           # "fresh" | "replay" | "mutate"
     steps: int          # used for "fresh" and for interactive generation in "mutate"
-    ops: Optional[Ops] = None         # used for "replay" / "mutate"
-    seed_id: Optional[int] = None
-    pivot_idx: Optional[int] = None   # "mutate": replay ops[0..pivot_idx], then generate interactively
+    ops: Ops | None = None         # used for "replay" / "mutate"
+    seed_id: int | None = None
+    pivot_idx: int | None = None   # "mutate": replay ops[0..pivot_idx], then generate interactively
 
 
 @dataclass
@@ -63,10 +61,10 @@ class WorkResult:
     ops: Ops
     exec_time: float
     mode: str = "fresh"        # "fresh" | "replay" | "mutate"
-    seed_id: Optional[int] = None
+    seed_id: int | None = None
     special_pivot_idxs: list[int] = field(default_factory=list)
-    error: Optional[str] = None
-    error_category: Optional[str] = None  # "crash" | "timedout" | "retry_tick" | "op_mismatch" | "fail_log" | "other"
+    error: str | None = None
+    error_category: str | None = None  # "crash" | "timedout" | "retry_tick" | "op_mismatch" | "fail_log" | "other"
 
 
 class SeedPool:
@@ -75,15 +73,12 @@ class SeedPool:
         self._weights: list[int] = []
         self._counter = 0
 
-    def next_seed_id(self) -> int:
-        return self._counter
-    
     def add(
         self,
         ops: Ops,
         n_signals: int,
-        productive_pivots: Optional[list[MutationPivot]] = None,
-        seed_id: Optional[int] = None,
+        productive_pivots: list[MutationPivot] | None = None,
+        seed_id: int | None = None,
     ) -> Seed:
         assigned_seed_id = self._counter if seed_id is None else seed_id
         seed = Seed(
@@ -97,7 +92,7 @@ class SeedPool:
         self._counter = max(self._counter, assigned_seed_id + 1)
         return seed
 
-    def pick_seed(self, rng: random.Random) -> "Optional[Seed]":
+    def pick_seed(self, rng: random.Random) -> Seed | None:
         """Pick a seed with probability proportional to its signal count."""
         if not self._seeds:
             return None
@@ -110,7 +105,7 @@ class SeedPool:
         signal_test_counts: Mapping[int, int],
         rng: random.Random,
         rarity_alpha: float,
-    ) -> Optional[tuple[Seed, MutationPivot]]:
+    ) -> tuple[Seed, MutationPivot] | None:
         candidates: list[tuple[Seed, MutationPivot]] = []
         weights: list[float] = []
 

@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Optional
 
 PROJ_DIR = Path(__file__).parent.parent.resolve()
 
@@ -35,7 +34,7 @@ class ResultDir:
     label: str
 
     @classmethod
-    def create(cls, label: Optional[str] = None, set_latest: bool = True) -> "ResultDir":
+    def create(cls, label: str | None = None, set_latest: bool = True) -> "ResultDir":
         """Create `results/<label>/` (defaults to `tmp_<ts>`); optionally point `results/latest` at it."""
         if label is None:
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -113,8 +112,8 @@ def parse_line(line: str, prefix: str) -> dict | None:
     json_str = line[TIMESTAMP_LEN + 1 + len(prefix) :].removeprefix(":")
     try:
         obj = json.loads(json_str)
-    except json.JSONDecodeError:
-        raise ValueError(f"Invalid JSON at line {line}")
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Invalid JSON at line {line}") from e
 
     # Parse timestamp
     ts_str = line[1 : TIMESTAMP_LEN - 1]
