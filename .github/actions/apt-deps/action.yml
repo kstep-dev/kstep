@@ -1,4 +1,4 @@
-name: apt dependencies
+name: Apt package cache
 description: Download apt packages and cache the .deb archives, optionally installing them.
 
 inputs:
