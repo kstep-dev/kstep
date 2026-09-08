@@ -5,8 +5,8 @@
 #include "handler.h"
 
 struct kstep_check_state {
-  s64 cfs_util_avg[NR_CPUS];
-  s64 rt_util_avg[NR_CPUS];
+  s64 cfs_util_avg[KSTEP_NR_CPUS];
+  s64 rt_util_avg[KSTEP_NR_CPUS];
 };
 
 void kstep_check_before_op(struct kstep_check_state *check);

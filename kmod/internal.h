@@ -16,6 +16,7 @@
 #include "driver.h"
 
 #define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
+#define KSTEP_NR_CPUS (32)
 
 // main.c
 extern struct kstep_driver *kstep_driver;

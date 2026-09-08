@@ -1,3 +1,4 @@
+#include <linux/arch_topology.h>
 #include <linux/cpuset.h>
 
 #include "driver.h"
@@ -177,13 +178,23 @@ static void topo_set_level(enum kstep_topo_level level, char *spec) {
     panic("Not every online CPU is assigned a group for level %d", level);
 
   if (level == KSTEP_TOPO_SMT) {
-    // Also update cpu_sibling_map so that cpu_smt_mask() / is_core_idle()
-    // reflect the new SMT topology.
-    KSYM_IMPORT_TYPED(cpumask_var_t, cpu_sibling_map);
+    // Also update the arch sibling masks so that cpu_smt_mask() /
+    // is_core_idle() reflect the new SMT topology. These read the arch
+    // topology directly and bypass sched_domain_topology entirely.
     int cpu;
+#ifdef CONFIG_GENERIC_ARCH_TOPOLOGY
+    // https://elixir.bootlin.com/linux/v6.17.8/source/include/linux/arch_topology.h#L88
+    KSYM_IMPORT_TYPED(struct cpu_topology, cpu_topology);
+    for_each_cpu(cpu, cpu_online_mask)
+      cpumask_copy(&KSYM_cpu_topology[cpu].thread_sibling,
+                   &kstep_masks[KSTEP_TOPO_SMT][cpu]);
+#else
+    // https://elixir.bootlin.com/linux/v6.17.8/source/arch/x86/kernel/smpboot.c#L95-L96
+    KSYM_IMPORT_TYPED(cpumask_var_t, cpu_sibling_map);
     for_each_cpu(cpu, cpu_online_mask)
       cpumask_copy(*per_cpu_ptr(KSYM_cpu_sibling_map, cpu),
                    &kstep_masks[KSTEP_TOPO_SMT][cpu]);
+#endif
   }
 }
 
@@ -228,7 +239,7 @@ static void apply_per_cpu_param(const char *spec,
   char buf[CPU_SPEC_LEN];
   char *cursor, *pair;
   int nr_cpus = num_online_cpus();
-  int values[NR_CPUS];
+  int values[KSTEP_NR_CPUS];
 
   for (int i = 0; i < nr_cpus; i++)
     values[i] = SCHED_CAPACITY_SCALE;
