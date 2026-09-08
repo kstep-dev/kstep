@@ -1,11 +1,12 @@
 import json
-from typing import Iterator
-from pathlib import Path
 from collections import defaultdict
+from collections.abc import Iterator
+from pathlib import Path
+
+from .cov import symbolize_pcs
 from .gen_input_ops import OP_NAME_TO_TYPE, OP_TYPE_TO_NAME
 from .input_seq import InputSeq
 
-from .cov import symbolize_pcs
 
 def pc_hash(pc: int) -> int:
     a = (pc ^ 61) ^ (pc >> 16)
@@ -61,7 +62,6 @@ class SignalCorpus:
         signal_records: dict[int, dict[int, list[int]]],
         kernel: str,
     ):
-        # new_pcs = {rec[3] for rec in signal_records if rec[3] not in self.seen_pcs}
         new_pcs = set()
         for pid_pcs in signal_records.values():
             for pcs in pid_pcs.values():
@@ -140,7 +140,7 @@ class SignalCorpus:
 
         # Add the signal to the new signals for the action if the task hits that new signal
         # Remove the signal from the new signals set if it has been recorded
-        # So that the following tasks hit the same signal will not be recorded        
+        # So that the following tasks hit the same signal will not be recorded
         for cmd_id, pid, prev_pc, pc, sig in self.iter_signals(signal_records):
             if sig in new_signals:
                 cmd_meta[cmd_id]["new_signal_ids"].append(sig)

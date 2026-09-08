@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import math
-from typing import Mapping
+from collections.abc import Mapping
 
-from scripts.fuzz_common import MutationPivot
 
 def signal_rarity(
     sig: int,
@@ -48,27 +47,3 @@ def pivot_weight(
         return 0.0
     return special_score / math.sqrt(1.0 + times_selected)
 
-
-def pick_pivot(
-    productive_pivots: list[MutationPivot],
-    signal_test_counts: Mapping[int, int],
-    rarity_alpha: float,
-) -> MutationPivot | None:
-    """Return the best-known metadata needed to weight a mutation pivot."""
-    if not productive_pivots:
-        return None
-
-    best_pivot: MutationPivot | None = None
-    best_weight = 0.0
-    for pivot in productive_pivots:
-        weight = pivot_weight(
-            signal_ids=pivot.signal_ids,
-            signal_test_counts=signal_test_counts,
-            rarity_alpha=rarity_alpha,
-            special_score=pivot.special_score,
-            times_selected=pivot.times_selected,
-        )
-        if weight > best_weight:
-            best_pivot = pivot
-            best_weight = weight
-    return best_pivot

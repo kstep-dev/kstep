@@ -2,12 +2,12 @@
 
 #include "checker.h"
 #include "handler_internal.h"
-#include "linux/sched.h"
+#include <linux/sched.h>
 
 struct kstep_task kstep_tasks[MAX_TASKS];
-struct kstep_managed_kthread kstep_kthreads[KSTEP_MAX_KTHREADS];
+struct task_struct *kstep_kthreads[KSTEP_MAX_KTHREADS];
 struct kstep_cgroup_state kstep_cgroups[MAX_CGROUPS];
-int cgroup_lineage[MAX_CGROUPS];
+static int cgroup_lineage[MAX_CGROUPS];
 
 bool kstep_op_is_valid_task_id(int id) { return id >= 0 && id < MAX_TASKS; }
 bool kstep_op_is_valid_cgroup_id(int id) { return id >= 0 && id < MAX_CGROUPS; }
@@ -17,7 +17,7 @@ bool kstep_op_is_valid_kthread_id(int id) {
 
 bool kstep_build_cgroup_name(int id, char *buf) {
   int depth = 0, cur = id, len = 0;
-  
+
   while (cur != -1) {
     if (!kstep_op_is_valid_cgroup_id(cur) || !kstep_cgroups[cur].exists ||
         depth >= MAX_CGROUPS)
@@ -90,7 +90,6 @@ static const char op_strs[OP_TYPE_NR][30] = {
   [OP_TASK_FREEZE] = "TASK_FREEZE",
 };
 
-
 /* Returns true if task p is in the state required to receive op type. */
 static bool op_task_state_ready(enum kstep_op_type type, struct task_struct *p) {
   if (type == OP_TASK_WAKEUP || type == OP_TASK_FREEZE)
@@ -149,12 +148,12 @@ static void print_state(void) {
   for (int i = 0; i < KSTEP_MAX_KTHREADS; i++) {
     enum kstep_kthread_state state;
 
-    if (!kstep_kthreads[i].p)
+    if (!kstep_kthreads[i])
       continue;
     state = kstep_op_kthread_state(i);
     pr_info("Kthread %d: pid=%d, cpu=%d, state=%d\n", i,
-            state == KSTEP_KTHREAD_DEAD ? -1 : kstep_kthreads[i].p->pid,
-            task_cpu(kstep_kthreads[i].p), kstep_kthreads[i].p->__state);
+            state == KSTEP_KTHREAD_DEAD ? -1 : kstep_kthreads[i]->pid,
+            task_cpu(kstep_kthreads[i]), kstep_kthreads[i]->__state);
   }
 
   for (int i = 0; i < MAX_CGROUPS; i++) {
@@ -164,10 +163,9 @@ static void print_state(void) {
   }
 }
 
-/*
- * Try to send the head queued op for task @id if its required state is met.
- * Sends at most one op per call.
- */
+/* Kthread ops hand control to a live remote kthread that keeps running during
+ * the helper's trailing sleep; global coverage in that window floods the async
+ * kthread path rather than the command itself. */
 static bool skip_global_cov(enum kstep_op_type type) {
   switch (type) {
   case OP_KTHREAD_CREATE: case OP_KTHREAD_START: case OP_KTHREAD_BIND:
@@ -185,11 +183,6 @@ static u8 execute_one_op(enum kstep_op_type type, int a, int b, int c) {
 
   kstep_check_before_op(&check_state);
 
-  /*
-   * START/YIELD hand control to a live remote kthread that can keep running
-   * during the helper's trailing sleep. Global coverage in that window floods
-   * the async kthread path rather than the command itself.
-  */
   if (collect_cov)
     kstep_cov_enable();
   pr_info("EXECOP: {\"op\": %d, \"a\": %d, \"b\": %d, \"c\": %d}\n", type, a, b, c);
@@ -206,7 +199,7 @@ static u8 execute_one_op(enum kstep_op_type type, int a, int b, int c) {
   return executed_steps;
 }
 
-static u8 buf[1 + 1 + 1 + MAX_TASKS * 2 + 1 + KSTEP_MAX_KTHREADS * 2 + 1];
+static u8 state_buf[1 + 1 + 1 + MAX_TASKS * 2 + 1 + KSTEP_MAX_KTHREADS * 2 + 1];
 
 void kstep_write_state(struct file *f, u8 executed_steps) {
   /* Format:
@@ -219,10 +212,9 @@ void kstep_write_state(struct file *f, u8 executed_steps) {
    * section. Task states are 0=blocked, 1=runnable, 2=on_cpu. */
   loff_t pos = 0;
   int len = 0;
-  
 
-  buf[len++] = OP_TYPE_NR;
-  buf[len++] = executed_steps + 11;
+  state_buf[len++] = OP_TYPE_NR;
+  state_buf[len++] = executed_steps + 11;
   for (int i = 0; i < MAX_TASKS; i++) {
     struct task_struct *p = kstep_tasks[i].p;
     u8 state;
@@ -235,30 +227,30 @@ void kstep_write_state(struct file *f, u8 executed_steps) {
       state = 1;
     else
       state = 0;
-    buf[len++] = (u8)i + 11; // avoid writing 10 (\n)
-    buf[len++] = state;
+    state_buf[len++] = (u8)i + 11; // avoid writing 10 (\n)
+    state_buf[len++] = state;
   }
-  buf[len++] = 0;
+  state_buf[len++] = 0;
   for (int i = 0; i < KSTEP_MAX_KTHREADS; i++) {
     enum kstep_kthread_state state;
 
-    if (!kstep_kthreads[i].p)
+    if (!kstep_kthreads[i])
       continue;
     state = kstep_op_kthread_state(i);
-    buf[len++] = (u8)i + 11;
-    buf[len++] = (u8)state;
+    state_buf[len++] = (u8)i + 11;
+    state_buf[len++] = (u8)state;
     if (state == KSTEP_KTHREAD_DEAD)
-      kstep_kthreads[i].p = NULL;
+      kstep_kthreads[i] = NULL;
   }
-  buf[len++] = '\n';
-  kernel_write(f, buf, len, &pos);
+  state_buf[len++] = '\n';
+  kernel_write(f, state_buf, len, &pos);
 }
 
 u8 kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
   if (type < 0 || type >= OP_TYPE_NR)
     panic("Operation failed: %d %d %d %d\n", type, a, b, c);
   if (!op_handlers[type]) {
-    TRACE_INFO("Operation not implemented: %d\n", type);
+    TRACE_INFO("Operation not implemented: %d", type);
     return 0;
   }
 

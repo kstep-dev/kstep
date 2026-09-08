@@ -11,7 +11,6 @@ void kstep_reset_task(struct task_struct *p) {
   p->se.prev_sum_exec_runtime = 0;
   p->se.nr_migrations = 0;
   p->se.vruntime = INIT_TIME_NS;
-  // p->se.deadline = INIT_TIME_NS;
 
 // https://github.com/torvalds/linux/commit/86bfbb7ce4f67a88df2639198169b685668e7349
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
@@ -99,17 +98,14 @@ void kstep_reset_cpumask(void) {
 #endif
 }
 
-// TODO: disable the dlserver for now
+// Disable the fair dl_server by giving it zero runtime.
 void kstep_reset_dl_server(void) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
   KSYM_IMPORT(dl_server_apply_params);
-  for (int cpu = 1; cpu <  num_online_cpus(); cpu++) {
-    u64 runtime =  0 * NSEC_PER_MSEC;
-		u64 period = 1000 * NSEC_PER_MSEC;
-    struct rq * rq = cpu_rq(cpu);
-		struct sched_dl_entity * dl_se = &rq->fair_server;
-    
-    KSYM_dl_server_apply_params(dl_se, runtime, period, 1);
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    u64 runtime = 0;
+    u64 period = 1000 * NSEC_PER_MSEC;
+    KSYM_dl_server_apply_params(&cpu_rq(cpu)->fair_server, runtime, period, 1);
   }
 #endif
 }

@@ -1,17 +1,16 @@
-from typing import Callable, List, Optional
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .gen_input_state import (
     KTHREAD_BLOCK_REQUESTED,
-    GenState,
     KTHREAD_BLOCKED,
     KTHREAD_CREATED,
-    KTHREAD_DEAD,
     KTHREAD_SPIN,
     KTHREAD_SYNCWAKE_REQUESTED,
     KTHREAD_YIELD,
-    TASK_SLEEPING,
     TASK_ON_CPU,
+    TASK_SLEEPING,
+    GenState,
 )
 
 OP_NAME_TO_TYPE = {
@@ -52,14 +51,14 @@ class Op:
     # function that emits the operation; change the generator state accordingly; returns the operation arguments
     emit: Callable
     # list of resources required by the operation
-    requires: List[str] = field(default_factory=list)
+    requires: list[str] = field(default_factory=list)
     # list of resources produced by the operation
-    produces: List[str] = field(default_factory=list)
+    produces: list[str] = field(default_factory=list)
     # list of argument types
-    arg_types: List[Optional[str]] = field(default_factory=lambda: [None, None, None])
+    arg_types: list[str | None] = field(default_factory=lambda: [None, None, None])
     # function that applies GenState side-effects for a replayed op (args already known, no randomness);
     # None means no side-effects beyond what update_from_kmod handles
-    replay: Optional[Callable] = None
+    replay: Callable | None = None
 
     def resolved_weight(self, m: GenState) -> int:
         if callable(self.weight):
@@ -316,7 +315,7 @@ def has_syncwake_pair(m: GenState) -> bool:
     return any(waker != wakee for waker in wakers for wakee in wakees)
 
 
-def build_ops(weight_overrides: Optional[dict[str, OpWeight]] = None) -> List[Op]:
+def build_ops(weight_overrides: dict[str, OpWeight] | None = None) -> list[Op]:
     weights: dict[str, OpWeight] = {
         "TASK_CREATE": 6,
         "TASK_FORK": 3,

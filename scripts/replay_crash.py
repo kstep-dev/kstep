@@ -70,8 +70,8 @@ def replay_crash(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     rerun_dir = crash_dir / f"rerun_{timestamp}"
     rerun_dir.mkdir(parents=True, exist_ok=False)
-    task_queue: "mp.Queue[WorkItem | None]" = mp.Queue()
-    result_queue: "mp.Queue" = mp.Queue()
+    task_queue: mp.Queue[WorkItem | None] = mp.Queue()
+    result_queue: mp.Queue = mp.Queue()
     task_queue.put(WorkItem(mode="replay", steps=0, ops=ops))
     task_queue.put(None)
 

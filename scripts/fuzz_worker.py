@@ -13,7 +13,7 @@ import subprocess
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO, Optional
+from typing import BinaryIO
 
 from run import Driver, build_qemu_cmd
 from scripts.fuzz_common import Ops, WorkItem, WorkResult, worker_dir
@@ -135,7 +135,7 @@ class FuzzWorkerSession:
                 raise RuntimeError("Timeout: Timed out waiting for the QEMU process") from exc
 
     # Read one protocol frame from the executor socket.
-    def _read_frame(self) -> Optional[bytes]:
+    def _read_frame(self) -> bytes | None:
         buf = bytearray()
         while True:
             ch = self.sock_file.read(1)
@@ -146,7 +146,7 @@ class FuzzWorkerSession:
                 return bytes(buf)
 
     # Decode the next task-state frame from the executor stream.
-    def read_kmod_state(self) -> Optional[KmodState]:
+    def read_kmod_state(self) -> KmodState | None:
         """Read state from kmod socket, discarding TTY echo."""
         while True:
             line = self._read_frame()
@@ -210,16 +210,16 @@ class FuzzWorker:
     def __init__(
         self,
         worker_id: int,
-        task_queue: "mp.Queue[Optional[WorkItem]]",
-        result_queue: "mp.Queue[WorkResult]",
+        task_queue: mp.Queue[WorkItem | None],
+        result_queue: mp.Queue[WorkResult],
         driver: Driver,
         kernel: str,
         cross_scheduler: bool = False,
         enable_kthreads: bool = False,
         enable_task_freeze: bool = True,
-        qemu_cpus: Optional[str] = None,
-        rng_seed: Optional[int] = None,
-        base_dir: Optional[Path] = None,
+        qemu_cpus: str | None = None,
+        rng_seed: int | None = None,
+        base_dir: Path | None = None,
         io_timeout_sec: float = 10.0,
     ) -> None:
         self.worker_id = worker_id
@@ -300,8 +300,8 @@ class FuzzWorker:
         self,
         work: WorkItem,
         session: FuzzWorkerSession,
-        ops_executed: Optional[Ops] = None,
-        special_pivot_idxs: Optional[list[int]] = None,
+        ops_executed: Ops | None = None,
+        special_pivot_idxs: list[int] | None = None,
         *,
         log_prefix: str = "STEP",
     ) -> tuple[Ops, list[int]]:
@@ -315,9 +315,9 @@ class FuzzWorker:
             op, a, b, c = generate_next_command(session.gen)
             executed_steps = session.send_op(op, a, b, c)
             if executed_steps > 0:
-                
+
                 if op == OP_NAME_TO_TYPE["TICK_REPEAT"]:
-                    for i in range(executed_steps):
+                    for _ in range(executed_steps):
                         ops_executed.append((OP_NAME_TO_TYPE["TICK"], 0, 0, 0))
                         self.logger.debug(
                             f"{log_prefix}: op={OP_NAME_TO_TYPE['TICK']},0,0,0 "
@@ -410,7 +410,7 @@ class FuzzWorker:
     def _finish_session(
         self,
         session: FuzzWorkerSession,
-    ) -> Optional[str]:
+    ) -> str | None:
         session.sock.sendall(b"EXIT\n")
         session.kill(kill_proc=False)
         return None
@@ -432,8 +432,8 @@ class FuzzWorker:
         self,
         work: WorkItem,
         ops_executed: Ops,
-        error: Optional[str],
-    ) -> Optional[str]:
+        error: str | None,
+    ) -> str | None:
         if error is not None:
             return error
 
@@ -462,8 +462,8 @@ class FuzzWorker:
         t0 = time.monotonic()
         ops_executed: Ops = []
         special_pivot_idxs: list[int] = []
-        error: Optional[str] = None
-        session: Optional[FuzzWorkerSession] = None
+        error: str | None = None
+        session: FuzzWorkerSession | None = None
 
         try:
             session = self._start_session(work)
@@ -506,7 +506,7 @@ class FuzzWorker:
     def run(self) -> None:
         signal.signal(signal.SIGINT, signal.SIG_IGN)
         while True:
-            work: Optional[WorkItem] = self.task_queue.get()
+            work: WorkItem | None = self.task_queue.get()
             if work is None:
                 break
             self.result_queue.put(self._run_one(work))
@@ -516,14 +516,14 @@ class FuzzWorker:
 # Launch a single worker process wrapper around the FuzzWorker class.
 def worker_main(
     worker_id: int,
-    task_queue: "mp.Queue[Optional[WorkItem]]",
-    result_queue: "mp.Queue[WorkResult]",
+    task_queue: mp.Queue[WorkItem | None],
+    result_queue: mp.Queue[WorkResult],
     driver: Driver,
     kernel: str,
     cross_scheduler: bool = False,
     enable_kthreads: bool = False,
     enable_task_freeze: bool = True,
-    qemu_cpus: Optional[str] = None,
+    qemu_cpus: str | None = None,
 ) -> None:
     worker = FuzzWorker(
         worker_id=worker_id,

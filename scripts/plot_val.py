@@ -7,9 +7,9 @@ import argparse
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from utils import ResultDir
 from parse_log import parse_jsonl
 from plot_utils import save_fig
+from utils import ResultDir
 
 
 def plot_util(buggy_df, fixed_df, ylabel: str):

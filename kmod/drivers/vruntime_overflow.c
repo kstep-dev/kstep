@@ -21,8 +21,8 @@ static void setup(void) {
 }
 
 static void *ineligible_group_with_eligible_tasks(void) {
-  if (special_task->on_cpu && 
-      !kstep_eligible(special_task->se.parent) && 
+  if (special_task->on_cpu &&
+      !kstep_eligible(special_task->se.parent) &&
       !kstep_eligible(special_task->se.parent->parent) &&
       kstep_eligible(&special_task->se))
     return special_task;

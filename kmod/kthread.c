@@ -3,7 +3,7 @@
 #include <linux/wait.h>
 
 #include "internal.h"
-#include "linux/sched.h"
+#include <linux/sched.h>
 
 struct kstep_kthread {
   struct task_struct     *task;
@@ -36,22 +36,30 @@ static struct kstep_kthread *kt_alloc(void) {
   return NULL;
 }
 
-static struct kstep_kthread *kt_find(struct task_struct *p) {
+static struct kstep_kthread *kt_lookup(struct task_struct *p) {
   for (int i = 0; i < KSTEP_MAX_KTHREADS; i++)
     if (pool[i].allocated && pool[i].task == p)
       return &pool[i];
-  panic("kstep: task %d (%s) is not a managed kthread", p->pid, p->comm);
   return NULL;
 }
 
-enum kstep_kthread_state kstep_kthread_get_state(struct task_struct *p) {
-  if (!p)
-    return KSTEP_KTHREAD_DEAD;
+static struct kstep_kthread *kt_find(struct task_struct *p) {
+  struct kstep_kthread *kt = kt_lookup(p);
+  if (!kt)
+    panic("kstep: task %d (%s) is not a managed kthread", p->pid, p->comm);
+  return kt;
+}
 
-  for (int i = 0; i < KSTEP_MAX_KTHREADS; i++)
-    if (pool[i].allocated && pool[i].task == p)
-      return pool[i].state;
-  return KSTEP_KTHREAD_DEAD;
+enum kstep_kthread_state kstep_kthread_get_state(struct task_struct *p) {
+  struct kstep_kthread *kt = p ? kt_lookup(p) : NULL;
+  return kt ? kt->state : KSTEP_KTHREAD_DEAD;
+}
+
+// All CPUs except CPU 0, which is reserved for the controller.
+static void worker_cpumask(struct cpumask *mask) {
+  cpumask_clear(mask);
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
+    cpumask_set_cpu(cpu, mask);
 }
 
 /* ---- thread function ---- */
@@ -103,21 +111,20 @@ static void do_syncwakeup(struct kstep_kthread *kt, void *arg) {
   __wake_up_sync(arg, TASK_NORMAL);
 
   struct task_struct *p;
-  struct rq * rq = cpu_rq(task_cpu(kt->task));
+  struct rq *rq = cpu_rq(task_cpu(kt->task));
   int runnable_task = 0;
 
   for_each_process(p) {
-    if (task_cpu(p) == task_cpu(kt->task) && p->__state == TASK_RUNNING) {
-      runnable_task ++;
-    }
+    if (task_cpu(p) == task_cpu(kt->task) && p->__state == TASK_RUNNING)
+      runnable_task++;
   }
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 14, 0)
   if (runnable_task == 1)
-    pr_info("warn: sync wakeup pick the remote cpu while local cpu will become idle queued_task=%d, delayed_task=%d", 
+    pr_info("warn: sync wakeup pick the remote cpu while local cpu will become idle queued_task=%d, delayed_task=%d",
             rq->nr_running, rq->cfs.h_nr_queued - rq->cfs.h_nr_runnable);
 #else
   if (runnable_task == 1)
-    pr_info("warn: sync wakeup pick the remote cpu while local cpu will become idle queued_task=%d", 
+    pr_info("warn: sync wakeup pick the remote cpu while local cpu will become idle queued_task=%d",
             rq->nr_running);
 #endif
 
@@ -143,10 +150,7 @@ struct task_struct *kstep_kthread_create(const char *name) {
   if (IS_ERR(kt->task))
     panic("kstep: failed to create spinner kthread '%s'", name);
 
-  cpumask_clear(&mask);
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
-    cpumask_set_cpu(cpu, &mask);
-
+  worker_cpumask(&mask);
   set_cpus_allowed_ptr(kt->task, &mask);
 
   TRACE_INFO("kthread_create: name=%s pid=%d", name, kt->task->pid);
@@ -161,7 +165,7 @@ void kstep_kthread_bind(struct task_struct *p, const struct cpumask *mask) {
   kstep_sleep();
 }
 
-/* Start a kthread created by kstep_kthread_sleeper(). */
+/* Start a kthread created by kstep_kthread_create(). */
 void kstep_kthread_start(struct task_struct *p) {
   struct kstep_kthread *kt = kt_find(p);
   TRACE_INFO("kthread_start: pid=%d", p->pid);
@@ -181,10 +185,10 @@ void kstep_kthread_yield(struct task_struct *p) {
 }
 
 /*
- * Create a kthread that blocks on an internal wait queue until
- * kstep_kthread_syncwake() wakes it, then spins.
+ * Make the kthread block on an internal wait queue until
+ * kstep_kthread_syncwake() wakes it, then spin.
  */
- void kstep_kthread_block(struct task_struct *p) {
+void kstep_kthread_block(struct task_struct *p) {
   struct kstep_kthread *kt = kt_find(p);
   TRACE_INFO("kthread_block: pid=%d", p->pid);
   kt->action = do_block_on_wq;
@@ -202,15 +206,12 @@ void kstep_kthread_syncwake(struct task_struct *waker, struct task_struct *wakee
   struct kstep_kthread *wakee_kt = kt_find(wakee);
   struct cpumask mask;
 
-  if ((waker_kt->action != do_spin && waker_kt->action != do_yield) || 
+  if ((waker_kt->action != do_spin && waker_kt->action != do_yield) ||
       wakee_kt->action != do_block_on_wq)
     panic("kstep: waker or wakee is not in the correct state");
-  
-  cpumask_clear(&mask);
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
-    cpumask_set_cpu(cpu, &mask);
 
-  set_cpus_allowed_ptr(wakee, & mask);
+  worker_cpumask(&mask);
+  set_cpus_allowed_ptr(wakee, &mask);
   kstep_sleep();
 
   TRACE_INFO("kthread_syncwake: waker_pid=%d wakee_pid=%d", waker->pid, wakee->pid);
@@ -223,5 +224,4 @@ void kstep_kthread_syncwake(struct task_struct *waker, struct task_struct *wakee
   waker_kt->state = KSTEP_KTHREAD_SYNCWAKE_REQUESTED;
   atomic_set(&waker_kt->action_updated, 1);
   kstep_sleep();
-  
 }

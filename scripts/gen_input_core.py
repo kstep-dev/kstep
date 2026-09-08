@@ -1,24 +1,23 @@
 import random
 
-from .gen_input_state import (
-    GenState,
-    KTHREAD_BLOCK_REQUESTED,
-    KTHREAD_BLOCKED,
-    KTHREAD_CREATED,
-    KTHREAD_DEAD,
-    KTHREAD_SPIN,
-    KTHREAD_SYNCWAKE_REQUESTED,
-    KTHREAD_YIELD,
-    TASK_SLEEPING,
-    TASK_ON_CPU,
-)
 from .gen_input_ops import (
-    OpWeight,
-    build_ops,
+    OP_NAME_TO_TYPE,
     RESOURCE_CGROUP,
     RESOURCE_KTHREAD,
     RESOURCE_TASK,
-    OP_NAME_TO_TYPE,
+    OpWeight,
+    build_ops,
+)
+from .gen_input_state import (
+    KTHREAD_BLOCK_REQUESTED,
+    KTHREAD_BLOCKED,
+    KTHREAD_CREATED,
+    KTHREAD_SPIN,
+    KTHREAD_SYNCWAKE_REQUESTED,
+    KTHREAD_YIELD,
+    TASK_ON_CPU,
+    TASK_SLEEPING,
+    GenState,
 )
 
 

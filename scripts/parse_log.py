@@ -22,7 +22,7 @@ def parse_jsonl(path: Path, type: str) -> pd.DataFrame:
 def parse_log(path: Path, prefix: str) -> pd.DataFrame:
     print(f'Parsing {path} with prefix "{prefix}"')
     data = []
-    with open(path, "r") as f:
+    with open(path) as f:
         for line in f:
             obj = parse_line(line, prefix)
             if obj is None:

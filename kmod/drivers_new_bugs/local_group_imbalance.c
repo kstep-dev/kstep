@@ -22,7 +22,7 @@ static void run(void) {
     kstep_task_pin(tasks[i], 1, 4);
 
   kstep_tick_repeat(400);
-  
+
 }
 
 KSTEP_DRIVER_DEFINE{

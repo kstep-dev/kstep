@@ -4,7 +4,7 @@
 #include <linux/sched.h>
 
 #define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
-#define DRIVER_NAME_LEN 32    
+#define DRIVER_NAME_LEN 32
 #define KSTEP_MAX_KTHREADS 16
 
 struct sched_domain;
@@ -89,6 +89,7 @@ void kstep_cgroup_destroy(const char *name);
 void kstep_cgroup_set_cpuset(const char *name, const char *cpuset);
 void kstep_cgroup_set_weight(const char *name, int weight);
 void kstep_cgroup_move_task(const char *name, int pid);
+bool kstep_task_is_frozen(struct task_struct *p);
 void kstep_freeze_task(struct task_struct *p);
 void kstep_thaw_task(struct task_struct *p);
 int kstep_eligible(struct sched_entity *se);

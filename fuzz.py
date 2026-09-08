@@ -27,8 +27,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from run import Driver, make_kstep, make_linux
-from scripts.utils import FUZZ_DIR, PROJ_DIR
 from scripts.fuzz_manager import run_manager
+from scripts.utils import FUZZ_DIR, PROJ_DIR
 
 
 def main() -> None:

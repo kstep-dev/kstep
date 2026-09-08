@@ -2,7 +2,7 @@
 
 #include "checker.h"
 #include "driver.h"
-#include "linux/cpumask.h"
+#include <linux/cpumask.h>
 #include "handler.h"
 #include "state.h"
 
@@ -15,7 +15,6 @@ typedef void(update_min_vruntime_fn_t)(struct cfs_rq *cfs_rq);
 /* Warn when TASK_FREEZE does not leave the target task in TASK_FROZEN. */
 static void kstep_check_task_freeze(int task_id) {
   struct task_struct *p;
-  unsigned int state;
 
   if (task_id < 0 || task_id >= MAX_TASKS)
     return;
@@ -24,15 +23,9 @@ static void kstep_check_task_freeze(int task_id) {
   if (!p)
     return;
 
-  state = READ_ONCE(p->__state);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
-  if (READ_ONCE(p->__state) & TASK_FROZEN)
-# else
-  if (READ_ONCE(p->flags) & PF_FROZEN)
-# endif
+  if (kstep_task_is_frozen(p))
     pr_info("warn: TASK_FREEZE left task %d pid=%d in state=0x%x\n",
-            task_id, p->pid, state);
-  
+            task_id, p->pid, READ_ONCE(p->__state));
 }
 
 /* Warn when a cgroup weight change leaves the parent vruntime baseline stale. */
@@ -58,7 +51,7 @@ static void kstep_check_cgroup_set_weight(int cgroup_id) {
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
     if (se->on_rq && se->sched_delayed) continue;
-#endif 
+#endif
 
     cfs_rq = cfs_rq_of(se);
     if (!cfs_rq) continue;
@@ -78,7 +71,6 @@ static void kstep_check_cgroup_set_weight(int cgroup_id) {
     if (new_min_vruntime != old_min_vruntime)
       pr_info("warn: the parent of cgroup %s on cpu%d delayed vruntime update (%llu -> %llu)\n",
               name, cpu, old_min_vruntime, new_min_vruntime);
-    
   }
 }
 
@@ -106,7 +98,7 @@ void kstep_check_work_conserve(void) {
   }
 
   if (runnable_tasks > num_online_cpus() - 1 &&
-      !cpumask_empty(&idle_cpus) && 
+      !cpumask_empty(&idle_cpus) &&
       eligible_runnable) {
     pr_info("warn: work conserving violation runnable=%d idle_cpus=%*pbl eligible=%d\n",
             runnable_tasks, cpumask_pr_args(&idle_cpus), eligible_runnable);
@@ -134,7 +126,6 @@ void kstep_check_extra_balance(int cpu, struct sched_domain *sd) {
     }
   } while (sg != sd->groups);
 }
-
 
 static s64 get_cfs_util_avg(struct rq *rq) {
   s64 removed = 0;

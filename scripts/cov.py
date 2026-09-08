@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import subprocess
 from collections import defaultdict
 from pathlib import Path
@@ -34,8 +32,7 @@ def symbolize_pcs(pcs: list[int], kernel: str) -> dict[int, tuple[str, str]]:
         ["addr2line", "-e", str(vmlinux_path), "-f", "-C"],
         input="".join(f"0x{pc:x}\n" for pc in pcs),
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         check=True,
     )
 
@@ -62,6 +59,6 @@ def symbolize_pcs(pcs: list[int], kernel: str) -> dict[int, tuple[str, str]]:
         if linux_prefix in loc_path:
             loc_path = loc_path.rsplit(linux_prefix, 1)[1]
         loc = f"{loc_path}{sep}{loc_suffix}" if sep else loc_path
-        
+
         out[pc] = (fn, loc)
     return out

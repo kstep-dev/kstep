@@ -60,7 +60,7 @@ void kstep_task_init(void);
 // kernel.c
 void kstep_cgroup_init(void);
 
-// cov.c
+// fuzz/cov.c
 void kstep_cov_init(void);
 void kstep_cov_enable(void);
 void kstep_cov_enable_controller(void);

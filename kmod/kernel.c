@@ -297,7 +297,7 @@ void kstep_cgroup_destroy(const char *name) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
     tg = css_tg(css);
 #else
-    tg = css ? container_of(css, struct task_group, css) : NULL;
+    tg = container_of(css, struct task_group, css);
 #endif
   rcu_read_unlock();
 
@@ -326,12 +326,17 @@ void kstep_cgroup_move_task(const char *name, int pid) {
   kstep_sleep();
 }
 
-void kstep_freeze_task(struct task_struct *p) {
+bool kstep_task_is_frozen(struct task_struct *p) {
+// https://github.com/torvalds/linux/commit/f5d39b020809146cc28e6e73369bf8065e0310aa
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
-  if (READ_ONCE(p->__state) & TASK_FROZEN) {
-# else
-  if (READ_ONCE(p->flags) & PF_FROZEN) {
-# endif
+  return READ_ONCE(p->__state) & TASK_FROZEN;
+#else
+  return READ_ONCE(p->flags) & PF_FROZEN;
+#endif
+}
+
+void kstep_freeze_task(struct task_struct *p) {
+  if (kstep_task_is_frozen(p)) {
     TRACE_INFO("Task %d already frozen", p->pid);
     return;
   }
