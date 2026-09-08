@@ -1,0 +1,47 @@
+name: Apt package cache
+description: Download apt packages and cache the .deb archives, optionally installing them.
+
+inputs:
+  packages:
+    description: Space-separated apt package names
+    required: true
+  install:
+    description: Install the .deb archives with dpkg after restoring them
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Compute cache key
+      id: meta
+      shell: bash
+      run: echo "key=${{ runner.arch }}-$(echo '${{ inputs.packages }}' | tr ' ' '+')" >> $GITHUB_OUTPUT
+
+    - name: Restore cached packages
+      id: cache
+      uses: actions/cache/restore@v5
+      with:
+        path: data/debs/*.deb
+        key: ${{ steps.meta.outputs.key }}
+        # Only the installing callers need the archives themselves
+        lookup-only: ${{ inputs.install != 'true' }}
+
+    - name: Download packages (cache miss)
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        mkdir -p data/debs/partial
+        sudo apt-get update
+        sudo apt-get install -y --download-only -o Dir::Cache::archives="$PWD/data/debs" ${{ inputs.packages }}
+
+    - name: Save cached packages
+      if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5
+      with:
+        path: data/debs/*.deb
+        key: ${{ steps.meta.outputs.key }}
+
+    - name: Install packages
+      if: ${{ inputs.install == 'true' }}
+      shell: bash
+      run: sudo dpkg -i --force-unsafe-io data/debs/*.deb
