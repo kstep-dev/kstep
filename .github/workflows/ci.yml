@@ -7,23 +7,27 @@ on:
   schedule:
     - cron: "0 0 * * 0" # Every week
 
+env:
+  PACKAGES_X86_64: qemu-system-x86 libelf-dev musl-tools
+  PACKAGES_AARCH64: qemu-system-arm libelf-dev musl-tools
+
 jobs:
   deps:
-    name: Cache deps
-    runs-on: ubuntu-latest
-    outputs:
-      key: ${{ steps.cache.outputs.key }}
+    name: Cache deps (${{ matrix.arm && 'aarch64' || 'x86_64' }})
+    strategy:
+      matrix:
+        arm: [false, true]
+    runs-on: ${{ matrix.arm && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v6
       - name: Cache deps
-        id: cache
-        uses: ./.github/actions/cache-deps
+        uses: ./.github/actions/apt-deps
         with:
-          packages: qemu-system-x86 libelf-dev musl-tools
+          packages: ${{ matrix.arm && env.PACKAGES_AARCH64 || env.PACKAGES_X86_64 }}
 
   test:
     needs: deps
-    name: ${{ matrix.fuzz && 'Fuzz' || 'Run' }} ${{ matrix.version }}
+    name: ${{ matrix.fuzz && 'Fuzz' || 'Run' }} ${{ matrix.version }} (${{ matrix.arm && 'aarch64' || 'x86_64' }})
     strategy:
       matrix:
         include:
@@ -35,14 +39,17 @@ jobs:
           - version: v5.15 # 2021 LTS
           - version: v6.18
             fuzz: true
-    runs-on: ubuntu-latest
+          - version: v7.0
+            arm: true
+    runs-on: ${{ matrix.arm && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Restore deps
-        uses: ./.github/actions/restore-deps
+      - name: Install deps
+        uses: ./.github/actions/apt-deps
         with:
-          key: ${{ needs.deps.outputs.key }}
+          packages: ${{ matrix.arm && env.PACKAGES_AARCH64 || env.PACKAGES_X86_64 }}
+          install: true
 
       - name: Build Linux
         uses: ./.github/actions/build-linux

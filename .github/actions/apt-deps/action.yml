@@ -1,30 +1,30 @@
-name: Cache apt dependencies
-description: Download apt packages and cache the .deb archives.
+name: apt dependencies
+description: Download apt packages and cache the .deb archives, optionally installing them.
 
 inputs:
   packages:
     description: Space-separated apt package names
     required: true
-
-outputs:
-  key:
-    description: Cache key (pass to restore-deps)
-    value: ${{ steps.meta.outputs.key }}
+  install:
+    description: Install the .deb archives with dpkg after restoring them
+    default: "false"
 
 runs:
   using: composite
   steps:
     - id: meta
       shell: bash
-      run: echo "key=$(echo '${{ inputs.packages }}' | tr ' ' '+')" >> $GITHUB_OUTPUT
+      run: echo "key=${{ runner.arch }}-$(echo '${{ inputs.packages }}' | tr ' ' '+')" >> $GITHUB_OUTPUT
 
     - id: cache
       uses: actions/cache/restore@v5
       with:
         path: data/debs/*.deb
         key: ${{ steps.meta.outputs.key }}
-        lookup-only: true
+        # Only the installing callers need the archives themselves
+        lookup-only: ${{ inputs.install != 'true' }}
 
+    # On a miss (cold cache, or evicted between jobs) download rather than fail
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
@@ -37,3 +37,7 @@ runs:
       with:
         path: data/debs/*.deb
         key: ${{ steps.meta.outputs.key }}
+
+    - if: ${{ inputs.install == 'true' }}
+      shell: bash
+      run: sudo dpkg -i --force-unsafe-io data/debs/*.deb

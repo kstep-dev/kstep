@@ -19,7 +19,7 @@ runs:
           build/${{ inputs.version }}/kernel
           build/${{ inputs.version }}/vmlinux
           build/${{ inputs.version }}/linux
-        key: ${{ inputs.version }}${{ inputs.cov == 'true' && '-cov' || '' }}-${{ hashFiles('linux/config.kstep*', 'linux/cov.c', 'linux/*.kstep') }}
+        key: ${{ runner.arch }}-${{ inputs.version }}${{ inputs.cov == 'true' && '-cov' || '' }}-${{ hashFiles('linux/config.kstep*', 'linux/cov.c', 'linux/*.kstep') }}
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
