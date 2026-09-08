@@ -12,11 +12,13 @@ inputs:
 runs:
   using: composite
   steps:
-    - id: meta
+    - name: Compute cache key
+      id: meta
       shell: bash
       run: echo "key=${{ runner.arch }}-$(echo '${{ inputs.packages }}' | tr ' ' '+')" >> $GITHUB_OUTPUT
 
-    - id: cache
+    - name: Restore cached packages
+      id: cache
       uses: actions/cache/restore@v5
       with:
         path: data/debs/*.deb
@@ -24,20 +26,22 @@ runs:
         # Only the installing callers need the archives themselves
         lookup-only: ${{ inputs.install != 'true' }}
 
-    # On a miss (cold cache, or evicted between jobs) download rather than fail
-    - if: steps.cache.outputs.cache-hit != 'true'
+    - name: Download packages (cache miss)
+      if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
         mkdir -p data/debs/partial
         sudo apt-get update
         sudo apt-get install -y --download-only -o Dir::Cache::archives="$PWD/data/debs" ${{ inputs.packages }}
 
-    - if: steps.cache.outputs.cache-hit != 'true'
+    - name: Save cached packages
+      if: steps.cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5
       with:
         path: data/debs/*.deb
         key: ${{ steps.meta.outputs.key }}
 
-    - if: ${{ inputs.install == 'true' }}
+    - name: Install packages
+      if: ${{ inputs.install == 'true' }}
       shell: bash
       run: sudo dpkg -i --force-unsafe-io data/debs/*.deb

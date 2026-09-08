@@ -32,6 +32,8 @@ jobs:
       matrix:
         include:
           - version: v7.0  # latest
+          - version: v7.0
+            arm: true
           - version: v6.18 # 2025 LTS
           - version: v6.12 # 2024 LTS
           - version: v6.6  # 2023 LTS
@@ -39,8 +41,6 @@ jobs:
           - version: v5.15 # 2021 LTS
           - version: v6.18
             fuzz: true
-          - version: v7.0
-            arm: true
     runs-on: ${{ matrix.arm && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v6
