@@ -13,6 +13,10 @@ module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
 static int __init kstep_main(void) {
   kstep_output_init();
 
+  if (num_online_cpus() > KSTEP_NR_CPUS)
+    panic("Number of online CPUs (%d) exceeds KSTEP_NR_CPUS (%d)", num_online_cpus(),
+          KSTEP_NR_CPUS);
+
   TRACE_INFO("Starting %s on Linux %s", driver_name, UTS_RELEASE);
   kstep_driver = kstep_sym_init(driver_name);
 
