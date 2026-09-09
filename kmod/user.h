@@ -13,7 +13,7 @@ enum sigcode {
 };
 
 // wait/post are a counting semaphore implemented as one FIFO on the root filesystem, created
-// by the kernel module at init: bytes are tokens, wait is a blocking read, post a one-byte write.
+// by init before the module loads: bytes are tokens, wait is a blocking read, post a one-byte write.
 #define PIPE_PATH "/pipe"
 
 #define TASK_READY_COMM "ready"

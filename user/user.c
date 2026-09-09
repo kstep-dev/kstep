@@ -92,6 +92,8 @@ static int init_main(int argc, char *argv[], char *envp[]) {
   mount_fs("/proc", "proc");
   mount_fs("/sys", "sysfs");
   mount_fs("/sys/kernel/debug", "debugfs");
+  if (mkfifo(PIPE_PATH, 0600) < 0) // the tasks' wait/post semaphore (see user.h)
+    panic("Failed to create %s", PIPE_PATH);
   mount_fs("/sys/fs/cgroup", "cgroup2");
   set_proc_affinity(0, 0);          // Bind to cpu 0
   set_tty_raw_output("/dev/ttyS1"); // JSON out, and commands in for the cli driver
@@ -105,8 +107,8 @@ static int init_main(int argc, char *argv[], char *envp[]) {
 // PROGRAM 2 — /task  (worker, spawned by kmod)
 // ============================================================================
 
-// The pipe is a FIFO created by the kernel module; a task opens it read-write on first
-// use, so a read blocks instead of hitting EOF and a write never sees EPIPE.
+// The pipe is the FIFO init created; a task opens it read-write on first use, so a read
+// blocks instead of hitting EOF and a write never sees EPIPE.
 static int pipe_fd(void) {
   static int fd;
   if (!fd && (fd = open(PIPE_PATH, O_RDWR)) < 0)
