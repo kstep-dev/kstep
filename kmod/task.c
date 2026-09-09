@@ -84,6 +84,12 @@ void kstep_task_pause(struct task_struct *p) {
   TRACE_INFO("Paused task %d", p->pid);
 }
 
+// Ask the task to exit (it does so the next time it runs and handles the signal).
+void kstep_task_exit(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_EXIT, 0);
+  TRACE_INFO("Exiting task %d", p->pid);
+}
+
 void kstep_task_wakeup(struct task_struct *p) {
   kstep_task_signal(p, SIGCODE_WAKEUP, 0);
   TRACE_INFO("Waked up task %d", p->pid);
@@ -129,19 +135,23 @@ void kstep_task_cfs(struct task_struct *p) {
   kstep_sleep();
 }
 
+void kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask) {
+  // directly call set_cpus_allowed_ptr is not enough, as it does not update the user_cpus_ptr
+  KSYM_IMPORT(sched_setaffinity);
+  kstep_cov_enable_controller();
+  if (KSYM_sched_setaffinity(p->pid, mask)) {
+    kstep_cov_disable_controller();
+    panic("Failed to set CPU affinity for task %d to CPUs %*pbl", p->pid, cpumask_pr_args(mask));
+  }
+  kstep_cov_disable_controller();
+}
+
 void kstep_task_pin(struct task_struct *p, int begin, int end) {
   struct cpumask mask;
   cpumask_clear(&mask);
   for (int i = begin; i <= end; i++)
     cpumask_set_cpu(i, &mask);
-  // directly call set_cpus_allowed_ptr is not enough, as it does not update the user_cpus_ptr
-  KSYM_IMPORT(sched_setaffinity);
-  kstep_cov_enable_controller();
-  if (KSYM_sched_setaffinity(p->pid, &mask)) {
-    kstep_cov_disable_controller();
-    panic("Failed to set CPU affinity for task %d to CPUs %d-%d", p->pid, begin, end);
-  }
-  kstep_cov_disable_controller();
+  kstep_task_set_affinity(p, &mask);
   TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
   kstep_sleep();
 }

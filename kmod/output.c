@@ -72,15 +72,23 @@ void kstep_json_begin(struct kstep_json *json) {
   kstep_json_field_u64(json, "timestamp", kstep_jiffies_get());
 }
 
-void kstep_json_end(struct kstep_json *json) {
+void kstep_json_field_bool(struct kstep_json *json, const char *key, bool val) {
+  kstep_json_field_fmt(json, key, "%s", val ? "true" : "false");
+}
+
+// Close the object and write it as one line to `file`.
+void kstep_json_end_to(struct kstep_json *json, struct file *file) {
   if (json->len > 0 && json->buf[json->len - 1] == ',')
     json->len--;
   kstep_json_append_char(json, '}');
   kstep_json_append_char(json, '\n');
-  ssize_t ret = kernel_write(output_file, json->buf, json->len, NULL);
+  ssize_t ret = kernel_write(file, json->buf, json->len, NULL);
   if (ret < 0)
     panic("write to output file failed: %ld", ret);
 }
+
+// Close the object and write it to the event trace (ttyS1).
+void kstep_json_end(struct kstep_json *json) { kstep_json_end_to(json, output_file); }
 
 void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,
                           const char *val2_fmt, ...) {

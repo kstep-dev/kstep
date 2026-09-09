@@ -29,6 +29,7 @@ static int __init kstep_main(void) {
   kstep_task_init();
   kstep_cgroup_init();
   kstep_trace_sched_group_alloc(); // also sets min_vruntime
+  kstep_cpu_apply_params();
   kstep_driver->setup();
   kstep_cpu_print();
 

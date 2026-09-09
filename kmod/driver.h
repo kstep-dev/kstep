@@ -1,6 +1,7 @@
 #ifndef KSTEP_DRIVER_H
 #define KSTEP_DRIVER_H
 
+#include <linux/fs.h>
 #include <linux/sched.h>
 
 #define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
@@ -41,7 +42,9 @@ void kstep_json_field_str(struct kstep_json *json, const char *key,
                           const char *val);
 void kstep_json_field_u64(struct kstep_json *json, const char *key, u64 val);
 void kstep_json_field_s64(struct kstep_json *json, const char *key, s64 val);
-void kstep_json_end(struct kstep_json *json);
+void kstep_json_field_bool(struct kstep_json *json, const char *key, bool val);
+void kstep_json_end(struct kstep_json *json);                       // -> event trace (ttyS1)
+void kstep_json_end_to(struct kstep_json *json, struct file *file); // -> any open file
 void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,
                           const char *val2_fmt, ...);
 #define kstep_pass(msg_fmt, ...)                                               \
@@ -64,7 +67,9 @@ void *kstep_sleep_until(void *(*fn)(void));
 
 // task.c
 struct task_struct *kstep_task_create(void);
+void kstep_task_exit(struct task_struct *p);
 void kstep_task_pin(struct task_struct *p, int begin, int end);
+void kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask);
 void kstep_task_fork(struct task_struct *p, int n);
 void kstep_task_fifo(struct task_struct *p);
 void kstep_task_cfs(struct task_struct *p);
@@ -126,5 +131,6 @@ void kstep_topo_set(const char *spec);
 void kstep_cap_set(const char *spec);
 void kstep_freq_set(const char *spec);
 void kstep_cpu_print(void);
+void kstep_cpu_apply_params(void); // topology=/capacity=/frequency= boot params
 
 #endif
