@@ -101,10 +101,9 @@ def build_qemu_cmd(
         "-no-reboot",
         # log file
         serial_device("char0"),
-        # structured JSON output (and, for the interactive cli driver, command input: a
-        # socket whose output side is still logged to the jsonl file)
-        (f"-chardev socket,id=char1,path={result_dir.sock},server=on,wait=on,logfile={result_dir.output}"
-         if driver.name == "cli" else f"-chardev file,id=char1,path={result_dir.output}"),
+        # structured JSON: logged to the jsonl file, and a socket so a client can also talk
+        # to the driver (the cli driver reads its commands here)
+        f"-chardev socket,id=char1,path={result_dir.output}.sock,server=on,wait=off,logfile={result_dir.output}",
         serial_device("char1"),
         # cov file
         f"-chardev file,id=char2,path={result_dir.cov}",
