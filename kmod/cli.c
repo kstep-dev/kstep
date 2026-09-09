@@ -1,9 +1,9 @@
-// Interactive driver: a line-oriented command interface on /dev/ttyS3.
-//
-// One command per line in, one flat JSON object per line out. Every reply carries
-// "timestamp" (logical ticks) and "ok"; errors add "error". The trace on ttyS1 is
-// produced as for any other driver, and CPU topology/capacity come from the usual
-// topology=/capacity= boot parameters.
+// Interactive driver on ttyS1, kSTEP's structured channel: commands are read from it,
+// one per line, and each is answered with one flat JSON object written to it like any
+// trace event (load_balance, ...), so the whole structured output is one ordered stream.
+// A reply carries "timestamp" (logical ticks) and "ok" (events carry "type" instead);
+// errors add "error". CPU topology/capacity come from the usual topology=/capacity=
+// boot parameters.
 //
 //   create                    new runnable CFS task on CPUs 1..N-1     -> {..,"pid":N}
 //   tick                      advance one tick; report who runs where   -> {..,"cpu1":N,"cpu2":N,...}  (0 = idle)
@@ -30,7 +30,7 @@
 
 #define LINE_MAX 128
 
-static struct file *cmd; // /dev/ttyS3
+static struct file *cmd; // /dev/ttyS1 for reading; replies go through the trace writer
 
 static struct task_struct *find(pid_t pid) {
   struct task_struct *p;
@@ -46,7 +46,7 @@ static void reply_begin(struct kstep_json *json, bool ok) {
   kstep_json_field_bool(json, "ok", ok);
 }
 
-static void reply_end(struct kstep_json *json) { kstep_json_end_to(json, cmd); }
+static void reply_end(struct kstep_json *json) { kstep_json_end(json); }
 
 static void reply_ok(void) {
   struct kstep_json json;
@@ -209,9 +209,9 @@ static bool execute(char *line) {
 }
 
 static void setup(void) {
-  cmd = filp_open("/dev/ttyS3", O_RDWR | O_NOCTTY, 0);
+  cmd = filp_open("/dev/ttyS1", O_RDONLY | O_NOCTTY, 0);
   if (IS_ERR(cmd))
-    panic("Failed to open /dev/ttyS3: %ld", PTR_ERR(cmd));
+    panic("Failed to open /dev/ttyS1: %ld", PTR_ERR(cmd));
 }
 
 static void run(void) {
@@ -242,6 +242,6 @@ KSTEP_DRIVER_DEFINE{
     .name = "cli",
     .setup = setup,
     .run = run,
-    .on_tick_begin = kstep_output_curr_task,
-    .step_interval_us = 1000,
+    .on_sched_balance_selected = kstep_output_balance, // load_balance events in the stream
+    .step_interval_us = 1000, // no on_tick_begin: the tick reply reports who runs where
 };

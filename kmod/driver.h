@@ -1,7 +1,6 @@
 #ifndef KSTEP_DRIVER_H
 #define KSTEP_DRIVER_H
 
-#include <linux/fs.h>
 #include <linux/sched.h>
 
 #define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
@@ -43,8 +42,7 @@ void kstep_json_field_str(struct kstep_json *json, const char *key,
 void kstep_json_field_u64(struct kstep_json *json, const char *key, u64 val);
 void kstep_json_field_s64(struct kstep_json *json, const char *key, s64 val);
 void kstep_json_field_bool(struct kstep_json *json, const char *key, bool val);
-void kstep_json_end(struct kstep_json *json);                       // -> event trace (ttyS1)
-void kstep_json_end_to(struct kstep_json *json, struct file *file); // -> any open file
+void kstep_json_end(struct kstep_json *json);
 void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,
                           const char *val2_fmt, ...);
 #define kstep_pass(msg_fmt, ...)                                               \

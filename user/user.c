@@ -94,6 +94,7 @@ static int init_main(int argc, char *argv[], char *envp[]) {
   mount_fs("/sys/kernel/debug", "debugfs");
   mount_fs("/sys/fs/cgroup", "cgroup2");
   set_proc_affinity(0, 0);          // Bind to cpu 0
+  set_tty_raw_output("/dev/ttyS1"); // JSON out, and commands in for the cli driver
   set_tty_raw_output("/dev/ttyS2"); // For code coverage data
   set_tty_raw_output("/dev/ttyS3"); // For interactive communication
   load_kmod("kmod.ko", argc, argv, envp);
