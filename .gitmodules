@@ -14,7 +14,3 @@
 	path = docs/website
 	url = https://github.com/kstep-dev/kstep-dev.github.io.git
 	branch = main
-[submodule "docs/web"]
-	path = docs/web
-	url = https://github.com/kstep-dev/web.git
-	branch = main
