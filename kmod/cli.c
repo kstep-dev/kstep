@@ -1,6 +1,6 @@
 // Interactive driver on ttyS1, kSTEP's structured channel: commands are read from it,
 // one per line, and each is answered with one flat JSON object written to it like any
-// trace event (load_balance, ...), so the whole structured output is one ordered stream.
+// trace event (load_balance, migrate), so the whole structured output is one ordered stream.
 // A reply carries "timestamp" (logical ticks) and "ok" (events carry "type" instead);
 // errors add "error". CPU topology/capacity come from the usual topology=/capacity=
 // boot parameters.
@@ -242,6 +242,9 @@ KSTEP_DRIVER_DEFINE{
     .name = "cli",
     .setup = setup,
     .run = run,
-    .on_sched_balance_selected = kstep_output_balance, // load_balance events in the stream
+    // events in the stream: load_balance = a CPU's balancer looked for work (after
+    // should_we_balance); migrate = a task actually moved (balancing or wakeup placement)
+    .on_sched_balance_selected = kstep_output_balance,
+    .on_task_migrate = kstep_output_migrate,
     .step_interval_us = 1000, // no on_tick_begin: the tick reply reports who runs where
 };

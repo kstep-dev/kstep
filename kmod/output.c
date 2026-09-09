@@ -142,3 +142,13 @@ void kstep_output_balance(int cpu, struct sched_domain *sd) {
   kstep_json_field_str(&json, "name", sd->name);
   kstep_json_end(&json);
 }
+
+void kstep_output_migrate(struct task_struct *p, int src_cpu, int dst_cpu) {
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, "type", "migrate");
+  kstep_json_field_u64(&json, "pid", task_pid_nr(p));
+  kstep_json_field_u64(&json, "src_cpu", src_cpu);
+  kstep_json_field_u64(&json, "dst_cpu", dst_cpu);
+  kstep_json_end(&json);
+}

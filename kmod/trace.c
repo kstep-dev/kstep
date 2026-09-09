@@ -65,6 +65,22 @@ void kstep_trace_sched_balance_selected(void) {
   KSTEP_TRACE_FUNC(name, on_sched_balance_selected);
 }
 
+// Callback at set_task_cpu(struct task_struct *p, unsigned int new_cpu): every
+// migration, whether by the load balancer or by wakeup placement.
+static void on_set_task_cpu(unsigned long ip, unsigned long parent_ip,
+                            struct ftrace_ops *op, struct ftrace_regs *fregs) {
+  struct task_struct *p =
+      (struct task_struct *)regs_get_kernel_argument((void *)fregs, 0);
+  int new_cpu = (int)regs_get_kernel_argument((void *)fregs, 1);
+  if (kstep_jiffies_get() == 0 || task_cpu(p) == new_cpu)
+    return;
+  kstep_driver->on_task_migrate(p, task_cpu(p), new_cpu);
+}
+
+void kstep_trace_task_migrate(void) {
+  KSTEP_TRACE_FUNC("set_task_cpu", on_set_task_cpu);
+}
+
 // Callback at init_tg_cfs_entry(struct task_group *tg, struct cfs_rq *cfs_rq,
 //     struct sched_entity *se, int cpu, struct sched_entity *parent)
 // Also sets min_vruntime for new task groups

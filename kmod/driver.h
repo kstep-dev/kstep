@@ -22,6 +22,8 @@ struct kstep_driver {
   void (*on_sched_balance_begin)(int cpu, struct sched_domain *sd);
   // Callback after should_we_balance
   void (*on_sched_balance_selected)(int cpu, struct sched_domain *sd);
+  // Callback at set_task_cpu (a task moves to another CPU: balancing or wakeup placement)
+  void (*on_task_migrate)(struct task_struct *p, int src_cpu, int dst_cpu);
   // Callback at init_tg_cfs_entry (new task group cfs_rq created)
   void (*on_sched_group_alloc)(struct task_group *tg, int cpu);
   u64 step_interval_us;                // Real time sleep between steps in us
@@ -55,6 +57,7 @@ void kstep_print_sched_debug(void);
 void kstep_output_curr_task(void);
 void kstep_output_nr_running(void);
 void kstep_output_balance(int cpu, struct sched_domain *sd);
+void kstep_output_migrate(struct task_struct *p, int src_cpu, int dst_cpu);
 
 // tick.c
 void kstep_tick(void);
