@@ -6,10 +6,8 @@
 
 bool kstep_op_is_valid_task_id(int id);
 bool kstep_op_is_valid_cgroup_id(int id);
-bool kstep_op_is_valid_kthread_id(int id);
 
 bool kstep_op_task_running(struct task_struct *p);
-enum kstep_kthread_state kstep_op_kthread_state(int id);
 
 bool kstep_op_cgroup_is_leaf(int id);
 struct task_group *kstep_op_lookup_cgroup_task_group(const char *name);
@@ -35,12 +33,5 @@ u8 kstep_op_cgroup_set_weight(int a, int b, int c);
 u8 kstep_op_cgroup_add_task(int a, int b, int c);
 u8 kstep_op_cgroup_destroy(int a, int b, int c);
 u8 kstep_op_cgroup_move_task_root(int a, int b, int c);
-
-u8 kstep_op_kthread_create(int a, int b, int c);
-u8 kstep_op_kthread_bind(int a, int b, int c);
-u8 kstep_op_kthread_start(int a, int b, int c);
-u8 kstep_op_kthread_yield(int a, int b, int c);
-u8 kstep_op_kthread_block(int a, int b, int c);
-u8 kstep_op_kthread_syncwake(int a, int b, int c);
 
 #endif

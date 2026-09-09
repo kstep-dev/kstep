@@ -3,10 +3,14 @@
 #include <linux/spinlock.h>
 
 #include "internal.h"
+#include <linux/namei.h> // kern_path_create, vfs_mknod
+#include <linux/version.h>
 #include "user.h"
 
 static struct file *console_file = NULL;
 static struct file *null_file = NULL;
+
+static void pipe_create(void);
 
 void kstep_task_init(void) {
   console_file = filp_open("/dev/console", O_WRONLY, 0); // write only
@@ -15,6 +19,7 @@ void kstep_task_init(void) {
   null_file = filp_open("/dev/null", O_RDONLY, 0); // read only
   if (IS_ERR(null_file))
     panic("Failed to open /dev/null");
+  pipe_create();
 }
 
 // Initialize stdin to `/dev/null` and stdout/stderr to `/dev/console`
@@ -88,6 +93,50 @@ void kstep_task_pause(struct task_struct *p) {
 void kstep_task_exit(struct task_struct *p) {
   kstep_task_signal(p, SIGCODE_EXIT, 0);
   TRACE_INFO("Exiting task %d", p->pid);
+}
+
+// wait/post: a counting semaphore shared by all tasks, implemented as one pipe whose bytes
+// are the tokens. wait sleeps in pipe_read() (TASK_INTERRUPTIBLE on the pipe's wait queue)
+// until a token is there and consumes it; post writes a token, and pipe_write() wakes one
+// waiter through wake_up_interruptible_sync_poll(), i.e. a WF_SYNC wakeup issued from the
+// poster's CPU: the production sync-wakeup path. A post with no waiter leaves a token, so the
+// next wait returns at once (a poster that should sleep uses kstep_task_pause).
+static void pipe_create(void) {
+  struct path parent;
+  struct dentry *dentry;
+  int err;
+
+  // kern_path_create/done_path_create became start_creating_path/end_creating_path and
+  // vfs_mknod gained a delegation argument in 6.19 (directory delegations).
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
+  dentry = start_creating_path(AT_FDCWD, PIPE_PATH, &parent, 0);
+  if (IS_ERR(dentry))
+    panic("kstep: cannot create %s: %ld", PIPE_PATH, PTR_ERR(dentry));
+  err = vfs_mknod(mnt_idmap(parent.mnt), d_inode(parent.dentry), dentry, S_IFIFO | 0600, 0, NULL);
+  end_creating_path(&parent, dentry);
+#else
+  dentry = kern_path_create(AT_FDCWD, PIPE_PATH, &parent, 0);
+  if (IS_ERR(dentry))
+    panic("kstep: cannot create %s: %ld", PIPE_PATH, PTR_ERR(dentry));
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 3, 0)
+  err = vfs_mknod(mnt_idmap(parent.mnt), d_inode(parent.dentry), dentry, S_IFIFO | 0600, 0);
+#else
+  err = vfs_mknod(mnt_user_ns(parent.mnt), d_inode(parent.dentry), dentry, S_IFIFO | 0600, 0);
+#endif
+  done_path_create(&parent, dentry);
+#endif
+  if (err)
+    panic("kstep: mknod %s failed: %d", PIPE_PATH, err);
+}
+
+void kstep_task_wait(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_WAIT, 0);
+  TRACE_INFO("Task %d waits", p->pid);
+}
+
+void kstep_task_post(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_POST, 0);
+  TRACE_INFO("Task %d posts (sync wakeup of one waiter)", p->pid);
 }
 
 void kstep_task_wakeup(struct task_struct *p) {

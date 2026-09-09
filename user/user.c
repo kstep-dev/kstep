@@ -96,7 +96,7 @@ static int init_main(int argc, char *argv[], char *envp[]) {
   set_proc_affinity(0, 0);          // Bind to cpu 0
   set_tty_raw_output("/dev/ttyS1"); // JSON out, and commands in for the cli driver
   set_tty_raw_output("/dev/ttyS2"); // For code coverage data
-  set_tty_raw_output("/dev/ttyS3"); // For interactive communication
+  set_tty_raw_output("/dev/ttyS3"); // For the fuzz executor's command socket
   load_kmod("kmod.ko", argc, argv, envp);
   panic("Kernel module exited unexpectedly");
 }
@@ -105,11 +105,25 @@ static int init_main(int argc, char *argv[], char *envp[]) {
 // PROGRAM 2 — /task  (worker, spawned by kmod)
 // ============================================================================
 
+// The pipe is a FIFO created by the kernel module; a task opens it read-write on first
+// use, so a read blocks instead of hitting EOF and a write never sees EPIPE.
+static int pipe_fd(void) {
+  static int fd;
+  if (!fd && (fd = open(PIPE_PATH, O_RDWR)) < 0)
+    panic("Failed to open %s", PIPE_PATH);
+  return fd;
+}
+
 static void handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
   int val = info->si_int;
   if (code == SIGCODE_WAKEUP)
     return;
+  else if (code == SIGCODE_WAIT) {
+    char c;
+    read(pipe_fd(), &c, 1); // wait: sleeps in pipe_read() until a token or a signal arrives
+  } else if (code == SIGCODE_POST)
+    write(pipe_fd(), "w", 1); // post: pipe_write() sync-wakes one waiter, from this CPU
   else if (code == SIGCODE_FORK) {
     for (int i = 0; i < val; i++) {
       int pid = fork();
