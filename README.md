@@ -93,7 +93,7 @@ make linux [KERNEL=<name>]  # Full kernel build. Run this after Linux file chang
 - **kmod/**: Kernel module (`kmod.ko`) loaded at boot
   - `drivers/`, `drivers_new_bugs/`: bug-specific drivers (one `.c` per bug)
   - `fuzz/`: fuzz executor, op handlers, coverage, sanity checks
-  - `cli.c`: interactive driver behind the website playground (text commands on ttyS3, JSON replies)
+  - `cli.c`: interactive driver behind the website playground (text commands in and JSON replies out on ttyS1)
   - `cpu.c`: topology, capacity, frequency setup (also the `topology=`/`capacity=`/`frequency=` boot parameters)
   - `driver.h`: public API for drivers (task creation, ticking, cgroups, etc.)
   - `internal.h` and other top-level `*.c`: framework primitives
