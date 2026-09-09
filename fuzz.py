@@ -98,12 +98,6 @@ def main() -> None:
         help="Enable cross-scheduler fuzzing; sets TASK_FIFO and TASK_CFS weights to 2 instead of 0",
     )
     parser.add_argument(
-        "--kthreads",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="Enable KTHREAD_* fuzz ops; when disabled their weights are 0",
-    )
-    parser.add_argument(
         "--task_freeze",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -153,7 +147,6 @@ def main() -> None:
         f"capacity={args.capacity or 'default'}  "
         f"ci_mode={args.ci_mode}  "
         f"cross_scheduler={args.cross_scheduler}  "
-        f"kthreads={args.kthreads}  "
         f"task_freeze={args.task_freeze}  "
         f"fresh_ratio={args.fresh_ratio}  mutate_ratio={args.mutate_ratio}  "
         f"special_mutate_ratio={args.special_mutate_ratio}  "
@@ -169,7 +162,6 @@ def main() -> None:
         special_mutate_ratio=args.special_mutate_ratio,
         pivot_rarity_alpha=args.pivot_rarity_alpha,
         cross_scheduler=args.cross_scheduler,
-        enable_kthreads=args.kthreads,
         enable_task_freeze=args.task_freeze,
         pin_cpus=args.pin_cpus,
         ci_mode=args.ci_mode,

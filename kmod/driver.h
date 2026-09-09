@@ -5,7 +5,6 @@
 
 #define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
 #define DRIVER_NAME_LEN 32
-#define KSTEP_MAX_KTHREADS 16
 
 struct sched_domain;
 struct kstep_driver {
@@ -77,6 +76,10 @@ void kstep_task_cfs(struct task_struct *p);
 void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
 void kstep_task_block(struct task_struct *p);
+// wait/post: a semaphore shared by all tasks (a pipe underneath); post is a WF_SYNC (sync)
+// wakeup of one waiter from the poster's CPU
+void kstep_task_wait(struct task_struct *p);
+void kstep_task_post(struct task_struct *p);
 void kstep_task_set_prio(struct task_struct *p, int prio);
 void kstep_task_kernel_pause(struct task_struct *p);
 void kstep_task_kernel_wakeup(struct task_struct *p);
@@ -99,24 +102,6 @@ bool kstep_task_is_frozen(struct task_struct *p);
 void kstep_freeze_task(struct task_struct *p);
 void kstep_thaw_task(struct task_struct *p);
 int kstep_eligible(struct sched_entity *se);
-
-// kthread.c
-enum kstep_kthread_state {
-  KSTEP_KTHREAD_CREATED = 0,
-  KSTEP_KTHREAD_SPIN,
-  KSTEP_KTHREAD_YIELD,
-  KSTEP_KTHREAD_BLOCK_REQUESTED,
-  KSTEP_KTHREAD_BLOCKED,
-  KSTEP_KTHREAD_SYNCWAKE_REQUESTED,
-  KSTEP_KTHREAD_DEAD,
-};
-struct task_struct *kstep_kthread_create(const char *name);
-void kstep_kthread_bind(struct task_struct *p, const struct cpumask *mask);
-void kstep_kthread_start(struct task_struct *p);
-void kstep_kthread_syncwake(struct task_struct *waker, struct task_struct *wakee);
-void kstep_kthread_block(struct task_struct *p);
-void kstep_kthread_yield(struct task_struct *p);
-enum kstep_kthread_state kstep_kthread_get_state(struct task_struct *p);
 
 // cpu.c
 #define CPU_SPEC_LEN 512

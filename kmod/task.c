@@ -90,6 +90,22 @@ void kstep_task_exit(struct task_struct *p) {
   TRACE_INFO("Exiting task %d", p->pid);
 }
 
+// wait/post: a counting semaphore shared by all tasks, implemented as one pipe (the FIFO
+// PIPE_PATH, created by init before the module loads) whose bytes are the tokens. wait sleeps in pipe_read() (TASK_INTERRUPTIBLE on the pipe's wait queue)
+// until a token is there and consumes it; post writes a token, and pipe_write() wakes one
+// waiter through wake_up_interruptible_sync_poll(), i.e. a WF_SYNC wakeup issued from the
+// poster's CPU: the production sync-wakeup path. A post with no waiter leaves a token, so the
+// next wait returns at once (a poster that should sleep uses kstep_task_pause).
+void kstep_task_wait(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_WAIT, 0);
+  TRACE_INFO("Task %d waits", p->pid);
+}
+
+void kstep_task_post(struct task_struct *p) {
+  kstep_task_signal(p, SIGCODE_POST, 0);
+  TRACE_INFO("Task %d posts (sync wakeup of one waiter)", p->pid);
+}
+
 void kstep_task_wakeup(struct task_struct *p) {
   kstep_task_signal(p, SIGCODE_WAKEUP, 0);
   TRACE_INFO("Waked up task %d", p->pid);

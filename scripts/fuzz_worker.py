@@ -75,7 +75,6 @@ def _check_for_crash(log_file: Path) -> bool:
 @dataclass
 class KmodState:
     task_states: list[dict]
-    kthread_states: list[dict]
     executed_steps: int
 
 @dataclass
@@ -157,11 +156,7 @@ class FuzzWorkerSession:
 
             payload = line[1:-1]
             if not payload:
-                return KmodState(
-                    task_states=[],
-                    kthread_states=[],
-                    executed_steps=0,
-                )
+                return KmodState(task_states=[], executed_steps=0)
             if len(payload) < 2:
                 continue
 
@@ -178,20 +173,9 @@ class FuzzWorkerSession:
                     {"id": payload[cursor] - 11, "state": payload[cursor + 1]}
                 )
                 cursor += 2
-            if cursor >= len(payload) or payload[cursor] != 0:
+            if cursor != len(payload) - 1 or payload[cursor] != 0:
                 continue
-            cursor += 1
-            if (len(payload) - cursor) % 2 != 0:
-                continue
-            kthread_states = [
-                {"id": payload[i] - 11, "state": payload[i + 1]}
-                for i in range(cursor, len(payload), 2)
-            ]
-            return KmodState(
-                task_states=task_states,
-                kthread_states=kthread_states,
-                executed_steps=executed_steps,
-            )
+            return KmodState(task_states=task_states, executed_steps=executed_steps)
 
     # Send one op to kmod and fold the returned state into the generator model.
     def send_op(self, op: int, a: int, b: int, c: int) -> int:
@@ -202,7 +186,7 @@ class FuzzWorkerSession:
             self.sock.sendall(b"EXIT\n")
             raise RuntimeError("Readfail: Failed to read task states")
 
-        self.gen.update_from_kmod(state.task_states, state.kthread_states)
+        self.gen.update_from_kmod(state.task_states)
         return state.executed_steps
 
 
@@ -215,7 +199,6 @@ class FuzzWorker:
         driver: Driver,
         kernel: str,
         cross_scheduler: bool = False,
-        enable_kthreads: bool = False,
         enable_task_freeze: bool = True,
         qemu_cpus: str | None = None,
         rng_seed: int | None = None,
@@ -228,7 +211,6 @@ class FuzzWorker:
         self.driver = driver
         self.kernel = kernel
         self.cross_scheduler = cross_scheduler
-        self.enable_kthreads = enable_kthreads
         self.enable_task_freeze = enable_task_freeze
         self.qemu_cpus = qemu_cpus
         self.io_timeout_sec = io_timeout_sec
@@ -274,16 +256,13 @@ class FuzzWorker:
         gen_seed = 0 if work.mode in ("replay") else self.rng.randint(0, 2**32 - 1)
         kstep_cpus = self.driver.num_cpus - 1
         max_tasks = self.rng.randint(kstep_cpus // 2, kstep_cpus * 6)
-        max_kthreads = self.rng.randint(1, min(16, max(1, kstep_cpus * 2)))
         max_cgroups = self.rng.randint(kstep_cpus * 1, kstep_cpus * 6)
         gen = init_genstate(
             max_tasks,
-            max_kthreads,
             max_cgroups,
             self.driver.num_cpus,
             gen_seed,
             cross_scheduler=self.cross_scheduler,
-            enable_kthreads=self.enable_kthreads,
             enable_task_freeze=self.enable_task_freeze,
         )
 
@@ -322,8 +301,7 @@ class FuzzWorker:
                         self.logger.debug(
                             f"{log_prefix}: op={OP_NAME_TO_TYPE['TICK']},0,0,0 "
                             f"executed_steps={executed_steps} "
-                            f"task_state={session.gen.task_state} "
-                            f"kthread_state={session.gen.kthread_state}"
+                            f"task_state={session.gen.task_state}"
                         )
                     if executed_steps < a and executed_steps > 0:
                         special_pivot_idxs.append(len(ops_executed) - 1)
@@ -335,8 +313,7 @@ class FuzzWorker:
                     self.logger.debug(
                         f"{log_prefix}: op={op},{a},{b},{c} "
                         f"executed_steps={executed_steps} "
-                        f"task_state={session.gen.task_state} "
-                        f"kthread_state={session.gen.kthread_state}"
+                        f"task_state={session.gen.task_state}"
                     )
                     ops_executed.append((op, a, b, c))
                     generated += 1
@@ -364,8 +341,7 @@ class FuzzWorker:
                     if executed_steps > 0:
                         self.logger.debug(
                             f"REPLAY: op={op},{a},{b},{c} executed_steps={executed_steps} "
-                            f"task_state={session.gen.task_state} "
-                            f"kthread_state={session.gen.kthread_state}"
+                            f"task_state={session.gen.task_state}"
                         )
                         ops_executed.append((op, a, b, c))
                         replay_update_genstate(session.gen, op, a, b, c)
@@ -373,12 +349,11 @@ class FuzzWorker:
                             replayed += 1
                         break
                 self.logger.debug(
-                    f"REPLAY {i} retry {retry}: task_state={session.gen.task_state} "
-                    f"kthread_state={session.gen.kthread_state}"
+                    f"REPLAY {i} retry {retry}: task_state={session.gen.task_state}"
                 )
             else:
                 op_name = OP_TYPE_TO_NAME.get(op, str(op))
-                actual = session.gen.task_state.get(a, session.gen.kthread_state.get(a, "not_found"))
+                actual = session.gen.task_state.get(a, "not_found")
                 session.sock.sendall(b"EXIT\n")
                 raise RuntimeError(
                     f"Replayfail: replay mismatch at step {i} after 50 retries: "
@@ -521,7 +496,6 @@ def worker_main(
     driver: Driver,
     kernel: str,
     cross_scheduler: bool = False,
-    enable_kthreads: bool = False,
     enable_task_freeze: bool = True,
     qemu_cpus: str | None = None,
 ) -> None:
@@ -532,7 +506,6 @@ def worker_main(
         driver=driver,
         kernel=kernel,
         cross_scheduler=cross_scheduler,
-        enable_kthreads=enable_kthreads,
         enable_task_freeze=enable_task_freeze,
         qemu_cpus=qemu_cpus,
     )

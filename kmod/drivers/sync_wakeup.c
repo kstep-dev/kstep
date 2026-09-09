@@ -1,58 +1,62 @@
 // https://github.com/torvalds/linux/commit/aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042
+//
+// A sync wakeup (WF_SYNC) tells the scheduler that the waker is about to sleep, so the
+// wakee may take the waker's CPU. With EEVDF's delayed dequeue, a task paused while
+// ineligible stays on the runqueue and still counts in nr_running, so wake_affine_idle()
+// believes the waker's CPU will stay busy and places the wakee on its previous CPU; the
+// waker then sleeps and its CPU goes idle while the wakee runs elsewhere.
+//
+// All three actors are user tasks. The sync wakeup is a real one: the waker writes into
+// post (pipe_write -> wake_up_interruptible_sync_poll) from its own CPU.
 
 #include "driver.h"
+#include "internal.h" // cpu_rq, for the check after the wakeup
 
-static struct task_struct *waker_task;
-static struct task_struct *wakee_task;
-static struct task_struct *other_task;
+static struct task_struct *other, *waker, *wakee;
 
 static void setup(void) {
-  other_task = kstep_task_create();
+  other = kstep_task_create();
+  waker = kstep_task_create();
+  wakee = kstep_task_create();
 
-  // Waker: waker pinned to CPU 1; will call __wake_up_sync when triggered.
-  waker_task = kstep_kthread_create("waker");
-  kstep_kthread_bind(waker_task, cpumask_of(1));
-  kstep_kthread_start(waker_task);
-  kstep_kthread_yield(waker_task);
+  // Waker on CPU 1, where it will issue the sync wakeup.
+  kstep_task_pin(waker, 1, 1);
 
-  // Wakee: sleeper, first restricted to CPU 2 so the scheduler sets
-  // wake_cpu=2 on the initial placement.  This makes prev_cpu differ from
-  // this_cpu inside __wake_up_sync, which is needed to trigger the bug.
-  wakee_task = kstep_kthread_create("wakee");
-  kstep_kthread_bind(wakee_task, cpumask_of(2));
-  kstep_kthread_start(wakee_task);
-  kstep_kthread_block(wakee_task);
-
-  // Expand allowed set to CPUs 1,2 after the initial placement on CPU 2.
-  struct cpumask mask;
-  cpumask_copy(&mask, cpu_active_mask);
-  cpumask_clear_cpu(0, &mask);
-  kstep_kthread_bind(wakee_task, &mask);
+  // Wakee waits, first restricted to CPU 2 so its wake_cpu is 2
+  // (prev_cpu != this_cpu inside the wakeup), then allowed on CPUs 1-2.
+  kstep_task_pin(wakee, 2, 2);
+  kstep_task_wait(wakee);
+  kstep_task_pin(wakee, 1, 2);
 }
 
 static void *is_ineligible(void) {
-  if (other_task->on_cpu && !kstep_eligible(&other_task->se))
-    return other_task;
+  if (other->on_cpu && !kstep_eligible(&other->se))
+    return other;
   return NULL;
 }
 
 static void run(void) {
-  kstep_task_pin(other_task, 1, 1);
-  kstep_task_wakeup(other_task);
+  kstep_task_pin(other, 1, 1);
+  kstep_task_wakeup(other);
+  kstep_task_wakeup(waker);
 
   kstep_tick_repeat(20);
 
-  // Tick until there is an ineligible task on CPU 1.
+  // Tick until `other` is current on CPU 1 and ineligible, then pause it: EEVDF keeps it
+  // queued (sched_delayed), so CPU 1's nr_running stays 2.
   kstep_tick_until(is_ineligible);
+  kstep_task_pause(other);
 
-  // Pause the ineligible task
-  kstep_task_pause(other_task);
+  // Waker (CPU 1) posts: a sync wakeup of the wakee. Then it sleeps, as a sync waker is
+  // expected to (with pause, not wait: it would consume its own token).
+  kstep_task_post(waker);
+  kstep_task_pause(waker);
 
-  // Trigger waker (on CPU 1) to call __wake_up_sync targeting wakee.
-  kstep_kthread_syncwake(waker_task, wakee_task);
-
-  // tick to show the impact
-  kstep_tick_repeat(10);
+  kstep_tick_repeat(1);
+  if (cpu_rq(1)->curr == cpu_rq(1)->idle && task_cpu(wakee) != 1)
+    TRACE_INFO("warn: sync wakeup placed the wakee on cpu %d while cpu 1 went idle",
+               task_cpu(wakee));
+  kstep_tick_repeat(9);
 }
 
 KSTEP_DRIVER_DEFINE{

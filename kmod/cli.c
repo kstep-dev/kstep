@@ -7,11 +7,14 @@
 //
 //   create                    new runnable CFS task on CPUs 1..N-1     -> {..,"pid":N}
 //   tick                      advance one tick; report who runs where   -> {..,"cpu1":N,"cpu2":N,...}  (0 = idle)
-//   task <pid>                scheduler counters of one task           -> {..,"state":..,"cpus":"1-2","vruntime":..,...}
+//   task <pid>                scheduler counters of one task           -> {..,"state":..,"cpus":"1-2","vruntime":..,"eligible":..,...}
 //   nice <pid> <-20..19>      set the nice value
 //   affinity <pid> <cpulist>  set the CPUs the task may run on, e.g. 1-2,4
 //   pause <pid>               put the task to sleep (it does when it next runs)
 //   wake <pid>                wake a paused task
+//   wait <pid>                semaphore wait: the task sleeps until a post (or `wake`)
+//   post <pid>                semaphore post: the task wakes one waiter with a sync (WF_SYNC)
+//                             wakeup from its own CPU (a pipe underneath)
 //   kill <pid>                ask the task to exit (it does when it next runs)
 //   exit                      end the session (the VM reboots)
 //
@@ -122,6 +125,12 @@ static void cmd_task(char *arg) {
   kstep_json_field_u64(&json, "weight", p->se.load.weight);
   kstep_json_field_u64(&json, "sum_exec_runtime", p->se.sum_exec_runtime);
   kstep_json_field_u64(&json, "vruntime", p->se.vruntime);
+  // EEVDF: eligible = vruntime <= the queue's weighted average; delayed = dequeued while
+  // ineligible and kept on the queue until eligible (sched_delayed)
+  kstep_json_field_bool(&json, "eligible", p->se.on_rq && kstep_eligible(&p->se));
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+  kstep_json_field_bool(&json, "delayed", p->se.sched_delayed);
+#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
   kstep_json_field_u64(&json, "deadline", p->se.deadline);
   kstep_json_field_u64(&json, "slice", p->se.slice);
@@ -190,6 +199,10 @@ static bool execute(char *line) {
     cmd_tick();
   else if (!strcmp(verb, "task"))
     cmd_task(arg);
+  else if (!strcmp(verb, "wait"))
+    cmd_signal(arg, "usage: wait <pid>", kstep_task_wait);
+  else if (!strcmp(verb, "post"))
+    cmd_signal(arg, "usage: post <pid>", kstep_task_post);
   else if (!strcmp(verb, "pause"))
     cmd_signal(arg, "usage: pause <pid>", kstep_task_pause);
   else if (!strcmp(verb, "wake"))

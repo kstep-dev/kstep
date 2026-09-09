@@ -21,7 +21,6 @@ struct kstep_cgroup_state {
 };
 
 extern struct kstep_task kstep_tasks[MAX_TASKS];
-extern struct task_struct *kstep_kthreads[KSTEP_MAX_KTHREADS];
 extern struct kstep_cgroup_state kstep_cgroups[MAX_CGROUPS];
 
 bool kstep_build_cgroup_name(int id, char *buf);
