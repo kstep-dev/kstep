@@ -72,6 +72,10 @@ void kstep_json_begin(struct kstep_json *json) {
   kstep_json_field_u64(json, "timestamp", kstep_jiffies_get());
 }
 
+void kstep_json_field_bool(struct kstep_json *json, const char *key, bool val) {
+  kstep_json_field_fmt(json, key, "%s", val ? "true" : "false");
+}
+
 void kstep_json_end(struct kstep_json *json) {
   if (json->len > 0 && json->buf[json->len - 1] == ',')
     json->len--;
@@ -136,5 +140,15 @@ void kstep_output_balance(int cpu, struct sched_domain *sd) {
   kstep_json_field_fmt(&json, "span", "\"%*pbl\"",
                        cpumask_pr_args(sched_domain_span(sd)));
   kstep_json_field_str(&json, "name", sd->name);
+  kstep_json_end(&json);
+}
+
+void kstep_output_migrate(struct task_struct *p, int src_cpu, int dst_cpu) {
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, "type", "migrate");
+  kstep_json_field_u64(&json, "pid", task_pid_nr(p));
+  kstep_json_field_u64(&json, "src_cpu", src_cpu);
+  kstep_json_field_u64(&json, "dst_cpu", dst_cpu);
   kstep_json_end(&json);
 }

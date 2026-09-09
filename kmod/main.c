@@ -29,6 +29,7 @@ static int __init kstep_main(void) {
   kstep_task_init();
   kstep_cgroup_init();
   kstep_trace_sched_group_alloc(); // also sets min_vruntime
+  kstep_cpu_apply_params();
   kstep_driver->setup();
   kstep_cpu_print();
 
@@ -52,6 +53,8 @@ static int __init kstep_main(void) {
     kstep_trace_sched_balance_begin();
   if (kstep_driver->on_sched_balance_selected)
     kstep_trace_sched_balance_selected();
+  if (kstep_driver->on_task_migrate)
+    kstep_trace_task_migrate();
   kstep_driver->run();
 
   TRACE_INFO("Exiting driver %s on Linux %s", kstep_driver->name, UTS_RELEASE);

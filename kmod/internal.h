@@ -40,6 +40,7 @@ void kstep_output_init(void);
 // trace.c
 void kstep_trace_sched_balance_begin(void);
 void kstep_trace_sched_balance_selected(void);
+void kstep_trace_task_migrate(void);
 void kstep_trace_sched_group_alloc(void);
 
 // reset.c

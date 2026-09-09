@@ -1,4 +1,5 @@
 #include <linux/arch_topology.h>
+#include <linux/moduleparam.h>
 #include <linux/cpuset.h>
 
 #include "driver.h"
@@ -212,6 +213,23 @@ static void topo_apply(void) {
 
   KSYM_IMPORT(rebuild_sched_domains);
   KSYM_rebuild_sched_domains();
+}
+
+// Boot parameters (run.py --topology/--capacity/--frequency, passed by init as module
+// params), applied before the driver's setup so a driver may still override them.
+static char param_topology[CPU_SPEC_LEN], param_capacity[CPU_SPEC_LEN],
+    param_frequency[CPU_SPEC_LEN];
+module_param_string(topology, param_topology, CPU_SPEC_LEN, 0644);
+module_param_string(capacity, param_capacity, CPU_SPEC_LEN, 0644);
+module_param_string(frequency, param_frequency, CPU_SPEC_LEN, 0644);
+
+void kstep_cpu_apply_params(void) {
+  if (param_capacity[0])
+    kstep_cap_set(param_capacity);
+  if (param_topology[0])
+    kstep_topo_set(param_topology);
+  if (param_frequency[0])
+    kstep_freq_set(param_frequency);
 }
 
 void kstep_topo_set(const char *spec) {
