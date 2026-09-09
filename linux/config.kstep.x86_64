@@ -3,3 +3,9 @@ CONFIG_ACPI_PROCESSOR=y
 CONFIG_HYPERVISOR_GUEST=y
 CONFIG_PARAVIRT=y
 CONFIG_KVM_GUEST=y
+
+# ACPI PM timer: lets the kernel calibrate the LAPIC timer against it instead of
+# verifying against jiffies. On slow hosts (emulation) the jiffies check fails,
+# the LAPIC timer is disabled, no CPU ever enters high-res tick mode, and kstep
+# cannot take over the tick.
+CONFIG_X86_PM_TIMER=y
