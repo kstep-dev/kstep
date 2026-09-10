@@ -5,26 +5,37 @@
 // failed command's reply is {"timestamp":..,"error":"..."}. CPU topology and capacity come
 // from the usual topology=/capacity= boot parameters.
 //
-//   create                    new runnable CFS task on CPUs 1..N-1     -> {"timestamp":T,"pid":N}
-//   tick                      advance one tick; report the pid running on each test CPU
-//                                                          -> {"timestamp":T,"cpu1":N,"cpu2":N,...}  (0 = idle)
-//   task <pid>                scheduler counters of one task           -> {"timestamp":T,"pid":N,"state":..,"cpus":"1-2","vruntime":..,...}
-//   nice <pid> <-20..19>      set the nice value
-//   affinity <pid> <cpulist>  set the CPUs the task may run on, e.g. 1-2,4
-//   pause <pid>               put the task to sleep (it does when it next runs)
-//   wake <pid>                wake a paused task
-//   wait <pid>                semaphore wait: the task sleeps until a post (or `wake`)
-//   post <pid>                semaphore post: the task wakes one waiter with a sync (WF_SYNC)
+// Tasks are named by their creation number 1, 2, .. (the same on every kernel and run, so a
+// script or a trace means the same thing everywhere); a number is never reused after `kill`.
+//
+//   create                    new runnable CFS task on CPUs 1..N-1     -> {"timestamp":T,"task":N}
+//   tick                      advance one tick                         -> {"timestamp":T}
+//   top                       one {"type":"task",...} record per live task, then the reply
+//                             {"timestamp":T,"tasks":N}. A record:
+//         {"timestamp":T,"type":"task","task":N,"state":"running|runnable|sleeping|blocked","cpu":C,
+//          "cpus":"1-2","cgroup":"/a","policy":"normal","nice":0,"weight":..,"sum_exec_runtime":..,"vruntime":..,...}
+//   task <n>                  `top` for one task: its record, then {"timestamp":T,"tasks":1}
+//   nice <n> <-20..19>        set the nice value (fair classes; kept across a spell as fifo/rr)
+//   policy <n> <normal|batch|idle|fifo|rr>   set the scheduling class (real-time at one fixed priority)
+//   affinity <n> <cpulist>    set the CPUs the task may run on, e.g. 1-2,4
+//   pause <n>                 put the task to sleep (it does when it next runs)
+//   wake <n>                  wake a paused task
+//   wait <n>                  semaphore wait: the task sleeps until a post (or `wake`)
+//   post <n>                  semaphore post: the task wakes one waiter with a sync (WF_SYNC)
 //                             wakeup from its own CPU (a pipe underneath)
-//   kill <pid>                ask the task to exit (it does when it next runs)
+//   kill <n>                  ask the task to exit (it does when it next runs)
+//   cgroup-create /a          create cgroup /a (its parent must exist; / is the root)
+//   cgroup-weight /a <w>      the cgroup's cpu.weight, 1..10000 (default 100)
+//   cgroup-cpus /a <cpulist>  the cgroup's cpuset.cpus
+//   attach <n> /a             attach the task to a cgroup (`attach <n> /` back to the root)
 //   exit                      end the session (the VM reboots)
 //
-// A <pid> that no longer exists answers "no such task", which is how a client learns
-// about exits.
+// A task that has exited answers "no such task" and has no `top` record. The migrate event
+// names the task by its number too (migrations of other processes are not reported).
+#include <linux/cgroup.h>
 #include <linux/cpumask.h>
 #include <linux/ctype.h>
 #include <linux/fs.h>
-#include <linux/pid.h>
 #include <linux/string.h>
 #include <linux/version.h>
 
@@ -50,65 +61,94 @@ static void reply_error(const char *msg) {
 
 static int last_cpu(void) { return num_online_cpus() - 1; }
 
-// Take the leading <pid> off *arg (the rest stays in *arg) and look the task up; on
+// The session's tasks by creation number: tasks[n - 1]. Each holds a reference, so the
+// pointer stays valid after the task exits (exit_state says it did).
+#define MAX_TASKS 64
+static struct task_struct *tasks[MAX_TASKS];
+static int ntasks;
+
+static int task_number(struct task_struct *p) {
+  for (int i = 0; i < ntasks; i++)
+    if (tasks[i] == p)
+      return i + 1;
+  return 0;
+}
+
+// Take the leading task number off *arg (the rest stays in *arg) and look the task up; on
 // failure reply with an error and return NULL.
 static struct task_struct *parse_task(char **arg, const char *usage) {
-  char *pid_s = *arg ? strsep(arg, " \t") : NULL;
-  struct task_struct *p = NULL;
-  int pid;
+  char *num_s = *arg ? strsep(arg, " \t") : NULL;
+  int n;
 
   if (*arg)
     *arg = strim(*arg);
-  if (!pid_s || kstrtoint(pid_s, 10, &pid) || pid <= 0) {
+  if (!num_s || kstrtoint(num_s, 10, &n) || n <= 0) {
     reply_error(usage);
     return NULL;
   }
-  rcu_read_lock();
-  p = pid_task(find_vpid(pid), PIDTYPE_PID); // NULL once the task has exited
-  rcu_read_unlock();
-  if (!p || p->exit_state) {
+  if (n > ntasks || tasks[n - 1]->exit_state) {
     reply_error("no such task");
     return NULL;
   }
-  return p;
+  return tasks[n - 1];
 }
 
 static void cmd_create(char *arg) {
   struct kstep_json json;
-  struct task_struct *p = kstep_task_create();
+  struct task_struct *p;
 
+  if (ntasks == MAX_TASKS)
+    return reply_error("too many tasks");
+  p = kstep_task_create();
+  tasks[ntasks++] = get_task_struct(p);
   kstep_task_pin(p, 1, last_cpu()); // keep off CPU 0, kSTEP's control CPU
   kstep_task_wakeup(p);
   kstep_json_begin(&json);
-  kstep_json_field_s64(&json, "pid", p->pid);
+  kstep_json_field_s64(&json, "task", ntasks);
   kstep_json_end(&json);
 }
 
 static void cmd_tick(char *arg) {
-  struct kstep_json json;
-
   kstep_tick();
-  kstep_json_begin(&json);
-  for (int cpu = 1; cpu <= last_cpu(); cpu++) {
-    char key[8];
-    snprintf(key, sizeof(key), "cpu%d", cpu);
-    kstep_json_field_s64(&json, key, task_pid_nr(cpu_rq(cpu)->curr));
-  }
-  kstep_json_end(&json);
+  reply();
 }
 
-static void cmd_task(char *arg) {
-  struct kstep_json json;
-  struct task_struct *p = parse_task(&arg, "usage: task <pid>");
+static const struct {
+  const char *name;
+  int policy;
+} policies[] = {
+    {"normal", SCHED_NORMAL}, {"batch", SCHED_BATCH}, {"idle", SCHED_IDLE},
+    {"fifo", SCHED_FIFO},     {"rr", SCHED_RR},
+};
 
-  if (!p)
-    return;
+static const char *policy_name(int policy) {
+  for (int i = 0; i < ARRAY_SIZE(policies); i++)
+    if (policies[i].policy == policy)
+      return policies[i].name;
+  return "?";
+}
+
+// One task's scheduler state as a "task" record.
+static void write_task(struct task_struct *p) {
+  struct kstep_json json;
+  unsigned int state = READ_ONCE(p->__state);
+
   kstep_json_begin(&json);
-  kstep_json_field_s64(&json, "pid", p->pid);
-  kstep_json_field_u64(&json, "state", READ_ONCE(p->__state));
-  kstep_json_field_s64(&json, "on_cpu", p->on_cpu);
+  kstep_json_field_str(&json, "type", "task");
+  kstep_json_field_s64(&json, "task", task_number(p));
+  kstep_json_field_str(&json, "state", p->on_cpu ? "running" : state == TASK_RUNNING ? "runnable" :
+                                        state & TASK_INTERRUPTIBLE ? "sleeping" : "blocked");
   kstep_json_field_s64(&json, "cpu", task_cpu(p));
   kstep_json_field_fmt(&json, "cpus", "\"%*pbl\"", cpumask_pr_args(p->cpus_ptr));
+  {
+    char cgroup[64];
+    rcu_read_lock();
+    if (cgroup_path(task_dfl_cgroup(p), cgroup, sizeof(cgroup)) < 0)
+      strscpy(cgroup, "?", sizeof(cgroup));
+    rcu_read_unlock();
+    kstep_json_field_str(&json, "cgroup", cgroup);
+  }
+  kstep_json_field_str(&json, "policy", policy_name(p->policy));
   kstep_json_field_s64(&json, "nice", task_nice(p));
   kstep_json_field_u64(&json, "weight", p->se.load.weight);
   kstep_json_field_u64(&json, "sum_exec_runtime", p->se.sum_exec_runtime);
@@ -126,8 +166,36 @@ static void cmd_task(char *arg) {
   kstep_json_end(&json);
 }
 
+static void reply_tasks(int n) {
+  struct kstep_json json;
+
+  kstep_json_begin(&json);
+  kstep_json_field_s64(&json, "tasks", n);
+  kstep_json_end(&json);
+}
+
+static void cmd_task(char *arg) {
+  struct task_struct *p = parse_task(&arg, "usage: task <n>");
+
+  if (!p)
+    return;
+  write_task(p);
+  reply_tasks(1);
+}
+
+static void cmd_top(char *arg) {
+  int n = 0;
+
+  for (int i = 0; i < ntasks; i++)
+    if (!tasks[i]->exit_state) {
+      write_task(tasks[i]);
+      n++;
+    }
+  reply_tasks(n);
+}
+
 static void cmd_affinity(char *arg) {
-  const char *usage = "usage: affinity <pid> <cpulist within 1..N-1>";
+  const char *usage = "usage: affinity <n> <cpulist within 1..N-1>";
   struct task_struct *p = parse_task(&arg, usage);
   struct cpumask mask;
 
@@ -141,7 +209,7 @@ static void cmd_affinity(char *arg) {
 }
 
 static void cmd_nice(char *arg) {
-  const char *usage = "usage: nice <pid> <-20..19>";
+  const char *usage = "usage: nice <n> <-20..19>";
   struct task_struct *p = parse_task(&arg, usage);
   int n;
 
@@ -149,7 +217,87 @@ static void cmd_nice(char *arg) {
     return;
   if (!arg || kstrtoint(arg, 10, &n) || n < MIN_NICE || n > MAX_NICE)
     return reply_error(usage);
-  kstep_task_set_prio(p, n);
+  kstep_task_set_nice(p, n);
+  reply();
+}
+
+static void cmd_policy(char *arg) {
+  const char *usage = "usage: policy <n> <normal|batch|idle|fifo|rr>";
+  struct task_struct *p = parse_task(&arg, usage);
+
+  if (!p)
+    return;
+  for (int i = 0; i < ARRAY_SIZE(policies); i++)
+    if (arg && !strcmp(arg, policies[i].name)) {
+      kstep_task_set_policy(p, policies[i].policy);
+      return reply();
+    }
+  reply_error(usage);
+}
+
+// cgroups are named by their path under the cgroup root, "/" being the root itself; the
+// kstep_cgroup_* helpers take the path without the leading slash. Take the leading path
+// off *arg; it must exist unless `create`.
+static const char *parse_cgroup(char **arg, const char *usage, bool create) {
+  char *path = *arg ? strsep(arg, " \t") : NULL;
+
+  if (*arg)
+    *arg = strim(*arg);
+  if (!path || path[0] != '/' || strstr(path, "..") || strlen(path) >= 48) {
+    reply_error(usage);
+    return NULL;
+  }
+  if (create ? (!path[1] || kstep_cgroup_exists(path + 1)) : (path[1] && !kstep_cgroup_exists(path + 1))) {
+    reply_error(create ? "cgroup exists" : "no such cgroup");
+    return NULL;
+  }
+  return path + 1;
+}
+
+static void cmd_cgroup_create(char *arg) {
+  const char *name = parse_cgroup(&arg, "usage: cgroup-create /path", true);
+
+  if (!name)
+    return;
+  kstep_cgroup_create(name);
+  reply();
+}
+
+static void cmd_cgroup_weight(char *arg) {
+  const char *usage = "usage: cgroup-weight /path <1..10000>";
+  const char *name = parse_cgroup(&arg, usage, false);
+  int weight;
+
+  if (!name)
+    return;
+  if (!arg || kstrtoint(arg, 10, &weight) || weight < 1 || weight > 10000)
+    return reply_error(usage);
+  kstep_cgroup_set_weight(name, weight);
+  reply();
+}
+
+static void cmd_cgroup_cpus(char *arg) {
+  const char *usage = "usage: cgroup-cpus /path <cpulist within 1..N-1>";
+  const char *name = parse_cgroup(&arg, usage, false);
+  struct cpumask mask;
+
+  if (!name)
+    return;
+  if (!arg || cpulist_parse(arg, &mask) || cpumask_empty(&mask) ||
+      cpumask_test_cpu(0, &mask) || cpumask_last(&mask) > last_cpu())
+    return reply_error(usage);
+  kstep_cgroup_set_cpuset(name, arg);
+  reply();
+}
+
+static void cmd_attach(char *arg) {
+  const char *usage = "usage: attach <n> /path";
+  struct task_struct *p = parse_task(&arg, usage);
+  const char *name;
+
+  if (!p || !(name = parse_cgroup(&arg, usage, false)))
+    return;
+  kstep_cgroup_move_task(name, p->pid);
   reply();
 }
 
@@ -157,8 +305,10 @@ static const struct {
   const char *verb;
   void (*fn)(char *arg);
 } commands[] = {
-    {"create", cmd_create}, {"tick", cmd_tick},         {"task", cmd_task},
-    {"nice", cmd_nice},     {"affinity", cmd_affinity},
+    {"create", cmd_create}, {"tick", cmd_tick},         {"task", cmd_task},         {"top", cmd_top},
+    {"nice", cmd_nice},     {"policy", cmd_policy},     {"affinity", cmd_affinity}, {"attach", cmd_attach},
+    {"cgroup-create", cmd_cgroup_create}, {"cgroup-weight", cmd_cgroup_weight},
+    {"cgroup-cpus", cmd_cgroup_cpus},
 };
 
 // Verbs that just signal a task: the SIGUSR1 handler in user/user.c does the actual
@@ -193,7 +343,7 @@ static bool execute(char *line) {
       char usage[32];
       struct task_struct *p;
 
-      snprintf(usage, sizeof(usage), "usage: %s <pid>", verb);
+      snprintf(usage, sizeof(usage), "usage: %s <n>", verb);
       p = parse_task(&arg, usage);
       if (p) {
         signals[i].fn(p);
@@ -207,6 +357,21 @@ static bool execute(char *line) {
   }
   reply_error("unknown command");
   return true;
+}
+
+// The migrate event with the task named by its number; other processes are not reported.
+static void output_migrate(struct task_struct *p, int src_cpu, int dst_cpu) {
+  struct kstep_json json;
+  int n = task_number(p);
+
+  if (!n)
+    return;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, "type", "migrate");
+  kstep_json_field_s64(&json, "task", n);
+  kstep_json_field_s64(&json, "src_cpu", src_cpu);
+  kstep_json_field_s64(&json, "dst_cpu", dst_cpu);
+  kstep_json_end(&json);
 }
 
 static void setup(void) {
@@ -246,6 +411,6 @@ KSTEP_DRIVER_DEFINE{
     // events in the stream: load_balance = a CPU's balancer looked for work (after
     // should_we_balance); migrate = a task actually moved (balancing or wakeup placement)
     .on_sched_balance_selected = kstep_output_balance,
-    .on_task_migrate = kstep_output_migrate,
-    .step_interval_us = 1000, // no on_tick_begin: the tick reply reports who runs where
+    .on_task_migrate = output_migrate,
+    .step_interval_us = 1000, // no on_tick_begin: clients ask with `top`
 };

@@ -24,7 +24,7 @@ static void run(void) {
 
   // A: nice 1 (weight 820), B: nice 0 (weight 1024).
   // Different weights ensure avg/load is not evenly divisible.
-  kstep_task_set_prio(task_a, 1);
+  kstep_task_set_nice(task_a, 1);
 
   kstep_task_wakeup(task_a);
   kstep_task_wakeup(task_b);

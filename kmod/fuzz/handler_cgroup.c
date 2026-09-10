@@ -128,7 +128,7 @@ u8 kstep_op_cgroup_add_task(int a, int b, int c) {
     return 0;
 
   if (kstep_tasks[b].p->policy != 0)
-    kstep_task_cfs(kstep_tasks[b].p);
+    kstep_task_set_policy(kstep_tasks[b].p, SCHED_NORMAL);
 
   kstep_cgroup_move_task(name, kstep_tasks[b].p->pid);
   kstep_tasks[b].cgroup_id = a;

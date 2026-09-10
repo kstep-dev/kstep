@@ -94,7 +94,7 @@ u8 kstep_op_task_fifo(int a, int b, int c) {
 
   /* Move the task back to the root cgroup, otherwise set_schedprio will fail. */
   kstep_op_move_task_to_root(a);
-  kstep_task_fifo(p);
+  kstep_task_set_policy(p, SCHED_FIFO);
   return 1;
 }
 
@@ -103,7 +103,7 @@ u8 kstep_op_task_cfs(int a, int b, int c) {
 
   if (!p)
     return 0;
-  kstep_task_cfs(p);
+  kstep_task_set_policy(p, SCHED_NORMAL);
   return 1;
 }
 
@@ -146,6 +146,6 @@ u8 kstep_op_task_set_prio(int a, int b, int c) {
     return 0;
   if (b < -20 || b > 19)
     return 0;
-  kstep_task_set_prio(p, b);
+  kstep_task_set_nice(p, b);
   return 1;
 }

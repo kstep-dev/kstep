@@ -12,7 +12,7 @@ static void setup(void) {
 
 static void run(void) {
   // set the first task to fifo
-  kstep_task_fifo(tasks[0]);
+  kstep_task_set_policy(tasks[0], SCHED_FIFO);
   kstep_task_wakeup(tasks[0]);
 
   // fake the frequency of cpu 1 to 50% of the base frequency
@@ -28,7 +28,7 @@ static void run(void) {
   kstep_tick_repeat(2);
 
   // wake up and set another task to fifo
-  kstep_task_fifo(tasks[1]);
+  kstep_task_set_policy(tasks[1], SCHED_FIFO);
   kstep_task_wakeup(tasks[1]);
 
   // tick for another 600 ticks (600ms) to show the impact
