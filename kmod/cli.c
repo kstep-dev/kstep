@@ -10,7 +10,8 @@
 //
 //   create                    new runnable CFS task on CPUs 1..N-1     -> {"timestamp":T,"task":N}
 //   tick                      advance one tick                         -> {"timestamp":T}
-//   top                       one {"type":"task",...} record per live task, then the reply
+//   top                       one {"type":"cpu",...} record per isolated CPU and one
+//                             {"type":"task",...} record per live task, then the reply
 //                             {"timestamp":T,"tasks":N}. A record:
 //         {"timestamp":T,"type":"task","task":N,"state":"running|runnable|sleeping|blocked","cpu":C,
 //          "cpus":"1-2","cgroup":"/a","policy":"normal","nice":0,"weight":..,"sum_exec_runtime":..,"vruntime":..,...}
@@ -186,6 +187,30 @@ static void cmd_task(char *arg) {
 static void cmd_top(char *arg) {
   int n = 0;
 
+  // Isolated CPUs are held between scheduler events while commands run. Read their
+  // queues directly: counting task records would miss delayed dequeue accounting.
+  for (int cpu = 1; cpu <= last_cpu(); cpu++) {
+    struct rq *rq = cpu_rq(cpu);
+    struct kstep_json json;
+
+    kstep_json_begin(&json);
+    kstep_json_field_str(&json, "type", "cpu");
+    kstep_json_field_u64(&json, "cpu", cpu);
+    kstep_json_field_u64(&json, "current", task_number(rq->curr));
+    kstep_json_field_bool(&json, "idle", rq->curr == rq->idle);
+    kstep_json_field_u64(&json, "nr_running", rq->nr_running);
+    kstep_json_field_u64(&json, "capacity", arch_scale_cpu_capacity(cpu));
+    kstep_json_field_u64(&json, "nr_switches", rq->nr_switches);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0)
+    kstep_json_field_u64(&json, "min_vruntime", rq->cfs.min_vruntime);
+#endif
+#ifdef CONFIG_SMP
+    kstep_json_field_u64(&json, "cfs_util_avg", rq->cfs.avg.util_avg);
+    kstep_json_field_u64(&json, "cfs_load_avg", rq->cfs.avg.load_avg);
+    kstep_json_field_u64(&json, "cfs_runnable_avg", rq->cfs.avg.runnable_avg);
+#endif
+    kstep_json_end(&json);
+  }
   for (int i = 0; i < ntasks; i++)
     if (!tasks[i]->exit_state) {
       write_task(tasks[i]);
