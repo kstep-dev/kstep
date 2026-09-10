@@ -119,35 +119,30 @@ void kstep_task_block(struct task_struct *p) {
   TRACE_INFO("Blocked task %d", p->pid);
 }
 
-void kstep_task_set_prio(struct task_struct *p, int prio) {
+// nice applies to the fair classes only; the kernel keeps it across a spell as fifo/rr.
+void kstep_task_set_nice(struct task_struct *p, int nice) {
   kstep_cov_enable_controller();
-  set_user_nice(p, prio);
+  set_user_nice(p, nice);
   kstep_cov_disable_controller();
-  TRACE_INFO("Set priority of task %d to %d", p->pid, prio);
+  TRACE_INFO("Set nice of task %d to %d", p->pid, nice);
   kstep_sleep();
 }
 
-void kstep_task_fifo(struct task_struct *p) {
-  struct sched_attr attr = {
-      .sched_policy = SCHED_FIFO,
-      .sched_priority = 80,
-  };
-  kstep_cov_enable_controller();
-  sched_setattr_nocheck(p, &attr);
-  kstep_cov_disable_controller();
-  TRACE_INFO("Set task %d to FIFO", p->pid);
-  kstep_sleep();
-}
+// Scheduling class: SCHED_NORMAL, SCHED_BATCH, SCHED_IDLE, SCHED_FIFO or SCHED_RR. The fair
+// classes keep the task's nice; the real-time ones get one fixed priority, since priority only
+// orders real-time tasks among themselves and kSTEP studies their effect on the fair class.
+#define KSTEP_RT_PRIORITY 80
+void kstep_task_set_policy(struct task_struct *p, int policy) {
+  struct sched_attr attr = {.sched_policy = policy};
 
-void kstep_task_cfs(struct task_struct *p) {
-  struct sched_attr attr = {
-      .sched_policy = SCHED_NORMAL,
-      .sched_nice = 0,
-  };
+  if (policy == SCHED_FIFO || policy == SCHED_RR)
+    attr.sched_priority = KSTEP_RT_PRIORITY;
+  else
+    attr.sched_nice = task_nice(p);
   kstep_cov_enable_controller();
   sched_setattr_nocheck(p, &attr);
   kstep_cov_disable_controller();
-  TRACE_INFO("Set task %d to CFS", p->pid);
+  TRACE_INFO("Set policy of task %d to %d", p->pid, policy);
   kstep_sleep();
 }
 

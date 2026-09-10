@@ -71,8 +71,7 @@ void kstep_task_exit(struct task_struct *p);
 void kstep_task_pin(struct task_struct *p, int begin, int end);
 void kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask);
 void kstep_task_fork(struct task_struct *p, int n);
-void kstep_task_fifo(struct task_struct *p);
-void kstep_task_cfs(struct task_struct *p);
+void kstep_task_set_policy(struct task_struct *p, int policy); // SCHED_NORMAL, SCHED_FIFO, ...
 void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
 void kstep_task_block(struct task_struct *p);
@@ -80,7 +79,7 @@ void kstep_task_block(struct task_struct *p);
 // wakeup of one waiter from the poster's CPU
 void kstep_task_wait(struct task_struct *p);
 void kstep_task_post(struct task_struct *p);
-void kstep_task_set_prio(struct task_struct *p, int prio);
+void kstep_task_set_nice(struct task_struct *p, int nice);
 void kstep_task_kernel_pause(struct task_struct *p);
 void kstep_task_kernel_wakeup(struct task_struct *p);
 
