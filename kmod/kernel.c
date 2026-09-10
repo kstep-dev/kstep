@@ -261,6 +261,18 @@ void kstep_cgroup_init(void) {
     KSYM_rcu_sync_enter(&cpuset_rwsem->rss);
 }
 
+bool kstep_cgroup_exists(const char *name) {
+  char path[MAX_PATH_LENGTH];
+  struct path p;
+
+  if (scnprintf(path, sizeof(path), CGROUP_ROOT "%s", name) >= sizeof(path))
+    return false;
+  if (kern_path(path, LOOKUP_DIRECTORY, &p))
+    return false;
+  path_put(&p);
+  return true;
+}
+
 void kstep_cgroup_create(const char *name) {
   char cpuset[32];
   kstep_cgroup_mkdir(name);

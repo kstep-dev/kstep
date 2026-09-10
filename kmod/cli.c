@@ -8,7 +8,8 @@
 //   create                    new runnable CFS task on CPUs 1..N-1     -> {"timestamp":T,"pid":N}
 //   tick                      advance one tick; report the pid running on each test CPU
 //                                                          -> {"timestamp":T,"cpu1":N,"cpu2":N,...}  (0 = idle)
-//   task <pid>                scheduler counters of one task           -> {"timestamp":T,"pid":N,"state":..,"cpus":"1-2","vruntime":..,...}
+//   task <pid>                scheduler counters of one task
+//                       -> {"timestamp":T,"pid":N,"state":..,"cpus":"1-2","cgroup":"/a","vruntime":..,...}
 //   nice <pid> <-20..19>      set the nice value
 //   affinity <pid> <cpulist>  set the CPUs the task may run on, e.g. 1-2,4
 //   pause <pid>               put the task to sleep (it does when it next runs)
@@ -17,10 +18,15 @@
 //   post <pid>                semaphore post: the task wakes one waiter with a sync (WF_SYNC)
 //                             wakeup from its own CPU (a pipe underneath)
 //   kill <pid>                ask the task to exit (it does when it next runs)
+//   cgroup-create /a          create cgroup /a (its parent must exist; / is the root)
+//   cgroup-weight /a <w>      the cgroup's cpu.weight, 1..10000 (default 100)
+//   cgroup-cpus /a <cpulist>  the cgroup's cpuset.cpus
+//   attach <pid> /a           attach the task to a cgroup (`attach <pid> /` back to the root)
 //   exit                      end the session (the VM reboots)
 //
 // A <pid> that no longer exists answers "no such task", which is how a client learns
 // about exits.
+#include <linux/cgroup.h>
 #include <linux/cpumask.h>
 #include <linux/ctype.h>
 #include <linux/fs.h>
@@ -109,6 +115,14 @@ static void cmd_task(char *arg) {
   kstep_json_field_s64(&json, "on_cpu", p->on_cpu);
   kstep_json_field_s64(&json, "cpu", task_cpu(p));
   kstep_json_field_fmt(&json, "cpus", "\"%*pbl\"", cpumask_pr_args(p->cpus_ptr));
+  {
+    char cgroup[64];
+    rcu_read_lock();
+    if (cgroup_path(task_dfl_cgroup(p), cgroup, sizeof(cgroup)) < 0)
+      strscpy(cgroup, "?", sizeof(cgroup));
+    rcu_read_unlock();
+    kstep_json_field_str(&json, "cgroup", cgroup);
+  }
   kstep_json_field_s64(&json, "nice", task_nice(p));
   kstep_json_field_u64(&json, "weight", p->se.load.weight);
   kstep_json_field_u64(&json, "sum_exec_runtime", p->se.sum_exec_runtime);
@@ -153,12 +167,80 @@ static void cmd_nice(char *arg) {
   reply();
 }
 
+// cgroups are named by their path under the cgroup root, "/" being the root itself; the
+// kstep_cgroup_* helpers take the path without the leading slash. Take the leading path
+// off *arg; it must exist unless `create`.
+static const char *parse_cgroup(char **arg, const char *usage, bool create) {
+  char *path = *arg ? strsep(arg, " \t") : NULL;
+
+  if (*arg)
+    *arg = strim(*arg);
+  if (!path || path[0] != '/' || strstr(path, "..") || strlen(path) >= 48) {
+    reply_error(usage);
+    return NULL;
+  }
+  if (create ? (!path[1] || kstep_cgroup_exists(path + 1)) : (path[1] && !kstep_cgroup_exists(path + 1))) {
+    reply_error(create ? "cgroup exists" : "no such cgroup");
+    return NULL;
+  }
+  return path + 1;
+}
+
+static void cmd_cgroup_create(char *arg) {
+  const char *name = parse_cgroup(&arg, "usage: cgroup-create /path", true);
+
+  if (!name)
+    return;
+  kstep_cgroup_create(name);
+  reply();
+}
+
+static void cmd_cgroup_weight(char *arg) {
+  const char *usage = "usage: cgroup-weight /path <1..10000>";
+  const char *name = parse_cgroup(&arg, usage, false);
+  int weight;
+
+  if (!name)
+    return;
+  if (!arg || kstrtoint(arg, 10, &weight) || weight < 1 || weight > 10000)
+    return reply_error(usage);
+  kstep_cgroup_set_weight(name, weight);
+  reply();
+}
+
+static void cmd_cgroup_cpus(char *arg) {
+  const char *usage = "usage: cgroup-cpus /path <cpulist within 1..N-1>";
+  const char *name = parse_cgroup(&arg, usage, false);
+  struct cpumask mask;
+
+  if (!name)
+    return;
+  if (!arg || cpulist_parse(arg, &mask) || cpumask_empty(&mask) ||
+      cpumask_test_cpu(0, &mask) || cpumask_last(&mask) > last_cpu())
+    return reply_error(usage);
+  kstep_cgroup_set_cpuset(name, arg);
+  reply();
+}
+
+static void cmd_attach(char *arg) {
+  const char *usage = "usage: attach <pid> /path";
+  struct task_struct *p = parse_task(&arg, usage);
+  const char *name;
+
+  if (!p || !(name = parse_cgroup(&arg, usage, false)))
+    return;
+  kstep_cgroup_move_task(name, p->pid);
+  reply();
+}
+
 static const struct {
   const char *verb;
   void (*fn)(char *arg);
 } commands[] = {
     {"create", cmd_create}, {"tick", cmd_tick},         {"task", cmd_task},
-    {"nice", cmd_nice},     {"affinity", cmd_affinity},
+    {"nice", cmd_nice},     {"affinity", cmd_affinity}, {"attach", cmd_attach},
+    {"cgroup-create", cmd_cgroup_create}, {"cgroup-weight", cmd_cgroup_weight},
+    {"cgroup-cpus", cmd_cgroup_cpus},
 };
 
 // Verbs that just signal a task: the SIGUSR1 handler in user/user.c does the actual

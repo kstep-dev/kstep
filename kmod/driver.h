@@ -93,6 +93,7 @@ void kstep_sched_feat_enable(const char *name);
 void kstep_sched_feat_disable(const char *name);
 void kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
                         ...);
+bool kstep_cgroup_exists(const char *name);
 void kstep_cgroup_create(const char *name);
 void kstep_cgroup_destroy(const char *name);
 void kstep_cgroup_set_cpuset(const char *name, const char *cpuset);
