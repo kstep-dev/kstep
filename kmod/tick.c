@@ -96,8 +96,8 @@ void *kstep_tick_until(void *(*fn)(void)) {
 }
 
 void kstep_sleep(void) {
-  if (kstep_driver->step_interval_us <= 0)
-    panic("Invalid step_interval_us %llu", kstep_driver->step_interval_us);
+  if (kstep_driver->step_interval_us == 0)
+    return;
   usleep_range(kstep_driver->step_interval_us, kstep_driver->step_interval_us);
 }
 

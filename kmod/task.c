@@ -7,20 +7,18 @@
 #include "user.h"
 
 static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *off) {
-  // Check and halt with interrupts off, so an interrupt in between is not lost.
+  // Check and halt with interrupts off, so an interrupt in between wakes the halt, not lost.
   local_irq_disable();
-  if (need_resched() || signal_pending(current)) {
-    local_irq_enable();
-    return 0;
-  }
+  if (!need_resched() && !signal_pending(current)) {
 #if defined(CONFIG_X86)
-  arch_safe_halt(); // sti; hlt (or the paravirt op): interrupts come on only as it halts
+    arch_safe_halt(); // sti; hlt (or the paravirt op): interrupts come on only as it halts
 #elif defined(CONFIG_ARM64)
-  wfi(); // wakes on a pending interrupt even while masked
-  local_irq_enable();
+    wfi(); // wakes on a pending interrupt even while masked
 #else
 #error "no halt for this architecture"
 #endif
+  }
+  local_irq_enable(); // a no-op after arch_safe_halt
   return 0; // back to user mode, where a pending reschedule or signal is acted on
 }
 
