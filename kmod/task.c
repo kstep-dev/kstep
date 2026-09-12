@@ -14,9 +14,9 @@ static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, lof
     return 0;
   }
 #if defined(CONFIG_X86)
-  asm volatile("sti; hlt" ::: "memory"); // sti takes effect after hlt
+  arch_safe_halt(); // sti; hlt (or the paravirt op): interrupts come on only as it halts
 #elif defined(CONFIG_ARM64)
-  asm volatile("wfi" ::: "memory"); // wakes on a pending interrupt even while masked
+  wfi(); // wakes on a pending interrupt even while masked
   local_irq_enable();
 #else
 #error "no halt for this architecture"
