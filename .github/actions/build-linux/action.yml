@@ -17,6 +17,7 @@ runs:
       with:
         path: |
           build/${{ inputs.version }}/arch
+          build/${{ inputs.version }}/config.stamp
           build/${{ inputs.version }}/kernel
           build/${{ inputs.version }}/vmlinux
           build/${{ inputs.version }}/linux

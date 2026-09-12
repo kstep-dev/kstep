@@ -110,7 +110,7 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
   - `current`: symlink to the active `<name>/` (set by `checkout.py`)
   - `master/`: bare kernel clone reused by `checkout.py --git`
   - `user.<arch>`: statically linked userspace binary
-  - `<name>/`: `kernel` (bootable image) and `rootfs.cpio` (kmod.ko + user) for QEMU; `vmlinux` for gdb/addr2line; `arch` (target arch); `linux/` source tree; `kmod/` module build dir with `kmod.ko` and the clangd `compile_commands.json` (the project root symlinks to it)
+  - `<name>/`: `kernel` (the image QEMU boots: on x86 the vmlinux itself, entered through its PVH note; on arm64 the Image, plus `vmlinux` for gdb/addr2line) and `rootfs.cpio` (kmod.ko + user); `arch` (target arch); `linux/` source tree; `kmod/` module build dir with `kmod.ko` and the clangd `compile_commands.json` (the project root symlinks to it)
 
 - **results/**: Run outputs. See [`results/README.md`](https://github.com/kstep-dev/results). `repro_<bug>/` and `fuzz_<bug>/` are tracked; `tmp_*` are gitignored.
 

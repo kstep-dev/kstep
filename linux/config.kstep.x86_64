@@ -13,3 +13,7 @@ CONFIG_X86_PM_TIMER=y
 # Boot the uncompressed vmlinux through its PVH entry (QEMU -kernel vmlinux): decompressing the
 # bzImage in the guest runs cold through the wasm JIT and costs about 0.6 s of the browser boot.
 CONFIG_PVH=y
+
+# Kernel console: the pc machine's 16550 (ttyS0)
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y

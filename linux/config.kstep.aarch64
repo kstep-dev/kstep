@@ -1,4 +1,5 @@
-# The kernel console is a PCI serial device (`-device pci-serial`) so that `console=ttyS0`
-# holds on both architectures; kSTEP's own channels are virtio console ports.
-CONFIG_SERIAL_8250_PCI=y
+# Kernel console: the virt machine's PL011 (ttyAMA0), which also has an earlycon. PCI is for the
+# virtio console ports that carry kSTEP's own channels.
+CONFIG_SERIAL_AMBA_PL011=y
+CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
 CONFIG_PCI_HOST_GENERIC=y
