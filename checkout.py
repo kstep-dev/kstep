@@ -81,12 +81,12 @@ def checkout(
         if patch:
             patch_linux(linux_dir, patch)
     set_current_build(kernel)
-    logging.info(f"Checked out Linux {ref} to {fmt_path(linux_dir)}")
+    logging.info(f"Build {fmt_path(BUILD_DIR / kernel)} (Linux {ref}) is now current")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("ref", type=str, nargs="?", default="v6.14")
+    parser.add_argument("ref", type=str, nargs="?", default="v6.18")
     parser.add_argument("kernel", type=str, nargs="?", default=None)
     source = parser.add_mutually_exclusive_group()
     source.add_argument("--tar", dest="tarball", action="store_true", default=True)

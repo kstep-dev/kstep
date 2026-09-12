@@ -18,12 +18,12 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 - Try not to directly manipulate internal scheduler state.
 - Add detailed logging in your driver for all relevant fields to aid debugging. If necessary, add kernel-side logging with `printk()`.
 - Build and execute the driver on the buggy kernel with:
-  `./checkout.py [hash]~1 [name]_buggy --git && make linux NAME=[name]_buggy && ./run.py [driver_name] --name [name]_buggy`
+  `./checkout.py [hash]~1 [name]_buggy --git && ./make.py --build [name]_buggy linux && ./run.py [driver_name] --build [name]_buggy`
 - Determine whether the bug is reproduced by examining the output logs:
   `cat data/logs/latest.log`
 - If you do not observe the bug, refine your implementation and repeat the process.
 - After confirming that your driver triggers the bug, rerun the same driver on the fixed kernel:
-  `./checkout.py [hash] [name]_fixed --git && make linux NAME=[name]_fixed && ./run.py [driver_name] --name [name]_fixed`
+  `./checkout.py [hash] [name]_fixed --git && ./make.py --build [name]_fixed linux && ./run.py [driver_name] --build [name]_fixed`
 - Review the logs to ensure the bug no longer occurs. In rare cases where the issue persists despite the fix, provide clear documentation and report your findings.
 
 #### Refinement Stage

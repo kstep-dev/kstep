@@ -16,6 +16,7 @@ runs:
       uses: actions/cache@v5
       with:
         path: |
+          build/${{ inputs.version }}/arch
           build/${{ inputs.version }}/kernel
           build/${{ inputs.version }}/vmlinux
           build/${{ inputs.version }}/linux
@@ -28,5 +29,6 @@ runs:
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       run: |
-        make linux KSTEP_EXTRA_CONFIG=${{ inputs.cov == 'true' && 'linux/config.kstep.cov' || '' }}
-        make clean-all
+        # Native build: kSTEP defaults to x86_64 and cross-compiles otherwise
+        ./make.py --arch $(uname -m) linux ${{ inputs.cov == 'true' && '--config linux/config.kstep.cov' || '' }}
+        ./make.py clean --all

@@ -15,7 +15,7 @@ Seed scheduling:
   fraction of iterations use fresh random generation vs. seed replay.
 
 Usage:
-  python fuzz.py --kernel v6.18_test [options]
+  python fuzz.py --build v6.18_test [options]
 """
 
 import argparse
@@ -26,7 +26,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from run import Driver, make_kstep, make_linux
+from make import Build, build_kstep, build_linux
+from run import Driver
 from scripts.fuzz_manager import run_manager
 from scripts.utils import FUZZ_DIR, PROJ_DIR
 
@@ -36,7 +37,7 @@ def main() -> None:
         description="Concurrent coverage-guided fuzzer for kSTEP",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("--kernel", required=True,
+    parser.add_argument("--build", required=True,
                         help="Linux build name, e.g. v6.18_test")
     parser.add_argument("--num_cpus", type=int, default=5,
                         help="vCPUs per QEMU instance")
@@ -126,9 +127,10 @@ def main() -> None:
     logging.getLogger().addHandler(file_handler)
     logging.info(f"Logging to {log_path}")
 
+    b = Build(args.build)
     if args.rebuild_linux:
-        make_linux(args.kernel, config=PROJ_DIR / "linux" / "config.kstep.cov")
-    make_kstep(args.kernel)
+        build_linux(b, extra_config=PROJ_DIR / "linux" / "config.kstep.cov")
+    build_kstep(b)
 
     driver = Driver(
         name="executor",
@@ -141,7 +143,7 @@ def main() -> None:
 
     logging.info(
         f"kSTEP fuzzer: workers={args.workers}  driver=executor  "
-        f"linux={args.kernel}  steps={args.steps}  "
+        f"build={args.build}  steps={args.steps}  "
         f"topology={args.topology or 'default'}  "
         f"frequency={args.frequency or 'default'}  "
         f"capacity={args.capacity or 'default'}  "
@@ -155,7 +157,7 @@ def main() -> None:
     run_manager(
         n_workers=args.workers,
         driver=driver,
-        kernel=args.kernel,
+        kernel=args.build,
         steps=args.steps,
         fresh_ratio=args.fresh_ratio,
         mutate_ratio=args.mutate_ratio,

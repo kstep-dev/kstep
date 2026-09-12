@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from make import HOST_ARCH, Build, build_kstep, build_linux
 from scripts import (
     BUILD_CURR_DIR,
     BUILD_DIR,
@@ -17,9 +18,6 @@ from scripts import (
 from scripts.corpus import GLOBAL_SIGNAL_CORPUS
 from scripts.cov import cov_parse
 from scripts.input_seq import input_seq_from_log
-
-ARCH = os.uname().machine
-assert ARCH in ("x86_64", "aarch64"), f"Unsupported architecture: {ARCH}"
 
 
 @dataclass(frozen=True)
@@ -42,13 +40,15 @@ def build_qemu_cmd(
     headless: bool = False,
     cpu_affinity: str | None = None,
 ) -> str:
-    kvm_path = Path("/dev/kvm")
-    if kvm_path.exists() and not os.access(kvm_path, os.R_OK):
-        system(f"sudo chmod 666 {kvm_path}")
+    b = Build(kernel)
+    ARCH = b.arch
+    kernel_img = b.dir / "kernel"
+    rootfs_img = b.rootfs
 
-    build = BUILD_DIR / kernel
-    kernel_img = build / "kernel"
-    rootfs_img = build / "rootfs.cpio"
+    kvm_path = Path("/dev/kvm")
+    use_kvm = ARCH == HOST_ARCH and kvm_path.exists()
+    if use_kvm and not os.access(kvm_path, os.R_OK):
+        system(f"sudo chmod 666 {kvm_path}")
 
     isol_cpus = f"1-{driver.num_cpus - 1}" if driver.num_cpus > 2 else "1"
     boot_args = [
@@ -66,7 +66,7 @@ def build_qemu_cmd(
     ]
 
     if ARCH == "x86_64":
-        boot_args += ["tsc=nowatchdog"]
+        boot_args += ["tsc=nowatchdog", "tsc=reliable"]
 
     # Everything after the `--` is passed to init
     # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
@@ -88,7 +88,7 @@ def build_qemu_cmd(
         return f"-serial chardev:{name}"
 
     cmd = [
-        f"qemu-system-{ARCH}",
+        b.arch.qemu,
         f"-smp {driver.num_cpus}",
         "-cpu max",
         f"-m {driver.mem_mb}M",
@@ -109,7 +109,7 @@ def build_qemu_cmd(
         f"-chardev file,id=char2,path={result_dir.cov}",
         serial_device("char2"),
         # acceleration
-        f"-accel {'kvm' if kvm_path.exists() else 'tcg'}",
+        f"-accel {'kvm' if use_kvm else 'tcg'}",
     ]
 
     if headless:
@@ -212,25 +212,9 @@ def run_gdb(kernel: str):
     system(f"gdb {linux_dir}/vmlinux " + " ".join(args))
 
 
-def make_kstep(kernel: str, log: bool = False):
-    cmd = f"make kstep KERNEL={kernel}"
-    if log:
-        cmd += f" >> {BUILD_DIR / kernel / 'build.log'}"
-    system(cmd)
-
-
-def make_linux(kernel: str, config: Path | None = None, log: bool = False):
-    cmd = f"make linux KERNEL={kernel}"
-    if config:
-        cmd += f" KSTEP_EXTRA_CONFIG={config}"
-    if log:
-        cmd += f" >> {BUILD_DIR / kernel / 'build.log'}"
-    system(cmd)
-
-
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--kernel", type=str, default=None)
+    parser.add_argument("--build", type=str, default=None, help="build name under build/ (default: build/current)")
     parser.add_argument("--label", type=str, default=None)
     parser.add_argument("--debug", action="store_true")
     parser.add_argument("--rebuild_linux", action="store_true", default=False)
@@ -244,15 +228,16 @@ def main():
     parser.add_argument("--params", type=str, nargs="+", default=None)
     args = parser.parse_args()
 
-    kernel = args.kernel or BUILD_CURR_DIR.resolve().name
+    kernel = args.build or BUILD_CURR_DIR.resolve().name
 
     if args.debug and not is_port_free(1234):
         logging.info("Port 1234 is already in use, running GDB...")
         run_gdb(kernel=kernel)
     else:
+        b = Build(kernel)
         if args.rebuild_linux:
-            make_linux(kernel=kernel)
-        make_kstep(kernel=kernel)
+            build_linux(b)
+        build_kstep(b)
         driver = Driver(**{
             field.name: value
             for field in dataclasses.fields(Driver)

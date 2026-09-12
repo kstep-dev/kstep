@@ -4,8 +4,9 @@ import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
-from checkout import Linux, checkout, set_current_build
-from run import Driver, make_kstep, make_linux, run_qemu
+from checkout import Linux, checkout
+from make import Build, build_kstep, build_linux
+from run import Driver, run_qemu
 from scripts import (
     BUILD_DIR,
     PROJ_DIR,
@@ -112,28 +113,16 @@ def plot_data(python_script: str, driver: str):
     system(f"{PROJ_DIR}/scripts/plot_{python_script}.py {driver}")
 
 
-def reproduce(linux: Linux, driver: Driver, build: bool):
+def reproduce(linux: Linux, driver: Driver):
     kernel = f"{driver.name}_{linux.name}"
 
-    # Committed run artifacts: a bootable kernel + initramfs is all QEMU needs.
-    kernel_img = BUILD_DIR / kernel / "kernel"
-    rootfs_img = BUILD_DIR / kernel / "rootfs.cpio"
-    prebuilt = kernel_img.exists() and rootfs_img.exists()
-
-    if build or not prebuilt:
-        if not build:
-            log_step(kernel, "No prebuilt artifacts found — building from source")
-        log_step(kernel, "Checkout Linux")
-        checkout(linux.ref, kernel=kernel, patch=linux.patch, tarball=True)
-        log_step(kernel, "Build Linux")
-        make_linux(kernel=kernel, config=linux.config, log=True)
-        log_step(kernel, "Build kSTEP")
-        make_kstep(kernel=kernel, log=True)
-    else:
-        log_step(
-            kernel, "Using prebuilt artifacts (pass --build to rebuild from source)"
-        )
-        set_current_build(kernel)
+    log_step(kernel, "Checkout Linux")
+    checkout(linux.ref, kernel=kernel, patch=linux.patch, tarball=True)
+    b = Build(kernel, log=BUILD_DIR / kernel / "build.log")
+    log_step(kernel, f"Build Linux (log: {b.log})")
+    build_linux(b, extra_config=linux.config)
+    log_step(kernel, "Build kSTEP")
+    build_kstep(b)
 
     result_dir = ResultDir.create(f"repro_{driver.name}/{linux.name}")
     log_step(kernel, "Run kSTEP")
@@ -142,7 +131,7 @@ def reproduce(linux: Linux, driver: Driver, build: bool):
     run_qemu(kernel=kernel, driver=driver, result_dir=result_dir, headless=True)
 
 
-def main(bug: Bug, runs: list[str], build: bool):
+def main(bug: Bug, runs: list[str]):
     print("=" * 80, flush=True)
     print(f" {bug.driver.name} ".center(80, "="), flush=True)
     print("=" * 80, flush=True)
@@ -152,7 +141,7 @@ def main(bug: Bug, runs: list[str], build: bool):
         if r == "plot":
             continue
         linux = linux_map.get(r, Linux(name=r, ref=r))
-        reproduce(linux, bug.driver, build)
+        reproduce(linux, bug.driver)
 
     if "plot" in runs:
         if bug.plot_format:
@@ -176,14 +165,6 @@ if __name__ == "__main__":
         default=["buggy", "fixed", "plot"],
         nargs="+",
     )
-    parser.add_argument(
-        "--build",
-        action="store_true",
-        default=False,
-        help="Build from source (checkout + compile kernel and kmod) instead of "
-        "using the committed prebuilt artifacts. Builds automatically when no "
-        "prebuilt artifacts are present.",
-    )
     args = parser.parse_args()
 
     if args.name == "all":
@@ -200,4 +181,4 @@ if __name__ == "__main__":
 
     print(f"running {len(selected_bugs)} bug(s)")
     for bug in selected_bugs:
-        main(bug=bug, runs=args.run, build=args.build)
+        main(bug=bug, runs=args.run)

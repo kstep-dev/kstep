@@ -8,8 +8,8 @@ on:
     - cron: "0 0 * * 0" # Every week
 
 env:
-  PACKAGES_X86_64: qemu-system-x86 libelf-dev musl-tools
-  PACKAGES_AARCH64: qemu-system-arm libelf-dev musl-tools
+  PACKAGES_X86_64: qemu-system-x86 libelf-dev
+  PACKAGES_AARCH64: qemu-system-arm libelf-dev
 
 jobs:
   deps:
@@ -58,12 +58,12 @@ jobs:
           cov: ${{ matrix.fuzz }}
 
       - name: Build kSTEP
-        run: make kstep KERNEL=${{ matrix.version }}
+        run: ./make.py --build ${{ matrix.version }} kstep
 
       - name: "[Run] Execute driver"
         if: ${{ ! matrix.fuzz }}
         timeout-minutes: 1
-        run: ./run.py --kernel ${{ matrix.version }}
+        run: ./run.py --build ${{ matrix.version }}
 
       - name: "[Run] Show driver output"
         if: ${{ ! matrix.fuzz }}
@@ -74,7 +74,7 @@ jobs:
         timeout-minutes: 5
         run: |
           ./fuzz.py \
-            --kernel ${{ matrix.version }} \
+            --build ${{ matrix.version }} \
             --workers 1 \
             --steps 10 \
             --ci_mode

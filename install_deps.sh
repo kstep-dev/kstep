@@ -11,11 +11,11 @@ PACKAGES=(
     libncurses-dev
     libssl-dev
     libelf-dev
-    musl-tools     # musl-gcc for static user binaries
+    gcc-x86-64-linux-gnu
+    gcc-aarch64-linux-gnu
+    qemu-system-x86
+    qemu-system-arm
     cpio           # rootfs
-    bear           # clangd completion
-    qemu-kvm       # run virtual machine
-    gdb            # optional kernel debugging
 )
 
 # Install apt packages
