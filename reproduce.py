@@ -28,7 +28,7 @@ class Bug:
     config: Path | None = None
     # Driver options
     num_cpus: int = 2
-    mem_mb: int = 128  # kSTEP itself needs ~20 MB; 128 MB also keeps the browser build small
+    mem_mb: int = 128  # kSTEP itself needs ~20 MB
     plot_format: str | None = None
 
     @property

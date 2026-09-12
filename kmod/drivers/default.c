@@ -12,20 +12,18 @@ static void run(void) {
     kstep_task_wakeup(tasks[i]);
   }
 
-  kstep_cgroup_create("g0");
+  kstep_print_sched_debug();
+  kstep_tick();
+  kstep_print_sched_debug();
 
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 100; i++) {
     kstep_tick();
+    for (int j = 0; j < ARRAY_SIZE(tasks); j++) {
+      if (tasks[j]->on_cpu) printk("%d", tasks[j]->pid);
+    }
   }
 
-  kstep_cgroup_move_task("g0", tasks[0]->pid);
-
-  kstep_cgroup_move_task("", tasks[0]->pid);
-}
-
-static void on_tick_begin(void) {
-  kstep_output_curr_task();
-  kstep_print_sched_debug();
+  TRACE_INFO("Done");
 }
 
 KSTEP_DRIVER_DEFINE{
@@ -33,5 +31,4 @@ KSTEP_DRIVER_DEFINE{
     .setup = setup,
     .run = run,
     .step_interval_us = 1000,
-    .on_tick_begin = on_tick_begin,
 };
