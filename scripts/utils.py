@@ -75,9 +75,16 @@ class TermColor(StrEnum):
     RESET = "\033[0m"
 
 
-def system(cmd: str):
+def system(cmd: str, cwd: Path = PROJ_DIR, log: Path | None = None):
+    """Run a shell command; with `log`, append its output to that file instead of the console."""
     logging.info(f"$ {TermColor.BLUE}{cmd}{TermColor.RESET}")
-    subprocess.run(cmd, shell=True, check=True, cwd=PROJ_DIR)
+    if log is None:
+        subprocess.run(cmd, shell=True, check=True, cwd=cwd)
+        return
+    with log.open("a") as f:
+        f.write(f"$ {cmd}\n")
+        f.flush()
+        subprocess.run(cmd, shell=True, check=True, cwd=cwd, stdout=f, stderr=subprocess.STDOUT)
 
 
 def download(url: str, output_path: Path):
