@@ -60,8 +60,7 @@ void kstep_move_kthreads(void) {
   struct task_struct *p;
   for_each_process(p) {
     // Skip if 0 is the only allowed cpu
-    if (cpumask_test_cpu(0, &p->cpus_mask) &&
-        cpumask_weight(&p->cpus_mask) == 1) {
+    if (cpumask_equal(&p->cpus_mask, cpumask_of(0))) {
       continue;
     }
     // skip non-kthreads and sys kthreads

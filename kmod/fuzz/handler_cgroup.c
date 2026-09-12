@@ -39,11 +39,7 @@ void kstep_op_cgroup_move_tasks_to_root(int id) {
     if (!kstep_tasks[i].p || kstep_tasks[i].cgroup_id != id)
       continue;
 
-    TRACE_INFO("Moving task %d from cgroup %d to root",
-               kstep_tasks[i].p->pid, id);
-    kstep_cgroup_move_task("", kstep_tasks[i].p->pid);
-    kstep_task_pin(kstep_tasks[i].p, 1, num_online_cpus() - 1);
-    kstep_tasks[i].cgroup_id = -1;
+    kstep_op_move_task_to_root(i);
   }
 }
 

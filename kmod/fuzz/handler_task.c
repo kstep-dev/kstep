@@ -65,8 +65,6 @@ u8 kstep_op_task_fork(int a, int b, int c) {
     panic("Task %d is not on CPU when forking", a);
   kstep_task_fork(kstep_tasks[a].p, 1);
   p = find_new_child(kstep_tasks[a].p);
-  if (!p)
-    return 0;
 
   kstep_tasks[b].p = p;
   kstep_tasks[b].cgroup_id = kstep_tasks[a].cgroup_id;

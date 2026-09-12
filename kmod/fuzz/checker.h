@@ -13,6 +13,5 @@ void kstep_check_before_op(struct kstep_check_state *check);
 void kstep_check_after_op(struct kstep_check_state *check,
                           enum kstep_op_type type, int a, int b, int c);
 void kstep_check_work_conserve(void);
-void kstep_check_extra_balance(int cpu, struct sched_domain *sd);
 
 #endif

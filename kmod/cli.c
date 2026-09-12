@@ -88,14 +88,21 @@ static int task_number(struct task_struct *p) {
   return 0;
 }
 
-// Take the leading task number off *arg (the rest stays in *arg) and look the task up; on
-// failure reply with an error and return NULL.
-static struct task_struct *parse_task(char **arg, const char *usage) {
-  char *num_s = *arg ? strsep(arg, " \t") : NULL;
-  int n;
+// Consume one argument while preserving the rest for command-specific validation.
+static char *take_arg(char **arg) {
+  char *token = *arg ? strsep(arg, " \t") : NULL;
 
   if (*arg)
     *arg = strim(*arg);
+  return token;
+}
+
+// Take the leading task number off *arg (the rest stays in *arg) and look the task up; on
+// failure reply with an error and return NULL.
+static struct task_struct *parse_task(char **arg, const char *usage) {
+  char *num_s = take_arg(arg);
+  int n;
+
   if (!num_s || kstrtoint(num_s, 10, &n) || n <= 0) {
     reply_error(usage);
     return NULL;
@@ -232,6 +239,12 @@ static void cmd_top(char *arg) {
   reply_tasks(n);
 }
 
+// Both task affinity and cgroup cpusets must exclude the controller CPU.
+static bool parse_test_cpus(const char *arg, struct cpumask *mask) {
+  return arg && !cpulist_parse(arg, mask) && !cpumask_empty(mask) &&
+         !cpumask_test_cpu(0, mask) && cpumask_last(mask) <= last_cpu();
+}
+
 static void cmd_affinity(char *arg) {
   const char *usage = "usage: affinity <n> <cpulist within 1..N-1>";
   struct task_struct *p = parse_task(&arg, usage);
@@ -239,8 +252,7 @@ static void cmd_affinity(char *arg) {
 
   if (!p)
     return;
-  if (!arg || cpulist_parse(arg, &mask) || cpumask_empty(&mask) ||
-      cpumask_test_cpu(0, &mask) || cpumask_last(&mask) > last_cpu())
+  if (!parse_test_cpus(arg, &mask))
     return reply_error(usage);
   kstep_task_set_affinity(p, &mask);
   reply();
@@ -277,10 +289,8 @@ static void cmd_policy(char *arg) {
 // kstep_cgroup_* helpers take the path without the leading slash. Take the leading path
 // off *arg; it must exist unless `create`.
 static const char *parse_cgroup(char **arg, const char *usage, bool create) {
-  char *path = *arg ? strsep(arg, " \t") : NULL;
+  char *path = take_arg(arg);
 
-  if (*arg)
-    *arg = strim(*arg);
   if (!path || path[0] != '/' || strstr(path, "..") || strlen(path) >= 48) {
     reply_error(usage);
     return NULL;
@@ -319,8 +329,7 @@ static void cmd_cgroup_cpus(char *arg) {
 
   if (!name)
     return;
-  if (!arg || cpulist_parse(arg, &mask) || cpumask_empty(&mask) ||
-      cpumask_test_cpu(0, &mask) || cpumask_last(&mask) > last_cpu())
+  if (!parse_test_cpus(arg, &mask))
     return reply_error(usage);
   reply_errno(kstep_cgroup_set_cpuset(name, arg));
 }

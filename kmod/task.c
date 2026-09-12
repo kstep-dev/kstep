@@ -178,12 +178,11 @@ void kstep_task_set_nice(struct task_struct *p, int nice) {
 // Scheduling class: SCHED_NORMAL, SCHED_BATCH, SCHED_IDLE, SCHED_FIFO or SCHED_RR. The fair
 // classes keep the task's nice; the real-time ones get one fixed priority, since priority only
 // orders real-time tasks among themselves and kSTEP studies their effect on the fair class.
-#define KSTEP_RT_PRIORITY 80
 void kstep_task_set_policy(struct task_struct *p, int policy) {
   struct sched_attr attr = {.sched_policy = policy};
 
   if (policy == SCHED_FIFO || policy == SCHED_RR)
-    attr.sched_priority = KSTEP_RT_PRIORITY;
+    attr.sched_priority = 80;
   else
     attr.sched_nice = task_nice(p);
   kstep_cov_enable_controller();
@@ -196,11 +195,10 @@ void kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask) 
   // directly call set_cpus_allowed_ptr is not enough, as it does not update the user_cpus_ptr
   KSYM_IMPORT(sched_setaffinity);
   kstep_cov_enable_controller();
-  if (KSYM_sched_setaffinity(p->pid, mask)) {
-    kstep_cov_disable_controller();
-    panic("Failed to set CPU affinity for task %d to CPUs %*pbl", p->pid, cpumask_pr_args(mask));
-  }
+  int err = KSYM_sched_setaffinity(p->pid, mask);
   kstep_cov_disable_controller();
+  if (err)
+    panic("Failed to set CPU affinity for task %d to CPUs %*pbl", p->pid, cpumask_pr_args(mask));
 }
 
 void kstep_task_pin(struct task_struct *p, int begin, int end) {

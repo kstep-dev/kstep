@@ -13,7 +13,6 @@ struct console_parse_state {
   char line_buf[MAX_LINE_LENGTH];
   size_t line_len;
 };
-static struct file *console;
 static struct file *sock;
 
 static void parse_console_input(char *buf) {
@@ -68,7 +67,6 @@ static bool process_console_chunk(const char *buf, ssize_t nread,
 }
 
 static void setup(void) {
-  console = filp_open("/dev/hvc0", O_RDONLY, 0);
   sock = filp_open("/dev/hvc2", O_RDWR, 0);
 
   kstep_cov_init();

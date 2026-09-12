@@ -123,8 +123,9 @@ def configure(b: Build, extra_config: Path | None = None):
     (b.dir / "arch").write_text(f"{b.arch}\n")
 
 
-def build_linux(b: Build, extra_config: Path | None = None):
-    configure(b, extra_config)
+def build_linux(b: Build, extra_config: Path | None = None, *, reconfigure: bool = True):
+    if reconfigure or not (b.linux / ".config").exists():
+        configure(b, extra_config)
     b.kbuild(
         f"KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION=1 "
         f"LOCALVERSION=-{b.name} WERROR=0 HOSTCFLAGS=-Wno-error all compile_commands.json"
@@ -140,7 +141,7 @@ def build_linux(b: Build, extra_config: Path | None = None):
 # its .config, so this never rebuilds it there.
 def kernel_stale(b: Build) -> bool:
     kernel, dot_config = b.dir / "kernel", b.linux / ".config"
-    return not (b.linux / "Module.symvers").exists() or not kernel.exists() or \
+    return not (b.linux / "Module.symvers").exists() or not kernel.exists() or not dot_config.exists() or \
         kernel.stat().st_mtime < dot_config.stat().st_mtime
 
 
@@ -181,7 +182,7 @@ def build_rootfs(b: Build):
 
 def build_kstep(b: Build):
     if kernel_stale(b):
-        build_linux(b)
+        build_linux(b, reconfigure=False)  # Preserve custom fragments and manual .config edits.
     build_user(b)
     build_kmod(b)
     build_rootfs(b)
