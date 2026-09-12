@@ -179,12 +179,10 @@ void kstep_sched_feat_write(const char *fmt, ...) {
 
 void kstep_sched_feat_enable(const char *name) {
   kstep_sched_feat_write("%s", name);
-  kstep_sleep();
 }
 
 void kstep_sched_feat_disable(const char *name) {
   kstep_sched_feat_write("NO_%s", name);
-  kstep_sleep();
 }
 
 int kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
@@ -331,31 +329,23 @@ void kstep_cgroup_destroy(const char *name) {
   rcu_read_unlock();
 
   kstep_rmdir(path);
-  kstep_sleep();
 
   if (tg)
     KSYM_unregister_fair_sched_group(tg);
 
   cgroup_put(cgrp);
-  kstep_sleep();
 }
 
 int kstep_cgroup_set_cpuset(const char *name, const char *cpuset) {
-  int err = kstep_cgroup_write(name, "cpuset.cpus", "%s", cpuset);
-  kstep_sleep();
-  return err;
+  return kstep_cgroup_write(name, "cpuset.cpus", "%s", cpuset);
 }
 
 int kstep_cgroup_set_weight(const char *name, int weight) {
-  int err = kstep_cgroup_write(name, "cpu.weight", "%d", weight);
-  kstep_sleep();
-  return err;
+  return kstep_cgroup_write(name, "cpu.weight", "%d", weight);
 }
 
 int kstep_cgroup_move_task(const char *name, int pid) {
-  int err = kstep_cgroup_write(name, "cgroup.procs", "%d", pid);
-  kstep_sleep();
-  return err;
+  return kstep_cgroup_write(name, "cgroup.procs", "%d", pid);
 }
 
 bool kstep_task_is_frozen(struct task_struct *p) {

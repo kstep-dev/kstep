@@ -13,25 +13,21 @@ static bool pid_known(pid_t pid) {
 
 bool kstep_op_task_running(struct task_struct *p) {
 #ifdef TIF_NEED_RESCHED_LAZY
-  return p->on_cpu && !test_tsk_thread_flag(p, TIF_NEED_RESCHED_LAZY) &&
-         !test_tsk_thread_flag(p, TIF_NEED_RESCHED);
-#else
-  return p->on_cpu && !test_tsk_thread_flag(p, TIF_NEED_RESCHED);
+  if (test_tsk_thread_flag(p, TIF_NEED_RESCHED_LAZY))
+    return false;
 #endif
+  return p->on_cpu && !test_tsk_need_resched(p);
 }
 
+// The fork has settled by the time kstep_task_fork() returns, so the child exists already.
 static struct task_struct *find_new_child(struct task_struct *parent) {
   struct task_struct *p;
 
-  for (int attempt = 0; attempt < 100; attempt++) {
-    for_each_process(p) {
-      if ((p->real_parent == parent || p->parent == parent) &&
-          p->pid > parent->pid && !pid_known(p->pid))
-        return p;
-    }
-    kstep_sleep();
+  for_each_process(p) {
+    if ((p->real_parent == parent || p->parent == parent) && p->pid > parent->pid &&
+        !pid_known(p->pid))
+      return p;
   }
-
   panic("No new child found for parent %d", parent->pid);
 }
 

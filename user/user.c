@@ -8,7 +8,6 @@
 #include <stdio.h>       // fprintf
 #include <string.h>      // strcmp
 #include <sys/mount.h>   // mount
-#include <sys/prctl.h>   // PR_SET_NAME
 #include <sys/reboot.h>  // reboot
 #include <sys/stat.h>    // mkdir
 #include <sys/syscall.h> // SYS_*
@@ -16,7 +15,7 @@
 #include <time.h>        // nanosleep, struct timespec
 #include <unistd.h>      // close, getpid, syscall, fork, pause, _exit
 
-#include "user.h" // SIGCODE_*, TASK_READY_COMM
+#include "user.h" // SIGCODE_*, KSTEP_CTRL_FD
 
 #define panic(msg, ...)                                                        \
   do {                                                                         \
@@ -63,8 +62,10 @@ static void load_kmod(const char *path, int argc, char *argv[], char *envp[]) {
 // Disable output post-processing
 static void set_tty_raw_output(const char *path) {
   int fd = open(path, O_RDWR | O_NOCTTY);
-  if (fd < 0)
-    panic("Failed to open %s", path);
+  if (fd < 0) { // a virtio port only exists when QEMU attaches it (e.g. the fuzz socket)
+    fprintf(stderr, "Skipping %s: %s\n", path, strerror(errno));
+    return;
+  }
 
   struct termios termios;
   if (tcgetattr(fd, &termios) < 0)
@@ -73,8 +74,8 @@ static void set_tty_raw_output(const char *path) {
   cfmakeraw(&termios);
   if (tcsetattr(fd, TCSANOW, &termios) < 0)
     panic("Failed to tcsetattr %s", path);
-
-  close(fd);
+  // Deliberately left open: hvc resets the termios when the last file on the tty closes
+  // (TTY_DRIVER_RESET_TERMIOS), and init lives as long as the guest anyway.
 }
 
 static void set_proc_affinity(int begin, int end) { // [begin, end]
@@ -96,9 +97,9 @@ static int init_main(int argc, char *argv[], char *envp[]) {
     panic("Failed to create %s", PIPE_PATH);
   mount_fs("/sys/fs/cgroup", "cgroup2");
   set_proc_affinity(0, 0);          // Bind to cpu 0
-  set_tty_raw_output("/dev/ttyS1"); // JSON out, and commands in for the cli driver
-  set_tty_raw_output("/dev/ttyS2"); // For code coverage data
-  set_tty_raw_output("/dev/ttyS3"); // For the fuzz executor's command socket
+  set_tty_raw_output("/dev/hvc0"); // JSON out, and commands in for the cli driver
+  set_tty_raw_output("/dev/hvc1"); // For code coverage data
+  set_tty_raw_output("/dev/hvc2"); // For the fuzz executor's command socket (only attached when fuzzing)
   load_kmod("kmod.ko", argc, argv, envp);
   panic("Kernel module exited unexpectedly");
 }
@@ -144,19 +145,13 @@ static void handler(int signum, siginfo_t *info, void *context) {
     panic("Unknown signal code: %d", code);
 }
 
-__attribute__((noreturn)) static void loop(void) {
-  while (1)
-    __asm__("" : : : "memory");
-}
-
-static int task_main(void) {
+__attribute__((noreturn)) static int task_main(void) {
   struct sigaction sa = {.sa_sigaction = handler,
                          .sa_flags = SA_SIGINFO | SA_NODEFER};
   sigaction(SIGUSR1, &sa, NULL);
-  prctl(PR_SET_NAME, TASK_READY_COMM);
-
-  pause();
-  loop();
+  write(KSTEP_CTRL_FD, NULL, 0); // park until the first wakeup (see kstep_ctrl_write)
+  while (1)
+    read(KSTEP_CTRL_FD, NULL, 0); // run: halt until told otherwise (see kstep_ctrl_read)
 }
 
 // ============================================================================

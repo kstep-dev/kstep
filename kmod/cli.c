@@ -1,4 +1,4 @@
-// Interactive driver on ttyS1, kSTEP's structured channel: commands are read from it, one
+// Interactive driver on the JSON port (/dev/hvc0), kSTEP's structured channel: commands are read from it, one
 // per line, and each is answered with one flat JSON object written to it like any trace
 // event (load_balance, migrate), so the whole structured output is one ordered stream.
 // A reply carries "timestamp" (logical ticks) and no "type" (trace events have one); a
@@ -45,7 +45,7 @@
 
 #define LINE_MAX 128
 
-static struct file *cmd; // /dev/ttyS1 for reading; replies go through the trace writer
+static struct file *cmd; // /dev/hvc0 for reading; replies go through the trace writer
 
 static void reply(void) {
   struct kstep_json json;
@@ -345,8 +345,8 @@ static const struct {
     {"cgroup-cpus", cmd_cgroup_cpus},
 };
 
-// Verbs that just signal a task: the SIGUSR1 handler in user/user.c does the actual
-// pause(), wakeup, wait, post or exit when the task next runs.
+// Verbs that signal a task: the SIGUSR1 handler in user/user.c does the actual pause(), wakeup,
+// wait, post or exit; the signal settles before the verb returns (see kstep_task_signal).
 static const struct {
   const char *verb;
   void (*fn)(struct task_struct *p);
@@ -409,9 +409,9 @@ static void output_migrate(struct task_struct *p, int src_cpu, int dst_cpu) {
 }
 
 static void setup(void) {
-  cmd = filp_open("/dev/ttyS1", O_RDONLY | O_NOCTTY, 0);
+  cmd = filp_open("/dev/hvc0", O_RDONLY | O_NOCTTY, 0);
   if (IS_ERR(cmd))
-    panic("Failed to open /dev/ttyS1: %ld", PTR_ERR(cmd));
+    panic("Failed to open /dev/hvc0: %ld", PTR_ERR(cmd));
 }
 
 static void run(void) {
@@ -446,5 +446,4 @@ KSTEP_DRIVER_DEFINE{
     // should_we_balance); migrate = a task actually moved (balancing or wakeup placement)
     .on_sched_balance_selected = kstep_output_balance,
     .on_task_migrate = output_migrate,
-    .step_interval_us = 1000, // no on_tick_begin: clients ask with `top`
 };

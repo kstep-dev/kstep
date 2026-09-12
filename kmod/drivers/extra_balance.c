@@ -1,9 +1,28 @@
 // https://github.com/torvalds/linux/commit/6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3
 
 #include "driver.h"
-#include "fuzz/checker.h"
+#include "internal.h" // cpu_rq, sched_group_span
 
 static struct task_struct *tasks[5];
+
+// Log the balance and flag one on a busy CPU while a CPU of its own group idles (the bug).
+static void check_extra_balance(int cpu, struct sched_domain *sd) {
+  struct sched_group *sg = sd->groups;
+  int i;
+
+  kstep_output_balance(cpu, sd);
+  if (cpu_rq(cpu)->nr_running == 0)
+    return;
+  do {
+    if (!cpumask_test_cpu(cpu, sched_group_span(sg)))
+      continue;
+    for_each_cpu(i, sched_group_span(sg))
+      if (cpu_rq(i)->nr_running == 0) {
+        pr_info("warn: load balance triggered on busy cpu while idle cpu in the same group");
+        return;
+      }
+  } while (sg != sd->groups);
+}
 
 static void setup(void) {
   // SMT pairs: [1,2] [3,4], MC: [1-4]
@@ -34,6 +53,5 @@ KSTEP_DRIVER_DEFINE{
     .setup = setup,
     .run = run,
     .on_tick_begin = kstep_output_nr_running,
-    .on_sched_balance_selected = kstep_check_extra_balance,
-    .step_interval_us = 100,
+    .on_sched_balance_selected = check_extra_balance,
 };

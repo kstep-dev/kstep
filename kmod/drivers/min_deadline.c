@@ -109,7 +109,6 @@ static void run(void)
                parent_cfs->curr == group_se);
 
     kstep_cgroup_set_weight("g0", weights[w]);
-    kstep_sleep();
 
     if (!check_cfs_rq_min_deadline(parent_cfs)) {
       TRACE_INFO("min_deadline corrupted after weight=%d", weights[w]);
@@ -129,6 +128,5 @@ KSTEP_DRIVER_DEFINE{
     .name = "min_deadline",
     .setup = setup,
     .run = run,
-    .step_interval_us = 1000,
 };
 #endif

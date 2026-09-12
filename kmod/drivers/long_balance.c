@@ -31,21 +31,10 @@ static struct task_struct *busy_task;
 
 static void setup(void) { busy_task = kstep_task_create(); }
 
-static void *fork_finished(void) {
-  struct task_struct *p;
-  int nr_running = 0;
-  for_each_process(p) {
-    if (task_cpu(p) == task_cpu(busy_task) && p->parent == busy_task)
-      nr_running++;
-  }
-  return nr_running >= NUM_TASKS ? (void *)true : (void *)false;
-}
-
 static void run(void) {
   kstep_task_pin(busy_task, 1, 1);
   kstep_task_wakeup(busy_task);
   kstep_task_fork(busy_task, NUM_TASKS);
-  kstep_sleep_until(fork_finished);
   kstep_tick_repeat(2000);
 }
 
@@ -55,5 +44,4 @@ KSTEP_DRIVER_DEFINE{
     .run = run,
     .on_sched_softirq_begin = on_sched_softirq_begin,
     .on_sched_softirq_end = on_sched_softirq_end,
-    .step_interval_us = 1000,
 };

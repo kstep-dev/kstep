@@ -1,3 +1,4 @@
+#include <linux/anon_inodes.h>
 #include <linux/umh.h>
 #include <uapi/linux/sched/types.h>
 #include <linux/spinlock.h>
@@ -5,8 +6,48 @@
 #include "internal.h"
 #include "user.h"
 
+// The task halting in kstep_ctrl_read() on each CPU, NULL otherwise. Written by that task only, with
+// interrupts off; kstep_settle() compares it with rq->curr, so a stale value never passes for another task.
+DEFINE_PER_CPU(struct task_struct *, kstep_settled_task);
+
+static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *off) {
+  // Check and halt with interrupts off, so an interrupt in between wakes the halt, not lost.
+  local_irq_disable();
+  if (!need_resched() && !signal_pending(current)) {
+    __this_cpu_write(kstep_settled_task, current);
+#if defined(CONFIG_X86)
+    arch_safe_halt(); // sti; hlt (or the paravirt op): interrupts come on only as it halts
+#elif defined(CONFIG_ARM64)
+    wfi(); // wakes on a pending interrupt even while masked
+#else
+#error "no halt for this architecture"
+#endif
+    __this_cpu_write(kstep_settled_task, NULL);
+  }
+  local_irq_enable(); // a no-op after arch_safe_halt
+  return 0; // back to user mode, where a pending reschedule or signal is acted on
+}
+
+// A new task parks here (TASK_INTERRUPTIBLE, like pause()) until its first wakeup, and tells
+// kstep_task_create() so. The controller shares this CPU and wakes on complete(), but runs only
+// once this task has switched out: no preemption point lies between the two calls
+// (CONFIG_PREEMPT_NONE, see linux/config.kstep). So no spin and no polling on either side.
+static DECLARE_COMPLETION(kstep_task_parked);
+
+static ssize_t kstep_ctrl_write(struct file *f, const char __user *buf, size_t len, loff_t *off) {
+  set_current_state(TASK_INTERRUPTIBLE); // before complete(): parked once the controller looks
+  complete(&kstep_task_parked);
+  schedule(); // until the first wakeup; nothing else wakes a parked task
+  return 0;
+}
+
+static const struct file_operations kstep_ctrl_fops = {.read = kstep_ctrl_read,
+                                                       .write = kstep_ctrl_write};
+
+// One open file each, shared by every task (like fds inherited across fork): none has state.
 static struct file *console_file = NULL;
 static struct file *null_file = NULL;
+static struct file *ctrl_file = NULL;
 
 void kstep_task_init(void) {
   console_file = filp_open("/dev/console", O_WRONLY, 0); // write only
@@ -15,20 +56,28 @@ void kstep_task_init(void) {
   null_file = filp_open("/dev/null", O_RDONLY, 0); // read only
   if (IS_ERR(null_file))
     panic("Failed to open /dev/null");
+  ctrl_file = anon_inode_getfile("kstep", &kstep_ctrl_fops, NULL, O_RDWR);
+  if (IS_ERR(ctrl_file))
+    panic("Failed to create the control file");
 }
 
-// Initialize stdin to `/dev/null` and stdout/stderr to `/dev/console`
-// Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
+// Initialize stdin to `/dev/null`, stdout/stderr to `/dev/console`, and KSTEP_CTRL_FD to the
+// control file. Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
 static int task_init(struct subprocess_info *info, struct cred *new) {
-  const char *names[] = {"stdin", "stdout", "stderr"};
-  struct file *files[] = {null_file, console_file, console_file};
+  const char *names[] = {"stdin", "stdout", "stderr", "kstep"};
+  struct file *files[] = {null_file, console_file, console_file, ctrl_file};
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < ARRAY_SIZE(files); i++) {
     int fd = get_unused_fd_flags(0);
     if (fd < 0 || fd != i)
       panic("get_unused_fd_flags returned %d for %s", fd, names[i]);
     fd_install(fd, get_file(files[i]));
   }
+
+  // Start on the controller's CPU: it runs whenever the controller blocks, whatever the other
+  // CPUs are doing. kstep_task_create() moves it once parked.
+  if (set_cpus_allowed_ptr(current, cpumask_of(0)))
+    panic("Failed to pin task %d to CPU 0", current->pid);
 
   *(struct task_struct **)info->data = current;
   TRACE_INFO("Task created with pid %d", current->pid);
@@ -39,6 +88,7 @@ struct task_struct *kstep_task_create(void) {
   char *argv[] = {"task", NULL};
 
   struct task_struct *p = NULL;
+  reinit_completion(&kstep_task_parked);
   struct subprocess_info *info = call_usermodehelper_setup(
       "/user", argv, NULL, GFP_KERNEL, task_init, NULL, &p);
   if (info == NULL)
@@ -50,18 +100,12 @@ struct task_struct *kstep_task_create(void) {
   if (p == NULL)
     panic("Failed to get task struct");
 
-  // Wait until the helper has completed startup and acknowledged readiness.
-  for (int i = 0; i < 100; i++) {
-    kstep_sleep();
-    if (strcmp(p->comm, TASK_READY_COMM) == 0) {
-      TRACE_INFO("Task %d is ready", p->pid);
-      kstep_task_pin(p, 1, num_online_cpus() - 1);
-      kstep_reset_task(p);
-      return p;
-    }
-    TRACE_INFO("Waiting for task %d to become ready", p->pid);
-  }
-  panic("Task %d did not start", p->pid);
+  // Parked: off CPU 0 in TASK_INTERRUPTIBLE (see kstep_ctrl_write).
+  wait_for_completion(&kstep_task_parked);
+  TRACE_INFO("Task %d is ready", p->pid);
+  kstep_task_pin(p, 1, num_online_cpus() - 1);
+  kstep_reset_task(p);
+  return p;
 }
 
 static void kstep_task_signal(struct task_struct *p, enum sigcode code,
@@ -71,7 +115,11 @@ static void kstep_task_signal(struct task_struct *p, enum sigcode code,
   kstep_cov_enable_controller();
   send_sig_info(SIGUSR1, &info, p);
   kstep_cov_disable_controller();
-  kstep_sleep();
+  kstep_settle();
+  // Still pending: the task is not current (it acts after a tick) or frozen. Fine for a wakeup,
+  // whose effect is the wakeup itself; settle covers it (rq->ttwu_pending is set before the IPI).
+  if (code != SIGCODE_WAKEUP && signal_pending(p))
+    TRACE_INFO("Task %d has not handled signal code %d yet", p->pid, code);
 }
 
 void kstep_task_fork(struct task_struct *p, int n) {
@@ -125,7 +173,6 @@ void kstep_task_set_nice(struct task_struct *p, int nice) {
   set_user_nice(p, nice);
   kstep_cov_disable_controller();
   TRACE_INFO("Set nice of task %d to %d", p->pid, nice);
-  kstep_sleep();
 }
 
 // Scheduling class: SCHED_NORMAL, SCHED_BATCH, SCHED_IDLE, SCHED_FIFO or SCHED_RR. The fair
@@ -143,7 +190,6 @@ void kstep_task_set_policy(struct task_struct *p, int policy) {
   sched_setattr_nocheck(p, &attr);
   kstep_cov_disable_controller();
   TRACE_INFO("Set policy of task %d to %d", p->pid, policy);
-  kstep_sleep();
 }
 
 void kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask) {
@@ -164,32 +210,4 @@ void kstep_task_pin(struct task_struct *p, int begin, int end) {
     cpumask_set_cpu(i, &mask);
   kstep_task_set_affinity(p, &mask);
   TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
-  kstep_sleep();
-}
-
-void kstep_task_kernel_pause(struct task_struct *p) {
-  // Set TASK_INTERRUPTIBLE so that both signal_wakeup (sends SIGUSR1, which
-  // wakes TASK_INTERRUPTIBLE) and kernel_wakeup (wake_up_process, which wakes
-  // any sleeping state) can wake the task. try_to_block_task() will check
-  // signal_pending() and abort the block if signals are pending, but since
-  // kSTEP controls signal delivery there are no stray signals at pause time.
-  WRITE_ONCE(p->__state, TASK_INTERRUPTIBLE);
-
-  // Trigger a reschedule on the task's CPU. When returning to userspace,
-  // exit_to_user_mode_loop() calls schedule(), which will see the
-  // non-RUNNING state and dequeue the task via the normal blocking path.
-  kstep_cov_enable_controller();
-  set_tsk_thread_flag(p, TIF_NEED_RESCHED);
-  kick_process(p);
-  kstep_cov_disable_controller();
-
-  kstep_sleep();
-  TRACE_INFO("Paused task %d (kernel)", p->pid);
-}
-
-void kstep_task_kernel_wakeup(struct task_struct *p) {
-  kstep_cov_enable_controller();
-  wake_up_process(p);
-  kstep_cov_disable_controller();
-  TRACE_INFO("Waked up task %d (kernel)", p->pid);
 }

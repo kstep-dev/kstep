@@ -95,9 +95,37 @@ static void kstep_reset_runqueue(struct rq *rq) {
   }
 }
 
+// Task groups accumulated PELT load in real time before the clock was mocked (tasks run on CPU 0
+// while created and moved into their cgroups). It feeds tg->load_avg and with it the group
+// entities' weights on every CPU, so leaving it makes runs differ. Root cfs_rqs are reset above.
+static void kstep_reset_task_groups(void) {
+  KSYM_IMPORT(task_groups);
+  KSYM_IMPORT(root_task_group);
+  struct task_group *tg;
+
+  list_for_each_entry_rcu(tg, KSYM_task_groups, list) {
+    if (tg == KSYM_root_task_group)
+      continue;
+    atomic_long_set(&tg->load_avg, 0);
+    for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
+      struct cfs_rq *cfs_rq = tg->cfs_rq[cpu];
+      struct sched_entity *se = tg->se[cpu];
+
+      memset(&cfs_rq->avg, 0, sizeof(struct sched_avg));
+      cfs_rq->avg.last_update_time = INIT_TIME_NS;
+      cfs_rq->tg_load_avg_contrib = 0;
+      cfs_rq->propagate = 0;
+      cfs_rq->prop_runnable_sum = 0;
+      memset(&se->avg, 0, sizeof(struct sched_avg));
+      se->avg.last_update_time = INIT_TIME_NS;
+    }
+  }
+}
+
 void kstep_reset_runqueues(void) {
   for (int cpu = 1; cpu < num_online_cpus(); cpu++)
     kstep_reset_runqueue(cpu_rq(cpu));
+  kstep_reset_task_groups();
   TRACE_INFO("Reset runqueues state");
 }
 

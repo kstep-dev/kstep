@@ -94,6 +94,5 @@ KSTEP_DRIVER_DEFINE{
     .name = "vlag_overflow",
     .setup = setup,
     .run = run,
-    .step_interval_us = 1000,
     .tick_interval_ns = 10000000000ULL * 1000ULL,
 };

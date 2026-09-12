@@ -94,7 +94,7 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 - **kmod/**: Kernel module (`kmod.ko`) loaded at boot
   - `drivers/`, `drivers_new_bugs/`: bug-specific drivers (one `.c` per bug)
   - `fuzz/`: fuzz executor, op handlers, coverage, sanity checks
-  - `cli.c`: interactive driver behind the website playground (text commands in and JSON replies out on ttyS1)
+  - `cli.c`: interactive driver behind the website playground (text commands in and JSON replies out on the virtio console port)
   - `cpu.c`: topology, capacity, frequency setup (also the `topology=`/`capacity=`/`frequency=` boot parameters)
   - `driver.h`: public API for drivers (task creation, ticking, cgroups, etc.)
   - `internal.h` and other top-level `*.c`: framework primitives
@@ -110,7 +110,7 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
   - `current`: symlink to the active `<name>/` (set by `checkout.py`)
   - `master/`: bare kernel clone reused by `checkout.py --git`
   - `user.<arch>`: statically linked userspace binary
-  - `<name>/`: `kernel` (bootable image) and `rootfs.cpio` (kmod.ko + user) for QEMU; `vmlinux` for gdb/addr2line; `arch` (target arch); `linux/` source tree; `kmod/` module build dir with `kmod.ko` and the clangd `compile_commands.json` (the project root symlinks to it)
+  - `<name>/`: `kernel` (the image QEMU boots: on x86 the vmlinux itself, entered through its PVH note; on arm64 the Image, plus `vmlinux` for gdb/addr2line) and `rootfs.cpio` (kmod.ko + user); `arch` (target arch); `linux/` source tree; `kmod/` module build dir with `kmod.ko` and the clangd `compile_commands.json` (the project root symlinks to it)
 
 - **results/**: Run outputs. See [`results/README.md`](https://github.com/kstep-dev/results). `repro_<bug>/` and `fuzz_<bug>/` are tracked; `tmp_*` are gitignored.
 
