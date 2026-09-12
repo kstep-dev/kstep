@@ -10,7 +10,7 @@
 	path = docs/study
 	url = https://github.com/kstep-dev/study.git
 	branch = master
-[submodule "docs/website"]
-	path = docs/website
+[submodule "website"]
+	path = website
 	url = https://github.com/kstep-dev/kstep-dev.github.io.git
 	branch = main
