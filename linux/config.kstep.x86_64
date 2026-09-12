@@ -9,3 +9,7 @@ CONFIG_KVM_GUEST=y
 # the LAPIC timer is disabled, no CPU ever enters high-res tick mode, and kstep
 # cannot take over the tick.
 CONFIG_X86_PM_TIMER=y
+
+# Boot the uncompressed vmlinux through its PVH entry (QEMU -kernel vmlinux): decompressing the
+# bzImage in the guest runs cold through the wasm JIT and costs about 0.6 s of the browser boot.
+CONFIG_PVH=y

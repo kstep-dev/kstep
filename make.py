@@ -6,8 +6,9 @@
     ./make.py clean   [--build B] [--all]
 
 A build dir is bound to one target arch, recorded in build/<B>/arch when the kernel is first
-configured; `--arch` is only needed on the first build. There is no dependency tracking:
-kbuild does its own, and every other step takes seconds.
+configured; `--arch` is only needed on the first build. Dependency tracking is kbuild's, plus
+two checks it cannot make: the config fragments (configure) and a kernel reconfiguration
+invalidating the kmod's objects (build_kmod). Every other step takes seconds.
 """
 
 import argparse
@@ -33,7 +34,9 @@ class Arch(StrEnum):
 
     @property
     def image(self) -> str:
-        return {Arch.X86_64: "arch/x86/boot/bzImage", Arch.AARCH64: "arch/arm64/boot/Image"}[self]
+        # x86: the uncompressed vmlinux, which QEMU enters through its PVH note (CONFIG_PVH);
+        # decompressing a bzImage in the guest costs about 0.6 s under emulation.
+        return {Arch.X86_64: "vmlinux", Arch.AARCH64: "arch/arm64/boot/Image"}[self]
 
     @property
     def cross(self) -> str:
@@ -103,22 +106,33 @@ def append_once(path: Path, line: str):
             f.write(line + "\n")
 
 
+# Kbuild tracks the kernel sources and its own generated files; what it cannot see is kSTEP's
+# side: the files linked into kernel/sched and the config fragments merged into .config. So run
+# merge_config only when a fragment is newer than the last merge (merge_config leaves .config
+# untouched when nothing changed, so .config itself cannot be the reference). The stamp records
+# the extra fragment the build was created with (reproduce.py's config.kstep.cov), so later
+# builds through run.py or fuzz.py keep it without being told again.
 def configure(b: Build, extra_config: Path | None = None):
     sched = b.linux / "kernel" / "sched"
     for f in COV_FILES:
         link = sched / f.name
-        link.unlink(missing_ok=True)
-        link.symlink_to(f)
+        if not (link.is_symlink() and link.resolve() == f):
+            link.unlink(missing_ok=True)
+            link.symlink_to(f)
     append_once(sched / "Makefile", "include $(src)/Makefile.kstep")
     append_once(b.linux / "init" / "Kconfig", 'source "kernel/sched/Kconfig.kstep"')
 
-    fragments = [KSTEP_CONFIG, Path(f"{KSTEP_CONFIG}.{b.arch}")]
-    if extra_config:
-        fragments.append(extra_config.resolve())
-    b.run(f"{b.kbuild_env} ./scripts/kconfig/merge_config.sh -n {' '.join(map(str, fragments))}", cwd=b.linux)
+    stamp = b.dir / "config.stamp"
+    extra = str(extra_config.resolve()) if extra_config else stamp.read_text().strip() if stamp.exists() else ""
+    fragments = [KSTEP_CONFIG, Path(f"{KSTEP_CONFIG}.{b.arch}")] + ([Path(extra)] if extra else [])
+    if not (b.linux / ".config").exists() or not stamp.exists() or \
+            max(f.stat().st_mtime for f in fragments) > stamp.stat().st_mtime:
+        b.run(f"{b.kbuild_env} ./scripts/kconfig/merge_config.sh -n {' '.join(map(str, fragments))}", cwd=b.linux)
+        stamp.write_text(f"{extra}\n")
     (b.dir / "arch").write_text(f"{b.arch}\n")
 
 
+# A no-op when nothing changed (about 1.5 s of make scanning), so build_kstep() can always call it.
 def build_linux(b: Build, extra_config: Path | None = None):
     configure(b, extra_config)
     b.kbuild(
@@ -165,8 +179,7 @@ def build_rootfs(b: Build):
 
 
 def build_kstep(b: Build):
-    if not (b.linux / "Module.symvers").exists():
-        build_linux(b)
+    build_linux(b)
     build_user(b)
     build_kmod(b)
     build_rootfs(b)
