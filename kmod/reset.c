@@ -33,10 +33,25 @@ void kstep_reset_tasks(void) {
 }
 
 static void kstep_reset_runqueue(struct rq *rq) {
-  // reset rq
-  KSYM_IMPORT(update_rq_clock);
+  // reset rq clocks. The mocked sched clock starts at INIT_TIME_NS, which is behind the real
+  // clock the rq was last updated with when boot took longer than that (e.g. QEMU in a
+  // browser: kmod up at ~12s real time on an iPhone). update_rq_clock() drops a backwards
+  // step, so the rq clock, and with it vruntime, would stay frozen until the mocked clock
+  // caught up. Set the clocks directly instead; on x86 clock_task == clock without irq/steal
+  // time accounting, and clock_pelt == clock_task at capacity 1024.
   KSYM_IMPORT(sysctl_sched_migration_cost);
-  KSYM_update_rq_clock(rq);
+  rq->clock = INIT_TIME_NS;
+  rq->clock_task = INIT_TIME_NS;
+// https://github.com/torvalds/linux/commit/23127296889fe84b0762b191b5d041e8ba6f2599
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0)
+  rq->clock_pelt = INIT_TIME_NS;
+  rq->lost_idle_time = 0;
+#endif
+// v5.19 "sched/fair: Decay task PELT values during wakeup migration"
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 19, 0)
+  rq->clock_pelt_idle = INIT_TIME_NS;
+  rq->clock_idle = INIT_TIME_NS;
+#endif
   rq->avg_idle = 2 * *KSYM_sysctl_sched_migration_cost;
   rq->max_idle_balance_cost = *KSYM_sysctl_sched_migration_cost;
   rq->idle_stamp = INIT_TIME_NS;
