@@ -147,7 +147,7 @@ static void handler(int signum, siginfo_t *info, void *context) {
     panic("Unknown signal code: %d", code);
 }
 
-static int task_main(void) {
+__attribute__((noreturn)) static int task_main(void) {
   struct sigaction sa = {.sa_sigaction = handler,
                          .sa_flags = SA_SIGINFO | SA_NODEFER};
   sigaction(SIGUSR1, &sa, NULL);
