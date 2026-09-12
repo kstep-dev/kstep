@@ -17,4 +17,6 @@ enum sigcode {
 #define PIPE_PATH "/pipe"
 
 #define TASK_READY_COMM "ready"
+
+#define KSTEP_CTRL_FD 3
 #endif

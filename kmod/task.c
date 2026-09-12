@@ -1,3 +1,4 @@
+#include <linux/anon_inodes.h>
 #include <linux/umh.h>
 #include <uapi/linux/sched/types.h>
 #include <linux/spinlock.h>
@@ -5,8 +6,30 @@
 #include "internal.h"
 #include "user.h"
 
+static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *off) {
+  // Check and halt with interrupts off, so an interrupt in between is not lost.
+  local_irq_disable();
+  if (need_resched() || signal_pending(current)) {
+    local_irq_enable();
+    return 0;
+  }
+#if defined(CONFIG_X86)
+  asm volatile("sti; hlt" ::: "memory"); // sti takes effect after hlt
+#elif defined(CONFIG_ARM64)
+  asm volatile("wfi" ::: "memory"); // wakes on a pending interrupt even while masked
+  local_irq_enable();
+#else
+#error "no halt for this architecture"
+#endif
+  return 0; // back to user mode, where a pending reschedule or signal is acted on
+}
+
+static const struct file_operations kstep_ctrl_fops = {.read = kstep_ctrl_read};
+
+// One open file each, shared by every task (like fds inherited across fork): none has state.
 static struct file *console_file = NULL;
 static struct file *null_file = NULL;
+static struct file *ctrl_file = NULL;
 
 void kstep_task_init(void) {
   console_file = filp_open("/dev/console", O_WRONLY, 0); // write only
@@ -15,15 +38,18 @@ void kstep_task_init(void) {
   null_file = filp_open("/dev/null", O_RDONLY, 0); // read only
   if (IS_ERR(null_file))
     panic("Failed to open /dev/null");
+  ctrl_file = anon_inode_getfile("kstep", &kstep_ctrl_fops, NULL, O_RDONLY);
+  if (IS_ERR(ctrl_file))
+    panic("Failed to create the control file");
 }
 
-// Initialize stdin to `/dev/null` and stdout/stderr to `/dev/console`
-// Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
+// Initialize stdin to `/dev/null`, stdout/stderr to `/dev/console`, and KSTEP_CTRL_FD to the
+// control file. Reference: `console_on_rootfs` and `init_dup` in `init/main.c`
 static int task_init(struct subprocess_info *info, struct cred *new) {
-  const char *names[] = {"stdin", "stdout", "stderr"};
-  struct file *files[] = {null_file, console_file, console_file};
+  const char *names[] = {"stdin", "stdout", "stderr", "kstep"};
+  struct file *files[] = {null_file, console_file, console_file, ctrl_file};
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < ARRAY_SIZE(files); i++) {
     int fd = get_unused_fd_flags(0);
     if (fd < 0 || fd != i)
       panic("get_unused_fd_flags returned %d for %s", fd, names[i]);

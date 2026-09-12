@@ -150,7 +150,7 @@ static void handler(int signum, siginfo_t *info, void *context) {
 
 __attribute__((noreturn)) static void loop(void) {
   while (1)
-    __asm__("" : : : "memory");
+    read(KSTEP_CTRL_FD, NULL, 0);
 }
 
 static int task_main(void) {
