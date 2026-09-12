@@ -137,6 +137,14 @@ def build_user(b: Build):
 def build_kmod(b: Build):
     # A symlink mirror of kmod/ so kbuild's objects stay in build/
     mirror = b.dir / "kmod"
+    # kbuild does not rebuild an external module's objects after the kernel is reconfigured, and
+    # objects compiled under the old config (inlined preempt counting, struct layouts) then link
+    # against a kernel that disagrees. autoconf.h is rewritten on every reconfiguration: drop the
+    # objects that predate it.
+    autoconf = b.linux / "include" / "generated" / "autoconf.h"
+    objects = list(mirror.rglob("*.o"))
+    if objects and min(o.stat().st_mtime for o in objects) < autoconf.stat().st_mtime:
+        shutil.rmtree(mirror)
     mirror.mkdir(exist_ok=True)
     for p in mirror.rglob("*"):
         if p.is_symlink():
