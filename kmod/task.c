@@ -6,10 +6,15 @@
 #include "internal.h"
 #include "user.h"
 
+// The task halting in kstep_ctrl_read() on each CPU, NULL otherwise. Written by that task only, with
+// interrupts off; kstep_settle() compares it with rq->curr, so a stale value never passes for another task.
+DEFINE_PER_CPU(struct task_struct *, kstep_settled_task);
+
 static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *off) {
   // Check and halt with interrupts off, so an interrupt in between wakes the halt, not lost.
   local_irq_disable();
   if (!need_resched() && !signal_pending(current)) {
+    __this_cpu_write(kstep_settled_task, current);
 #if defined(CONFIG_X86)
     arch_safe_halt(); // sti; hlt (or the paravirt op): interrupts come on only as it halts
 #elif defined(CONFIG_ARM64)
@@ -17,6 +22,7 @@ static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, lof
 #else
 #error "no halt for this architecture"
 #endif
+    __this_cpu_write(kstep_settled_task, NULL);
   }
   local_irq_enable(); // a no-op after arch_safe_halt
   return 0; // back to user mode, where a pending reschedule or signal is acted on
@@ -94,7 +100,11 @@ static void kstep_task_signal(struct task_struct *p, enum sigcode code,
   kstep_cov_enable_controller();
   send_sig_info(SIGUSR1, &info, p);
   kstep_cov_disable_controller();
-  kstep_sleep();
+  kstep_settle();
+  // Still pending: the task is not current (it acts after a tick) or frozen. Fine for a wakeup,
+  // whose effect is the wakeup itself; settle covers it (rq->ttwu_pending is set before the IPI).
+  if (code != SIGCODE_WAKEUP && signal_pending(p))
+    TRACE_INFO("Task %d has not handled signal code %d yet", p->pid, code);
 }
 
 void kstep_task_fork(struct task_struct *p, int n) {
@@ -148,7 +158,6 @@ void kstep_task_set_nice(struct task_struct *p, int nice) {
   set_user_nice(p, nice);
   kstep_cov_disable_controller();
   TRACE_INFO("Set nice of task %d to %d", p->pid, nice);
-  kstep_sleep();
 }
 
 // Scheduling class: SCHED_NORMAL, SCHED_BATCH, SCHED_IDLE, SCHED_FIFO or SCHED_RR. The fair
@@ -166,7 +175,6 @@ void kstep_task_set_policy(struct task_struct *p, int policy) {
   sched_setattr_nocheck(p, &attr);
   kstep_cov_disable_controller();
   TRACE_INFO("Set policy of task %d to %d", p->pid, policy);
-  kstep_sleep();
 }
 
 void kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask) {
@@ -187,32 +195,4 @@ void kstep_task_pin(struct task_struct *p, int begin, int end) {
     cpumask_set_cpu(i, &mask);
   kstep_task_set_affinity(p, &mask);
   TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
-  kstep_sleep();
-}
-
-void kstep_task_kernel_pause(struct task_struct *p) {
-  // Set TASK_INTERRUPTIBLE so that both signal_wakeup (sends SIGUSR1, which
-  // wakes TASK_INTERRUPTIBLE) and kernel_wakeup (wake_up_process, which wakes
-  // any sleeping state) can wake the task. try_to_block_task() will check
-  // signal_pending() and abort the block if signals are pending, but since
-  // kSTEP controls signal delivery there are no stray signals at pause time.
-  WRITE_ONCE(p->__state, TASK_INTERRUPTIBLE);
-
-  // Trigger a reschedule on the task's CPU. When returning to userspace,
-  // exit_to_user_mode_loop() calls schedule(), which will see the
-  // non-RUNNING state and dequeue the task via the normal blocking path.
-  kstep_cov_enable_controller();
-  set_tsk_thread_flag(p, TIF_NEED_RESCHED);
-  kick_process(p);
-  kstep_cov_disable_controller();
-
-  kstep_sleep();
-  TRACE_INFO("Paused task %d (kernel)", p->pid);
-}
-
-void kstep_task_kernel_wakeup(struct task_struct *p) {
-  kstep_cov_enable_controller();
-  wake_up_process(p);
-  kstep_cov_disable_controller();
-  TRACE_INFO("Waked up task %d (kernel)", p->pid);
 }

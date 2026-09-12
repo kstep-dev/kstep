@@ -25,7 +25,6 @@ struct kstep_driver {
   void (*on_task_migrate)(struct task_struct *p, int src_cpu, int dst_cpu);
   // Callback at init_tg_cfs_entry (new task group cfs_rq created)
   void (*on_sched_group_alloc)(struct task_group *tg, int cpu);
-  u64 step_interval_us;                // Real time sleep between steps in us
   u64 tick_interval_ns;                // Virtual clock advance per tick in ns
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
@@ -62,8 +61,7 @@ void kstep_output_migrate(struct task_struct *p, int src_cpu, int dst_cpu);
 void kstep_tick(void);
 void kstep_tick_repeat(int n);
 void *kstep_tick_until(void *(*fn)(void));
-void kstep_sleep(void);
-void *kstep_sleep_until(void *(*fn)(void));
+void kstep_settle(void);
 
 // task.c
 struct task_struct *kstep_task_create(void);
@@ -80,8 +78,6 @@ void kstep_task_block(struct task_struct *p);
 void kstep_task_wait(struct task_struct *p);
 void kstep_task_post(struct task_struct *p);
 void kstep_task_set_nice(struct task_struct *p, int nice);
-void kstep_task_kernel_pause(struct task_struct *p);
-void kstep_task_kernel_wakeup(struct task_struct *p);
 
 // kernel.c
 int kstep_write(const char *path, const char *buf, size_t size);

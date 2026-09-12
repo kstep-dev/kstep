@@ -13,11 +13,10 @@ static bool pid_known(pid_t pid) {
 
 bool kstep_op_task_running(struct task_struct *p) {
 #ifdef TIF_NEED_RESCHED_LAZY
-  return p->on_cpu && !test_tsk_thread_flag(p, TIF_NEED_RESCHED_LAZY) &&
-         !test_tsk_thread_flag(p, TIF_NEED_RESCHED);
-#else
-  return p->on_cpu && !test_tsk_thread_flag(p, TIF_NEED_RESCHED);
+  if (test_tsk_thread_flag(p, TIF_NEED_RESCHED_LAZY))
+    return false;
 #endif
+  return p->on_cpu && !test_tsk_need_resched(p);
 }
 
 static struct task_struct *find_new_child(struct task_struct *parent) {
@@ -29,7 +28,6 @@ static struct task_struct *find_new_child(struct task_struct *parent) {
           p->pid > parent->pid && !pid_known(p->pid))
         return p;
     }
-    kstep_sleep();
   }
 
   panic("No new child found for parent %d", parent->pid);

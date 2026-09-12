@@ -74,10 +74,37 @@ void kstep_tick(void) {
   kstep_jiffies_tick();
   for (int cpu = 1; cpu < num_online_cpus(); cpu++)
     smp_call_function_single(cpu, kstep_do_sched_tick, NULL, 1);
-  kstep_sleep();
+  kstep_settle(); // every CPU has acted on the reschedule its tick asked for
   kstep_cfs_bandwidth_tick();
   if (kstep_driver->on_tick_end)
     kstep_driver->on_tick_end();
+}
+
+// Nothing is left to happen on the CPU without a new controller action: no wakeup or reschedule
+// pending, and it is idle with an empty runqueue or its current task halts in the control device
+// with no signal pending. (A switch in progress fails the runqueue or settled-task test.)
+static bool kstep_cpu_settled(int cpu) {
+  struct rq *rq = cpu_rq(cpu);
+  struct task_struct *curr = READ_ONCE(rq->curr);
+
+  if (READ_ONCE(rq->ttwu_pending) || test_tsk_need_resched(curr))
+    return false;
+#ifdef TIF_NEED_RESCHED_LAZY
+  if (test_tsk_thread_flag(curr, TIF_NEED_RESCHED_LAZY))
+    return false;
+#endif
+  if (curr == rq->idle)
+    return READ_ONCE(rq->nr_running) == 0;
+  return READ_ONCE(per_cpu(kstep_settled_task, cpu)) == curr && !signal_pending(curr);
+}
+
+// Wait until every CPU but the controller's has acted on what was asked of it. Ends each step (a
+// tick or a signal to a task), so the driver reads a complete state; other actions (nice, policy,
+// affinity, cgroup writes) are settled by the following step.
+void kstep_settle(void) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
+    while (!kstep_cpu_settled(cpu))
+      cpu_relax();
 }
 
 void kstep_tick_repeat(int n) {
@@ -92,20 +119,5 @@ void *kstep_tick_until(void *(*fn)(void)) {
     if (result)
       return result;
     kstep_tick();
-  }
-}
-
-void kstep_sleep(void) {
-  if (kstep_driver->step_interval_us == 0)
-    return;
-  usleep_range(kstep_driver->step_interval_us, kstep_driver->step_interval_us);
-}
-
-void *kstep_sleep_until(void *(*fn)(void)) {
-  while (1) {
-    void *result = fn();
-    if (result)
-      return result;
-    kstep_sleep();
   }
 }

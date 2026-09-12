@@ -61,6 +61,5 @@ KSTEP_DRIVER_DEFINE{
     .name = "throttled_limbo_list",
     .setup = setup,
     .run = run,
-    .step_interval_us = 1000,
 };
 #endif

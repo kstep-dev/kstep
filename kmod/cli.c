@@ -446,5 +446,4 @@ KSTEP_DRIVER_DEFINE{
     // should_we_balance); migrate = a task actually moved (balancing or wakeup placement)
     .on_sched_balance_selected = kstep_output_balance,
     .on_task_migrate = output_migrate,
-    .step_interval_us = 1000, // no on_tick_begin: clients ask with `top`
 };

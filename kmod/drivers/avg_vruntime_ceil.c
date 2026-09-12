@@ -111,6 +111,5 @@ KSTEP_DRIVER_DEFINE{
     .name = "avg_vruntime_ceil",
     .setup = setup,
     .run = run,
-    .step_interval_us = 1000,
 };
 #endif

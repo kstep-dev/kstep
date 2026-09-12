@@ -30,5 +30,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "default",
     .setup = setup,
     .run = run,
-    .step_interval_us = 1000,
 };

@@ -108,5 +108,4 @@ KSTEP_DRIVER_DEFINE {
   .run = run,
   .on_tick_end = kstep_output_nr_running,
   .on_sched_balance_selected = kstep_check_extra_balance,
-  .step_interval_us = 10000,
 };
