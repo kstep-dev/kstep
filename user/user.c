@@ -8,7 +8,6 @@
 #include <stdio.h>       // fprintf
 #include <string.h>      // strcmp
 #include <sys/mount.h>   // mount
-#include <sys/prctl.h>   // PR_SET_NAME
 #include <sys/reboot.h>  // reboot
 #include <sys/stat.h>    // mkdir
 #include <sys/syscall.h> // SYS_*
@@ -16,7 +15,7 @@
 #include <time.h>        // nanosleep, struct timespec
 #include <unistd.h>      // close, getpid, syscall, fork, pause, _exit
 
-#include "user.h" // SIGCODE_*, TASK_READY_COMM
+#include "user.h" // SIGCODE_*, KSTEP_CTRL_FD
 
 #define panic(msg, ...)                                                        \
   do {                                                                         \
@@ -148,19 +147,13 @@ static void handler(int signum, siginfo_t *info, void *context) {
     panic("Unknown signal code: %d", code);
 }
 
-__attribute__((noreturn)) static void loop(void) {
-  while (1)
-    read(KSTEP_CTRL_FD, NULL, 0);
-}
-
 static int task_main(void) {
   struct sigaction sa = {.sa_sigaction = handler,
                          .sa_flags = SA_SIGINFO | SA_NODEFER};
   sigaction(SIGUSR1, &sa, NULL);
-  prctl(PR_SET_NAME, TASK_READY_COMM);
-
   pause();
-  loop();
+  while (1)
+    read(KSTEP_CTRL_FD, NULL, 0);
 }
 
 // ============================================================================

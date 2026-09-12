@@ -117,7 +117,7 @@ def reproduce(linux: Linux, driver: Driver):
     kernel = f"{driver.name}_{linux.name}"
 
     log_step(kernel, "Checkout Linux")
-    checkout(linux.ref, kernel=kernel, patch=linux.patch, tarball=True)
+    checkout(linux.ref, kernel=kernel, patch=linux.patch, tarball=True, set_current=False)
     b = Build(kernel, log=BUILD_DIR / kernel / "build.log")
     log_step(kernel, f"Build Linux (log: {b.log})")
     build_linux(b, extra_config=linux.config)

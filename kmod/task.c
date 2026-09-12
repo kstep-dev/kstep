@@ -74,18 +74,17 @@ struct task_struct *kstep_task_create(void) {
   if (p == NULL)
     panic("Failed to get task struct");
 
-  // Wait until the helper has completed startup and acknowledged readiness.
-  for (int i = 0; i < 100; i++) {
-    kstep_sleep();
-    if (strcmp(p->comm, TASK_READY_COMM) == 0) {
-      TRACE_INFO("Task %d is ready", p->pid);
-      kstep_task_pin(p, 1, num_online_cpus() - 1);
-      kstep_reset_task(p);
-      return p;
-    }
-    TRACE_INFO("Waiting for task %d to become ready", p->pid);
-  }
-  panic("Task %d did not start", p->pid);
+  // Ready once it sleeps in pause(): off the CPU in TASK_INTERRUPTIBLE. exec has completed
+  // (UMH_WAIT_EXEC) and nothing before pause() sleeps interruptibly, so that is the first such
+  // sleep. wait_task_inactive spins while the task runs and returns 0 if it stopped in another
+  // state; the task starts out on this CPU, so yield to let it run.
+  KSYM_IMPORT(wait_task_inactive);
+  while (!KSYM_wait_task_inactive(p, TASK_INTERRUPTIBLE))
+    schedule();
+  TRACE_INFO("Task %d is ready", p->pid);
+  kstep_task_pin(p, 1, num_online_cpus() - 1);
+  kstep_reset_task(p);
+  return p;
 }
 
 static void kstep_task_signal(struct task_struct *p, enum sigcode code,

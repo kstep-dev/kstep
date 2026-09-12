@@ -66,6 +66,7 @@ def checkout(
     kernel: str,
     patch: Path | None = None,
     tarball: bool = False,
+    set_current: bool = True,
 ):
     linux_dir = BUILD_DIR / kernel / "linux"
     if not linux_dir.exists():
@@ -80,8 +81,11 @@ def checkout(
 
         if patch:
             patch_linux(linux_dir, patch)
-    set_current_build(kernel)
-    logging.info(f"Build {fmt_path(BUILD_DIR / kernel)} (Linux {ref}) is now current")
+    if set_current:
+        set_current_build(kernel)
+        logging.info(f"Build {fmt_path(BUILD_DIR / kernel)} (Linux {ref}) is now current")
+    else:
+        logging.info(f"Build {fmt_path(BUILD_DIR / kernel)} (Linux {ref}) checked out")
 
 
 if __name__ == "__main__":

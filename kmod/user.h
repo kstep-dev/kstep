@@ -16,7 +16,5 @@ enum sigcode {
 // by init before the module loads: bytes are tokens, wait is a blocking read, post a one-byte write.
 #define PIPE_PATH "/pipe"
 
-#define TASK_READY_COMM "ready"
-
 #define KSTEP_CTRL_FD 3
 #endif
