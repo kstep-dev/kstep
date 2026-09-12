@@ -36,6 +36,7 @@ u64 kstep_jiffies_get(void);
 
 // output.c
 void kstep_output_init(void);
+void kstep_output_flush(void);
 
 // trace.c
 void kstep_trace_sched_balance_begin(void);
@@ -62,7 +63,8 @@ DECLARE_PER_CPU(struct task_struct *, kstep_settled_task); // the task halting i
 // kernel.c
 void kstep_cgroup_init(void);
 
-// fuzz/cov.c
+// fuzz/cov.c (built with CONFIG_KSTEP_COV only, see Kbuild)
+#ifdef CONFIG_KSTEP_COV
 void kstep_cov_init(void);
 void kstep_cov_enable(void);
 void kstep_cov_enable_controller(void);
@@ -70,6 +72,10 @@ void kstep_cov_disable_controller(void);
 void kstep_cov_disable(void);
 void kstep_cov_dump(void);
 void kstep_cov_cmd_id_inc(void);
+#else
+static inline void kstep_cov_enable_controller(void) {}
+static inline void kstep_cov_disable_controller(void) {}
+#endif
 
 // sym.c
 struct kstep_driver *kstep_sym_init(const char *driver_name);

@@ -68,8 +68,8 @@ static bool process_console_chunk(const char *buf, ssize_t nread,
 }
 
 static void setup(void) {
-  console = filp_open("/dev/ttyS1", O_RDONLY, 0);
-  sock = filp_open("/dev/ttyS3", O_RDWR, 0);
+  console = filp_open("/dev/hvc0", O_RDONLY, 0);
+  sock = filp_open("/dev/hvc2", O_RDWR, 0);
 
   kstep_cov_init();
 }
@@ -79,7 +79,7 @@ static void run(void) {
   struct console_parse_state state = {};
 
   if (IS_ERR(sock))
-    panic("Failed to open /dev/ttyS3");
+    panic("Failed to open /dev/hvc2");
 
   /* Signal to Python that the kmod is ready. Keep the step count non-zero to
    * avoid an all-zero payload. */

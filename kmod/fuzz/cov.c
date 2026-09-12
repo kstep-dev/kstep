@@ -89,9 +89,9 @@ void kstep_cov_init(void) {
   if (sanitizer_cov_trace_pc_ptr == NULL)
     panic("kstep: rebuild with linux/config.kstep.cov to enable coverage");
 
-  cov_file = filp_open("/dev/ttyS2", O_WRONLY | O_NOCTTY, 0);
+  cov_file = filp_open("/dev/hvc1", O_WRONLY | O_NOCTTY, 0);
   if (IS_ERR(cov_file))
-    panic("Failed to open /dev/ttyS2: %ld", PTR_ERR(cov_file));
+    panic("Failed to open /dev/hvc1: %ld", PTR_ERR(cov_file));
 
   // Pre-fault each page in the buffer
   for (int cpu = 0; cpu < NR_CPUS; cpu++)

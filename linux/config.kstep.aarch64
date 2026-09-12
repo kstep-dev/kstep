@@ -1,5 +1,4 @@
-# `qemu-system-aarch64 -M virt` only supports one ISA serial device (`-serial`).
-# To add more, we need to use PCI serial devices (e.g., `-device pci-serial`).
+# The kernel console is a PCI serial device (`-device pci-serial`) so that `console=ttyS0`
+# holds on both architectures; kSTEP's own channels are virtio console ports.
 CONFIG_SERIAL_8250_PCI=y
-CONFIG_PCI=y
 CONFIG_PCI_HOST_GENERIC=y

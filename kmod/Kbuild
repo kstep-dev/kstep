@@ -1,3 +1,5 @@
 obj-m := kmod.o
-kmod-y := $(patsubst $(src)/%.c,%.o,$(shell find $(src) -name '*.c'))
+kmod-y := $(patsubst $(src)/%.c,%.o,$(shell find $(src) -name '*.c' -not -path '$(src)/fuzz/*'))
+# The fuzzer (and its 33 MB of static coverage buffers) only on kernels built with linux/config.kstep.cov
+kmod-$(CONFIG_KSTEP_COV) += $(patsubst $(src)/%.c,%.o,$(shell find $(src)/fuzz -name '*.c'))
 ccflags-y := -I$(srctree) -I$(src) -std=gnu11 -Werror -Wno-declaration-after-statement

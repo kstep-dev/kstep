@@ -3,9 +3,9 @@
 static struct file *output_file;
 
 void kstep_output_init(void) {
-  output_file = filp_open("/dev/ttyS1", O_WRONLY | O_NOCTTY, 0);
+  output_file = filp_open("/dev/hvc0", O_WRONLY | O_NOCTTY, 0);
   if (IS_ERR(output_file))
-    panic("Failed to open /dev/ttyS1: %ld", PTR_ERR(output_file));
+    panic("Failed to open /dev/hvc0: %ld", PTR_ERR(output_file));
 }
 
 static void kstep_json_append_char(struct kstep_json *json, char c) {
@@ -76,14 +76,48 @@ void kstep_json_field_bool(struct kstep_json *json, const char *key, bool val) {
   kstep_json_field_fmt(json, key, "%s", val ? "true" : "false");
 }
 
+// Only the controller, on CPU 0 in process context, writes to the port. Every line is appended here
+// first; the controller then writes the buffer out, so lines from scheduler hooks (any CPU, interrupts
+// off, runqueue locks held) come out before its own and the stream keeps its order. A tty write from
+// a hook (8250 or hvc alike) would join the tty's wait queue and spin for the port lock, while CPU 0
+// draining the port holds that lock and spins in try_to_wake_up() on the writer, still on-cpu inside
+// __schedule().
+static char pending[1 << 16];
+static size_t pending_len;
+static DEFINE_RAW_SPINLOCK(pending_lock);
+
+// Called by the controller only, so one static copy suffices; the write itself may sleep.
+void kstep_output_flush(void) {
+  static char flushing[sizeof(pending)];
+  size_t len;
+
+  raw_spin_lock_irq(&pending_lock);
+  len = pending_len;
+  memcpy(flushing, pending, len);
+  pending_len = 0;
+  raw_spin_unlock_irq(&pending_lock);
+  if (!len)
+    return;
+  ssize_t ret = kernel_write(output_file, flushing, len, NULL);
+  if (ret < 0)
+    panic("write to output file failed: %ld", ret);
+}
+
 void kstep_json_end(struct kstep_json *json) {
+  unsigned long flags;
+
   if (json->len > 0 && json->buf[json->len - 1] == ',')
     json->len--;
   kstep_json_append_char(json, '}');
   kstep_json_append_char(json, '\n');
-  ssize_t ret = kernel_write(output_file, json->buf, json->len, NULL);
-  if (ret < 0)
-    panic("write to output file failed: %ld", ret);
+  raw_spin_lock_irqsave(&pending_lock, flags);
+  if (pending_len + json->len > sizeof(pending))
+    panic("pending output overflow");
+  memcpy(pending + pending_len, json->buf, json->len);
+  pending_len += json->len;
+  raw_spin_unlock_irqrestore(&pending_lock, flags);
+  if (!irqs_disabled()) // the controller; a hook runs with interrupts off and leaves it to the controller
+    kstep_output_flush();
 }
 
 void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,

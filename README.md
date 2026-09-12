@@ -94,7 +94,7 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 - **kmod/**: Kernel module (`kmod.ko`) loaded at boot
   - `drivers/`, `drivers_new_bugs/`: bug-specific drivers (one `.c` per bug)
   - `fuzz/`: fuzz executor, op handlers, coverage, sanity checks
-  - `cli.c`: interactive driver behind the website playground (text commands in and JSON replies out on ttyS1)
+  - `cli.c`: interactive driver behind the website playground (text commands in and JSON replies out on the virtio console port)
   - `cpu.c`: topology, capacity, frequency setup (also the `topology=`/`capacity=`/`frequency=` boot parameters)
   - `driver.h`: public API for drivers (task creation, ticking, cgroups, etc.)
   - `internal.h` and other top-level `*.c`: framework primitives

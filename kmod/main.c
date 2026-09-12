@@ -56,6 +56,7 @@ static int __init kstep_main(void) {
   if (kstep_driver->on_task_migrate)
     kstep_trace_task_migrate();
   kstep_driver->run();
+  kstep_output_flush();
 
   TRACE_INFO("Exiting driver %s on Linux %s", kstep_driver->name, UTS_RELEASE);
 

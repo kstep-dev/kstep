@@ -104,10 +104,15 @@ def build_qemu_cmd(
         # structured JSON: logged to the jsonl file, and a socket so a client can also talk
         # to the driver (the cli driver reads its commands here)
         f"-chardev socket,id=char1,path={result_dir.output}.sock,server=on,wait=off,logfile={result_dir.output}",
-        serial_device("char1"),
+        # kSTEP's channels are virtio console ports (/dev/hvc0..2): one virtqueue kick per write
+        # instead of one port I/O exit per byte on a 16550, which dominated per-command latency
+        # under emulation. The kernel console stays on ttyS0: it is up from console_init, while
+        # hvc0 only exists once PCI has been enumerated, and it never drops lines.
+        "-device virtio-serial-pci,id=vs0",
+        "-device virtconsole,bus=vs0.0,nr=0,chardev=char1",
         # cov file
         f"-chardev file,id=char2,path={result_dir.cov}",
-        serial_device("char2"),
+        "-device virtconsole,bus=vs0.0,nr=1,chardev=char2",
         # acceleration
         f"-accel {'kvm' if use_kvm else 'tcg'}",
     ]
@@ -123,7 +128,7 @@ def build_qemu_cmd(
     if use_sock:
         cmd += [
             f"-chardev socket,id=char3,path={result_dir.sock},server=on,wait=on",
-            serial_device("char3"),
+            "-device virtconsole,bus=vs0.0,nr=2,chardev=char3",
         ]
 
     if ARCH == "aarch64":
