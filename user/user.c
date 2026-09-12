@@ -71,6 +71,10 @@ static void set_tty_raw_output(const char *path) {
     return;
 
   cfmakeraw(&termios);
+  // Highest rate QEMU's 16550 model supports. The rate only affects emulated timing: the
+  // receive-FIFO timeout interrupt (4 character-times) gates every command shorter than the
+  // FIFO trigger level, 4.2 ms at the default 9600 baud versus 0.35 ms here.
+  cfsetspeed(&termios, B115200);
   if (tcsetattr(fd, TCSANOW, &termios) < 0)
     panic("Failed to tcsetattr %s", path);
 
