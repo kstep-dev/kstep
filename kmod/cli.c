@@ -60,6 +60,19 @@ static void reply_error(const char *msg) {
   kstep_json_end(&json);
 }
 
+// Reply to a cgroup operation: {} on success, else the error the kernel refused it with.
+// EOPNOTSUPP/EBUSY is cgroup v2's no-internal-process rule: a cgroup cannot both hold
+// tasks and have children with controllers.
+static void reply_errno(int err) {
+  char msg[48];
+  if (!err)
+    return reply();
+  if (err == -EOPNOTSUPP || err == -EBUSY)
+    return reply_error("cgroup cannot hold both tasks and controlled children");
+  scnprintf(msg, sizeof(msg), "failed (errno %d)", -err);
+  reply_error(msg);
+}
+
 static int last_cpu(void) { return num_online_cpus() - 1; }
 
 // The session's tasks by creation number: tasks[n - 1]. Each holds a reference, so the
@@ -284,8 +297,7 @@ static void cmd_cgroup_create(char *arg) {
 
   if (!name)
     return;
-  kstep_cgroup_create(name);
-  reply();
+  reply_errno(kstep_cgroup_create(name));
 }
 
 static void cmd_cgroup_weight(char *arg) {
@@ -297,8 +309,7 @@ static void cmd_cgroup_weight(char *arg) {
     return;
   if (!arg || kstrtoint(arg, 10, &weight) || weight < 1 || weight > 10000)
     return reply_error(usage);
-  kstep_cgroup_set_weight(name, weight);
-  reply();
+  reply_errno(kstep_cgroup_set_weight(name, weight));
 }
 
 static void cmd_cgroup_cpus(char *arg) {
@@ -311,8 +322,7 @@ static void cmd_cgroup_cpus(char *arg) {
   if (!arg || cpulist_parse(arg, &mask) || cpumask_empty(&mask) ||
       cpumask_test_cpu(0, &mask) || cpumask_last(&mask) > last_cpu())
     return reply_error(usage);
-  kstep_cgroup_set_cpuset(name, arg);
-  reply();
+  reply_errno(kstep_cgroup_set_cpuset(name, arg));
 }
 
 static void cmd_attach(char *arg) {
@@ -322,8 +332,7 @@ static void cmd_attach(char *arg) {
 
   if (!p || !(name = parse_cgroup(&arg, usage, false)))
     return;
-  kstep_cgroup_move_task(name, p->pid);
-  reply();
+  reply_errno(kstep_cgroup_move_task(name, p->pid));
 }
 
 static const struct {
