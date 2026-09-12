@@ -28,7 +28,21 @@ static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, lof
   return 0; // back to user mode, where a pending reschedule or signal is acted on
 }
 
-static const struct file_operations kstep_ctrl_fops = {.read = kstep_ctrl_read};
+// A new task parks here (TASK_INTERRUPTIBLE, like pause()) until its first wakeup, and tells
+// kstep_task_create() so. The controller shares this CPU and wakes on complete(), but runs only
+// once this task has switched out: no preemption point lies between the two calls
+// (CONFIG_PREEMPT_NONE, see linux/config.kstep). So no spin and no polling on either side.
+static DECLARE_COMPLETION(kstep_task_parked);
+
+static ssize_t kstep_ctrl_write(struct file *f, const char __user *buf, size_t len, loff_t *off) {
+  set_current_state(TASK_INTERRUPTIBLE); // before complete(): parked once the controller looks
+  complete(&kstep_task_parked);
+  schedule(); // until the first wakeup; nothing else wakes a parked task
+  return 0;
+}
+
+static const struct file_operations kstep_ctrl_fops = {.read = kstep_ctrl_read,
+                                                       .write = kstep_ctrl_write};
 
 // One open file each, shared by every task (like fds inherited across fork): none has state.
 static struct file *console_file = NULL;
@@ -42,7 +56,7 @@ void kstep_task_init(void) {
   null_file = filp_open("/dev/null", O_RDONLY, 0); // read only
   if (IS_ERR(null_file))
     panic("Failed to open /dev/null");
-  ctrl_file = anon_inode_getfile("kstep", &kstep_ctrl_fops, NULL, O_RDONLY);
+  ctrl_file = anon_inode_getfile("kstep", &kstep_ctrl_fops, NULL, O_RDWR);
   if (IS_ERR(ctrl_file))
     panic("Failed to create the control file");
 }
@@ -60,6 +74,11 @@ static int task_init(struct subprocess_info *info, struct cred *new) {
     fd_install(fd, get_file(files[i]));
   }
 
+  // Start on the controller's CPU: it runs whenever the controller blocks, whatever the other
+  // CPUs are doing. kstep_task_create() moves it once parked.
+  if (set_cpus_allowed_ptr(current, cpumask_of(0)))
+    panic("Failed to pin task %d to CPU 0", current->pid);
+
   *(struct task_struct **)info->data = current;
   TRACE_INFO("Task created with pid %d", current->pid);
   return 0;
@@ -69,6 +88,7 @@ struct task_struct *kstep_task_create(void) {
   char *argv[] = {"task", NULL};
 
   struct task_struct *p = NULL;
+  reinit_completion(&kstep_task_parked);
   struct subprocess_info *info = call_usermodehelper_setup(
       "/user", argv, NULL, GFP_KERNEL, task_init, NULL, &p);
   if (info == NULL)
@@ -80,13 +100,8 @@ struct task_struct *kstep_task_create(void) {
   if (p == NULL)
     panic("Failed to get task struct");
 
-  // Ready once it sleeps in pause(): off the CPU in TASK_INTERRUPTIBLE. exec has completed
-  // (UMH_WAIT_EXEC) and nothing before pause() sleeps interruptibly, so that is the first such
-  // sleep. wait_task_inactive spins while the task runs and returns 0 if it stopped in another
-  // state; the task starts out on this CPU, so yield to let it run.
-  KSYM_IMPORT(wait_task_inactive);
-  while (!KSYM_wait_task_inactive(p, TASK_INTERRUPTIBLE))
-    schedule();
+  // Parked: off CPU 0 in TASK_INTERRUPTIBLE (see kstep_ctrl_write).
+  wait_for_completion(&kstep_task_parked);
   TRACE_INFO("Task %d is ready", p->pid);
   kstep_task_pin(p, 1, num_online_cpus() - 1);
   kstep_reset_task(p);

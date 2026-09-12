@@ -345,8 +345,8 @@ static const struct {
     {"cgroup-cpus", cmd_cgroup_cpus},
 };
 
-// Verbs that just signal a task: the SIGUSR1 handler in user/user.c does the actual
-// pause(), wakeup, wait, post or exit when the task next runs.
+// Verbs that signal a task: the SIGUSR1 handler in user/user.c does the actual pause(), wakeup,
+// wait, post or exit; the signal settles before the verb returns (see kstep_task_signal).
 static const struct {
   const char *verb;
   void (*fn)(struct task_struct *p);

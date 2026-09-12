@@ -151,9 +151,9 @@ static int task_main(void) {
   struct sigaction sa = {.sa_sigaction = handler,
                          .sa_flags = SA_SIGINFO | SA_NODEFER};
   sigaction(SIGUSR1, &sa, NULL);
-  pause();
+  write(KSTEP_CTRL_FD, NULL, 0); // park until the first wakeup (see kstep_ctrl_write)
   while (1)
-    read(KSTEP_CTRL_FD, NULL, 0);
+    read(KSTEP_CTRL_FD, NULL, 0); // run: halt until told otherwise (see kstep_ctrl_read)
 }
 
 // ============================================================================
