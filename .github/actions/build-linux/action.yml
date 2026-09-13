@@ -16,8 +16,6 @@ runs:
       uses: actions/cache@v5
       with:
         path: |
-          build/${{ inputs.version }}/config.extra
-          build/${{ inputs.version }}/arch
           build/${{ inputs.version }}/kernel
           build/${{ inputs.version }}/vmlinux
           build/${{ inputs.version }}/linux
@@ -25,11 +23,8 @@ runs:
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      run: ./checkout.py ${{ inputs.version }} --tar
-
-    - if: steps.cache.outputs.cache-hit != 'true'
-      shell: bash
+      # `clean --all` drops the kbuild objects before caching; the image and Module.symvers survive it
       run: |
-        # Native build: kSTEP defaults to x86_64 and cross-compiles otherwise
-        ./make.py --arch $(uname -m) linux ${{ inputs.cov == 'true' && '--config linux/config.kstep.cov' || '' }}
-        ./make.py clean --all
+        ./checkout.py ${{ inputs.version }} --tar
+        ./make.py --build ${{ inputs.version }} linux ${{ inputs.cov == 'true' && '--config linux/config.kstep.cov' || '' }}
+        ./make.py --build ${{ inputs.version }} clean --all
