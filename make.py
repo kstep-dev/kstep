@@ -28,7 +28,6 @@ KERNEL_IMAGE = {"x86_64": "arch/x86/boot/bzImage", "aarch64": "arch/arm64/boot/I
 @dataclass(frozen=True)
 class Build:
     name: str | None = None  # dir under build/; defaults to build/current
-    log: Path | None = None  # append command output here instead of the console
 
     def __post_init__(self):
         name = self.name or BUILD_CURR_DIR.resolve().name
@@ -68,12 +67,6 @@ class Build:
     def user(self) -> Path:
         return BUILD_DIR / "user"
 
-    def run(self, cmd: str, cwd: Path = PROJ_DIR):
-        system(cmd, cwd=cwd, log=self.log)
-
-    def kbuild(self, args: str):
-        self.run(f"make -j{os.cpu_count()} {args}", cwd=self.linux)
-
 
 KSTEP_CONFIG = PROJ_DIR / "linux" / "config.kstep"
 COV_FILES = [PROJ_DIR / "linux" / f for f in ("cov.c", "Kconfig.kstep", "Makefile.kstep")]
@@ -85,7 +78,7 @@ def append_once(path: Path, line: str):
             f.write(line + "\n")
 
 
-def configure(b: Build, extra_config: Path | None = None):
+def configure(b: Build, extra_config: Path | None, log: Path | None):
     sched = b.linux / "kernel" / "sched"
     for f in COV_FILES:
         link = sched / f.name
@@ -97,15 +90,16 @@ def configure(b: Build, extra_config: Path | None = None):
     fragments = [KSTEP_CONFIG, Path(f"{KSTEP_CONFIG}.{ARCH}")]
     if extra_config:
         fragments.append(extra_config.resolve())
-    b.run(f"./scripts/kconfig/merge_config.sh -n {' '.join(map(str, fragments))}", cwd=b.linux)
+    system(f"cd {b.linux} && ./scripts/kconfig/merge_config.sh -n {' '.join(map(str, fragments))}", log=log)
 
 
-def build_linux(b: Build, extra_config: Path | None = None, *, reconfigure: bool = True):
+def build_linux(b: Build, extra_config: Path | None = None, *, reconfigure: bool = True, log: Path | None = None):
     if reconfigure or not b.config.exists():
-        configure(b, extra_config)
-    b.kbuild(
-        f"KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION=1 "
-        f"LOCALVERSION=-{b.name} WERROR=0 HOSTCFLAGS=-Wno-error all compile_commands.json"
+        configure(b, extra_config, log)
+    system(
+        f"make -C {b.linux} -j{os.cpu_count()} KBUILD_BUILD_TIMESTAMP='1970-01-01' KBUILD_BUILD_VERSION=1 "
+        f"LOCALVERSION=-{b.name} WERROR=0 HOSTCFLAGS=-Wno-error all compile_commands.json",
+        log=log,
     )
     # copy, not copy2: kernel_stale() needs the image's mtime
     shutil.copy(b.linux / KERNEL_IMAGE, b.kernel)
@@ -122,7 +116,7 @@ def kernel_stale(b: Build) -> bool:
 
 
 def build_user(b: Build):
-    b.run(f"gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o {b.user} {PROJ_DIR / 'user' / 'user.c'}")
+    system(f"gcc -Wall -Wextra -Wno-unused-parameter -std=c99 -static -o {b.user} {PROJ_DIR / 'user' / 'user.c'}")
 
 
 def build_kmod(b: Build):
@@ -131,7 +125,7 @@ def build_kmod(b: Build):
         if p.is_symlink():
             p.unlink()
     b.run(f"cp -rs {PROJ_DIR / 'kmod'}/* {b.kmod_dir}")
-    b.kbuild(f"M={b.kmod_dir} modules compile_commands.json")
+    system(f"make -C {b.linux} -j{os.cpu_count()} M={b.kmod_dir} modules compile_commands.json")
 
 
 def pad4(data: bytes) -> bytes:
@@ -167,7 +161,7 @@ def clean(b: Build, full: bool = False):
     b.rootfs.unlink(missing_ok=True)
     if full:
         b.user.unlink(missing_ok=True)
-        b.kbuild("clean")
+        system(f"make -C {b.linux} clean")
 
 
 if __name__ == "__main__":
