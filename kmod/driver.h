@@ -29,7 +29,7 @@ struct kstep_driver {
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 
-// output.c
+// io.c
 struct kstep_json {
   size_t len;
   char buf[512 - sizeof(size_t)];
@@ -55,7 +55,6 @@ void kstep_print_sched_debug(void);
 void kstep_output_curr_task(void);
 void kstep_output_nr_running(void);
 void kstep_output_balance(int cpu, struct sched_domain *sd);
-void kstep_output_migrate(struct task_struct *p, int src_cpu, int dst_cpu);
 
 // tick.c
 void kstep_tick(void);
@@ -67,7 +66,7 @@ void kstep_settle(void);
 struct task_struct *kstep_task_create(void);
 void kstep_task_exit(struct task_struct *p);
 void kstep_task_pin(struct task_struct *p, int begin, int end);
-void kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask);
+int kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask);
 void kstep_task_fork(struct task_struct *p, int n);
 void kstep_task_set_policy(struct task_struct *p, int policy); // SCHED_NORMAL, SCHED_FIFO, ...
 void kstep_task_pause(struct task_struct *p);

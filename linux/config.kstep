@@ -15,7 +15,6 @@ CONFIG_TTY=y
 CONFIG_PRINTK=y
 CONFIG_PRINTK_TIME=y
 CONFIG_VIRTIO_MENU=y
-CONFIG_VIRTIO_CONSOLE=y
 
 #
 # /proc, /proc/sys, /sys, /sys/kernel/debug, /dev

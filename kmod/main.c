@@ -11,7 +11,7 @@ static char driver_name[DRIVER_NAME_LEN] = "default";
 module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
 
 static int __init kstep_main(void) {
-  kstep_output_init();
+  kstep_io_init();
 
   if (num_online_cpus() > KSTEP_NR_CPUS)
     panic("Number of online CPUs (%d) exceeds KSTEP_NR_CPUS (%d)", num_online_cpus(),
@@ -28,7 +28,7 @@ static int __init kstep_main(void) {
   // Run userspace programs when we know the system is ready
   kstep_task_init();
   kstep_cgroup_init();
-  kstep_trace_sched_group_alloc(); // also sets min_vruntime
+  kstep_trace_init(); // the group-alloc hook also sets min_vruntime
   kstep_cpu_apply_params();
   kstep_driver->setup();
   kstep_cpu_print();
@@ -48,15 +48,7 @@ static int __init kstep_main(void) {
 
   TRACE_INFO("Running driver %s", kstep_driver->name);
 
-  if (kstep_driver->on_sched_balance_begin ||
-      kstep_driver->on_sched_balance_selected)
-    kstep_trace_sched_balance_begin();
-  if (kstep_driver->on_sched_balance_selected)
-    kstep_trace_sched_balance_selected();
-  if (kstep_driver->on_task_migrate)
-    kstep_trace_task_migrate();
   kstep_driver->run();
-  kstep_output_flush();
 
   TRACE_INFO("Exiting driver %s on Linux %s", kstep_driver->name, UTS_RELEASE);
 

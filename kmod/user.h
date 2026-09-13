@@ -1,9 +1,21 @@
 #ifndef KSTEP_USER_H
 #define KSTEP_USER_H
 
+// Commands a running task picks up from its control-file read: the controller writes them into
+// the task's mailbox, and the task sees them the next time it returns from its halt (the next
+// tick), like a real process that acts when it runs. Sleeping tasks are still signalled.
+enum kstep_cmd {
+  KSTEP_CMD_NONE,
+  KSTEP_CMD_FORK, // arg: number of children
+};
+
+struct kstep_msg {
+  int cmd; // enum kstep_cmd
+  int arg;
+};
+
 enum sigcode {
   SIGCODE_WAKEUP,
-  SIGCODE_FORK,
   SIGCODE_EXIT,
   SIGCODE_PAUSE,
   SIGCODE_BLOCK,
