@@ -55,7 +55,6 @@ void kstep_print_sched_debug(void);
 void kstep_output_curr_task(void);
 void kstep_output_nr_running(void);
 void kstep_output_balance(int cpu, struct sched_domain *sd);
-void kstep_output_migrate(struct task_struct *p, int src_cpu, int dst_cpu);
 
 // tick.c
 void kstep_tick(void);
