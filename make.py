@@ -124,7 +124,7 @@ def build_kmod(b: Build):
     for p in b.kmod_dir.rglob("*"):
         if p.is_symlink():
             p.unlink()
-    b.run(f"cp -rs {PROJ_DIR / 'kmod'}/* {b.kmod_dir}")
+    system(f"cp -rs {PROJ_DIR / 'kmod'}/* {b.kmod_dir}")
     system(f"make -C {b.linux} -j{os.cpu_count()} M={b.kmod_dir} modules compile_commands.json")
 
 
