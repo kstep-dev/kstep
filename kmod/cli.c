@@ -14,7 +14,7 @@
 //                             {"type":"task",...} record per live task, then the reply
 //                             {"timestamp":T,"tasks":N}. A record:
 //         {"timestamp":T,"type":"task","task":N,"state":"running|runnable|sleeping|blocked","cpu":C,
-//          "cpus":"1-2","cgroup":"/a","policy":"normal","nice":0,"weight":..,"sum_exec_runtime":..,"vruntime":..,...}
+//          "cpus":6,"cgroup":"/a","policy":"normal","nice":0,"weight":..,"sum_exec_runtime":..,"vruntime":..,...}
 //   task <n>                  `top` for one task: its record, then {"timestamp":T,"tasks":1}
 //   nice <n> <-20..19>        set the nice value (fair classes; kept across a spell as fifo/rr)
 //   policy <n> <normal|batch|idle|fifo|rr>   set the scheduling class (real-time at one fixed priority)
@@ -160,7 +160,7 @@ static void write_task(struct task_struct *p) {
   kstep_json_field_str(&json, "state", p->on_cpu ? "running" : state == TASK_RUNNING ? "runnable" :
                                         state & TASK_INTERRUPTIBLE ? "sleeping" : "blocked");
   kstep_json_field_s64(&json, "cpu", task_cpu(p));
-  kstep_json_field_fmt(&json, "cpus", "\"%*pbl\"", cpumask_pr_args(p->cpus_ptr));
+  kstep_json_field_u64(&json, "cpus", cpumask_bits(p->cpus_ptr)[0]);  // allowed CPUs as a bitmask
   {
     char cgroup[64];
     rcu_read_lock();
