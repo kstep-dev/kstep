@@ -36,13 +36,13 @@ u64 kstep_jiffies_get(void);
 
 // output.c
 void kstep_output_init(void);
-void kstep_output_flush(void);
+// chan.c: the virtio console port, usable from any context
+void kstep_chan_init(void);
+void kstep_chan_write(const char *data, size_t len);
+void kstep_chan_readline(char *line, size_t max);
 
 // trace.c
-void kstep_trace_sched_balance_begin(void);
-void kstep_trace_sched_balance_selected(void);
-void kstep_trace_task_migrate(void);
-void kstep_trace_sched_group_alloc(void);
+void kstep_trace_init(void); // hook init_tg_cfs_entry, and what the driver's callbacks need
 
 // reset.c
 void kstep_reset_runqueues(void);

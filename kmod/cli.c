@@ -1,4 +1,4 @@
-// The interactive driver. Commands arrive on /dev/hvc0 one per line; each is answered with one
+// The interactive driver. Commands arrive on the channel (chan.c) one per line; each is answered with one
 // JSON reply, {"timestamp":T,...} or {"timestamp":T,"error":"..."}, in the same ordered stream as
 // the trace events (load_balance, migrate). Machine state is not in the stream: after every command
 // it is rewritten into a table in guest memory (state.h) whose address the ready line reports.
@@ -20,7 +20,6 @@
 //   exit                      end the session (the VM reboots)
 #include <linux/cgroup.h>
 #include <linux/cpumask.h>
-#include <linux/ctype.h>
 #include <linux/fs.h>
 #include <linux/gfp.h>
 #include <linux/string.h>
@@ -32,8 +31,6 @@
 #include "state.h"
 
 #define LINE_MAX 128
-
-static struct file *cmd; // /dev/hvc0, read side
 
 // The reply to the command being executed: run() opens it, a command adds its fields (none on
 // plain success), run() closes it once the state table is updated.
@@ -207,7 +204,11 @@ static void cmd_affinity(char *arg) {
     return;
   if (!parse_test_cpus(arg, &mask))
     return reply_error(usage);
-  kstep_task_set_affinity(p, &mask);
+  int err = kstep_task_set_affinity(p, &mask);
+  // sched_setaffinity rejects a mask disjoint from the task's cpuset (cgroup cpuset.cpus) with EINVAL.
+  if (err == -EINVAL)
+    return reply_error("cpulist has no CPU in the task's cgroup cpuset");
+  reply_errno(err);
 }
 
 static void cmd_nice(char *arg) {
@@ -361,9 +362,6 @@ static void output_migrate(struct task_struct *p, int src_cpu, int dst_cpu) {
 }
 
 static void setup(void) {
-  cmd = filp_open("/dev/hvc0", O_RDONLY | O_NOCTTY, 0);
-  if (IS_ERR(cmd))
-    panic("Failed to open /dev/hvc0: %ld", PTR_ERR(cmd));
   state = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, get_order(sizeof(*state)));
   if (!state)
     panic("Failed to allocate the state table");
@@ -371,39 +369,25 @@ static void setup(void) {
 
 static void run(void) {
   struct kstep_json json;
-  char line[LINE_MAX], c;
-  size_t len = 0;
-  loff_t pos = 0;
+  char line[LINE_MAX];
+  bool more = true;
 
   kstep_json_begin(&json);
   kstep_json_field_bool(&json, "ready", true);
   kstep_json_field_u64(&json, "state", virt_to_phys(state)); // guest-physical address of the state table
   kstep_json_end(&json);
-  kstep_output_flush();
-  while (true) {
-    if (kernel_read(cmd, &c, 1, &pos) != 1)
-      continue;
-    if (c == '\n') {
-      bool more = true;
-      char *l;
+  while (more) {
+    char *l;
 
-      line[len] = '\0';
-      len = 0;
-      l = strim(line);
-      if (*l && *l != '#') {
-        kstep_json_begin(&reply);
-        more = execute(l);
-        state_update(); // before the reply, so the table is current when it lands
-        kstep_json_end(&reply);
-        kstep_output_flush();
-      }
-      if (!more)
-        break;
-    } else if (len + 1 < LINE_MAX && isprint(c)) {
-      line[len++] = c;
-    }
+    kstep_chan_readline(line, sizeof(line));
+    l = strim(line);
+    if (!*l || *l == '#')
+      continue;
+    kstep_json_begin(&reply);
+    more = execute(l);
+    state_update(); // before the reply, so the table is current when it lands
+    kstep_json_end(&reply);
   }
-  filp_close(cmd, NULL);
 }
 
 KSTEP_DRIVER_DEFINE{

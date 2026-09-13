@@ -91,7 +91,6 @@ void kstep_tick(void) {
   kstep_bandwidth_tick();
   if (kstep_driver->on_tick_end)
     kstep_driver->on_tick_end();
-  kstep_output_flush(); // the tick's records and the hooks' events, in one write
 }
 
 // Nothing is left to happen on the CPU without a new controller action: no wakeup or reschedule
