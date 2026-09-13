@@ -34,6 +34,12 @@ void kstep_jiffies_init(void);
 void kstep_jiffies_tick(void);
 u64 kstep_jiffies_get(void);
 
+// shm.c: the region of guest memory the host reads directly (shm.h)
+phys_addr_t kstep_shm_init(void);
+void kstep_shm_update(struct task_struct **tasks, int ntasks);
+void kstep_shm_event(u32 type, u32 task, u32 src_cpu, u32 dst_cpu, const char *name);
+void kstep_shm_balance(int cpu, struct sched_domain *sd);
+
 // io.c
 void kstep_io_init(void);
 void kstep_io_write(const char *data, size_t len);

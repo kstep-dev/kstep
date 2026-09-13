@@ -1,7 +1,8 @@
 // The interactive driver. Commands arrive on the channel (io.c) one per line; each is answered with one
 // JSON reply, {"timestamp":T,...} or {"timestamp":T,"error":"..."}, in the same ordered stream as
-// the trace events (load_balance, migrate). Machine state is not in the stream: after every command
-// it is rewritten into a table in guest memory (state.h) whose address the ready line reports.
+// nothing else. Machine state is not in the stream: after every command
+// it is rewritten into a region of guest memory (shm.h) whose address the ready line reports, along
+// with the trace events (a CPU's balancer looked for work; a task moved).
 //
 // Tasks are numbered 1, 2, .. in creation order; a number is never reused.
 //
@@ -21,19 +22,17 @@
 #include <linux/cgroup.h>
 #include <linux/cpumask.h>
 #include <linux/fs.h>
-#include <linux/gfp.h>
 #include <linux/string.h>
 #include <linux/version.h>
-#include <asm/io.h>
 
 #include "driver.h"
 #include "internal.h"
-#include "state.h"
+#include "shm.h"
 
 #define LINE_MAX 128
 
 // The reply to the command being executed: run() opens it, a command adds its fields (none on
-// plain success), run() closes it once the state table is updated.
+// plain success), run() closes it once the shared region is updated.
 static struct kstep_json reply;
 
 static void reply_error(const char *msg) { kstep_json_field_str(&reply, "error", msg); }
@@ -62,7 +61,7 @@ static char *take_arg(char **arg) {
 
 // The session's tasks by creation number: tasks[n - 1]. Numbering is this front-end's
 // convention (the fuzz executor has its own); a number is never reused after `kill`.
-static struct task_struct *tasks[KSTEP_STATE_TASKS];
+static struct task_struct *tasks[KSTEP_SHM_TASKS];
 static int ntasks;
 
 static int task_number(struct task_struct *p) {
@@ -92,7 +91,7 @@ static struct task_struct *parse_task(char **arg, const char *usage) {
 static void cmd_create(char *arg) {
   struct task_struct *p;
 
-  if (ntasks == KSTEP_STATE_TASKS)
+  if (ntasks == KSTEP_SHM_TASKS)
     return reply_error("too many tasks");
   p = kstep_task_create();
   tasks[ntasks++] = p; // the task's kSTEP record keeps it referenced
@@ -110,84 +109,6 @@ static const struct {
 };
 
 static void cmd_tick(char *arg) { kstep_tick(); }
-
-// Rewrite the state table (state.h). The isolated CPUs are held while a command runs, so
-// their queues can be read directly.
-static struct kstep_state *state;
-
-static void state_update(void) {
-  u32 ncpus = min(last_cpu(), KSTEP_STATE_CPUS), nt = 0; // nt: table entries written
-
-  WRITE_ONCE(state->hdr.gen, state->hdr.gen + 1); // odd: updating
-  smp_wmb();
-  for (int cpu = 1; cpu <= ncpus; cpu++) {
-    struct rq *rq = cpu_rq(cpu);
-    struct kstep_state_cpu *c = &state->cpu[cpu - 1];
-
-    *c = (struct kstep_state_cpu){
-        .cpu = cpu,
-        .curr = task_number(rq->curr),
-        .idle = rq->curr == rq->idle,
-        .capacity = arch_scale_cpu_capacity(cpu),
-        .nr_running = rq->nr_running,
-        .nr_switches = rq->nr_switches,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0)
-        .min_vruntime = rq->cfs.min_vruntime,
-#endif
-#ifdef CONFIG_SMP
-        .util_avg = rq->cfs.avg.util_avg,
-        .load_avg = rq->cfs.avg.load_avg,
-        .runnable_avg = rq->cfs.avg.runnable_avg,
-#endif
-    };
-  }
-  for (int id = 1; id <= ntasks; id++) {
-    struct task_struct *p = tasks[id - 1];
-    struct kstep_state_task *t = &state->task[nt];
-    unsigned int st;
-    u32 flags = 0;
-
-    if (p->exit_state)
-      continue;
-    st = READ_ONCE(p->__state);
-    // EEVDF: eligible = vruntime <= the queue's average; delayed = kept on the queue until eligible
-    if (p->se.on_rq && kstep_eligible(&p->se))
-      flags |= KSTEP_TASK_ELIGIBLE;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
-    if (p->se.sched_delayed)
-      flags |= KSTEP_TASK_DELAYED;
-#endif
-    *t = (struct kstep_state_task){
-        .task = id,
-        .state = p->on_cpu ? KSTEP_TASK_RUNNING
-                 : st == TASK_RUNNING ? KSTEP_TASK_RUNNABLE
-                 : st & TASK_INTERRUPTIBLE ? KSTEP_TASK_SLEEPING
-                 : KSTEP_TASK_BLOCKED,
-        .cpu = task_cpu(p),
-        .policy = p->policy,
-        .nice = task_nice(p),
-        .flags = flags,
-        .cpus = cpumask_bits(p->cpus_ptr)[0],
-        .weight = p->se.load.weight,
-        .sum_exec_runtime = p->se.sum_exec_runtime,
-        .vruntime = p->se.vruntime,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-        .deadline = p->se.deadline,
-        .slice = p->se.slice,
-#endif
-    };
-    rcu_read_lock();
-    if (cgroup_path(task_dfl_cgroup(p), t->cgroup, sizeof(t->cgroup)) < 0)
-      strscpy(t->cgroup, "?", sizeof(t->cgroup));
-    rcu_read_unlock();
-    nt++;
-  }
-  state->hdr.timestamp = kstep_jiffies_get();
-  state->hdr.ncpus = ncpus;
-  state->hdr.ntasks = nt;
-  smp_wmb();
-  WRITE_ONCE(state->hdr.gen, state->hdr.gen + 1); // even: consistent
-}
 
 // Both task affinity and cgroup cpusets must exclude the controller CPU.
 static bool parse_test_cpus(const char *arg, struct cpumask *mask) {
@@ -346,26 +267,17 @@ static bool execute(char *line) {
   return true;
 }
 
-// The migrate event; migrations of other processes are not reported.
-static void output_migrate(struct task_struct *p, int src_cpu, int dst_cpu) {
-  struct kstep_json json;
+// on_task_migrate: one of our tasks moved (other processes are not reported)
+static void shm_migrate(struct task_struct *p, int src_cpu, int dst_cpu) {
   int n = task_number(p);
 
-  if (!n)
-    return;
-  kstep_json_begin(&json);
-  kstep_json_field_str(&json, "type", "migrate");
-  kstep_json_field_s64(&json, "task", n);
-  kstep_json_field_s64(&json, "src_cpu", src_cpu);
-  kstep_json_field_s64(&json, "dst_cpu", dst_cpu);
-  kstep_json_end(&json);
+  if (n)
+    kstep_shm_event(KSTEP_EVENT_MIGRATE, n, src_cpu, dst_cpu, NULL);
 }
 
-static void setup(void) {
-  state = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, get_order(sizeof(*state)));
-  if (!state)
-    panic("Failed to allocate the state table");
-}
+static phys_addr_t shm_phys;
+
+static void setup(void) { shm_phys = kstep_shm_init(); }
 
 static void run(void) {
   struct kstep_json json;
@@ -374,7 +286,7 @@ static void run(void) {
 
   kstep_json_begin(&json);
   kstep_json_field_bool(&json, "ready", true);
-  kstep_json_field_u64(&json, "state", virt_to_phys(state)); // guest-physical address of the state table
+  kstep_json_field_u64(&json, "shm", shm_phys); // guest-physical address of the shared region
   kstep_json_end(&json);
   while (more) {
     char *l;
@@ -385,7 +297,7 @@ static void run(void) {
       continue;
     kstep_json_begin(&reply);
     more = execute(l);
-    state_update(); // before the reply, so the table is current when it lands
+    kstep_shm_update(tasks, ntasks); // before the reply, so the region is current when it lands
     kstep_json_end(&reply);
   }
 }
@@ -394,7 +306,6 @@ KSTEP_DRIVER_DEFINE{
     .name = "cli",
     .setup = setup,
     .run = run,
-    // events in the stream: a CPU's balancer looked for work; a task moved
-    .on_sched_balance_selected = kstep_output_balance,
-    .on_task_migrate = output_migrate,
+    .on_sched_balance_selected = kstep_shm_balance,
+    .on_task_migrate = shm_migrate,
 };
