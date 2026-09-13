@@ -20,7 +20,7 @@ phys_addr_t kstep_shm_init(void) {
 // The state after a command. The isolated CPUs are held while a command runs, so their queues
 // can be read directly. tasks[n - 1] is the cli's task number n; exited tasks are skipped.
 void kstep_shm_update(struct task_struct **tasks, int ntasks) {
-  u32 ncpus = min(num_online_cpus() - 1, KSTEP_SHM_CPUS), nt = 0; // nt: table entries written
+  u32 ncpus = min_t(u32, num_online_cpus() - 1, KSTEP_SHM_CPUS), nt = 0; // nt: table entries written
 
   WRITE_ONCE(shm->hdr.gen, shm->hdr.gen + 1); // odd: updating
   smp_wmb();
