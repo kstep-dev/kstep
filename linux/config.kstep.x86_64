@@ -10,9 +10,9 @@ CONFIG_KVM_GUEST=y
 # cannot take over the tick.
 CONFIG_X86_PM_TIMER=y
 
-# Boot the uncompressed vmlinux through its PVH entry (QEMU -kernel vmlinux): decompressing the
-# bzImage in the guest runs cold through the wasm JIT and costs about 0.6 s of the browser boot.
-CONFIG_PVH=y
+# virtio console ports over PCI (QEMU -device virtio-serial-pci)
+CONFIG_PCI=y
+CONFIG_VIRTIO_PCI=y
 
 # Kernel console: the pc machine's 16550 (ttyS0)
 CONFIG_SERIAL_8250=y

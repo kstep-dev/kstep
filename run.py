@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
-from make import HOST_ARCH, Build, build_kstep, build_linux
+from make import ARCH, Build, build_kstep, build_linux
 from scripts import (
     BUILD_CURR_DIR,
     BUILD_DIR,
@@ -41,12 +41,8 @@ def build_qemu_cmd(
     cpu_affinity: str | None = None,
 ) -> str:
     b = Build(kernel)
-    ARCH = b.arch
-    kernel_img = b.dir / "kernel"
-    rootfs_img = b.rootfs
-
     kvm_path = Path("/dev/kvm")
-    use_kvm = ARCH == HOST_ARCH and kvm_path.exists()
+    use_kvm = kvm_path.exists()
     if use_kvm and not os.access(kvm_path, os.R_OK):
         system(f"sudo chmod 666 {kvm_path}")
 
@@ -62,12 +58,18 @@ def build_qemu_cmd(
         f"nohz_full={isol_cpus}",
         "init=/user",
         "panic=-1",  # Exit immediately on panic
-        # the machine's UART: a 16550 on the pc machine, the PL011 on virt (with an earlycon)
-        "console=ttyS0" if ARCH == "x86_64" else "console=ttyAMA0 earlycon",
     ]
 
     if ARCH == "x86_64":
-        boot_args += ["tsc=nowatchdog", "tsc=reliable"]
+        boot_args += ["console=ttyS0", "tsc=nowatchdog", "tsc=reliable"]
+        machine = []
+        tcg_cpu = "max"
+        virtio_serial = "virtio-serial-pci"
+    else:
+        boot_args += ["console=ttyAMA0", "earlycon"]
+        machine = ["-machine virt"]
+        tcg_cpu = "cortex-a57"
+        virtio_serial = "virtio-serial-device"
 
     # Everything after the `--` is passed to init
     # https://www.kernel.org/doc/html/latest/admin-guide/kernel-parameters.html
@@ -84,12 +86,13 @@ def build_qemu_cmd(
         boot_args.extend(driver.params)
 
     cmd = [
-        b.arch.qemu,
+        f"qemu-system-{ARCH}",
+        *machine,
+        f"-cpu {'host' if use_kvm else tcg_cpu}",
         f"-smp {driver.num_cpus}",
-        "-cpu max",
         f"-m {driver.mem_mb}M",
-        f"-kernel {kernel_img}",
-        f"-initrd {rootfs_img}",
+        f"-kernel {b.kernel}",
+        f"-initrd {b.rootfs}",
         f'-append "{" ".join(boot_args)}"',
         "-nographic",
         "-nodefaults",
@@ -102,9 +105,9 @@ def build_qemu_cmd(
         f"-chardev socket,id=char1,path={result_dir.output}.sock,server=on,wait=off,logfile={result_dir.output}",
         # kSTEP's channels are virtio console ports (/dev/hvc0..2): one virtqueue kick per write
         # instead of one port I/O exit per byte on a 16550, which dominated per-command latency
-        # under emulation. The kernel console stays on ttyS0: it is up from console_init, while
-        # hvc0 only exists once PCI has been enumerated, and it never drops lines.
-        "-device virtio-serial-pci,id=vs0",
+        # under emulation. The kernel console stays on the UART: it is up from console_init, while
+        # hvc0 only exists once the transport has been probed, and it never drops lines.
+        f"-device {virtio_serial},id=vs0",
         "-device virtconsole,bus=vs0.0,nr=0,chardev=char1",
         # cov file
         f"-chardev file,id=char2,path={result_dir.cov}",
@@ -126,9 +129,6 @@ def build_qemu_cmd(
             f"-chardev socket,id=char3,path={result_dir.sock},server=on,wait=on",
             "-device virtconsole,bus=vs0.0,nr=2,chardev=char3",
         ]
-
-    if ARCH == "aarch64":
-        cmd += ["-machine virt", "-cpu cortex-a57"]
 
     if debug:
         cmd += ["-s", "-S"]

@@ -96,6 +96,7 @@ if __name__ == "__main__":
     source.add_argument("--tar", dest="tarball", action="store_true", default=True)
     source.add_argument("--git", dest="tarball", action="store_false")
     parser.add_argument("--patch", type=Path, default=None)
+    parser.add_argument("--no-current", dest="set_current", action="store_false", help="leave build/current alone")
     args = parser.parse_args()
 
     checkout(
@@ -103,4 +104,5 @@ if __name__ == "__main__":
         kernel=args.kernel if args.kernel else args.ref,
         tarball=args.tarball,
         patch=args.patch,
+        set_current=args.set_current,
     )
