@@ -161,16 +161,12 @@ static __always_inline void kstep_cov_flush_pcs(u32 slot, u32 cmd_id) {
   if (count == 0)
     return;
 
-  struct {
-    u32 cmd_id;
-    u32 pid;
-    u64 pc;
-  } records[SIG_CHUNK_SIZE];
+  struct cov_entry records[SIG_CHUNK_SIZE];
 
   for (u32 i = 0; i < count; i++) {
     records[i].cmd_id = cmd_id;
     records[i].pid = slot_entries[slot].pid;
-    records[i].pc = slot_entries[slot].pcs[i];
+    records[i].ip = slot_entries[slot].pcs[i];
   }
 
   kernel_write(cov_file, records, count * sizeof(records[0]), 0);

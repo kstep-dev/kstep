@@ -1,5 +1,12 @@
 #include "internal.h"
 
+// Discard real-time execution history and start PELT at the mocked clock's epoch.
+// Callers retain their distinct task load and task-group accounting initialization.
+static void reset_sched_avg(struct sched_avg *avg) {
+  memset(avg, 0, sizeof(*avg));
+  avg->last_update_time = INIT_TIME_NS;
+}
+
 void kstep_reset_task(struct task_struct *p) {
   // reset generic task stats
   p->nivcsw = 0;
@@ -18,8 +25,7 @@ void kstep_reset_task(struct task_struct *p) {
 #endif
 
   // reset sched avg stats
-  memset(&p->se.avg, 0, sizeof(struct sched_avg));
-  p->se.avg.last_update_time = INIT_TIME_NS;
+  reset_sched_avg(&p->se.avg);
   p->se.avg.load_avg = scale_load_down(p->se.load.weight);
 }
 
@@ -76,8 +82,7 @@ static void kstep_reset_runqueue(struct rq *rq) {
   rq->cfs.avg_vruntime = 0;
   rq->cfs.avg_load = 0;
 #endif
-  memset(&rq->cfs.avg, 0, sizeof(struct sched_avg));
-  rq->cfs.avg.last_update_time = INIT_TIME_NS;
+  reset_sched_avg(&rq->cfs.avg);
 
   // reset sched domain
   struct sched_domain *sd;
@@ -111,13 +116,11 @@ static void kstep_reset_task_groups(void) {
       struct cfs_rq *cfs_rq = tg->cfs_rq[cpu];
       struct sched_entity *se = tg->se[cpu];
 
-      memset(&cfs_rq->avg, 0, sizeof(struct sched_avg));
-      cfs_rq->avg.last_update_time = INIT_TIME_NS;
+      reset_sched_avg(&cfs_rq->avg);
       cfs_rq->tg_load_avg_contrib = 0;
       cfs_rq->propagate = 0;
       cfs_rq->prop_runnable_sum = 0;
-      memset(&se->avg, 0, sizeof(struct sched_avg));
-      se->avg.last_update_time = INIT_TIME_NS;
+      reset_sched_avg(&se->avg);
     }
   }
 }

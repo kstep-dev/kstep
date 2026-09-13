@@ -11,11 +11,7 @@ PACKAGES=(
     libncurses-dev
     libssl-dev
     libelf-dev
-    gcc-x86-64-linux-gnu
-    gcc-aarch64-linux-gnu
-    qemu-system-x86
-    qemu-system-arm
-    cpio           # rootfs
+    qemu-system-$([ "$(uname -m)" = x86_64 ] && echo x86 || echo arm)
 )
 
 # Install apt packages

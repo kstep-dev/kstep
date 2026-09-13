@@ -9,4 +9,4 @@ dependencies = [
 ]
 
 [tool.pyright]
-exclude = ["linux/**"]
+exclude = ["build/**"]

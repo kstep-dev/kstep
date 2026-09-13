@@ -8,7 +8,6 @@ from checkout import Linux, checkout
 from make import Build, build_kstep, build_linux
 from run import Driver, run_qemu
 from scripts import (
-    BUILD_DIR,
     PROJ_DIR,
     ResultDir,
     TermColor,
@@ -118,9 +117,10 @@ def reproduce(linux: Linux, driver: Driver):
 
     log_step(kernel, "Checkout Linux")
     checkout(linux.ref, kernel=kernel, patch=linux.patch, tarball=True, set_current=False)
-    b = Build(kernel, log=BUILD_DIR / kernel / "build.log")
-    log_step(kernel, f"Build Linux (log: {b.log})")
-    build_linux(b, extra_config=linux.config)
+    b = Build(kernel)
+    log = b.dir / "build.log"
+    log_step(kernel, f"Build Linux (log: {log})")
+    build_linux(b, extra_config=linux.config, log=log)
     log_step(kernel, "Build kSTEP")
     build_kstep(b)
 

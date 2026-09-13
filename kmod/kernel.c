@@ -206,14 +206,6 @@ int kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
   return kstep_write(path, data, size);
 }
 
-static int kstep_cgroup_mkdir(const char *name) {
-  char path[MAX_PATH_LENGTH] = {0};
-  int ret = scnprintf(path, sizeof(path), CGROUP_ROOT "%s", name);
-  if (ret <= 0 || ret >= sizeof(path))
-    panic("failed to form cgroup file path for %s", name);
-  return kstep_mkdir(path);
-}
-
 static void kstep_rmdir(const char *dir) {
   struct path path;
   struct inode *parent;
@@ -288,7 +280,7 @@ int kstep_cgroup_create(const char *name) {
       scnprintf(path, sizeof(path), CGROUP_ROOT "%s", name) >= sizeof(path))
     panic("failed to form cpuset for %s", name);
 
-  err = kstep_cgroup_mkdir(name);
+  err = kstep_mkdir(path);
   if (err)
     return err;
   err = kstep_cgroup_write(name, "cgroup.subtree_control", CGROUP_CONTROL) ?:
@@ -401,4 +393,22 @@ int kstep_eligible(struct sched_entity *se) {
 #else
   panic("unsupported kernel");
 #endif
+}
+
+// Report balancing from a busy CPU while a CPU in its local group is idle.
+// Shared by the extra_balance reproducer and the fuzzer's balance callback.
+void kstep_check_extra_balance(int cpu, struct sched_domain *sd) {
+  struct sched_group *sg = sd->groups;
+  int i;
+
+  kstep_output_balance(cpu, sd);
+  if (cpu_rq(cpu)->nr_running == 0 ||
+      !cpumask_test_cpu(cpu, sched_group_span(sg)))
+    return;
+  for_each_cpu(i, sched_group_span(sg)) {
+    if (cpu_rq(i)->nr_running == 0) {
+      pr_info("warn: load balance triggered on busy cpu while idle cpu in the same group");
+      return;
+    }
+  }
 }

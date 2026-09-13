@@ -201,12 +201,8 @@ u8 kstep_execute_op(enum kstep_op_type type, int a, int b, int c) {
   if (type == OP_TICK_REPEAT)
     return op_handlers[type](a, b, c);
 
-  /*
-   * Signal ops are serialised through the per-task queue.
-   * Rule: enqueue if the queue is already non-empty (another op is waiting)
-   *       OR the task is not yet in the required state.
-   *       Send directly only when queue is empty AND state is ready.
-  */
+  // Reject signal ops until the task is ready; the executor reports its current
+  // state so the input generator can choose the next operation.
   if (is_task_signal_op(type)) {
     if (!kstep_op_is_valid_task_id(a) || !kstep_tasks[a].p)
       panic("Task %d not found", a);

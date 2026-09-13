@@ -28,26 +28,25 @@ static void kstep_json_append_str(struct kstep_json *json, const char *str) {
   kstep_json_append_char(json, '"');
 }
 
-static void kstep_json_append_fmt(struct kstep_json *json, const char *fmt,
-                                  va_list args) {
+static void kstep_json_field_vfmt(struct kstep_json *json, const char *key,
+                                   const char *val_fmt, va_list args) {
+  kstep_json_append_str(json, key);
+  kstep_json_append_char(json, ':');
+
   int rem = sizeof(json->buf) - json->len;
-  int len = vsnprintf(json->buf + json->len, rem, fmt, args);
+  int len = vsnprintf(json->buf + json->len, rem, val_fmt, args);
   if (len < 0 || len >= rem)
     panic("json formatting failed");
   json->len += len;
+  kstep_json_append_char(json, ',');
 }
 
 void kstep_json_field_fmt(struct kstep_json *json, const char *key,
                           const char *val_fmt, ...) {
-  kstep_json_append_str(json, key);
-  kstep_json_append_char(json, ':');
-
   va_list args;
   va_start(args, val_fmt);
-  kstep_json_append_fmt(json, val_fmt, args);
+  kstep_json_field_vfmt(json, key, val_fmt, args);
   va_end(args);
-
-  kstep_json_append_char(json, ',');
 }
 
 void kstep_json_field_str(struct kstep_json *json, const char *key,
@@ -125,15 +124,12 @@ void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,
   struct kstep_json json;
   kstep_json_begin(&json);
   kstep_json_field_str(&json, key1, val1);
-  kstep_json_append_str(&json, key2);
-  kstep_json_append_char(&json, ':');
 
   va_list args;
   va_start(args, val2_fmt);
-  kstep_json_append_fmt(&json, val2_fmt, args);
+  kstep_json_field_vfmt(&json, key2, val2_fmt, args);
   va_end(args);
 
-  kstep_json_append_char(&json, ',');
   kstep_json_end(&json);
 }
 

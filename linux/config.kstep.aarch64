@@ -1,5 +1,6 @@
-# Kernel console: the virt machine's PL011 (ttyAMA0), which also has an earlycon. PCI is for the
-# virtio console ports that carry kSTEP's own channels.
+# Kernel console: the virt machine's PL011 (ttyAMA0), which also has an earlycon.
 CONFIG_SERIAL_AMBA_PL011=y
 CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-CONFIG_PCI_HOST_GENERIC=y
+# virtio console ports over virtio-mmio (QEMU -device virtio-serial-device): no PCI host needed
+# on virt, and no PCI enumeration at boot.
+CONFIG_VIRTIO_MMIO=y

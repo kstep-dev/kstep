@@ -105,28 +105,6 @@ void kstep_check_work_conserve(void) {
   }
 }
 
-/* Log the selected balance decision and flag obviously unnecessary balancing
- * inside the local sched group. */
-void kstep_check_extra_balance(int cpu, struct sched_domain *sd) {
-  int i;
-  struct sched_group *sg = sd->groups;
-  kstep_output_balance(cpu, sd);
-  if (cpu_rq(cpu)->nr_running == 0)
-    return;
-  do {
-    // Find the local group
-    if (!cpumask_test_cpu(cpu, sched_group_span(sg)))
-      continue;
-
-    for_each_cpu(i, sched_group_span(sg)) {
-      if (cpu_rq(i)->nr_running == 0) {
-        pr_info("warn: load balance triggered on busy cpu while idle cpu in the same group");
-        return;
-      }
-    }
-  } while (sg != sd->groups);
-}
-
 static s64 get_cfs_util_avg(struct rq *rq) {
   s64 removed = 0;
   struct cfs_rq *cfs_rq, *pos;

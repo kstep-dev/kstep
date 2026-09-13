@@ -98,6 +98,7 @@ bool kstep_task_is_frozen(struct task_struct *p);
 void kstep_freeze_task(struct task_struct *p);
 void kstep_thaw_task(struct task_struct *p);
 int kstep_eligible(struct sched_entity *se);
+void kstep_check_extra_balance(int cpu, struct sched_domain *sd);
 
 // cpu.c
 #define CPU_SPEC_LEN 512
