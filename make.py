@@ -134,10 +134,24 @@ def build_kmod(b: Build):
     b.kbuild(f"M={b.kmod_dir} modules compile_commands.json")
 
 
+def pad4(data: bytes) -> bytes:
+    return data + b"\0" * (-len(data) % 4)
+
+
+def cpio_header(name: str, size: int) -> bytes:
+    """A newc-format header, as the kernel unpacks it (Documentation/driver-api/early-userspace/
+    buffer-format.rst). Every file is a root-owned 0755 regular file: the archive is reproducible."""
+    # ino, mode, uid, gid, nlink, mtime, filesize, devmajor, devminor, rdevmajor, rdevminor, namesize, check
+    header = "070701" + "%08x" * 13 % (0, 0o100755, 0, 0, 1, 0, size, 0, 0, 0, 0, len(name) + 1, 0)
+    return pad4((header + name + "\0").encode())
+
+
 def build_rootfs(b: Build):
-    b.kbuild("usr/gen_init_cpio")  # a host tool, removed by `make clean`
-    spec = f"file /kmod.ko {b.kmod} 0644 0 0\nfile /user {b.user} 0755 0 0"
-    b.run(f"echo '{spec}' | ./usr/gen_init_cpio -t 0 - > {b.rootfs}", cwd=b.linux)
+    with b.rootfs.open("wb") as f:
+        for name, path in [("kmod.ko", b.kmod), ("user", b.user)]:
+            data = path.read_bytes()
+            f.write(cpio_header(name, len(data)) + pad4(data))
+        f.write(cpio_header("TRAILER!!!", 0))
 
 
 def build_kstep(b: Build):
