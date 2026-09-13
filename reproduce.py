@@ -8,7 +8,6 @@ from checkout import Linux, checkout
 from make import Build, build_kstep, build_linux
 from run import Driver, run_qemu
 from scripts import (
-    BUILD_DIR,
     PROJ_DIR,
     ResultDir,
     TermColor,
