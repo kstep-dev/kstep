@@ -34,15 +34,19 @@ void kstep_jiffies_init(void);
 void kstep_jiffies_tick(void);
 u64 kstep_jiffies_get(void);
 
-// output.c
-void kstep_output_init(void);
-void kstep_output_flush(void);
+// shm.c: the region of guest memory the host reads directly (shm.h)
+phys_addr_t kstep_shm_init(void);
+void kstep_shm_update(struct task_struct **tasks, int ntasks);
+void kstep_shm_event(u32 type, u32 task, u32 src_cpu, u32 dst_cpu, const char *name);
+void kstep_shm_balance(int cpu, struct sched_domain *sd);
+
+// io.c
+void kstep_io_init(void);
+void kstep_io_write(const char *data, size_t len);
+void kstep_io_readline(char *line, size_t max);
 
 // trace.c
-void kstep_trace_sched_balance_begin(void);
-void kstep_trace_sched_balance_selected(void);
-void kstep_trace_task_migrate(void);
-void kstep_trace_sched_group_alloc(void);
+void kstep_trace_init(void); // hook init_tg_cfs_entry, and what the driver's callbacks need
 
 // reset.c
 void kstep_reset_runqueues(void);
@@ -58,7 +62,7 @@ void kstep_prealloc_kworkers(void);
 
 // task.c
 void kstep_task_init(void);
-DECLARE_PER_CPU(struct task_struct *, kstep_settled_task); // the task halting in the control device
+bool kstep_task_settled(struct task_struct *p); // in the halt of the control file's read, nothing pending
 
 // kernel.c
 void kstep_cgroup_init(void);

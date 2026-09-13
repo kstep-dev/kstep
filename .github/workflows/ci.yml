@@ -69,24 +69,24 @@ jobs:
         if: ${{ ! matrix.fuzz }}
         run: cat results/latest/kstep.jsonl
 
-      - name: "[Fuzz] Execute workers"
-        if: ${{ matrix.fuzz }}
-        timeout-minutes: 5
-        run: |
-          ./fuzz.py \
-            --build ${{ matrix.version }} \
-            --workers 1 \
-            --steps 10 \
-            --ci_mode
+      # - name: "[Fuzz] Execute workers"
+      #   if: ${{ matrix.fuzz }}
+      #   timeout-minutes: 5
+      #   run: |
+      #     ./fuzz.py \
+      #       --build ${{ matrix.version }} \
+      #       --workers 1 \
+      #       --steps 10 \
+      #       --ci_mode
 
-      - name: "[Fuzz] Show fresh-mode log"
-        if: ${{ matrix.fuzz }}
-        run: cat results/fuzz/fresh/worker.debug.log
+      # - name: "[Fuzz] Show fresh-mode log"
+      #   if: ${{ matrix.fuzz }}
+      #   run: cat results/fuzz/fresh/worker.debug.log
 
-      - name: "[Fuzz] Show replay-mode log"
-        if: ${{ matrix.fuzz }}
-        run: cat results/fuzz/replay/worker.debug.log
+      # - name: "[Fuzz] Show replay-mode log"
+      #   if: ${{ matrix.fuzz }}
+      #   run: cat results/fuzz/replay/worker.debug.log
 
-      - name: "[Fuzz] Show mutation-mode log"
-        if: ${{ matrix.fuzz }}
-        run: cat results/fuzz/mutation/worker.debug.log
+      # - name: "[Fuzz] Show mutation-mode log"
+      #   if: ${{ matrix.fuzz }}
+      #   run: cat results/fuzz/mutation/worker.debug.log

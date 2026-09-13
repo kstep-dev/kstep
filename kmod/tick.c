@@ -108,7 +108,7 @@ static bool kstep_cpu_settled(int cpu) {
 #endif
   if (curr == rq->idle)
     return READ_ONCE(rq->nr_running) == 0;
-  return READ_ONCE(per_cpu(kstep_settled_task, cpu)) == curr && !signal_pending(curr);
+  return kstep_task_settled(curr);
 }
 
 // Wait until every CPU but the controller's has acted on what was asked of it. Ends each step (a
