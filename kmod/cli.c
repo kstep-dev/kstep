@@ -379,7 +379,7 @@ static void run(void) {
   while (more) {
     char *l;
 
-    kstep_chan_readline(line, sizeof(line));
+    kstep_io_readline(line, sizeof(line));
     l = strim(line);
     if (!*l || *l == '#')
       continue;

@@ -35,10 +35,9 @@ void kstep_jiffies_tick(void);
 u64 kstep_jiffies_get(void);
 
 // io.c
-// io.c: the channel to the host (a virtio console port the kmod drives itself), usable from any context
 void kstep_io_init(void);
-void kstep_chan_write(const char *data, size_t len);
-void kstep_chan_readline(char *line, size_t max);
+void kstep_io_write(const char *data, size_t len);
+void kstep_io_readline(char *line, size_t max);
 
 // trace.c
 void kstep_trace_init(void); // hook init_tg_cfs_entry, and what the driver's callbacks need

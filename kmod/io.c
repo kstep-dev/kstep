@@ -9,6 +9,7 @@
 // buffered and written by the controller.
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
+#include <linux/version.h>
 #include <linux/virtio.h>
 #include <linux/virtio_config.h>
 #include <linux/virtio_console.h>
@@ -55,7 +56,7 @@ static void tx_done(struct virtqueue *vq) {
 
 // Any context. The host consumes buffers in order, so a full pool means it is behind by
 // TX_BUFS records; reclaiming here covers the common case of a missed tx interrupt.
-void kstep_chan_write(const char *data, size_t len) {
+void kstep_io_write(const char *data, size_t len) {
   struct scatterlist sg;
   unsigned long flags;
   char *buf;
@@ -105,7 +106,7 @@ static void rx_done(struct virtqueue *vq) {
 
 // The controller: the next line of input, without its newline, sleeping until one is complete.
 // Longer lines are cut to max - 1 bytes.
-void kstep_chan_readline(char *line, size_t max) {
+void kstep_io_readline(char *line, size_t max) {
   unsigned long flags;
   size_t len = 0;
   char c;
@@ -123,9 +124,16 @@ void kstep_chan_readline(char *line, size_t max) {
 
 static int chan_probe(struct virtio_device *vdev) {
   struct virtqueue *vqs[2];
-  struct virtqueue_info info[2] = {{"rx", rx_done}, {"tx", tx_done}};
-  int err = virtio_find_vqs(vdev, 2, vqs, info, NULL);
+  int err;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 11, 0)
+  struct virtqueue_info info[2] = {{"rx", rx_done}, {"tx", tx_done}};
+  err = virtio_find_vqs(vdev, 2, vqs, info, NULL);
+#else
+  vq_callback_t *callbacks[2] = {rx_done, tx_done};
+  const char *names[2] = {"rx", "tx"};
+  err = virtio_find_vqs(vdev, 2, vqs, callbacks, names, NULL);
+#endif
   if (err)
     return err;
   rx_vq = vqs[0];
@@ -149,7 +157,7 @@ static void chan_remove(struct virtio_device *vdev) {}
 static const struct virtio_device_id chan_ids[] = {{VIRTIO_ID_CONSOLE, VIRTIO_DEV_ANY_ID}, {0}};
 
 static struct virtio_driver chan_driver = {
-    .driver.name = "kstep_chan",
+    .driver.name = "kstep_io",
     .id_table = chan_ids,
     .probe = chan_probe,
     .remove = chan_remove,
@@ -237,7 +245,7 @@ void kstep_json_end(struct kstep_json *json) {
     json->len--;
   kstep_json_append_char(json, '}');
   kstep_json_append_char(json, '\n');
-  kstep_chan_write(json->buf, json->len); // from any context: the channel is ours (above)
+  kstep_io_write(json->buf, json->len); // from any context: the channel is ours (above)
 }
 
 void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,
