@@ -11,7 +11,7 @@ static char driver_name[DRIVER_NAME_LEN] = "default";
 module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
 
 static int __init kstep_main(void) {
-  kstep_output_init();
+  kstep_io_init();
 
   if (num_online_cpus() > KSTEP_NR_CPUS)
     panic("Number of online CPUs (%d) exceeds KSTEP_NR_CPUS (%d)", num_online_cpus(),

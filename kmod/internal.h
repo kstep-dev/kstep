@@ -34,10 +34,9 @@ void kstep_jiffies_init(void);
 void kstep_jiffies_tick(void);
 u64 kstep_jiffies_get(void);
 
-// output.c
-void kstep_output_init(void);
-// chan.c: the virtio console port, usable from any context
-void kstep_chan_init(void);
+// io.c
+// io.c: the channel to the host (a virtio console port the kmod drives itself), usable from any context
+void kstep_io_init(void);
 void kstep_chan_write(const char *data, size_t len);
 void kstep_chan_readline(char *line, size_t max);
 

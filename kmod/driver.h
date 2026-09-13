@@ -29,7 +29,7 @@ struct kstep_driver {
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
 
-// output.c
+// io.c
 struct kstep_json {
   size_t len;
   char buf[512 - sizeof(size_t)];

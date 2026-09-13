@@ -1,4 +1,6 @@
-// kSTEP's channel: the virtio console port, driven by the kmod itself. The kernel's virtio_console
+// kSTEP's I/O: the channel to the host, and the JSON records that travel on it.
+//
+// The channel is the virtio console port, driven by the kmod itself. The kernel's virtio_console
 // is not built, so the device is unclaimed until this driver binds at module load; QEMU's side
 // (virtio-serial + virtconsole, single port, no multiport) is unchanged. Owning the virtqueues is
 // what lets any context send a record: a scheduler hook on an isolated CPU, interrupts off,
@@ -153,10 +155,151 @@ static struct virtio_driver chan_driver = {
     .remove = chan_remove,
 };
 
-void kstep_chan_init(void) {
+void kstep_io_init(void) {
   init_completion(&probed);
   if (register_virtio_driver(&chan_driver))
     panic("channel: register_virtio_driver failed");
   if (!wait_for_completion_timeout(&probed, HZ))
     panic("channel: no virtio console device (is CONFIG_VIRTIO_CONSOLE off and virtconsole attached?)");
+}
+
+// ---- JSON records ----
+
+static void kstep_json_append_char(struct kstep_json *json, char c) {
+  if (json->len + 1 >= sizeof(json->buf))
+    panic("json buffer overflow");
+  json->buf[json->len++] = c;
+}
+
+static void kstep_json_append_buf(struct kstep_json *json, const char *buf,
+                                  size_t len) {
+  if (json->len + len >= sizeof(json->buf))
+    panic("json buffer overflow");
+  memcpy(json->buf + json->len, buf, len);
+  json->len += len;
+}
+
+static void kstep_json_append_str(struct kstep_json *json, const char *str) {
+  kstep_json_append_char(json, '"');
+  kstep_json_append_buf(json, str, strlen(str));
+  kstep_json_append_char(json, '"');
+}
+
+static void kstep_json_field_vfmt(struct kstep_json *json, const char *key,
+                                   const char *val_fmt, va_list args) {
+  kstep_json_append_str(json, key);
+  kstep_json_append_char(json, ':');
+
+  int rem = sizeof(json->buf) - json->len;
+  int len = vsnprintf(json->buf + json->len, rem, val_fmt, args);
+  if (len < 0 || len >= rem)
+    panic("json formatting failed");
+  json->len += len;
+  kstep_json_append_char(json, ',');
+}
+
+void kstep_json_field_fmt(struct kstep_json *json, const char *key,
+                          const char *val_fmt, ...) {
+  va_list args;
+  va_start(args, val_fmt);
+  kstep_json_field_vfmt(json, key, val_fmt, args);
+  va_end(args);
+}
+
+void kstep_json_field_str(struct kstep_json *json, const char *key,
+                          const char *val) {
+  kstep_json_append_str(json, key);
+  kstep_json_append_char(json, ':');
+  kstep_json_append_str(json, val);
+  kstep_json_append_char(json, ',');
+}
+
+void kstep_json_field_u64(struct kstep_json *json, const char *key, u64 val) {
+  kstep_json_field_fmt(json, key, "%llu", val);
+}
+
+void kstep_json_field_s64(struct kstep_json *json, const char *key, s64 val) {
+  kstep_json_field_fmt(json, key, "%lld", val);
+}
+
+void kstep_json_begin(struct kstep_json *json) {
+  json->len = 0;
+  kstep_json_append_char(json, '{');
+  kstep_json_field_u64(json, "timestamp", kstep_jiffies_get());
+}
+
+void kstep_json_field_bool(struct kstep_json *json, const char *key, bool val) {
+  kstep_json_field_fmt(json, key, "%s", val ? "true" : "false");
+}
+
+void kstep_json_end(struct kstep_json *json) {
+  if (json->len > 0 && json->buf[json->len - 1] == ',')
+    json->len--;
+  kstep_json_append_char(json, '}');
+  kstep_json_append_char(json, '\n');
+  kstep_chan_write(json->buf, json->len); // from any context: the channel is ours (above)
+}
+
+void kstep_json_print_2kv(const char *key1, const char *val1, const char *key2,
+                          const char *val2_fmt, ...) {
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, key1, val1);
+
+  va_list args;
+  va_start(args, val2_fmt);
+  kstep_json_field_vfmt(&json, key2, val2_fmt, args);
+  va_end(args);
+
+  kstep_json_end(&json);
+}
+
+void kstep_print_sched_debug(void) {
+  KSYM_IMPORT(sysrq_sched_debug_show);
+  KSYM_sysrq_sched_debug_show();
+}
+
+void kstep_output_curr_task(void) {
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    struct task_struct *curr = cpu_rq(cpu)->curr;
+    struct kstep_json json;
+    kstep_json_begin(&json);
+    kstep_json_field_str(&json, "type", "curr_task");
+    kstep_json_field_u64(&json, "cpu", cpu);
+    kstep_json_field_u64(&json, "pid", task_pid_nr(curr));
+    kstep_json_end(&json);
+  }
+}
+
+void kstep_output_nr_running(void) {
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, "type", "nr_running");
+  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+    char key[8];
+    snprintf(key, sizeof(key), "cpu%d", cpu);
+    kstep_json_field_u64(&json, key, cpu_rq(cpu)->nr_running);
+  }
+  kstep_json_end(&json);
+}
+
+void kstep_output_balance(int cpu, struct sched_domain *sd) {
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, "type", "load_balance");
+  kstep_json_field_u64(&json, "dst_cpu", cpu);
+  kstep_json_field_fmt(&json, "span", "\"%*pbl\"",
+                       cpumask_pr_args(sched_domain_span(sd)));
+  kstep_json_field_str(&json, "name", sd->name);
+  kstep_json_end(&json);
+}
+
+void kstep_output_migrate(struct task_struct *p, int src_cpu, int dst_cpu) {
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, "type", "migrate");
+  kstep_json_field_u64(&json, "pid", task_pid_nr(p));
+  kstep_json_field_u64(&json, "src_cpu", src_cpu);
+  kstep_json_field_u64(&json, "dst_cpu", dst_cpu);
+  kstep_json_end(&json);
 }

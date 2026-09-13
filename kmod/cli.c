@@ -1,4 +1,4 @@
-// The interactive driver. Commands arrive on the channel (chan.c) one per line; each is answered with one
+// The interactive driver. Commands arrive on the channel (io.c) one per line; each is answered with one
 // JSON reply, {"timestamp":T,...} or {"timestamp":T,"error":"..."}, in the same ordered stream as
 // the trace events (load_balance, migrate). Machine state is not in the stream: after every command
 // it is rewritten into a table in guest memory (state.h) whose address the ready line reports.

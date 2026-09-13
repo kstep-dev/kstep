@@ -97,7 +97,7 @@ static int init_main(int argc, char *argv[], char *envp[]) {
     panic("Failed to create %s", PIPE_PATH);
   mount_fs("/sys/fs/cgroup", "cgroup2");
   set_proc_affinity(0, 0);          // Bind to cpu 0
-  // The kmod drives the JSON channel's virtio port itself (kmod/chan.c); no tty to set up
+  // The kmod drives the JSON channel's virtio port itself (kmod/io.c); no tty to set up
   set_tty_raw_output("/dev/hvc1"); // For code coverage data
   set_tty_raw_output("/dev/hvc2"); // For the fuzz executor's command socket (only attached when fuzzing)
   load_kmod("kmod.ko", argc, argv, envp);
