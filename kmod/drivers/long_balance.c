@@ -3,7 +3,6 @@
 #include <linux/sched/signal.h>
 
 #include "driver.h"
-#include "internal.h"
 
 #define NUM_TASKS 20000
 

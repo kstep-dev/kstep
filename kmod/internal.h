@@ -58,7 +58,7 @@ void kstep_prealloc_kworkers(void);
 
 // task.c
 void kstep_task_init(void);
-DECLARE_PER_CPU(struct task_struct *, kstep_settled_task); // the task halting in the control device
+bool kstep_task_settled(struct task_struct *p); // in the halt of the control file's read, nothing pending
 
 // kernel.c
 void kstep_cgroup_init(void);

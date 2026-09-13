@@ -85,7 +85,9 @@ static char pending[1 << 16];
 static size_t pending_len;
 static DEFINE_RAW_SPINLOCK(pending_lock);
 
-// Called by the controller only, so one static copy suffices; the write itself may sleep.
+// Called by the controller only, so one static copy suffices; the write itself may sleep. The
+// controller flushes where it pauses (after a tick, after a cli command, at exit): one tty write
+// per batch instead of one per record, each a virtqueue kick and, under emulation, a host exit.
 void kstep_output_flush(void) {
   static char flushing[sizeof(pending)];
   size_t len;
@@ -115,7 +117,7 @@ void kstep_json_end(struct kstep_json *json) {
   memcpy(pending + pending_len, json->buf, json->len);
   pending_len += json->len;
   raw_spin_unlock_irqrestore(&pending_lock, flags);
-  if (!irqs_disabled()) // the controller; a hook runs with interrupts off and leaves it to the controller
+  if (!irqs_disabled() && pending_len > sizeof(pending) / 2) // a controller printing a lot between pauses
     kstep_output_flush();
 }
 

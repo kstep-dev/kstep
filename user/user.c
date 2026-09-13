@@ -119,7 +119,6 @@ static int pipe_fd(void) {
 
 static void handler(int signum, siginfo_t *info, void *context) {
   int code = info->si_code;
-  int val = info->si_int;
   if (code == SIGCODE_WAKEUP)
     return;
   else if (code == SIGCODE_WAIT) {
@@ -127,15 +126,7 @@ static void handler(int signum, siginfo_t *info, void *context) {
     read(pipe_fd(), &c, 1); // wait: sleeps in pipe_read() until a token or a signal arrives
   } else if (code == SIGCODE_POST)
     write(pipe_fd(), "w", 1); // post: pipe_write() sync-wakes one waiter, from this CPU
-  else if (code == SIGCODE_FORK) {
-    for (int i = 0; i < val; i++) {
-      int pid = fork();
-      if (pid < 0)
-        panic("fork failed at i == %d", i);
-      if (pid == 0) // child process: stop forking further
-        return;
-    }
-  } else if (code == SIGCODE_EXIT)
+  else if (code == SIGCODE_EXIT)
     _exit(0);
   else if (code == SIGCODE_PAUSE)
     pause();
@@ -145,13 +136,30 @@ static void handler(int signum, siginfo_t *info, void *context) {
     panic("Unknown signal code: %d", code);
 }
 
+// A command read from the control file (see kstep_ctrl_read). A child of fork stops forking.
+static void dispatch(struct kstep_msg *msg) {
+  if (msg->cmd == KSTEP_CMD_FORK) {
+    for (int i = 0; i < msg->arg; i++) {
+      int pid = fork();
+      if (pid < 0)
+        panic("fork failed at i == %d", i);
+      if (pid == 0)
+        return;
+    }
+  } else
+    panic("Unknown command: %d", msg->cmd);
+}
+
 __attribute__((noreturn)) static int task_main(void) {
   struct sigaction sa = {.sa_sigaction = handler,
                          .sa_flags = SA_SIGINFO | SA_NODEFER};
+  struct kstep_msg msg;
   sigaction(SIGUSR1, &sa, NULL);
-  write(KSTEP_CTRL_FD, NULL, 0); // park until the first wakeup (see kstep_ctrl_write)
+  // The first read parks until the first wakeup; later ones halt until told otherwise, or
+  // hand over a command (see kstep_ctrl_read).
   while (1)
-    read(KSTEP_CTRL_FD, NULL, 0); // run: halt until told otherwise (see kstep_ctrl_read)
+    if (read(KSTEP_CTRL_FD, &msg, sizeof(msg)) == sizeof(msg))
+      dispatch(&msg);
 }
 
 // ============================================================================

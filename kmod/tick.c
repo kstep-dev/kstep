@@ -91,6 +91,7 @@ void kstep_tick(void) {
   kstep_bandwidth_tick();
   if (kstep_driver->on_tick_end)
     kstep_driver->on_tick_end();
+  kstep_output_flush(); // the tick's records and the hooks' events, in one write
 }
 
 // Nothing is left to happen on the CPU without a new controller action: no wakeup or reschedule
@@ -108,7 +109,7 @@ static bool kstep_cpu_settled(int cpu) {
 #endif
   if (curr == rq->idle)
     return READ_ONCE(rq->nr_running) == 0;
-  return READ_ONCE(per_cpu(kstep_settled_task, cpu)) == curr && !signal_pending(curr);
+  return kstep_task_settled(curr);
 }
 
 // Wait until every CPU but the controller's has acted on what was asked of it. Ends each step (a
