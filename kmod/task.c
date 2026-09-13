@@ -266,14 +266,14 @@ void kstep_task_set_policy(struct task_struct *p, int policy) {
   TRACE_INFO("Set policy of task %d to %d", p->pid, policy);
 }
 
-void kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask) {
+// Returns -EINVAL when the mask does not intersect the task's cpuset (cgroup cpuset.cpus).
+int kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask) {
   // directly call set_cpus_allowed_ptr is not enough, as it does not update the user_cpus_ptr
   KSYM_IMPORT(sched_setaffinity);
   kstep_cov_enable_controller();
   int err = KSYM_sched_setaffinity(p->pid, mask);
   kstep_cov_disable_controller();
-  if (err)
-    panic("Failed to set CPU affinity for task %d to CPUs %*pbl", p->pid, cpumask_pr_args(mask));
+  return err;
 }
 
 void kstep_task_pin(struct task_struct *p, int begin, int end) {
@@ -281,6 +281,7 @@ void kstep_task_pin(struct task_struct *p, int begin, int end) {
   cpumask_clear(&mask);
   for (int i = begin; i <= end; i++)
     cpumask_set_cpu(i, &mask);
-  kstep_task_set_affinity(p, &mask);
+  if (kstep_task_set_affinity(p, &mask))
+    panic("Failed to set CPU affinity for task %d to CPUs %*pbl", p->pid, cpumask_pr_args(&mask));
   TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
 }
