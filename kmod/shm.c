@@ -8,7 +8,6 @@
 #include "shm.h"
 
 static struct kstep_shm *shm;
-static DEFINE_RAW_SPINLOCK(event_lock); // hooks on any CPU append events
 
 phys_addr_t kstep_shm_init(void) {
   shm = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, get_order(sizeof(*shm)));
@@ -16,6 +15,8 @@ phys_addr_t kstep_shm_init(void) {
     panic("Failed to allocate the shared region");
   return virt_to_phys(shm);
 }
+
+u8 *kstep_shm_cov(void) { return shm->cov; }
 
 // The state after a command. The isolated CPUs are held while a command runs, so their queues
 // can be read directly. tasks[n - 1] is the cli's task number n; exited tasks are skipped.
@@ -96,22 +97,3 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
   WRITE_ONCE(shm->hdr.gen, shm->hdr.gen + 1); // even: consistent
 }
 
-// A trace event, from any context: published by nevents once written.
-void kstep_shm_event(u32 type, u32 task, u32 src_cpu, u32 dst_cpu, const char *name) {
-  unsigned long flags;
-  struct kstep_shm_event *e;
-
-  raw_spin_lock_irqsave(&event_lock, flags);
-  e = &shm->event[shm->hdr.nevents % KSTEP_SHM_EVENTS];
-  *e = (struct kstep_shm_event){.timestamp = kstep_jiffies_get(), .type = type, .task = task, .src_cpu = src_cpu, .dst_cpu = dst_cpu};
-  if (name)
-    strscpy(e->name, name, sizeof(e->name));
-  smp_wmb();
-  WRITE_ONCE(shm->hdr.nevents, shm->hdr.nevents + 1);
-  raw_spin_unlock_irqrestore(&event_lock, flags);
-}
-
-// on_sched_balance_selected: a CPU's balancer looked for work in a domain
-void kstep_shm_balance(int cpu, struct sched_domain *sd) {
-  kstep_shm_event(KSTEP_EVENT_BALANCE, 0, 0, cpu, sd->name);
-}

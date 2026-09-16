@@ -12,21 +12,6 @@ RESULTS_DIR = PROJ_DIR / "results"
 BUILD_DIR = PROJ_DIR / "build"
 BUILD_CURR_DIR = BUILD_DIR / "current"
 
-ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-FUZZ_DIR = RESULTS_DIR / f"tmp_{ts}"
-FUZZ_SUCCESS_DIR = FUZZ_DIR / "success"
-FUZZ_ERROR_DIR = FUZZ_DIR / "error"
-FUZZ_CORPUS_DIR = FUZZ_DIR / "corpus"
-
-
-def fuzz_mode_dir(mode: str) -> Path:
-    name = {
-        "fresh": "fresh",
-        "replay": "replay",
-        "mutate": "mutation",
-    }.get(mode, mode)
-    return RESULTS_DIR / "fuzz" / name
-
 
 @dataclass(frozen=True)
 class ResultDir:
@@ -55,10 +40,6 @@ class ResultDir:
     def log(self) -> Path: return self.path / "qemu.log"
     @property
     def output(self) -> Path: return self.path / "kstep.jsonl"
-    @property
-    def cov(self) -> Path: return self.path / "kstep.cov"
-    @property
-    def sock(self) -> Path: return self.path / "qemu.sock"
     @property
     def debug_log(self) -> Path: return self.path / "debug.log"
 

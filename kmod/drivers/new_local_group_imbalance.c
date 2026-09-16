@@ -3,6 +3,8 @@
 
 static struct task_struct *tasks[6];
 static void setup(void) {
+  kstep_on_tick_end(kstep_output_nr_running);
+  kstep_on_balance_selected(kstep_output_balance);
   kstep_topo_set("CLS=0|1-2|3-4");
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
@@ -29,6 +31,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "local_group_imbalance",
     .setup = setup,
     .run = run,
-    .on_tick_end = kstep_output_nr_running,
-    .on_sched_balance_selected = kstep_output_balance,
 };

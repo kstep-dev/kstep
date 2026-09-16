@@ -18,8 +18,14 @@
 #define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 #define KSTEP_NR_CPUS (32)
 
+// The test CPUs: every online CPU but 0, which is kstep's controller and runs no session task.
+#define for_each_test_cpu(cpu) for (int cpu = 1, _ncpus = num_online_cpus(); cpu < _ncpus; cpu++)
+
 // main.c
 extern struct kstep_driver *kstep_driver;
+
+// kernel.c
+bool kstep_freezer_active(void); // the system-wide freezer, which kstep_freeze_task runs itself
 
 // tick.c
 void kstep_tick_init(void);
@@ -37,8 +43,7 @@ u64 kstep_jiffies_get(void);
 // shm.c: the region of guest memory the host reads directly (shm.h)
 phys_addr_t kstep_shm_init(void);
 void kstep_shm_update(struct task_struct **tasks, int ntasks);
-void kstep_shm_event(u32 type, u32 task, u32 src_cpu, u32 dst_cpu, const char *name);
-void kstep_shm_balance(int cpu, struct sched_domain *sd);
+u8 *kstep_shm_cov(void);
 
 // io.c
 void kstep_io_init(void);
@@ -67,19 +72,10 @@ bool kstep_task_settled(struct task_struct *p); // in the halt of the control fi
 // kernel.c
 void kstep_cgroup_init(void);
 
-// fuzz/cov.c (built with CONFIG_KSTEP_COV only, see Kbuild)
-#ifdef CONFIG_KSTEP_COV
-void kstep_cov_init(void);
-void kstep_cov_enable(void);
-void kstep_cov_enable_controller(void);
-void kstep_cov_disable_controller(void);
-void kstep_cov_disable(void);
-void kstep_cov_dump(void);
-void kstep_cov_cmd_id_inc(void);
-#else
-static inline void kstep_cov_enable_controller(void) {}
-static inline void kstep_cov_disable_controller(void) {}
-#endif
+// cov.c: the edge map over kernel/sched (kernels built with linux/config.kstep.cov; a no-op otherwise)
+void kstep_cov_init(u8 *map);
+// Bracket a scheduler call the controller makes on a task's behalf: CPU 0 is recorded while on.
+void kstep_cov_controller(bool on);
 
 // sym.c
 struct kstep_driver *kstep_sym_init(const char *driver_name);

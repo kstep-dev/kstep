@@ -44,9 +44,9 @@ git clone --recurse-submodules https://github.com/kstep-dev/kstep && cd kstep
 | **[driver_util_avg.c](kmod/drivers/util_avg.c)** <br> **Fix**: [linux@17e3e88](https://github.com/torvalds/linux/commit/17e3e88ed0b6318fde0d1c14df1a804711cab1b5) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg/fixed/kstep.jsonl) | <img src="https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg/plot.png" style="width: 50%;"> |
 | **[long_balance.c](kmod/drivers/long_balance.c)** <br> **Fix**: [linux@2feab24](https://github.com/torvalds/linux/commit/2feab2492deb2f14f9675dd6388e9e2bf669c27a) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_long_balance/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_long_balance/fixed/kstep.jsonl) | <img src="https://raw.githubusercontent.com/kstep-dev/results/main/repro_long_balance/plot.png" style="width: 50%;"> |
 | **[lag_vruntime.c](kmod/drivers/lag_vruntime.c)** <br> **Fix**: [linux@5068d84](https://github.com/torvalds/linux/commit/5068d84054b766efe7c6202fc71b2350d1c326f1) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_lag_vruntime/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_lag_vruntime/fixed/kstep.jsonl) | <img src="https://raw.githubusercontent.com/kstep-dev/results/main/repro_lag_vruntime/plot.png" style="width: 50%;"> |
-| **[even_idle_cpu.c](kmod/drivers_new_bugs/even_idle_cpu.c)** <br> **Fix**: [even_idle_cpu.patch](linux/even_idle_cpu.patch) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_even_idle_cpu/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_even_idle_cpu/fixed/kstep.jsonl) | ![](https://raw.githubusercontent.com/kstep-dev/results/main/repro_even_idle_cpu/plot.png) |
-| **[local_group_imbalance.c](kmod/drivers_new_bugs/local_group_imbalance.c)** <br> **Fix**: [fix_local_group_imbalanced.patch](linux/fix_local_group_imbalanced.patch) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_local_group_imbalance/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_local_group_imbalance/fixed/kstep.jsonl) | ![](https://raw.githubusercontent.com/kstep-dev/results/main/repro_local_group_imbalance/plot.png) |
-| **[util_avg_jump.c](kmod/drivers_new_bugs/util_avg_jump.c)** <br> **Fix**: [fix_util_avg_jump.patch](linux/fix_util_avg_jump.patch) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg_jump/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg_jump/fixed/kstep.jsonl) | <img src="https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg_jump/plot.png" style="width: 50%;"> |
+| **[even_idle_cpu.c](kmod/drivers/new_even_idle_cpu.c)** <br> **Fix**: [even_idle_cpu.patch](linux/even_idle_cpu.patch) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_even_idle_cpu/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_even_idle_cpu/fixed/kstep.jsonl) | ![](https://raw.githubusercontent.com/kstep-dev/results/main/repro_even_idle_cpu/plot.png) |
+| **[local_group_imbalance.c](kmod/drivers/new_local_group_imbalance.c)** <br> **Fix**: [fix_local_group_imbalanced.patch](linux/fix_local_group_imbalanced.patch) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_local_group_imbalance/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_local_group_imbalance/fixed/kstep.jsonl) | ![](https://raw.githubusercontent.com/kstep-dev/results/main/repro_local_group_imbalance/plot.png) |
+| **[util_avg_jump.c](kmod/drivers/new_util_avg_jump.c)** <br> **Fix**: [fix_util_avg_jump.patch](linux/fix_util_avg_jump.patch) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg_jump/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg_jump/fixed/kstep.jsonl) | <img src="https://raw.githubusercontent.com/kstep-dev/results/main/repro_util_avg_jump/plot.png" style="width: 50%;"> |
 | **[rt_runtime_toggle.c](kmod/drivers/rt_runtime_toggle.c)** <br> **Fix**: [linux@9b58e97](https://github.com/torvalds/linux/commit/9b58e976b3b391c0cf02e038d53dd0478ed3013c) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_rt_runtime_toggle/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_rt_runtime_toggle/fixed/kstep.jsonl) | ![](https://raw.githubusercontent.com/kstep-dev/results/main/repro_rt_runtime_toggle/plot.png) |
 | **[uclamp_inversion.c](kmod/drivers/uclamp_inversion.c)** <br> **Fix**: [linux@0213b70](https://github.com/torvalds/linux/commit/0213b7083e81f4acd69db32cb72eb4e5f220329a) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_uclamp_inversion/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_uclamp_inversion/fixed/kstep.jsonl) | <img src="https://raw.githubusercontent.com/kstep-dev/results/main/repro_uclamp_inversion/plot.png" style="width: 50%;"> |
 | **[h_nr_runnable.c](kmod/drivers/h_nr_runnable.c)** <br> **Fix**: [linux@3429dd5](https://github.com/torvalds/linux/commit/3429dd57f0deb1a602c2624a1dd7c4c11b6c4734) <br> [buggy.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_h_nr_runnable/buggy/kstep.jsonl), [fixed.jsonl](https://raw.githubusercontent.com/kstep-dev/results/main/repro_h_nr_runnable/fixed/kstep.jsonl) | <img src="https://raw.githubusercontent.com/kstep-dev/results/main/repro_h_nr_runnable/plot.png" style="width: 50%;"> |
@@ -81,7 +81,7 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 ./run.py <name> [--num_cpus <n>] [--mem_mb <mb>] [--build <name>] [--label <dir>]
 ```
 
-- `<name>`: Driver to run (see `*.c` files in [`kmod/drivers/`](kmod/drivers/) and [`kmod/drivers_new_bugs/`](kmod/drivers_new_bugs/)).
+- `<name>`: Driver to run (see `*.c` files in [`kmod/drivers/`](kmod/drivers/)).
 - `[--build <name>]`: kernel build to run against (defaults to `build/current`).
 - `[--label <dir>]`: subdir under `results/` for output; defaults to a timestamped `tmp_*` dir. `results/latest` symlinks to it.
 - See `./run.py --help` for `--topology`, `--frequency`, `--capacity`, `--debug`, etc.
@@ -91,10 +91,10 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 ## 📁 Directory Structure
 
 - **kmod/**: Kernel module (`kmod.ko`) loaded at boot
-  - `drivers/`, `drivers_new_bugs/`: bug-specific drivers (one `.c` per bug)
-  - `fuzz/`: fuzz executor, op handlers, coverage, sanity checks
+  - `drivers/`: bug-specific drivers (one `.c` per bug)
+  - `checkers/`: rules over scheduler state and decisions, enabled by the cli's `check` verb
   - `cli.c`: interactive driver behind the website playground (text commands in and JSON replies out on the virtio console port)
-  - `cpu.c`: topology, capacity, frequency setup (also the `topology=`/`capacity=`/`frequency=` boot parameters)
+  - `cpu.c`: topology, capacity and frequency setup, behind the `cpu-topo`/`cpu-cap`/`cpu-freq` cli verbs
   - `driver.h`: public API for drivers (task creation, ticking, cgroups, etc.)
   - `internal.h` and other top-level `*.c`: framework primitives
 
@@ -111,6 +111,11 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
   - `user`: statically linked userspace binary
   - `<name>/`: `kernel` (the image QEMU boots: the bzImage on x86, the Image on arm64; plus `vmlinux` for gdb/addr2line) and `rootfs.cpio` (kmod.ko + user); `linux/` source tree; `kmod/` module build dir with `kmod.ko` and the clangd `compile_commands.json` (the project root symlinks to it)
 
-- **results/**: Run outputs. See [`results/README.md`](https://github.com/kstep-dev/results). `repro_<bug>/` and `fuzz_<bug>/` are tracked; `tmp_*` are gitignored.
+- **results/**: Run outputs. See [`results/README.md`](https://github.com/kstep-dev/results). `repro_<bug>/` is tracked; `tmp_*` are gitignored. The fuzzer's per-client runs land in `fuzz_<build>_<n>/`.
 
-- **scripts/**: Python utilities for fuzz orchestration, coverage parsing, and plotting.
+- **fuzzer/**: LibAFL fuzzer (`./fuzz.sh <bug>`), a host-side client of the `cli` driver; corpora and findings under `fuzzer/out/` (gitignored)
+  - the earlier in-guest fuzzer it replaced is kept for reference in [`docs/archive/old_fuzzer/`](docs/archive/old_fuzzer/)
+
+- **scripts/**: Python utilities for log parsing and plotting.
+
+- **bugs.yaml**: one entry per bug -- how to build, run, reproduce and fuzz it; read by `reproduce.py`, `run.py --bug` and the fuzzer

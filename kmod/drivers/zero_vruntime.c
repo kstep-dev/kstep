@@ -16,7 +16,10 @@
 static struct task_struct *solo_task;
 static struct task_struct *new_task;
 
+static void on_tick(void);
+
 static void setup(void) {
+  kstep_on_tick_begin(on_tick);
   solo_task = kstep_task_create();
   new_task = kstep_task_create();
 }
@@ -93,6 +96,5 @@ KSTEP_DRIVER_DEFINE{
     .name = "zero_vruntime",
     .setup = setup,
     .run = run,
-    .on_tick_begin = on_tick,
 };
 #endif

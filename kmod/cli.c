@@ -6,18 +6,25 @@
 //
 // Tasks are numbered 1, 2, .. in creation order; a number is never reused.
 //
-//   create                    new runnable CFS task on CPUs 1..N-1    -> {"timestamp":T,"task":N}
-//   tick                      advance one tick
+//   create [n]                n new runnable CFS tasks on CPUs 1..N-1 -> {"timestamp":T,"task":N}
+//   tick [n]                  advance n ticks (default 1)
 //   nice <n> <-20..19>        kept across a spell as fifo/rr
 //   policy <n> <normal|batch|idle|fifo|rr>   real-time classes run at one fixed priority
 //   affinity <n> <cpulist>    e.g. 1-2,4
 //   pause <n> / wake <n>      sleep when the task next runs / wake it
+//   block <n>                 like pause, in a freezable sleep (nanosleep)
+//   freeze <n> / thaw <n>     freeze the task where it stands, under the freezer / thaw it
 //   wait <n> / post <n>       semaphore: sleep until a post / wake one waiter with a sync wakeup
 //   kill <n>                  exit when the task next runs
 //   cgroup-create /a          the parent must exist; / is the root
 //   cgroup-weight /a <w>      cpu.weight, 1..10000 (default 100)
 //   cgroup-cpus /a <cpulist>  cpuset.cpus
-//   attach <n> /a             `attach <n> /` moves the task back to the root
+//   cgroup-destroy /a         it must hold no task and no child
+//   cgroup-attach /a <n>      `cgroup-attach / <n>` moves the task back to the root
+//   cpu-cap <cpu>=<scale>,...   CPU capacity, 1..1024; what the hardware is, so set it first
+//   cpu-topo <lvl>=<g>|<g>;...  e.g. SMT=0|1-2|3-4;CLS=0|1-2|3-4; rebuilds the sched domains
+//   cpu-freq <cpu>=<scale>,...  current frequency, as cpufreq changes it under a running system
+//   check <name>              enable a checker (checkers/); a rule that fires emits a warn record
 //   exit                      end the session (the VM reboots)
 #include <linux/cgroup.h>
 #include <linux/cpumask.h>
@@ -88,15 +95,22 @@ static struct task_struct *parse_task(char **arg, const char *usage) {
   return tasks[n - 1];
 }
 
+// create [n]: n tasks (default 1). The reply names the last one, so the caller knows the range.
 static void cmd_create(char *arg) {
-  struct task_struct *p;
+  int n = 1;
 
-  if (ntasks == KSTEP_SHM_TASKS)
+  if (arg && kstrtoint(arg, 10, &n))
+    return reply_error("usage: create [n]");
+  if (n < 1 || ntasks + n > KSTEP_SHM_TASKS)
     return reply_error("too many tasks");
-  p = kstep_task_create();
-  tasks[ntasks++] = p; // the task's kSTEP record keeps it referenced
-  kstep_task_pin(p, 1, last_cpu()); // keep off CPU 0, kSTEP's control CPU
-  kstep_task_wakeup(p);
+
+  for (int i = 0; i < n; i++) {
+    struct task_struct *p = kstep_task_create();
+
+    tasks[ntasks++] = p; // the task's kSTEP record keeps it referenced
+    kstep_task_pin(p, 1, last_cpu()); // keep off CPU 0, kSTEP's control CPU
+    kstep_task_wakeup(p);
+  }
   kstep_json_field_s64(&reply, "task", ntasks);
 }
 
@@ -108,7 +122,13 @@ static const struct {
     {"fifo", SCHED_FIFO},     {"rr", SCHED_RR},
 };
 
-static void cmd_tick(char *arg) { kstep_tick(); }
+static void cmd_tick(char *arg) {
+  int n = 1;
+
+  if (arg && (kstrtoint(arg, 10, &n) || n < 1 || n > 10000))
+    return reply_error("usage: tick [1..10000]");
+  kstep_tick_repeat(n);
+}
 
 // Both task affinity and cgroup cpusets must exclude the controller CPU.
 static bool parse_test_cpus(const char *arg, struct cpumask *mask) {
@@ -206,34 +226,75 @@ static void cmd_cgroup_cpus(char *arg) {
   reply_errno(kstep_cgroup_set_cpuset(name, arg));
 }
 
-static void cmd_attach(char *arg) {
-  const char *usage = "usage: attach <n> /path";
-  struct task_struct *p = parse_task(&arg, usage);
-  const char *name;
+static void cmd_cgroup_destroy(char *arg) {
+  const char *name = parse_cgroup(&arg, "usage: cgroup-destroy /path", false);
+  struct cgroup *cgrp;
+  bool busy;
 
-  if (!p || !(name = parse_cgroup(&arg, usage, false)))
+  if (!name)
+    return;
+  if (!*name)
+    return reply_error("cannot destroy the root cgroup");
+  cgrp = cgroup_get_from_path(name);
+  if (IS_ERR(cgrp))
+    return reply_error("no such cgroup");
+  busy = cgroup_is_populated(cgrp) || cgrp->nr_descendants; // children still offlining are not in the way
+  cgroup_put(cgrp);
+  if (busy)
+    return reply_error("cgroup has tasks or children");
+  kstep_cgroup_destroy(name);
+}
+
+static void cmd_cgroup_attach(char *arg) {
+  const char *usage = "usage: cgroup-attach /path <n>";
+  const char *name = parse_cgroup(&arg, usage, false);
+  struct task_struct *p;
+
+  if (!name || !(p = parse_task(&arg, usage)))
     return;
   reply_errno(kstep_cgroup_move_task(name, p->pid));
 }
+
+static void cmd_check(char *arg) {
+  if (!arg)
+    return reply_error("usage: check <name>");
+  if (kstep_check_enable(arg))
+    reply_error("no such check");
+}
+
+// The machine: capacity and topology are what the hardware is, so a program sets them once,
+// before it starts; frequency changes under a running system, as cpufreq does. Each takes one
+// spec string and hands it to cpu.c, which reports what it could not parse.
+static const struct {
+  const char *verb, *usage;
+  void (*set)(const char *spec);
+} machine[] = {
+    {"cpu-cap", "usage: cpu-cap <cpu>=<scale>[,...]", kstep_cap_set},
+    {"cpu-topo", "usage: cpu-topo <level>=<group>|<group>[;...]", kstep_topo_set},
+    {"cpu-freq", "usage: cpu-freq <cpu>=<scale>[,...]", kstep_freq_set},
+};
 
 static const struct {
   const char *verb;
   void (*fn)(char *arg);
 } commands[] = {
     {"create", cmd_create}, {"tick", cmd_tick},
-    {"nice", cmd_nice},     {"policy", cmd_policy},     {"affinity", cmd_affinity}, {"attach", cmd_attach},
+    {"nice", cmd_nice},     {"policy", cmd_policy},     {"affinity", cmd_affinity},
     {"cgroup-create", cmd_cgroup_create}, {"cgroup-weight", cmd_cgroup_weight},
-    {"cgroup-cpus", cmd_cgroup_cpus},
+    {"cgroup-cpus", cmd_cgroup_cpus}, {"cgroup-destroy", cmd_cgroup_destroy},
+    {"cgroup-attach", cmd_cgroup_attach},
+    {"check", cmd_check},
 };
 
-// Verbs that signal a task: the SIGUSR1 handler in user/user.c does the work; the signal has
-// settled before the verb returns (see kstep_task_signal).
+// Verbs that act on one task. Most tell it something through its control file (kmod/task.c) and it
+// acts when it next runs; freeze and thaw are done to it, by the freezer, where it stands.
 static const struct {
   const char *verb;
   void (*fn)(struct task_struct *p);
 } signals[] = {
-    {"pause", kstep_task_pause}, {"wake", kstep_task_wakeup}, {"wait", kstep_task_wait},
+    {"pause", kstep_task_pause}, {"wake", kstep_task_wakeup}, {"block", kstep_task_block}, {"wait", kstep_task_wait},
     {"post", kstep_task_post},   {"kill", kstep_task_exit},
+    {"freeze", kstep_freeze_task}, {"thaw", kstep_thaw_task},
 };
 
 /* Returns false when the session should end. */
@@ -248,6 +309,14 @@ static bool execute(char *line) {
   for (int i = 0; i < ARRAY_SIZE(commands); i++)
     if (!strcmp(verb, commands[i].verb)) {
       commands[i].fn(arg);
+      return true;
+    }
+  for (int i = 0; i < ARRAY_SIZE(machine); i++)
+    if (!strcmp(verb, machine[i].verb)) {
+      if (arg)
+        machine[i].set(arg);
+      else
+        reply_error(machine[i].usage);
       return true;
     }
   for (int i = 0; i < ARRAY_SIZE(signals); i++)
@@ -267,23 +336,36 @@ static bool execute(char *line) {
   return true;
 }
 
-// on_task_migrate: one of our tasks moved (other processes are not reported)
-static void shm_migrate(struct task_struct *p, int src_cpu, int dst_cpu) {
+// A task migrate: one of our tasks moved (other processes are not reported)
+static void report_migrate(struct task_struct *p, int src_cpu, int dst_cpu) {
   int n = task_number(p);
 
   if (n)
-    kstep_shm_event(KSTEP_EVENT_MIGRATE, n, src_cpu, dst_cpu, NULL);
+    kstep_output_migrate(n, src_cpu, dst_cpu);
 }
 
 static phys_addr_t shm_phys;
 
-static void setup(void) { shm_phys = kstep_shm_init(); }
+// The session's tasks, for a rule that judges them as a set (checkers/).
+struct task_struct **kstep_session_tasks(int *n) {
+  *n = ntasks;
+  return tasks;
+}
+
+// The session's own reporting. The rules register for what they watch as they are enabled
+// (checkers/), so nothing here has to know which of them wants which event.
+static void setup(void) {
+  kstep_on_balance_selected(kstep_output_balance);
+  kstep_on_task_migrate(report_migrate);
+  shm_phys = kstep_shm_init();
+}
 
 static void run(void) {
   struct kstep_json json;
   char line[LINE_MAX];
   bool more = true;
 
+  kstep_cov_init(kstep_shm_cov()); // from here on, the session's scheduler coverage (if the kernel has it)
   kstep_json_begin(&json);
   kstep_json_field_bool(&json, "ready", true);
   kstep_json_field_u64(&json, "shm", shm_phys); // guest-physical address of the shared region
@@ -306,6 +388,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "cli",
     .setup = setup,
     .run = run,
-    .on_sched_balance_selected = kstep_shm_balance,
-    .on_task_migrate = shm_migrate,
 };

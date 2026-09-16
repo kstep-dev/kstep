@@ -1,8 +1,10 @@
 #!/usr/bin/env -S uv run --script
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+
+import yaml
 
 from checkout import Linux, checkout
 from make import Build, build_kstep, build_linux
@@ -15,8 +17,12 @@ from scripts import (
 )
 
 
+BUGS_FILE = PROJ_DIR / "bugs.yaml"
+
+
 @dataclass(frozen=True)
 class Bug:
+    """One bugs.yaml entry: how to build, run, reproduce and fuzz a bug (fields documented there)."""
     name: str
     # Commit-based: buggy = fix~1, fixed = fix
     fix: str | None = None
@@ -25,14 +31,21 @@ class Bug:
     patch: str | None = None
     # Extra kernel config fragment to merge
     config: Path | None = None
-    # Driver options
+    extra: bool = False
+    plot_format: str | None = None
+    # The machine (run.py Driver fields)
     num_cpus: int = 2
     mem_mb: int = 128  # kSTEP itself needs ~20 MB
-    plot_format: str | None = None
+    # Fuzzing cli material (checks, verbs, setup), see bugs.yaml
+    fuzz: dict = field(default_factory=dict)
+
+    @property
+    def machine(self) -> dict:
+        return {k: getattr(self, k) for k in ("num_cpus", "mem_mb")}
 
     @property
     def driver(self) -> Driver:
-        return Driver(name=self.name, num_cpus=self.num_cpus, mem_mb=self.mem_mb)
+        return Driver(name=self.name, **self.machine)
 
     @property
     def linux(self) -> list[Linux]:
@@ -57,50 +70,24 @@ class Bug:
                 f"Bug '{self.name}': specify either 'fix' or 'ref'+'patch'"
             )
 
+    def print_facts(self):
+        """One `key value` line per fact, for the fuzzer."""
+        print("name", self.name)
+        for k, v in self.machine.items():
+            if v is not None:
+                print(k, v)
+        for k in ("checks", "verbs", "setup"):
+            for line in self.fuzz.get(k, []):
+                print(k.rstrip("s") if k != "setup" else k, line)
 
-# fmt: off
-BUGS = [
-    Bug("sync_wakeup", ref="v6.14", patch="sync_wakeup.patch", num_cpus=3, plot_format="curr_task"),
-    Bug("vruntime_overflow", fix="bbce3de72be56e4b5f68924b7da9630cc89aa1a8", plot_format="curr_task"),
-    Bug("freeze", fix="cd9626e9ebc77edec33023fe95dab4b04ffc819d", plot_format="curr_task"),
-    Bug("extra_balance", fix="6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3", num_cpus=5, plot_format="lb_nr_running"),
-    Bug("util_avg", fix="17e3e88ed0b6318fde0d1c14df1a804711cab1b5", plot_format="val"),
-    Bug("long_balance", fix="2feab2492deb2f14f9675dd6388e9e2bf669c27a", num_cpus=3, mem_mb=4096, plot_format="rebalance"),
-    Bug("lag_vruntime", fix="5068d84054b766efe7c6202fc71b2350d1c326f1", plot_format="min_vruntime"),
-    Bug(
-        "even_idle_cpu",
-        ref="v6.17",
-        patch="even_idle_cpu.patch",
-        num_cpus=5,
-        plot_format="lb_nr_running",
-    ),
-    Bug(
-        "local_group_imbalance",
-        ref="c369299895a591d96745d6492d4888259b004a9e",
-        patch="fix_local_group_imbalanced.patch",
-        num_cpus=5,
-        plot_format="lb_nr_running",
-    ),
-    Bug(
-        "util_avg_jump",
-        ref="c369299895a591d96745d6492d4888259b004a9e",
-        patch="fix_util_avg_jump.patch",
-        num_cpus=2,
-        plot_format="val",
-    ),
-]
-BUGS_EXTRA = [
-    Bug("rt_runtime_toggle", fix="9b58e976b3b391c0cf02e038d53dd0478ed3013c", plot_format="curr_task"),
-    Bug("uclamp_inversion", fix="0213b7083e81f4acd69db32cb72eb4e5f220329a", plot_format="val"),
-    Bug("h_nr_runnable", fix="3429dd57f0deb1a602c2624a1dd7c4c11b6c4734", plot_format="val"),
-    Bug("vlag_overflow", fix="1560d1f6eb6b398bddd80c16676776c0325fe5fe", num_cpus=3),
-    Bug("throttled_limbo_list", fix="956dfda6a70885f18c0f8236a461aa2bc4f556ad", num_cpus=3),
-    Bug("slice_update", fix="2f2fc17bab0011430ceb6f2dc1959e7d1f981444"),
-    Bug("avg_vruntime_ceil", fix="650cad561cce04b62a8c8e0446b685ef171bc3bb"),
-    Bug("min_deadline", fix="8dafa9d0eb1a1550a0f4d462db9354161bc51e0c"),
-    Bug("zero_vruntime", fix="b3d99f43c72b56cf7a104a364e7fb34b0702828b"),
-]
-# fmt: on
+
+def load_bugs() -> dict[str, Bug]:
+    return {name: Bug(name=name, **(entry or {})) for name, entry in yaml.safe_load(BUGS_FILE.read_text()).items()}
+
+
+ALL_BUGS = load_bugs()
+BUGS = [b for b in ALL_BUGS.values() if not b.extra]
+BUGS_EXTRA = [b for b in ALL_BUGS.values() if b.extra]
 
 
 def log_step(prefix: str, message: str):
@@ -112,8 +99,8 @@ def plot_data(python_script: str, driver: str):
     system(f"{PROJ_DIR}/scripts/plot_{python_script}.py {driver}")
 
 
-def reproduce(linux: Linux, driver: Driver):
-    kernel = f"{driver.name}_{linux.name}"
+def reproduce(bug: "Bug", linux: Linux):
+    kernel = f"{bug.name}_{linux.name}"
 
     log_step(kernel, "Checkout Linux")
     checkout(linux.ref, kernel=kernel, patch=linux.patch, tarball=True, set_current=False)
@@ -124,16 +111,16 @@ def reproduce(linux: Linux, driver: Driver):
     log_step(kernel, "Build kSTEP")
     build_kstep(b)
 
-    result_dir = ResultDir.create(f"repro_{driver.name}/{linux.name}")
+    result_dir = ResultDir.create(f"repro_{bug.name}/{linux.name}")
     log_step(kernel, "Run kSTEP")
     log_step(kernel, f"QEMU Log: {result_dir.log}")
     log_step(kernel, f"kSTEP Output: {result_dir.output}")
-    run_qemu(kernel=kernel, driver=driver, result_dir=result_dir, headless=True)
+    run_qemu(kernel=kernel, driver=bug.driver, result_dir=result_dir, headless=True)
 
 
 def main(bug: Bug, runs: list[str]):
     print("=" * 80, flush=True)
-    print(f" {bug.driver.name} ".center(80, "="), flush=True)
+    print(f" {bug.name} ".center(80, "="), flush=True)
     print("=" * 80, flush=True)
 
     linux_map = {linux.name: linux for linux in bug.linux}
@@ -141,13 +128,13 @@ def main(bug: Bug, runs: list[str]):
         if r == "plot":
             continue
         linux = linux_map.get(r, Linux(name=r, ref=r))
-        reproduce(linux, bug.driver)
+        reproduce(bug, linux)
 
     if "plot" in runs:
         if bug.plot_format:
-            plot_data(bug.plot_format, bug.driver.name)
+            plot_data(bug.plot_format, bug.name)
         else:
-            print(f"Plot format not specified for bug '{bug.driver.name}'")
+            print(f"Plot format not specified for bug '{bug.name}'")
 
 
 if __name__ == "__main__":
@@ -156,7 +143,7 @@ if __name__ == "__main__":
         "name",
         type=str,
         default="all",
-        choices=["all", "extra", *[bug.driver.name for bug in BUGS + BUGS_EXTRA]],
+        choices=["all", "extra", *ALL_BUGS],
         help="The name of the bug to reproduce, or 'all' to reproduce all BUGS.",
     )
     parser.add_argument(
@@ -165,19 +152,19 @@ if __name__ == "__main__":
         default=["buggy", "fixed", "plot"],
         nargs="+",
     )
+    parser.add_argument("--print", action="store_true", help="print the bug's facts from bugs.yaml and exit (the fuzzer reads them)")
     args = parser.parse_args()
+
+    if args.print:
+        ALL_BUGS[args.name].print_facts()
+        raise SystemExit
 
     if args.name == "all":
         selected_bugs = BUGS
     elif args.name == "extra":
         selected_bugs = BUGS_EXTRA
     else:
-        bug = next(
-            (bug for bug in BUGS + BUGS_EXTRA if bug.driver.name == args.name), None
-        )
-        if not bug:
-            raise ValueError(f"Bug '{args.name}' not found.")
-        selected_bugs = [bug]
+        selected_bugs = [ALL_BUGS[args.name]]
 
     print(f"running {len(selected_bugs)} bug(s)")
     for bug in selected_bugs:

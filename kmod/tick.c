@@ -4,7 +4,7 @@
 
 static void kstep_disable_sched_timer(void) {
   KSYM_IMPORT(tick_get_tick_sched);
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+  for_each_test_cpu(cpu) {
     // Ref: tick_sched_timer_dying in
     // https://elixir.bootlin.com/linux/v6.14/source/kernel/time/tick-sched.c#L1606
     struct tick_sched *ts = KSYM_tick_get_tick_sched(cpu);
@@ -36,11 +36,9 @@ static void kstep_do_sched_tick(void *data) {
   // Drain SCHED_SOFTIRQ synchronously to avoid non-deterministic delivery
   if (local_softirq_pending() & (1 << SCHED_SOFTIRQ)) {
     set_softirq_pending(local_softirq_pending() & ~(1 << SCHED_SOFTIRQ));
-    if (kstep_driver->on_sched_softirq_begin)
-      kstep_driver->on_sched_softirq_begin();
+    kstep_emit(softirq_begin, kstep_void_fn);
     sched_softirq_fn();
-    if (kstep_driver->on_sched_softirq_end)
-      kstep_driver->on_sched_softirq_end();
+    kstep_emit(softirq_end, kstep_void_fn);
   }
 }
 
@@ -81,16 +79,14 @@ static void kstep_bandwidth_tick(void) {
 
 void kstep_tick(void) {
   kstep_settle(); // actions since the last step (nice, cgroup writes, ...) have taken effect
-  if (kstep_driver->on_tick_begin)
-    kstep_driver->on_tick_begin();
+  kstep_emit(tick_begin, kstep_void_fn);
   kstep_sched_clock_tick();
   kstep_jiffies_tick();
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
+  for_each_test_cpu(cpu)
     smp_call_function_single(cpu, kstep_do_sched_tick, NULL, 1);
   kstep_settle(); // every CPU has acted on the reschedule its tick asked for
   kstep_bandwidth_tick();
-  if (kstep_driver->on_tick_end)
-    kstep_driver->on_tick_end();
+  kstep_emit(tick_end, kstep_void_fn);
 }
 
 // Nothing is left to happen on the CPU without a new controller action: no wakeup or reschedule
@@ -115,9 +111,10 @@ static bool kstep_cpu_settled(int cpu) {
 // tick or a signal to a task), so the driver reads a complete state, and begins each tick, so
 // other actions (nice, policy, affinity, cgroup writes) have taken effect before it is observed.
 void kstep_settle(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
+  for_each_test_cpu(cpu)
     while (!kstep_cpu_settled(cpu))
       cpu_relax();
+  kstep_emit(settle, kstep_void_fn); // the step is complete: whatever judges one does it here
 }
 
 void kstep_tick_repeat(int n) {

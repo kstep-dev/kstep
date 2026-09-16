@@ -5,7 +5,10 @@
 
 static struct task_struct *tasks[2];
 
+static void on_tick_begin(void);
+
 static void setup(void) {
+  kstep_on_tick_begin(on_tick_begin);
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
 }
@@ -45,5 +48,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "util_avg",
     .setup = setup,
     .run = run,
-    .on_tick_begin = on_tick_begin,
 };

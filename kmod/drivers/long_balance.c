@@ -28,7 +28,11 @@ static void on_sched_softirq_end(void) {
 
 static struct task_struct *busy_task;
 
-static void setup(void) { busy_task = kstep_task_create(); }
+static void setup(void) {
+  kstep_on_softirq_begin(on_sched_softirq_begin);
+  kstep_on_softirq_end(on_sched_softirq_end);
+  busy_task = kstep_task_create();
+}
 
 static void run(void) {
   kstep_task_pin(busy_task, 1, 1);
@@ -41,6 +45,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "long_balance",
     .setup = setup,
     .run = run,
-    .on_sched_softirq_begin = on_sched_softirq_begin,
-    .on_sched_softirq_end = on_sched_softirq_end,
 };

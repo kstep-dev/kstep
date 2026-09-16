@@ -11,7 +11,10 @@
 static struct task_struct *target_task;
 static struct task_struct *other_task;
 
+static void on_tick_begin(void);
+
 static void setup(void) {
+  kstep_on_tick_begin(on_tick_begin);
   kstep_cgroup_create("g0");
   kstep_cgroup_create("g1");
 
@@ -65,6 +68,5 @@ KSTEP_DRIVER_DEFINE{
     .name = "h_nr_runnable",
     .setup = setup,
     .run = run,
-    .on_tick_begin = on_tick_begin,
 };
 #endif
