@@ -1,0 +1,11 @@
+[package]
+name = "kstep-fuzzer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libafl = "0.16"
+libafl_bolts = "0.16"
+
+[profile.release]
+debug = 1

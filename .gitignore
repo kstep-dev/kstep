@@ -6,3 +6,5 @@ __pycache__
 
 # Build artifacts
 build/
+fuzzer/target
+fuzzer/out

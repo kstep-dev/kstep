@@ -2,7 +2,7 @@
 
 void kstep_disable_workqueue(void) {
   KSYM_IMPORT_TYPED(void, workqueue_offline_cpu);
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+  for_each_test_cpu(cpu) {
     work_on_cpu(cpu, KSYM_workqueue_offline_cpu, (void *)(uintptr_t)cpu);
     TRACE_INFO("Disabled workqueue on CPU %d", cpu);
   }

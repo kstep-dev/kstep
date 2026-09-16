@@ -6,6 +6,7 @@ static struct task_struct *starved_task;
 static struct task_struct *other_task;
 
 static void setup(void) {
+  kstep_on_tick_begin(kstep_output_curr_task);
   kstep_cgroup_create("g0");
   kstep_cgroup_create("g0/g1");
   kstep_cgroup_create("g0/g2");
@@ -56,5 +57,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "vruntime_overflow",
     .setup = setup,
     .run = run,
-    .on_tick_begin = kstep_output_curr_task,
 };

@@ -3,31 +3,30 @@
 
 #include <linux/sched.h>
 
+#include "event.h"
+
 #define TRACE_INFO(fmt, ...) pr_info("\033[92m" fmt "\033[0m\n", ##__VA_ARGS__)
 #define DRIVER_NAME_LEN 32
 
-struct sched_domain;
+// A driver is the program kstep runs: it sets up the session and steps it. That is all it is --
+// everything that happens during the session, down to the tick, is an event (event.h) a driver
+// registers for in its setup() like anyone else. So a driver that watches something carries no more
+// than one that does not, and the checkers and the shared-memory log watch the same events without
+// the driver knowing.
 struct kstep_driver {
   char name[DRIVER_NAME_LEN];
-  void (*setup)(void);
-  void (*run)(void);
-  // Callbacks before and after each tick
-  void (*on_tick_begin)(void);
-  void (*on_tick_end)(void);
-  // Callbacks before and after load balancing softirq
-  void (*on_sched_softirq_begin)(void);
-  void (*on_sched_softirq_end)(void);
-  // Callback at sched_balance_rq
-  void (*on_sched_balance_begin)(int cpu, struct sched_domain *sd);
-  // Callback after should_we_balance
-  void (*on_sched_balance_selected)(int cpu, struct sched_domain *sd);
-  // Callback at set_task_cpu (a task moves to another CPU: balancing or wakeup placement)
-  void (*on_task_migrate)(struct task_struct *p, int src_cpu, int dst_cpu);
-  // Callback at init_tg_cfs_entry (new task group cfs_rq created)
-  void (*on_sched_group_alloc)(struct task_group *tg, int cpu);
-  u64 tick_interval_ns;                // Virtual clock advance per tick in ns
+  void (*setup)(void); // build the session: the machine, the tasks, and what this driver watches
+  void (*run)(void);   // step it
+  u64 tick_interval_ns; // Virtual clock advance per tick in ns
 };
 #define KSTEP_DRIVER_DEFINE static struct kstep_driver DRIVER __used =
+
+// The session's tasks, for anything that judges them as a set (the cli driver owns them)
+struct task_struct **kstep_session_tasks(int *ntasks);
+
+// checkers/: enabling a rule is the rule registering for the events it watches, so this is the
+// whole interface -- the cli's `check` verb and nothing else.
+int kstep_check_enable(const char *name); // 0, or -ENOENT for an unknown name
 
 // io.c
 struct kstep_json {
@@ -55,6 +54,7 @@ void kstep_print_sched_debug(void);
 void kstep_output_curr_task(void);
 void kstep_output_nr_running(void);
 void kstep_output_balance(int cpu, struct sched_domain *sd);
+void kstep_output_migrate(u32 task, int src_cpu, int dst_cpu);
 
 // tick.c
 void kstep_tick(void);
@@ -113,6 +113,5 @@ void kstep_topo_set(const char *spec);
 void kstep_cap_set(const char *spec);
 void kstep_freq_set(const char *spec);
 void kstep_cpu_print(void);
-void kstep_cpu_apply_params(void); // topology=/capacity=/frequency= boot params
 
 #endif

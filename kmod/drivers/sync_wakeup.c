@@ -15,6 +15,7 @@
 static struct task_struct *other, *waker, *wakee;
 
 static void setup(void) {
+  kstep_on_tick_begin(kstep_output_curr_task);
   other = kstep_task_create();
   waker = kstep_task_create();
   wakee = kstep_task_create();
@@ -63,5 +64,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "sync_wakeup",
     .setup = setup,
     .run = run,
-    .on_tick_begin = kstep_output_curr_task,
 };

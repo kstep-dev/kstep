@@ -126,7 +126,7 @@ static void kstep_reset_task_groups(void) {
 }
 
 void kstep_reset_runqueues(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++)
+  for_each_test_cpu(cpu)
     kstep_reset_runqueue(cpu_rq(cpu));
   kstep_reset_task_groups();
   TRACE_INFO("Reset runqueues state");
@@ -136,7 +136,7 @@ void kstep_reset_cpumask(void) {
   KSYM_IMPORT_TYPED(int, distribute_cpu_mask_prev);
 // https://github.com/torvalds/linux/commit/46a87b3851f0d6eb05e6d83d5c5a30df0eca8f76
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+  for_each_test_cpu(cpu) {
     int *ptr = per_cpu_ptr(KSYM_distribute_cpu_mask_prev, cpu);
     *ptr = 0;
   }
@@ -148,7 +148,7 @@ void kstep_reset_cpumask(void) {
 void kstep_reset_dl_server(void) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
   KSYM_IMPORT(dl_server_apply_params);
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+  for_each_test_cpu(cpu) {
     u64 runtime = 0;
     u64 period = 1000 * NSEC_PER_MSEC;
     KSYM_dl_server_apply_params(&cpu_rq(cpu)->fair_server, runtime, period, 1);

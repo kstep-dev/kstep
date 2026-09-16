@@ -3,6 +3,8 @@
 static struct task_struct *tasks[4];
 
 static void setup(void) {
+  kstep_on_tick_begin(kstep_output_nr_running);
+  kstep_on_balance_selected(kstep_output_balance);
   kstep_cap_set("2=512,4=512");
   kstep_topo_set("CLS=0|1-2|3-4");
 
@@ -30,6 +32,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "even_idle_cpu",
     .setup = setup,
     .run = run,
-    .on_tick_begin = kstep_output_nr_running,
-    .on_sched_balance_selected = kstep_output_balance,
 };

@@ -186,9 +186,9 @@ static void kstep_task_signal(struct task_struct *p, enum sigcode code,
                               int val) {
   struct kernel_siginfo info = {
       .si_signo = SIGUSR1, .si_code = code, .si_int = val};
-  kstep_cov_enable_controller();
+  kstep_cov_controller(true);
   send_sig_info(SIGUSR1, &info, p);
-  kstep_cov_disable_controller();
+  kstep_cov_controller(false);
   kstep_settle();
   // Still pending: the task is not current (it acts after a tick) or frozen. Fine for a wakeup,
   // whose effect is the wakeup itself; settle covers it (rq->ttwu_pending is set before the IPI).
@@ -244,9 +244,9 @@ void kstep_task_block(struct task_struct *p) {
 
 // nice applies to the fair classes only; the kernel keeps it across a spell as fifo/rr.
 void kstep_task_set_nice(struct task_struct *p, int nice) {
-  kstep_cov_enable_controller();
+  kstep_cov_controller(true);
   set_user_nice(p, nice);
-  kstep_cov_disable_controller();
+  kstep_cov_controller(false);
   TRACE_INFO("Set nice of task %d to %d", p->pid, nice);
 }
 
@@ -260,9 +260,9 @@ void kstep_task_set_policy(struct task_struct *p, int policy) {
     attr.sched_priority = 80;
   else
     attr.sched_nice = task_nice(p);
-  kstep_cov_enable_controller();
+  kstep_cov_controller(true);
   sched_setattr_nocheck(p, &attr);
-  kstep_cov_disable_controller();
+  kstep_cov_controller(false);
   TRACE_INFO("Set policy of task %d to %d", p->pid, policy);
 }
 
@@ -270,10 +270,10 @@ void kstep_task_set_policy(struct task_struct *p, int policy) {
 int kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask) {
   // directly call set_cpus_allowed_ptr is not enough, as it does not update the user_cpus_ptr
   KSYM_IMPORT(sched_setaffinity);
-  kstep_cov_enable_controller();
-  int err = KSYM_sched_setaffinity(p->pid, mask);
-  kstep_cov_disable_controller();
-  return err;
+  kstep_cov_controller(true);
+  int ret = KSYM_sched_setaffinity(p->pid, mask);
+  kstep_cov_controller(false);
+  return ret;
 }
 
 void kstep_task_pin(struct task_struct *p, int begin, int end) {

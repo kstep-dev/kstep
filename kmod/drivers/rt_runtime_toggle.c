@@ -4,7 +4,10 @@
 
 static struct task_struct *rt;
 
-static void setup(void) { rt = kstep_task_create(); }
+static void setup(void) {
+  kstep_on_tick_begin(kstep_output_curr_task);
+  rt = kstep_task_create();
+}
 
 static void run(void) {
   kstep_sysctl_write("kernel.sched_rt_runtime_us", "%d", -1);
@@ -18,5 +21,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "rt_runtime_toggle",
     .setup = setup,
     .run = run,
-    .on_tick_begin = kstep_output_curr_task,
 };

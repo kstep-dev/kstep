@@ -29,7 +29,6 @@ static int __init kstep_main(void) {
   kstep_task_init();
   kstep_cgroup_init();
   kstep_trace_init(); // the group-alloc hook also sets min_vruntime
-  kstep_cpu_apply_params();
   kstep_driver->setup();
   kstep_cpu_print();
 
@@ -40,7 +39,8 @@ static int __init kstep_main(void) {
 
   kstep_sched_feat_disable("NI_RANDOM");
 
-  // Reset the scheduler state to initial state
+  // Reset the scheduler state to initial state, before the driver creates anything: a task is
+  // reset as it is created (kstep_task_create) and runnable from then on, in setup as in run.
   kstep_reset_runqueues();
   kstep_reset_cpumask();
   kstep_reset_tasks();

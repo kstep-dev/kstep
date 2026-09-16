@@ -15,7 +15,10 @@
 
 static struct task_struct *task;
 
+static void on_tick_begin(void);
+
 static void setup(void) {
+  kstep_on_tick_begin(on_tick_begin);
   task = kstep_task_create();
   // fake the frequency of cpu 1 to 50% of the base frequency
   kstep_freq_set("1=512");
@@ -47,6 +50,5 @@ KSTEP_DRIVER_DEFINE{
     .name = "util_avg_jump",
     .setup = setup,
     .run = run,
-    .on_tick_begin = on_tick_begin,
 };
 #endif

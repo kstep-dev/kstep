@@ -6,6 +6,8 @@
 static struct task_struct *tasks[5];
 
 static void setup(void) {
+  kstep_on_tick_begin(kstep_output_nr_running);
+  kstep_on_balance_selected(kstep_check_extra_balance);
   // SMT pairs: [1,2] [3,4], MC: [1-4]
   kstep_topo_set("SMT=0|1-2|3-4;CLS=0|1-2|3-4");
 
@@ -33,6 +35,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "extra_balance",
     .setup = setup,
     .run = run,
-    .on_tick_begin = kstep_output_nr_running,
-    .on_sched_balance_selected = kstep_check_extra_balance,
 };

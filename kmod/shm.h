@@ -1,22 +1,22 @@
 // The region of guest memory the host reads directly (shm.c writes it, website/site/kstep.mjs
-// decodes it; keep the two in step): the machine's state, rewritten after every cli command, and a
-// ring of trace events appended by scheduler hooks. gen is a seqlock over the state: odd while an
-// update is in progress, even and unchanged around a consistent read. nevents counts events ever
-// appended; the ring holds the last KSTEP_SHM_EVENTS of them.
+// decodes it; keep the two in step): the machine's state, rewritten after every cli command, and
+// the coverage map (cov.c). gen is a seqlock over the state: odd while an update is in progress,
+// even and unchanged around a consistent read. Trace events are not here: scheduler hooks write
+// them as JSON records on the driver's channel (io.c).
 #pragma once
 
+#include <linux/stddef.h>
 #include <linux/types.h>
 
 #define KSTEP_SHM_CPUS 8 // isolated CPUs 1..8
 #define KSTEP_SHM_TASKS 64
-#define KSTEP_SHM_EVENTS 256
+#define KSTEP_SHM_COV (1 << 16) // edge map, saturating byte counts
 
 struct kstep_shm_hdr {
   u32 gen;
   u32 timestamp; // logical ticks
   u32 ncpus, ntasks;
-  u32 nevents;
-  u32 reserved[3];
+  u32 reserved[4];
 };
 
 struct kstep_shm_cpu {
@@ -38,22 +38,14 @@ struct kstep_shm_task {
   char cgroup[32];
 };
 
-enum kstep_shm_event_type { KSTEP_EVENT_BALANCE, KSTEP_EVENT_MIGRATE };
-
-struct kstep_shm_event {
-  u32 timestamp, type;
-  u32 task, src_cpu, dst_cpu; // task: 0 for a balance
-  char name[12];              // balance: the sched domain's name
-};
-
 struct kstep_shm {
   struct kstep_shm_hdr hdr;
   struct kstep_shm_cpu cpu[KSTEP_SHM_CPUS];
   struct kstep_shm_task task[KSTEP_SHM_TASKS];
-  struct kstep_shm_event event[KSTEP_SHM_EVENTS];
+  u8 cov[KSTEP_SHM_COV];
 };
 
 static_assert(sizeof(struct kstep_shm_hdr) == 32);
 static_assert(sizeof(struct kstep_shm_cpu) == 64);
 static_assert(sizeof(struct kstep_shm_task) == 104);
-static_assert(sizeof(struct kstep_shm_event) == 32);
+static_assert(offsetof(struct kstep_shm, cov) == 7200); // fuzzer/src/main.rs reads it at this offset

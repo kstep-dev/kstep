@@ -349,33 +349,51 @@ bool kstep_task_is_frozen(struct task_struct *p) {
 #endif
 }
 
-void kstep_freeze_task(struct task_struct *p) {
-  if (kstep_task_is_frozen(p)) {
-    TRACE_INFO("Task %d already frozen", p->pid);
-    return;
-  }
-
-// https://github.com/torvalds/linux/commit/f5d39b020809146cc28e6e73369bf8065e0310aa
+// Between start and stop, freeze_task() freezes sleepers at once and running tasks freeze when
+// they next return to user space.
+static void kstep_freezer_start(void) {
+  KSYM_IMPORT(pm_freezing);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
   static_branch_inc(&freezer_active);
 #else
   atomic_inc(&system_freezing_cnt);
 #endif
-
-  KSYM_IMPORT(pm_freezing);
-  KSYM_IMPORT(freeze_task);
-
   *KSYM_pm_freezing = true;
+}
 
-  TRACE_INFO("Freezing task %d", p->pid);
-  KSYM_freeze_task(p);
-
+static void kstep_freezer_stop(void) {
+  KSYM_IMPORT(pm_freezing);
   *KSYM_pm_freezing = false;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 1, 0)
   static_branch_dec(&freezer_active);
 #else
   atomic_dec(&system_freezing_cnt);
 #endif
+}
+
+bool kstep_freezer_active(void) {
+  KSYM_IMPORT(pm_freezing);
+  return *KSYM_pm_freezing;
+}
+
+void kstep_freeze_task(struct task_struct *p) {
+  bool active = kstep_freezer_active(); // under a system-wide freeze, leave the freezer's state alone
+
+  if (kstep_task_is_frozen(p)) {
+    TRACE_INFO("Task %d already frozen", p->pid);
+    return;
+  }
+
+  KSYM_IMPORT(freeze_task);
+
+  if (!active)
+    kstep_freezer_start();
+  TRACE_INFO("Freezing task %d", p->pid);
+  unsigned int state_before = READ_ONCE(p->__state); // what freeze_task() is about to see
+  KSYM_freeze_task(p);
+  kstep_emit(freeze, kstep_freeze_fn, p, state_before);
+  if (!active)
+    kstep_freezer_stop();
 }
 
 void kstep_thaw_task(struct task_struct *p) {

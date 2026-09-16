@@ -6,7 +6,10 @@
 static struct task_struct *target_task;
 static struct task_struct *other_task;
 
+static void on_tick_begin(void);
+
 static void setup(void) {
+  kstep_on_tick_begin(on_tick_begin);
   // Create target task and add it to group g0
   target_task = kstep_task_create();
   // Create other tasks
@@ -42,5 +45,4 @@ KSTEP_DRIVER_DEFINE{
     .name = "lag_vruntime",
     .setup = setup,
     .run = run,
-    .on_tick_begin = on_tick_begin,
 };

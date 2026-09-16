@@ -1,0 +1,124 @@
+# The bugs kSTEP reproduces and fuzzes: one entry per bug, the single place that records what a
+# bug needs. Loaded by reproduce.py, which `run.py --bug X` (the X driver, or `run.py cli --bug X`,
+# on X's machine) and `kstep-fuzzer X` read through. Kernels live in build/<bug>_buggy and
+# build/<bug>_fixed. Fields:
+#   fix            the fix commit; buggy = fix~1, fixed = fix
+#   ref, patch     or: buggy = ref, fixed = ref + linux/<patch>
+#   config         extra kernel config fragment to merge
+#   extra          true for the bugs outside the paper's main table
+#   plot_format    scripts/plot_<format>.py draws the reproduction
+#   num_cpus, mem_mb   the machine (run.py Driver fields); capacity, topology and frequency
+#                      are cli verbs, so they belong in fuzz.setup
+#   fuzz:          what the fuzzer needs beyond the machine
+#     checks         checkers/ rules to enable
+#     verbs          cli verbs this bug needs beyond the general table (tick, policy, affinity,
+#                    pause, wake); fifo and rr are the policy verb with those policies
+#     setup          cli lines run before every fuzzed program: the initial condition. It makes the
+#                    tasks: create is not in the general table, so a program's task ids are fixed
+
+sync_wakeup:
+  ref: v6.14
+  patch: sync_wakeup.patch
+  num_cpus: 3
+  plot_format: curr_task
+  fuzz:
+    checks: [sync_wakeup]
+    verbs: [wait, post]
+    setup: ["create 3"]
+
+vruntime_overflow:
+  fix: bbce3de72be56e4b5f68924b7da9630cc89aa1a8
+  num_cpus: 2
+  plot_format: curr_task
+  fuzz:
+    checks: [vruntime]
+    verbs: [cgroup-create, cgroup-attach, cgroup-weight]
+    setup: ["create 3"]
+
+util_avg:
+  fix: 17e3e88ed0b6318fde0d1c14df1a804711cab1b5
+  num_cpus: 2
+  plot_format: val
+  fuzz:
+    # No rule yet. The signal is one tick's drop after a 1-tick sleep: 894->111 on the buggy kernel
+    # against 894->526 on the fixed one, so a flat threshold (util_decay's 1024, the old fuzzer's
+    # 1010) misses both. pelt's decay bound is the right shape but guards on a saturated CPU, and
+    # this one peaks at 908: a rule here has to bound how much catch-up decay one idle tick allows.
+    checks: []
+    verbs: [fifo, rr, cpu-freq]
+    setup: ["cpu-freq 1=512", "create 2"]
+
+freeze:
+  fix: cd9626e9ebc77edec33023fe95dab4b04ffc819d
+  num_cpus: 2
+  plot_format: curr_task
+  fuzz:
+    checks: [frozen]
+    verbs: [freeze, thaw, block]
+    setup: ["create 3"]
+
+extra_balance:
+  fix: 6d7e4782bcf549221b4ccfffec2cf4d1a473f1a3
+  num_cpus: 5
+  plot_format: lb_nr_running
+  fuzz:
+    checks: [balance]
+    setup: ["cpu-topo SMT=0|1-2|3-4;CLS=0|1-2|3-4", "create 5"]
+
+lag_vruntime:
+  fix: 5068d84054b766efe7c6202fc71b2350d1c326f1
+  num_cpus: 2
+  plot_format: min_vruntime
+  fuzz:
+    checks: []   # no generic rule found: min_vruntime is legitimately stale after nice/policy/affinity
+
+long_balance:
+  fix: 2feab2492deb2f14f9675dd6388e9e2bf669c27a
+  num_cpus: 3
+  mem_mb: 4096
+  plot_format: rebalance
+  fuzz:
+    checks: []   # needs ~20000 tasks
+
+even_idle_cpu:
+  ref: v6.17
+  patch: even_idle_cpu.patch
+  num_cpus: 5
+  plot_format: lb_nr_running
+  fuzz:
+    # No oracle yet. work_conserve warns on the fixed kernel too, and not the same number of times
+    # from boot to boot (one program: 310 warns buggy / 3 fixed, another 113 / 60, and the same
+    # program has come out silent on fixed), so vetting a candidate against the fixed kernel cannot
+    # filter it either -- 24 raw candidates became 2, both spurious. This bug needs a focused rule.
+    checks: [work_conserve]
+    setup: ["cpu-cap 2=512,4=512", "cpu-topo CLS=0|1-2|3-4", "create 4"]
+
+local_group_imbalance:
+  ref: c369299895a591d96745d6492d4888259b004a9e
+  patch: fix_local_group_imbalanced.patch
+  num_cpus: 5
+  plot_format: lb_nr_running
+  fuzz:
+    checks: []   # see even_idle_cpu: work_conserve is not sound on its own
+    setup: ["cpu-topo CLS=0|1-2|3-4", "create 6"]
+
+util_avg_jump:
+  ref: c369299895a591d96745d6492d4888259b004a9e
+  patch: fix_util_avg_jump.patch
+  num_cpus: 2
+  plot_format: val
+  fuzz:
+    checks: []   # see util_avg: the same signal, and no rule of the right shape yet
+    verbs: [fifo, rr, cpu-freq]
+    setup: ["cpu-freq 1=512", "create 2"]
+
+# Outside the paper's main table.
+rt_runtime_toggle: {fix: 9b58e976b3b391c0cf02e038d53dd0478ed3013c, plot_format: curr_task, extra: true}
+uclamp_inversion: {fix: 0213b7083e81f4acd69db32cb72eb4e5f220329a, plot_format: val, extra: true}
+h_nr_runnable: {fix: 3429dd57f0deb1a602c2624a1dd7c4c11b6c4734, plot_format: val, extra: true}
+vlag_overflow: {fix: 1560d1f6eb6b398bddd80c16676776c0325fe5fe, num_cpus: 3, extra: true}
+throttled_limbo_list: {fix: 956dfda6a70885f18c0f8236a461aa2bc4f556ad, num_cpus: 3, extra: true}
+slice_update: {fix: 2f2fc17bab0011430ceb6f2dc1959e7d1f981444, extra: true}
+avg_vruntime_ceil: {fix: 650cad561cce04b62a8c8e0446b685ef171bc3bb, extra: true}
+min_deadline: {fix: 8dafa9d0eb1a1550a0f4d462db9354161bc51e0c, extra: true}
+zero_vruntime: {fix: b3d99f43c72b56cf7a104a364e7fb34b0702828b, extra: true}

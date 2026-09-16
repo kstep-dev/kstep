@@ -268,7 +268,7 @@ void kstep_print_sched_debug(void) {
 }
 
 void kstep_output_curr_task(void) {
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+  for_each_test_cpu(cpu) {
     struct task_struct *curr = cpu_rq(cpu)->curr;
     struct kstep_json json;
     kstep_json_begin(&json);
@@ -283,11 +283,23 @@ void kstep_output_nr_running(void) {
   struct kstep_json json;
   kstep_json_begin(&json);
   kstep_json_field_str(&json, "type", "nr_running");
-  for (int cpu = 1; cpu < num_online_cpus(); cpu++) {
+  for_each_test_cpu(cpu) {
     char key[8];
     snprintf(key, sizeof(key), "cpu%d", cpu);
     kstep_json_field_u64(&json, key, cpu_rq(cpu)->nr_running);
   }
+  kstep_json_end(&json);
+}
+
+// A task of the cli's moved between CPUs. Written from the migration hook, so it travels on the
+// channel from whatever context the scheduler was in.
+void kstep_output_migrate(u32 task, int src_cpu, int dst_cpu) {
+  struct kstep_json json;
+  kstep_json_begin(&json);
+  kstep_json_field_str(&json, "type", "migrate");
+  kstep_json_field_u64(&json, "task", task);
+  kstep_json_field_u64(&json, "src_cpu", src_cpu);
+  kstep_json_field_u64(&json, "dst_cpu", dst_cpu);
   kstep_json_end(&json);
 }
 
