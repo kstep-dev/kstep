@@ -19,8 +19,6 @@ phys_addr_t kstep_shm_init(void) {
   return virt_to_phys(shm);
 }
 
-u8 *kstep_shm_cov(void) { return shm->cov; }
-
 // The cgroups: the root and every live cgroup under it, in tree order, collected into `out`.
 // The tree walk needs RCU and the two control files sleep, so the walk takes the paths first and
 // the files are read after it. Reading the files is how the kernel's own interface reports these

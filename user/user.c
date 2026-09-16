@@ -13,7 +13,7 @@
 #include <sys/syscall.h> // SYS_*
 #include <termios.h>     // termios, tcgetattr, tcsetattr
 #include <time.h>        // nanosleep, struct timespec
-#include <unistd.h>      // close, getpid, syscall, fork, pause, _exit
+#include <unistd.h>      // close, getpid, syscall, pause, _exit
 
 #include "user.h" // SIGCODE_*, KSTEP_CTRL_FD
 
@@ -136,30 +136,15 @@ static void handler(int signum, siginfo_t *info, void *context) {
     panic("Unknown signal code: %d", code);
 }
 
-// A command read from the control file (see kstep_ctrl_read). A child of fork stops forking.
-static void dispatch(struct kstep_msg *msg) {
-  if (msg->cmd == KSTEP_CMD_FORK) {
-    for (int i = 0; i < msg->arg; i++) {
-      int pid = fork();
-      if (pid < 0)
-        panic("fork failed at i == %d", i);
-      if (pid == 0)
-        return;
-    }
-  } else
-    panic("Unknown command: %d", msg->cmd);
-}
-
 __attribute__((noreturn)) static int task_main(void) {
   struct sigaction sa = {.sa_sigaction = handler,
                          .sa_flags = SA_SIGINFO | SA_NODEFER};
-  struct kstep_msg msg;
+  char c;
   sigaction(SIGUSR1, &sa, NULL);
-  // The first read parks until the first wakeup; later ones halt until told otherwise, or
-  // hand over a command (see kstep_ctrl_read).
+  // The first read parks until the first wakeup; later ones halt until told otherwise
+  // (see kstep_ctrl_read). The read never yields data; the task's work is the halt itself.
   while (1)
-    if (read(KSTEP_CTRL_FD, &msg, sizeof(msg)) == sizeof(msg))
-      dispatch(&msg);
+    read(KSTEP_CTRL_FD, &c, sizeof(c));
 }
 
 // ============================================================================

@@ -1,7 +1,8 @@
 // The region of guest memory the host reads directly (shm.c writes it, website/site/kstep.mjs
-// decodes it; keep the two in step): the machine's state, rewritten after every cli command, and
-// the coverage map (cov.c). gen is a seqlock over the state: odd while an update is in progress,
-// even and unchanged around a consistent read. Trace events are not here: scheduler hooks write
+// decodes it; keep the two in step): the machine's state, rewritten after every cli command. gen
+// is a seqlock over the state: odd while an update is in progress,
+// even and unchanged around a consistent read. The coverage map (cov.c) is a region of its own,
+// so adding a field here never moves it; both addresses are reported on the cli's ready line. Trace events are not here: scheduler hooks write
 // them as JSON records on the driver's channel (io.c).
 #pragma once
 
@@ -11,7 +12,7 @@
 #define KSTEP_SHM_CPUS 8 // isolated CPUs 1..8
 #define KSTEP_SHM_TASKS 64
 #define KSTEP_SHM_CGROUPS 16
-#define KSTEP_SHM_COV (1 << 16) // edge map, saturating byte counts
+#define KSTEP_COV_SIZE (1 << 16) // cov.c's edge map, saturating byte counts; fuzzer/src/main.rs MAP_SIZE
 
 struct kstep_shm_hdr {
   u32 gen;
@@ -54,11 +55,9 @@ struct kstep_shm {
   struct kstep_shm_cpu cpu[KSTEP_SHM_CPUS];
   struct kstep_shm_task task[KSTEP_SHM_TASKS];
   struct kstep_shm_cgroup cgroup[KSTEP_SHM_CGROUPS];
-  u8 cov[KSTEP_SHM_COV];
 };
 
 static_assert(sizeof(struct kstep_shm_hdr) == 32);
 static_assert(sizeof(struct kstep_shm_cpu) == 72);
 static_assert(sizeof(struct kstep_shm_task) == 104);
 static_assert(sizeof(struct kstep_shm_cgroup) == 56);
-static_assert(offsetof(struct kstep_shm, cov) == 8096); // fuzzer/src/main.rs reads it at this offset

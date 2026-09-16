@@ -2,7 +2,6 @@
 #include <linux/umh.h>
 #include <linux/xarray.h>
 #include <uapi/linux/sched/types.h>
-#include <linux/spinlock.h>
 
 #include "internal.h"
 #include "user.h"
@@ -10,63 +9,41 @@
 // Written by the task itself only, so no two writers race; the controller reads it.
 enum kstep_task_state {
   KSTEP_TASK_NEW,     // created, not yet at its first control-file read, which parks it
-  KSTEP_TASK_ACTIVE,  // between halts: acting on a command, or asleep in a syscall (pause, wait)
+  KSTEP_TASK_ACTIVE,  // between halts: running in user mode, or asleep in a syscall (pause, wait)
   KSTEP_TASK_SETTLED, // in the halt of kstep_ctrl_read(): the controller may look at its CPU (see
                       // kstep_settle). To the scheduler a CPU-bound task, rq->curr consuming its
                       // slice; the halt only lets the CPU sleep until the next tick instead of spin.
 };
 
-// kSTEP's record of every task that uses the control file: created before a created task's first
-// instruction (task_init), on a fork child's first read, or by the controller's first command to
-// it; never removed. Keyed by pid (a dense index, as an xarray wants; kSTEP's tasks are
-// single-threaded processes) rather than by file, which fork children share with their parent.
-// The lookup is the hot one (every halt return, every settle poll, the migrate hook with the
-// runqueue locked) and lock-free; the lock makes find-or-create atomic, so a task's first read
-// and a controller command racing for it create one record.
+// kSTEP's record of every task that uses the control file, created before the task's first
+// instruction (task_init) and never removed, so every later lookup only ever finds one. Keyed by
+// pid, a dense index as an xarray wants; kSTEP's tasks are single-threaded processes. The lookup
+// is the hot one (every halt return, every settle poll, the migrate hook with the runqueue
+// locked) and needs no lock: the only writer is the task's own creation, before it can run.
 struct kstep_task {
   struct task_struct *p; // referenced: stays readable (exit_state) after the task exits
   enum kstep_task_state state;
   struct completion parked; // the first read has parked the task (see kstep_task_create)
-  struct kstep_msg msg; // cmd is KSTEP_CMD_NONE when empty
 };
 static DEFINE_XARRAY(kstep_tasks);
-static DEFINE_SPINLOCK(kstep_tasks_lock);
 
 static struct kstep_task *kstep_task_find(struct task_struct *p) {
   struct kstep_task *t = xa_load(&kstep_tasks, p->pid);
   return t && t->p == p ? t : NULL; // a reused pid does not find the dead task's record
 }
 
-// The record of p, created in `state` if there is none yet.
-static struct kstep_task *kstep_task_get(struct task_struct *p, enum kstep_task_state state) {
-  struct kstep_task *t;
-  unsigned long flags;
+// Record p, which has no record yet. Runs in the new task's own context, before it runs.
+static void kstep_task_add(struct task_struct *p) {
+  struct kstep_task *t = kzalloc(sizeof(*t), GFP_KERNEL);
 
-  spin_lock_irqsave(&kstep_tasks_lock, flags);
-  t = kstep_task_find(p);
-  if (!t) {
-    t = kzalloc(sizeof(*t), GFP_ATOMIC);
-    if (!t)
-      panic("Failed to record task %d", p->pid);
-    t->p = get_task_struct(p);
-    t->state = state;
-    init_completion(&t->parked);
-    // initialized before it is published: lookups take no lock
-    if (xa_err(xa_store(&kstep_tasks, p->pid, t, GFP_ATOMIC)))
-      panic("Failed to record task %d", p->pid);
-  }
-  spin_unlock_irqrestore(&kstep_tasks_lock, flags);
-  return t;
-}
-
-// Queue a command; the task acts on it when it next returns from its halt. Nothing here
-// touches the scheduler: no signal, no IPI.
-static void kstep_task_send(struct task_struct *p, int cmd, int arg) {
-  struct kstep_task *t = kstep_task_get(p, KSTEP_TASK_ACTIVE);
-  if (READ_ONCE(t->msg.cmd) != KSTEP_CMD_NONE)
-    panic("Task %d has not picked up command %d yet", p->pid, t->msg.cmd);
-  t->msg.arg = arg;
-  smp_store_release(&t->msg.cmd, cmd);
+  if (!t)
+    panic("Failed to record task %d", p->pid);
+  t->p = get_task_struct(p);
+  t->state = KSTEP_TASK_NEW;
+  init_completion(&t->parked);
+  // initialized before it is published: lookups take no lock
+  if (xa_err(xa_store(&kstep_tasks, p->pid, t, GFP_KERNEL)))
+    panic("Failed to record task %d", p->pid);
 }
 
 bool kstep_task_settled(struct task_struct *p) {
@@ -75,7 +52,10 @@ bool kstep_task_settled(struct task_struct *p) {
 }
 
 static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *off) {
-  struct kstep_task *t = kstep_task_get(current, KSTEP_TASK_ACTIVE);
+  struct kstep_task *t = kstep_task_find(current);
+
+  if (!t)
+    panic("Task %d has no kSTEP record", current->pid);
 
   // A new task parks on its first read (TASK_INTERRUPTIBLE, like pause()) until its first
   // wakeup, and tells kstep_task_create() so. The controller shares this CPU and wakes on
@@ -87,16 +67,6 @@ static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, lof
     complete(&t->parked);
     schedule(); // until the first wakeup; nothing else wakes a parked task
     return 0;
-  }
-
-  // A queued command is handed over instead of halting.
-  if (smp_load_acquire(&t->msg.cmd) != KSTEP_CMD_NONE) {
-    struct kstep_msg msg = t->msg;
-    WRITE_ONCE(t->msg.cmd, KSTEP_CMD_NONE);
-    if (len < sizeof(msg) || copy_to_user(buf, &msg, sizeof(msg)))
-      panic("Task %d cannot receive command %d", current->pid, msg.cmd);
-    TRACE_INFO("Task %d picks up command %d (%d)", current->pid, msg.cmd, msg.arg);
-    return sizeof(msg);
   }
 
   // Check and halt with interrupts off, so an interrupt in between wakes the halt, not lost.
@@ -118,7 +88,7 @@ static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, lof
 
 static const struct file_operations kstep_ctrl_fops = {.read = kstep_ctrl_read};
 
-// One open file each, shared by every task (like fds inherited across fork): none has state.
+// One open file each, shared by every task: none has state.
 static struct file *console_file = NULL;
 static struct file *null_file = NULL;
 static struct file *ctrl_file = NULL;
@@ -153,7 +123,7 @@ static int task_init(struct subprocess_info *info, struct cred *new) {
   if (set_cpus_allowed_ptr(current, cpumask_of(0)))
     panic("Failed to pin task %d to CPU 0", current->pid);
 
-  kstep_task_get(current, KSTEP_TASK_NEW); // the first read parks
+  kstep_task_add(current); // the first read parks
   *(struct task_struct **)info->data = current;
   TRACE_INFO("Task created with pid %d", current->pid);
   return 0;
@@ -182,10 +152,8 @@ struct task_struct *kstep_task_create(void) {
   return p;
 }
 
-static void kstep_task_signal(struct task_struct *p, enum sigcode code,
-                              int val) {
-  struct kernel_siginfo info = {
-      .si_signo = SIGUSR1, .si_code = code, .si_int = val};
+static void kstep_task_signal(struct task_struct *p, enum sigcode code) {
+  struct kernel_siginfo info = {.si_signo = SIGUSR1, .si_code = code};
   kstep_cov_controller(true);
   send_sig_info(SIGUSR1, &info, p);
   kstep_cov_controller(false);
@@ -196,20 +164,14 @@ static void kstep_task_signal(struct task_struct *p, enum sigcode code,
     TRACE_INFO("Task %d has not handled signal code %d yet", p->pid, code);
 }
 
-// The forks happen once the task next runs (after the next tick), in its own context.
-void kstep_task_fork(struct task_struct *p, int n) {
-  kstep_task_send(p, KSTEP_CMD_FORK, n);
-  TRACE_INFO("Task %d will fork %d times", p->pid, n);
-}
-
 void kstep_task_pause(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_PAUSE, 0);
+  kstep_task_signal(p, SIGCODE_PAUSE);
   TRACE_INFO("Paused task %d", p->pid);
 }
 
 // Ask the task to exit (it does so the next time it runs and handles the signal).
 void kstep_task_exit(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_EXIT, 0);
+  kstep_task_signal(p, SIGCODE_EXIT);
   TRACE_INFO("Exiting task %d", p->pid);
 }
 
@@ -220,17 +182,17 @@ void kstep_task_exit(struct task_struct *p) {
 // poster's CPU: the production sync-wakeup path. A post with no waiter leaves a token, so the
 // next wait returns at once (a poster that should sleep uses kstep_task_pause).
 void kstep_task_wait(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_WAIT, 0);
+  kstep_task_signal(p, SIGCODE_WAIT);
   TRACE_INFO("Task %d waits", p->pid);
 }
 
 void kstep_task_post(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_POST, 0);
+  kstep_task_signal(p, SIGCODE_POST);
   TRACE_INFO("Task %d posts (sync wakeup of one waiter)", p->pid);
 }
 
 void kstep_task_wakeup(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_WAKEUP, 0);
+  kstep_task_signal(p, SIGCODE_WAKEUP);
   TRACE_INFO("Waked up task %d", p->pid);
 }
 
@@ -238,7 +200,7 @@ void kstep_task_wakeup(struct task_struct *p) {
 // TASK_INTERRUPTIBLE | TASK_FREEZABLE. Unlike kstep_task_pause (which uses
 // pause() and only sets TASK_INTERRUPTIBLE), this makes the task freezable.
 void kstep_task_block(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_BLOCK, 0);
+  kstep_task_signal(p, SIGCODE_BLOCK);
   TRACE_INFO("Blocked task %d", p->pid);
 }
 

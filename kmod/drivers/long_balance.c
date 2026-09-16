@@ -26,18 +26,24 @@ static void on_sched_softirq_end(void) {
              smp_processor_id(), lat_ns / 1000, lat_ns % 1000);
 }
 
-static struct task_struct *busy_task;
-
+// All on CPU 1: the point is one runqueue long enough that walking it in the balancer's
+// softirq takes measurable time. Only the queue length matters, so they are plain runnable
+// tasks and the driver never addresses them individually. Created here rather than in run()
+// because each create waits for its task to reach its first read, which needs the real timer
+// that kstep_tick_init() turns off between setup() and run() (see main.c).
 static void setup(void) {
   kstep_on_softirq_begin(on_sched_softirq_begin);
   kstep_on_softirq_end(on_sched_softirq_end);
-  busy_task = kstep_task_create();
+
+  for (int i = 0; i < NUM_TASKS; i++) {
+    struct task_struct *p = kstep_task_create();
+
+    kstep_task_pin(p, 1, 1);
+    kstep_task_wakeup(p);
+  }
 }
 
 static void run(void) {
-  kstep_task_pin(busy_task, 1, 1);
-  kstep_task_wakeup(busy_task);
-  kstep_task_fork(busy_task, NUM_TASKS);
   kstep_tick_repeat(2000);
 }
 

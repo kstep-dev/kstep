@@ -365,10 +365,15 @@ static void run(void) {
   char line[LINE_MAX];
   bool more = true;
 
-  kstep_cov_init(kstep_shm_cov()); // from here on, the session's scheduler coverage (if the kernel has it)
+  // From here on, the session's scheduler coverage; 0 where the kernel has none, which is what
+  // tells a coverage-driven host (fuzzer/) it is looking at the wrong kernel rather than at a run
+  // that found no edges.
+  phys_addr_t cov_phys = kstep_cov_init();
+
   kstep_json_begin(&json);
   kstep_json_field_bool(&json, "ready", true);
-  kstep_json_field_u64(&json, "shm", shm_phys); // guest-physical address of the shared region
+  kstep_json_field_u64(&json, "shm", shm_phys); // guest-physical address of the state region
+  kstep_json_field_u64(&json, "cov", cov_phys); // and of the coverage map, allocated apart from it
   kstep_json_end(&json);
   while (more) {
     char *l;

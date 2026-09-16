@@ -3,8 +3,9 @@
 //! A test case is a byte string. The host decodes it into cli lines (see `decode`), boots the
 //! image the way run.py does, feeds the lines over the jsonl socket, and reads the replies. A
 //! `warn` record from an enabled checker, or an oops in the console, is a finding; a stalled reply
-//! is a timeout. Coverage is the edge map in the guest's shared region (kmod/shm.h): QEMU backs
-//! guest RAM with a file, and the host reads the map out of it after the run. The guest has no
+//! is a timeout. Coverage is the guest's edge map (kmod/cov.c), a region of its own whose address
+//! the ready line reports: QEMU backs guest RAM with a file, and the host reads the map out of it
+//! after the run. The guest has no
 //! fuzzer-specific code.
 //!
 //! One fuzzing client per core, each with its own QEMU, result directory and RAM file; LibAFL's
@@ -186,8 +187,6 @@ struct Paths {
     ram: PathBuf,
 }
 
-const SHM_COV_OFFSET: u64 = 8096; // offsetof(struct kstep_shm, cov), asserted in shm.h
-
 /// One QEMU boot per test case, driven over the jsonl socket.
 struct QemuExecutor {
     cmd: String,
@@ -224,12 +223,14 @@ impl QemuExecutor {
         let mut rd = BufReader::new(sock.try_clone()?);
         let mut transcript = String::new();
         let mut line = String::new();
-        let shm = loop {
+        // The ready line reports where the coverage map is; a kernel built without
+        // linux/config.kstep.cov reports 0, and read_coverage leaves the map alone.
+        let cov = loop {
             line.clear();
             if rd.read_line(&mut line)? == 0 {
                 return Ok((Outcome::Timeout("eof before ready".into()), transcript, 0));
             }
-            if let Some(v) = line.split("\"shm\":").nth(1) {
+            if let Some(v) = line.split("\"cov\":").nth(1) {
                 break v.trim_end_matches(|c: char| !c.is_ascii_digit()).parse::<u64>().unwrap_or(0);
             }
         };
@@ -243,10 +244,10 @@ impl QemuExecutor {
             loop {
                 line.clear();
                 match rd.read_line(&mut line) {
-                    Ok(0) => return Ok((Outcome::Timeout(format!("eof at `{cmd}`")), transcript, shm)),
+                    Ok(0) => return Ok((Outcome::Timeout(format!("eof at `{cmd}`")), transcript, cov)),
                     Ok(_) => {}
                     Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        return Ok((Outcome::Timeout(format!("no reply to `{cmd}`")), transcript, shm))
+                        return Ok((Outcome::Timeout(format!("no reply to `{cmd}`")), transcript, cov))
                     }
                     Err(e) => return Err(e),
                 }
@@ -259,17 +260,17 @@ impl QemuExecutor {
                 }
             }
         }
-        Ok((warn.map_or(Outcome::Ok, Outcome::Warn), transcript, shm))
+        Ok((warn.map_or(Outcome::Ok, Outcome::Warn), transcript, cov))
     }
 
-    /// Copy the guest's edge map out of the RAM file.
-    fn read_coverage(&mut self, shm: u64) {
+    /// Copy the guest's edge map out of the RAM file, from the address the ready line reported.
+    fn read_coverage(&mut self, cov: u64) {
         use std::io::{Read, Seek, SeekFrom};
-        if shm < self.ram_base {
+        if cov < self.ram_base {
             return;
         }
         if let Ok(mut f) = fs::File::open(&self.paths.ram) {
-            if f.seek(SeekFrom::Start(shm - self.ram_base + SHM_COV_OFFSET)).is_ok() {
+            if f.seek(SeekFrom::Start(cov - self.ram_base)).is_ok() {
                 let _ = f.read_exact(self.map);
             }
         }
@@ -333,8 +334,8 @@ impl<EM, S, Z> Executor<EM, BytesInput, S, Z> for QemuExecutor {
     fn run_target(&mut self, _fuzzer: &mut Z, _state: &mut S, _mgr: &mut EM, input: &BytesInput) -> Result<ExitKind, libafl::Error> {
         let lines = decode(&input.target_bytes(), &self.target);
         self.map.fill(0);
-        let (outcome, transcript, shm) = self.boot(&self.cmd, &self.paths, &lines)?;
-        self.read_coverage(shm);
+        let (outcome, transcript, cov) = self.boot(&self.cmd, &self.paths, &lines)?;
+        self.read_coverage(cov);
         // A warn or an oops is a candidate until the fixed kernel has been shown to be quiet on
         // the same program; one extra boot, and only for a candidate.
         let candidate = match &outcome {
