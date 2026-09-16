@@ -35,6 +35,25 @@ int kstep_write(const char *path, const char *buf, size_t size) {
   return 0;
 }
 
+// The counterpart of kstep_write, for the cgroup files kSTEP reports back (shm.c). Returns the
+// bytes read, with the trailing newline cgroupfs writes stripped, or a negative errno.
+int kstep_read(const char *path, char *buf, size_t size) {
+  struct file *file = filp_open(path, O_RDONLY, 0);
+  loff_t pos = 0;
+  ssize_t ret;
+
+  if (IS_ERR(file))
+    return PTR_ERR(file);
+  ret = kernel_read(file, buf, size - 1, &pos);
+  filp_close(file, NULL);
+  if (ret < 0)
+    return ret;
+  while (ret > 0 && buf[ret - 1] == '\n')
+    ret--;
+  buf[ret] = '\0';
+  return ret;
+}
+
 int kstep_mkdir(const char *dir) {
   struct path path;
   int flags = LOOKUP_DIRECTORY;
@@ -257,6 +276,14 @@ void kstep_cgroup_init(void) {
   struct percpu_rw_semaphore *cpuset_rwsem = kstep_ksym_lookup("cpuset_rwsem");
   if (cpuset_rwsem)
     KSYM_rcu_sync_enter(&cpuset_rwsem->rss);
+}
+
+int kstep_cgroup_read(const char *name, const char *filename, char *buf, size_t size) {
+  char path[MAX_PATH_LENGTH];
+
+  if (scnprintf(path, sizeof(path), CGROUP_ROOT "%s/%s", name, filename) >= sizeof(path))
+    return -ENAMETOOLONG;
+  return kstep_read(path, buf, size);
 }
 
 bool kstep_cgroup_exists(const char *name) {

@@ -80,6 +80,7 @@ void kstep_task_set_nice(struct task_struct *p, int nice);
 
 // kernel.c
 int kstep_write(const char *path, const char *buf, size_t size);
+int kstep_read(const char *path, char *buf, size_t size);
 int kstep_mkdir(const char *dir);
 void kstep_sysctl_write(const char *name, const char *fmt, ...);
 void kstep_sched_feat_write(const char *fmt, ...);
@@ -87,6 +88,7 @@ void kstep_sched_feat_enable(const char *name);
 void kstep_sched_feat_disable(const char *name);
 int kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
                        ...);
+int kstep_cgroup_read(const char *name, const char *filename, char *buf, size_t size);
 bool kstep_cgroup_exists(const char *name);
 int kstep_cgroup_create(const char *name);
 void kstep_cgroup_destroy(const char *name);
@@ -112,6 +114,7 @@ void kstep_check_extra_balance(int cpu, struct sched_domain *sd);
 void kstep_topo_set(const char *spec);
 void kstep_cap_set(const char *spec);
 void kstep_freq_set(const char *spec);
+unsigned long kstep_freq_get(int cpu);
 void kstep_cpu_print(void);
 
 #endif

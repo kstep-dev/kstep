@@ -303,6 +303,13 @@ void kstep_freq_set(const char *spec) {
   apply_per_cpu_param(spec, set_freq);
 }
 
+// What set_freq last put there (the kernel's own arch_scale_freq_capacity reads the same
+// per-CPU value, but the symbol is not exported to modules).
+unsigned long kstep_freq_get(int cpu) {
+  KSYM_IMPORT(arch_freq_scale);
+  return *per_cpu_ptr(KSYM_arch_freq_scale, cpu);
+}
+
 static void print_cpu_scales(void) {
   KSYM_IMPORT(arch_freq_scale);
   pr_info("CPU scales:\n");

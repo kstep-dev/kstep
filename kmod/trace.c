@@ -4,9 +4,9 @@
 #include "internal.h"
 
 // The kernel side of the events in event.h: each traced function is hooked once and raised to
-// every observer watching it. What is traced follows from who is watching -- kstep_observe() arms
-// the hooks its observer needs, whenever it is called -- so a session traces nothing on behalf of
-// an observer that does not exist.
+// everyone registered for it. What is traced follows from who is watching -- registering for an
+// event arms the hook behind it, whenever that happens -- so a session traces nothing for an event
+// nobody watches.
 //
 // Every hook shares one ftrace_ops, registered once, and filters are set by address:
 // ftrace_set_filter() by name walks every traced function through kallsyms, 0.1 to 0.3 s per hook

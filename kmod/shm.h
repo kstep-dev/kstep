@@ -10,18 +10,20 @@
 
 #define KSTEP_SHM_CPUS 8 // isolated CPUs 1..8
 #define KSTEP_SHM_TASKS 64
+#define KSTEP_SHM_CGROUPS 16
 #define KSTEP_SHM_COV (1 << 16) // edge map, saturating byte counts
 
 struct kstep_shm_hdr {
   u32 gen;
   u32 timestamp; // logical ticks
-  u32 ncpus, ntasks;
-  u32 reserved[4];
+  u32 ncpus, ntasks, ncgroups;
+  u32 reserved[3];
 };
 
 struct kstep_shm_cpu {
   u32 cpu, curr; // curr: kSTEP task number running there, 0 for none or another process
   u32 idle, capacity;
+  u32 freq; // arch_freq_scale: the current frequency, which cpufreq moves under a running system
   u64 nr_running, nr_switches, min_vruntime, util_avg, load_avg, runnable_avg;
 };
 
@@ -38,14 +40,25 @@ struct kstep_shm_task {
   char cgroup[32];
 };
 
+// One entry per live cgroup, the root ("/") first: what the kernel holds, not what a driver
+// last wrote, so a weight or cpuset changed behind a program's back still shows up.
+struct kstep_shm_cgroup {
+  char path[40]; // as cgroup_path() reports it, e.g. "/a/b"
+  u64 cpus;      // cpuset.cpus.effective as a bitmask
+  u32 weight;    // cpu.weight, 0 where the cpu controller is not on
+  u32 reserved;
+};
+
 struct kstep_shm {
   struct kstep_shm_hdr hdr;
   struct kstep_shm_cpu cpu[KSTEP_SHM_CPUS];
   struct kstep_shm_task task[KSTEP_SHM_TASKS];
+  struct kstep_shm_cgroup cgroup[KSTEP_SHM_CGROUPS];
   u8 cov[KSTEP_SHM_COV];
 };
 
 static_assert(sizeof(struct kstep_shm_hdr) == 32);
-static_assert(sizeof(struct kstep_shm_cpu) == 64);
+static_assert(sizeof(struct kstep_shm_cpu) == 72);
 static_assert(sizeof(struct kstep_shm_task) == 104);
-static_assert(offsetof(struct kstep_shm, cov) == 7200); // fuzzer/src/main.rs reads it at this offset
+static_assert(sizeof(struct kstep_shm_cgroup) == 56);
+static_assert(offsetof(struct kstep_shm, cov) == 8096); // fuzzer/src/main.rs reads it at this offset

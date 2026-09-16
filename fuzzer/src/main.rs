@@ -186,7 +186,7 @@ struct Paths {
     ram: PathBuf,
 }
 
-const SHM_COV_OFFSET: u64 = 7200; // offsetof(struct kstep_shm, cov), asserted in shm.h
+const SHM_COV_OFFSET: u64 = 8096; // offsetof(struct kstep_shm, cov), asserted in shm.h
 
 /// One QEMU boot per test case, driven over the jsonl socket.
 struct QemuExecutor {
