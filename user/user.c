@@ -11,7 +11,6 @@
 #include <sys/reboot.h>  // reboot
 #include <sys/stat.h>    // mkdir
 #include <sys/syscall.h> // SYS_*
-#include <termios.h>     // termios, tcgetattr, tcsetattr
 #include <time.h>        // nanosleep, struct timespec
 #include <unistd.h>      // close, getpid, syscall, pause, _exit
 
@@ -59,25 +58,6 @@ static void load_kmod(const char *path, int argc, char *argv[], char *envp[]) {
   close(fd);
 }
 
-// Disable output post-processing
-static void set_tty_raw_output(const char *path) {
-  int fd = open(path, O_RDWR | O_NOCTTY);
-  if (fd < 0) { // a virtio port only exists when QEMU attaches it (e.g. the fuzz socket)
-    fprintf(stderr, "Skipping %s: %s\n", path, strerror(errno));
-    return;
-  }
-
-  struct termios termios;
-  if (tcgetattr(fd, &termios) < 0)
-    return;
-
-  cfmakeraw(&termios);
-  if (tcsetattr(fd, TCSANOW, &termios) < 0)
-    panic("Failed to tcsetattr %s", path);
-  // Deliberately left open: hvc resets the termios when the last file on the tty closes
-  // (TTY_DRIVER_RESET_TERMIOS), and init lives as long as the guest anyway.
-}
-
 static void set_proc_affinity(int begin, int end) { // [begin, end]
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
@@ -98,8 +78,6 @@ static int init_main(int argc, char *argv[], char *envp[]) {
   mount_fs("/sys/fs/cgroup", "cgroup2");
   set_proc_affinity(0, 0);          // Bind to cpu 0
   // The kmod drives the JSON channel's virtio port itself (kmod/io.c); no tty to set up
-  set_tty_raw_output("/dev/hvc1"); // For code coverage data
-  set_tty_raw_output("/dev/hvc2"); // For the fuzz executor's command socket (only attached when fuzzing)
   load_kmod("kmod.ko", argc, argv, envp);
   panic("Kernel module exited unexpectedly");
 }
