@@ -25,7 +25,7 @@
 // Bump KSTEP_SHM_LAYOUT whenever a record's fields change meaning without changing its size --
 // the strides below catch everything that resizes, this catches the rest.
 #define KSTEP_SHM_MAGIC 0x5054536b // "kSTP", little endian
-#define KSTEP_SHM_LAYOUT 1
+#define KSTEP_SHM_LAYOUT 2
 
 struct kstep_shm_hdr {
   u32 magic, layout;
@@ -41,11 +41,19 @@ struct kstep_shm_hdr {
   u32 reserved[2];
 };
 
+// The first block is the runqueue's own state; the second is what the load balancer reads when it
+// runs, which is not the same thing: nr_running counts everything queued, the balancer counts
+// h_nr_runnable, and a task left behind by delayed dequeue is in one and not the other.
+#define KSTEP_SHM_CPU_OVERLOADED 1u   // rd->overloaded: some CPU has work to pull, so idle CPUs look
+#define KSTEP_SHM_CPU_OVERUTILIZED 2u // rd->overutilized: EAS gives up and periodic balancing takes over
 struct kstep_shm_cpu {
   u32 cpu, curr; // curr: kSTEP task number running there, 0 for none or another process
   u32 idle, capacity;
   u32 freq; // arch_freq_scale: the current frequency, which cpufreq moves under a running system
   u64 nr_running, nr_switches, min_vruntime, util_avg, load_avg, runnable_avg;
+  u64 h_nr_runnable;   // cfs_rq->h_nr_runnable: runnable tasks as the balancer counts them
+  u32 flags;           // KSTEP_SHM_CPU_*, the root domain's two balancing switches
+  u32 next_balance_in; // ticks until rq->next_balance comes due, 0 when it already has
 };
 
 enum kstep_shm_task_state { KSTEP_TASK_RUNNING, KSTEP_TASK_RUNNABLE, KSTEP_TASK_SLEEPING, KSTEP_TASK_BLOCKED };
@@ -105,7 +113,7 @@ struct kstep_shm {
 };
 
 static_assert(sizeof(struct kstep_shm_hdr) == 96);
-static_assert(sizeof(struct kstep_shm_cpu) == 72);
+static_assert(sizeof(struct kstep_shm_cpu) == 88);
 static_assert(sizeof(struct kstep_shm_task) == 104);
 static_assert(sizeof(struct kstep_shm_cgroup) == 56);
 static_assert(sizeof(struct kstep_shm_group) == 24);

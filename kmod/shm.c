@@ -163,7 +163,18 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
         .util_avg = rq->cfs.avg.util_avg,
         .load_avg = rq->cfs.avg.load_avg,
         .runnable_avg = rq->cfs.avg.runnable_avg,
+        .flags = (get_rd_overloaded(rq->rd) ? KSTEP_SHM_CPU_OVERLOADED : 0) |
+                 (READ_ONCE(rq->rd->overutilized) ? KSTEP_SHM_CPU_OVERUTILIZED : 0),
 #endif
+        // h_nr_running until 6.13 renamed it; the field the balancer reads either way
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)
+        .h_nr_runnable = rq->cfs.h_nr_runnable,
+#else
+        .h_nr_runnable = rq->cfs.h_nr_running,
+#endif
+        // a deadline in jiffies, reported as the wait rather than the stamp: the page has no clock
+        // of the kernel's, and 0 reads as "due now" whether it is due or overdue
+        .next_balance_in = time_after(rq->next_balance, jiffies) ? rq->next_balance - jiffies : 0,
     };
   }
   for (int i = 0; i < ntasks && nt < KSTEP_SHM_TASKS; i++) {
