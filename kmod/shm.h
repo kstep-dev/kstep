@@ -44,15 +44,12 @@ struct kstep_shm_hdr {
 // The first block is the runqueue's own state; the second is what the load balancer reads when it
 // runs, which is not the same thing: nr_running counts everything queued, the balancer counts
 // h_nr_runnable, and a task left behind by delayed dequeue is in one and not the other.
-#define KSTEP_SHM_CPU_OVERLOADED 1u   // rd->overloaded: some CPU has work to pull, so idle CPUs look
-#define KSTEP_SHM_CPU_OVERUTILIZED 2u // rd->overutilized: EAS gives up and periodic balancing takes over
 struct kstep_shm_cpu {
   u32 cpu, curr; // curr: kSTEP task number running there, 0 for none or another process
   u32 idle, capacity;
   u32 freq; // arch_freq_scale: the current frequency, which cpufreq moves under a running system
   u64 nr_running, nr_switches, min_vruntime, util_avg, load_avg, runnable_avg;
   u64 h_nr_runnable;   // cfs_rq->h_nr_runnable: runnable tasks as the balancer counts them
-  u32 flags;           // KSTEP_SHM_CPU_*, the root domain's two balancing switches
   u32 next_balance_in; // ticks until rq->next_balance comes due, 0 when it already has
 };
 
