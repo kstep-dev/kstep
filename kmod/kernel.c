@@ -1,3 +1,4 @@
+#include <linux/task_work.h>
 #include <linux/cpumask.h>
 #include <linux/cgroup.h>
 #include <linux/dcache.h>
@@ -46,6 +47,13 @@ int kstep_read(const char *path, char *buf, size_t size) {
     return PTR_ERR(file);
   ret = kernel_read(file, buf, size - 1, &pos);
   filp_close(file, NULL);
+  // filp_close() only queues the release: fput() adds it to this task's task_work, which the
+  // kernel runs on the way back to user mode. kSTEP's controller never goes back -- it is the
+  // module init, looping inside finit_module for the whole session -- so without this every read
+  // leaks its struct file and the seq_file buffer under it, about 4.6 KB a time.
+  KSYM_IMPORT(task_work_run);
+  if (KSYM_task_work_run)
+    KSYM_task_work_run();
   if (ret < 0)
     return ret;
   while (ret > 0 && buf[ret - 1] == '\n')
