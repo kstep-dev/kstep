@@ -115,5 +115,6 @@ void kstep_cap_set(const char *spec);
 void kstep_freq_set(const char *spec);
 unsigned long kstep_freq_get(int cpu);
 void kstep_cpu_print(void);
+void kstep_sd_flags_str(int flags, char *buf, size_t len);
 
 #endif

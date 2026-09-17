@@ -16,6 +16,25 @@ phys_addr_t kstep_shm_init(void) {
   shm = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, get_order(sizeof(*shm)));
   if (!shm)
     panic("Failed to allocate the shared region");
+  // The shape, written once: it is a property of the build, not of any command.
+  shm->hdr = (struct kstep_shm_hdr){
+      .magic = KSTEP_SHM_MAGIC,
+      .layout = KSTEP_SHM_LAYOUT,
+      .cpu_off = offsetof(struct kstep_shm, cpu),
+      .cpu_stride = sizeof(struct kstep_shm_cpu),
+      .task_off = offsetof(struct kstep_shm, task),
+      .task_stride = sizeof(struct kstep_shm_task),
+      .cgroup_off = offsetof(struct kstep_shm, cgroup),
+      .cgroup_stride = sizeof(struct kstep_shm_cgroup),
+      .domain_off = offsetof(struct kstep_shm, domain),
+      .domain_stride = sizeof(struct kstep_shm_domain),
+      .max_cpus = KSTEP_SHM_CPUS,
+      .max_tasks = KSTEP_SHM_TASKS,
+      .max_cgroups = KSTEP_SHM_CGROUPS,
+      .max_domains = KSTEP_SHM_DOMAINS,
+      .max_groups = KSTEP_SHM_GROUPS,
+      .group_stride = sizeof(struct kstep_shm_group),
+  };
   return virt_to_phys(shm);
 }
 
@@ -62,6 +81,54 @@ static u32 shm_collect_cgroups(struct kstep_shm_cgroup *out) {
       free_cpumask_var(mask);
     }
   }
+  return n;
+}
+
+// The sched domains the kernel actually built, per CPU and innermost first. Read under RCU, like
+// any other walk of rq->sd. A group's span comes from sched_group_span (the CPUs it covers), not
+// its balance mask; sd->groups starts at the CPU's own group, so the order is the order that CPU's
+// balancer sees.
+static u32 shm_collect_domains(struct kstep_shm_domain *out, u32 ncpus) {
+  u32 n = 0;
+
+  rcu_read_lock();
+  for (int cpu = 1; cpu <= ncpus && n < KSTEP_SHM_DOMAINS; cpu++) {
+    struct sched_domain *sd;
+
+    for_each_domain(cpu, sd) {
+      struct kstep_shm_domain *d = &out[n];
+      struct sched_group *first, *sg;
+
+      if (n == KSTEP_SHM_DOMAINS)
+        break;
+      memset(d, 0, sizeof(*d));
+      d->cpu = cpu;
+      d->span = cpumask_bits(sched_domain_span(sd))[0];
+      strscpy(d->name, sd->name, sizeof(d->name));
+      kstep_sd_flags_str(sd->flags, d->flags, sizeof(d->flags));
+      d->imbalance_pct = sd->imbalance_pct;
+      d->balance_interval = sd->balance_interval;
+      d->nr_balance_failed = sd->nr_balance_failed;
+      d->busy_factor = sd->busy_factor;
+      d->cache_nice_tries = sd->cache_nice_tries;
+      // jiffies is the mocked clock plus a fixed offset (tick_jiffies.c), so this is logical ticks
+      d->last_balance_ago = jiffies - sd->last_balance;
+      first = sd->groups;
+      sg = first;
+      do {
+        struct kstep_shm_group *g = &d->group[d->ngroups];
+
+        g->span = cpumask_bits(sched_group_span(sg))[0];
+        g->capacity = sg->sgc->capacity;
+        g->min_capacity = sg->sgc->min_capacity;
+        g->max_capacity = sg->sgc->max_capacity;
+        g->weight = sg->group_weight;
+        sg = sg->next;
+      } while (++d->ngroups < KSTEP_SHM_GROUPS && sg != first);
+      n++;
+    }
+  }
+  rcu_read_unlock();
   return n;
 }
 
@@ -145,6 +212,7 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
   shm->hdr.ncpus = ncpus;
   shm->hdr.ntasks = nt;
   shm->hdr.ncgroups = ncgroups;
+  shm->hdr.ndomains = shm_collect_domains(shm->domain, ncpus);
   smp_wmb();
   WRITE_ONCE(shm->hdr.gen, shm->hdr.gen + 1); // even: consistent
 }

@@ -12,13 +12,30 @@
 #define KSTEP_SHM_CPUS 8 // isolated CPUs 1..8
 #define KSTEP_SHM_TASKS 64
 #define KSTEP_SHM_CGROUPS 16
+#define KSTEP_SHM_DOMAINS 40 // (CPU, level) pairs: KSTEP_SHM_CPUS x the five topology levels
+#define KSTEP_SHM_GROUPS 8   // a domain's balancing groups, at most one per CPU
 #define KSTEP_COV_SIZE (1 << 16) // cov.c's edge map, saturating byte counts; fuzzer/src/main.rs MAP_SIZE
 
+// The header describes the rest of the region, so the host reads where the tables are and how big
+// their records are instead of hardcoding it. Only the first three fields are a fixed contract:
+// magic, then layout, then gen. A host checks magic and layout before trusting anything else.
+// Bump KSTEP_SHM_LAYOUT whenever a record's fields change meaning without changing its size --
+// the strides below catch everything that resizes, this catches the rest.
+#define KSTEP_SHM_MAGIC 0x5054536b // "kSTP", little endian
+#define KSTEP_SHM_LAYOUT 1
+
 struct kstep_shm_hdr {
+  u32 magic, layout;
   u32 gen;
   u32 timestamp; // logical ticks
-  u32 ncpus, ntasks, ncgroups;
-  u32 reserved[3];
+  u32 ncpus, ntasks, ncgroups, ndomains;
+  u32 cpu_off, cpu_stride;
+  u32 task_off, task_stride;
+  u32 cgroup_off, cgroup_stride;
+  u32 domain_off, domain_stride;
+  u32 max_cpus, max_tasks, max_cgroups, max_domains;
+  u32 max_groups, group_stride;
+  u32 reserved[2];
 };
 
 struct kstep_shm_cpu {
@@ -50,14 +67,43 @@ struct kstep_shm_cgroup {
   u32 reserved;
 };
 
+// One sched domain as the kernel built it, per CPU, innermost first -- not the topology the cli
+// was asked for: Linux drops a level whose span adds nothing (sd_degenerate), so a level named in
+// `cpu-topo` may simply not be here, which is the whole reason this is worth reporting. The
+// balancing knobs are the ones that decide whether a given tick balances at all.
+struct kstep_shm_group {
+  u64 span;
+  u32 capacity;                   // sgc->capacity: the group's total, after RT/DL pressure
+  u32 min_capacity, max_capacity; // per-CPU extremes in the group; what misfit compares against
+  u32 weight;                     // CPUs in the group
+};
+
+struct kstep_shm_domain {
+  u32 cpu, ngroups;
+  u64 span;
+  char name[8];    // the topology level: SMT, CLS, MC, PKG, NODE
+  char flags[160]; // SD_* names as the kernel has them, "SD_" stripped, e.g. "SHARE_LLC, PREFER_SIBLING"
+  u32 imbalance_pct, balance_interval, busy_factor, cache_nice_tries;
+  u32 nr_balance_failed; // per CPU: consecutive failures here, which escalate to active balancing
+  u32 last_balance_ago;  // ticks since this CPU last balanced at this level
+  // Not here on purpose: sd->shared's nr_busy_cpus and has_idle_cores, which select_idle_sibling
+  // reads on a wakeup. Only the NOHZ path maintains nr_busy_cpus (set_cpu_sd_state_busy/idle) and
+  // this kernel is built without CONFIG_NO_HZ, so it sits at the domain's weight forever; measured
+  // has_idle_cores likewise never leaves 0. Both would read "nothing is idle" on an empty machine.
+  struct kstep_shm_group group[KSTEP_SHM_GROUPS];
+};
+
 struct kstep_shm {
   struct kstep_shm_hdr hdr;
   struct kstep_shm_cpu cpu[KSTEP_SHM_CPUS];
   struct kstep_shm_task task[KSTEP_SHM_TASKS];
   struct kstep_shm_cgroup cgroup[KSTEP_SHM_CGROUPS];
+  struct kstep_shm_domain domain[KSTEP_SHM_DOMAINS];
 };
 
-static_assert(sizeof(struct kstep_shm_hdr) == 32);
+static_assert(sizeof(struct kstep_shm_hdr) == 96);
 static_assert(sizeof(struct kstep_shm_cpu) == 72);
 static_assert(sizeof(struct kstep_shm_task) == 104);
 static_assert(sizeof(struct kstep_shm_cgroup) == 56);
+static_assert(sizeof(struct kstep_shm_group) == 24);
+static_assert(sizeof(struct kstep_shm_domain) == 400);
