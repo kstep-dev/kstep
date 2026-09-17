@@ -15,13 +15,6 @@
 
 #include "driver.h"
 
-// The epoch of the mocked clock: where sched_clock, vruntime and PELT all start after the reset.
-// reset_rq_clocks() rebases the rq clocks onto it, so it no longer has to outrun boot (it was 10s
-// for that). Small, but not 0: a zero epoch masks the local_group_imbalance reproduction (the
-// buggy kernel drops from 410/410 to 83/410 violating ticks, against 75/410 fixed), and fair.c
-// reads `se->avg.last_update_time == 0` as its "just migrated" sentinel. 1024 ns is one PELT
-// period, the unit ___update_load_sum() quantizes to, and matches the old 10s behaviour exactly.
-#define INIT_TIME_NS (1024ULL) // one PELT period
 #define KSTEP_NR_CPUS (32)
 
 // The test CPUs: every online CPU but 0, which is kstep's controller and runs no session task.

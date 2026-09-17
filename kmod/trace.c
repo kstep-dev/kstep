@@ -130,11 +130,11 @@ static void on_sched_group_alloc(unsigned long ip, unsigned long parent_ip,
 
 // https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
-  cfs_rq->zero_vruntime = INIT_TIME_NS;
+  cfs_rq->zero_vruntime = 0;
 #else
-  cfs_rq->min_vruntime = INIT_TIME_NS;
+  cfs_rq->min_vruntime = 0;
 #endif
-  TRACE_INFO("Set min vruntime to %llu ns on cpu %d", INIT_TIME_NS, cpu);
+  TRACE_INFO("Set min vruntime to 0 on cpu %d", cpu);
 }
 
 // Registering on a traced event: the kernel function behind it is traced the first time someone

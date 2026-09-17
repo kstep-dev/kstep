@@ -6,7 +6,10 @@
 
 #include "internal.h"
 
-static u64 kstep_sched_clock = INIT_TIME_NS;
+// The mocked clock starts one tick in; reset.c stamps the rq clocks and jiffies to match. One
+// tick is the smallest epoch that keeps task_hot() honest (it reads rq_clock_task() - exec_start,
+// which resets to 0, against sysctl_sched_migration_cost) and lands on a whole jiffy.
+static u64 kstep_sched_clock = TICK_NSEC;
 u64 kstep_sched_clock_get(void) { return kstep_sched_clock; }
 void kstep_sched_clock_tick(void) {
   u64 interval = kstep_driver->tick_interval_ns ?: TICK_NSEC;

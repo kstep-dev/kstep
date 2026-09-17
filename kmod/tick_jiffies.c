@@ -32,7 +32,7 @@ void kstep_jiffies_init(void) {
   KSYM_IMPORT(tick_next_period);
   *KSYM_tick_next_period = KTIME_MAX;
 
-  kstep_jiffies_offset = nsecs_to_jiffies(INIT_TIME_NS) + INITIAL_JIFFIES;
+  kstep_jiffies_offset = nsecs_to_jiffies(TICK_NSEC) + INITIAL_JIFFIES;
   kstep_jiffies_set(0);
 
   TRACE_INFO("Disabled jiffies update");
