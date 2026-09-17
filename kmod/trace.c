@@ -4,9 +4,9 @@
 #include "internal.h"
 
 // The kernel side of the events in event.h: each traced function is hooked once and raised to
-// every observer watching it. What is traced follows from who is watching -- kstep_observe() arms
-// the hooks its observer needs, whenever it is called -- so a session traces nothing on behalf of
-// an observer that does not exist.
+// everyone registered for it. What is traced follows from who is watching -- registering for an
+// event arms the hook behind it, whenever that happens -- so a session traces nothing for an event
+// nobody watches.
 //
 // Every hook shares one ftrace_ops, registered once, and filters are set by address:
 // ftrace_set_filter() by name walks every traced function through kallsyms, 0.1 to 0.3 s per hook
@@ -130,11 +130,11 @@ static void on_sched_group_alloc(unsigned long ip, unsigned long parent_ip,
 
 // https://github.com/torvalds/linux/commit/79f3f9bedd149ea438aaeb0fb6a083637affe205
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 19, 0)
-  cfs_rq->zero_vruntime = INIT_TIME_NS;
+  cfs_rq->zero_vruntime = 0;
 #else
-  cfs_rq->min_vruntime = INIT_TIME_NS;
+  cfs_rq->min_vruntime = 0;
 #endif
-  TRACE_INFO("Set min vruntime to %llu ns on cpu %d", INIT_TIME_NS, cpu);
+  TRACE_INFO("Set min vruntime to 0 on cpu %d", cpu);
 }
 
 // Registering on a traced event: the kernel function behind it is traced the first time someone

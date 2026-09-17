@@ -8,14 +8,27 @@
 KSYM_IMPORT_TYPED(struct sched_domain_topology_level *, sched_domain_topology);
 #define for_each_tl(tl) for (tl = *KSYM_sched_domain_topology; tl->mask; tl++)
 
-static void print_sd_flags(int flags) {
+// The set SD_* flag names, comma separated, from the kernel's own sd_flags.h -- the one place that
+// knows them. Taking them from the kernel rather than a table on the host means neither the log
+// nor the page can drift from the kernel in front of them (SD_SHARE_PKG_RESOURCES became
+// SD_SHARE_LLC, and such renames are routine). A list too long for the buffer is truncated.
+void kstep_sd_flags_str(int flags, char *buf, size_t len) {
+  size_t n = 0;
+
+  buf[0] = '\0';
 #define SD_FLAG(name, meta_flag)                                               \
-  if (flags & name) {                                                          \
-    flags &= ~name;                                                            \
-    pr_cont("%s%s", &#name[3], flags ? ", " : "");                             \
-  }
+  if (flags & name)                                                            \
+    n += scnprintf(buf + n, len - n, "%s%s", n ? ", " : "", &#name[3]);
 #include <linux/sched/sd_flags.h>
 #undef SD_FLAG
+}
+
+// 160: the longest list the levels below produce needs about 140.
+static void print_sd_flags(int flags) {
+  char buf[160];
+
+  kstep_sd_flags_str(flags, buf, sizeof(buf));
+  pr_cont("%s", buf);
 }
 
 static void print_cpumask(const struct cpumask *mask, int width) {
@@ -301,6 +314,13 @@ void kstep_cap_set(const char *spec) {
 
 void kstep_freq_set(const char *spec) {
   apply_per_cpu_param(spec, set_freq);
+}
+
+// What set_freq last put there (the kernel's own arch_scale_freq_capacity reads the same
+// per-CPU value, but the symbol is not exported to modules).
+unsigned long kstep_freq_get(int cpu) {
+  KSYM_IMPORT(arch_freq_scale);
+  return *per_cpu_ptr(KSYM_arch_freq_scale, cpu);
 }
 
 static void print_cpu_scales(void) {

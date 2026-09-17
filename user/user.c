@@ -11,9 +11,8 @@
 #include <sys/reboot.h>  // reboot
 #include <sys/stat.h>    // mkdir
 #include <sys/syscall.h> // SYS_*
-#include <termios.h>     // termios, tcgetattr, tcsetattr
 #include <time.h>        // nanosleep, struct timespec
-#include <unistd.h>      // close, getpid, syscall, fork, pause, _exit
+#include <unistd.h>      // close, getpid, syscall, pause, _exit
 
 #include "user.h" // SIGCODE_*, KSTEP_CTRL_FD
 
@@ -59,25 +58,6 @@ static void load_kmod(const char *path, int argc, char *argv[], char *envp[]) {
   close(fd);
 }
 
-// Disable output post-processing
-static void set_tty_raw_output(const char *path) {
-  int fd = open(path, O_RDWR | O_NOCTTY);
-  if (fd < 0) { // a virtio port only exists when QEMU attaches it (e.g. the fuzz socket)
-    fprintf(stderr, "Skipping %s: %s\n", path, strerror(errno));
-    return;
-  }
-
-  struct termios termios;
-  if (tcgetattr(fd, &termios) < 0)
-    return;
-
-  cfmakeraw(&termios);
-  if (tcsetattr(fd, TCSANOW, &termios) < 0)
-    panic("Failed to tcsetattr %s", path);
-  // Deliberately left open: hvc resets the termios when the last file on the tty closes
-  // (TTY_DRIVER_RESET_TERMIOS), and init lives as long as the guest anyway.
-}
-
 static void set_proc_affinity(int begin, int end) { // [begin, end]
   cpu_set_t cpuset;
   CPU_ZERO(&cpuset);
@@ -98,8 +78,6 @@ static int init_main(int argc, char *argv[], char *envp[]) {
   mount_fs("/sys/fs/cgroup", "cgroup2");
   set_proc_affinity(0, 0);          // Bind to cpu 0
   // The kmod drives the JSON channel's virtio port itself (kmod/io.c); no tty to set up
-  set_tty_raw_output("/dev/hvc1"); // For code coverage data
-  set_tty_raw_output("/dev/hvc2"); // For the fuzz executor's command socket (only attached when fuzzing)
   load_kmod("kmod.ko", argc, argv, envp);
   panic("Kernel module exited unexpectedly");
 }
@@ -136,30 +114,15 @@ static void handler(int signum, siginfo_t *info, void *context) {
     panic("Unknown signal code: %d", code);
 }
 
-// A command read from the control file (see kstep_ctrl_read). A child of fork stops forking.
-static void dispatch(struct kstep_msg *msg) {
-  if (msg->cmd == KSTEP_CMD_FORK) {
-    for (int i = 0; i < msg->arg; i++) {
-      int pid = fork();
-      if (pid < 0)
-        panic("fork failed at i == %d", i);
-      if (pid == 0)
-        return;
-    }
-  } else
-    panic("Unknown command: %d", msg->cmd);
-}
-
 __attribute__((noreturn)) static int task_main(void) {
   struct sigaction sa = {.sa_sigaction = handler,
                          .sa_flags = SA_SIGINFO | SA_NODEFER};
-  struct kstep_msg msg;
+  char c;
   sigaction(SIGUSR1, &sa, NULL);
-  // The first read parks until the first wakeup; later ones halt until told otherwise, or
-  // hand over a command (see kstep_ctrl_read).
+  // The first read parks until the first wakeup; later ones halt until told otherwise
+  // (see kstep_ctrl_read). The read never yields data; the task's work is the halt itself.
   while (1)
-    if (read(KSTEP_CTRL_FD, &msg, sizeof(msg)) == sizeof(msg))
-      dispatch(&msg);
+    read(KSTEP_CTRL_FD, &c, sizeof(c));
 }
 
 // ============================================================================

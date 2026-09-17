@@ -15,7 +15,6 @@
 
 #include "driver.h"
 
-#define INIT_TIME_NS (10ULL * 1000ULL * 1000ULL * 1000ULL) // 10s
 #define KSTEP_NR_CPUS (32)
 
 // The test CPUs: every online CPU but 0, which is kstep's controller and runs no session task.
@@ -43,7 +42,6 @@ u64 kstep_jiffies_get(void);
 // shm.c: the region of guest memory the host reads directly (shm.h)
 phys_addr_t kstep_shm_init(void);
 void kstep_shm_update(struct task_struct **tasks, int ntasks);
-u8 *kstep_shm_cov(void);
 
 // io.c
 void kstep_io_init(void);
@@ -73,7 +71,7 @@ bool kstep_task_settled(struct task_struct *p); // in the halt of the control fi
 void kstep_cgroup_init(void);
 
 // cov.c: the edge map over kernel/sched (kernels built with linux/config.kstep.cov; a no-op otherwise)
-void kstep_cov_init(u8 *map);
+phys_addr_t kstep_cov_init(void);
 // Bracket a scheduler call the controller makes on a task's behalf: CPU 0 is recorded while on.
 void kstep_cov_controller(bool on);
 
