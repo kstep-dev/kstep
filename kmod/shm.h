@@ -9,11 +9,14 @@
 #include <linux/stddef.h>
 #include <linux/types.h>
 
-#define KSTEP_SHM_CPUS 8 // isolated CPUs 1..8
+// As many as the module itself allows (KSTEP_NR_CPUS): the cap is the kmod's, not this region's.
+// KSTEP_SHM_GROUPS must track it -- a domain can have one group per CPU -- and KSTEP_SHM_DOMAINS
+// is one record per (CPU, level) over the five topology levels.
+#define KSTEP_SHM_CPUS 32 // isolated CPUs 1..32
 #define KSTEP_SHM_TASKS 64
 #define KSTEP_SHM_CGROUPS 16
-#define KSTEP_SHM_DOMAINS 40 // (CPU, level) pairs: KSTEP_SHM_CPUS x the five topology levels
-#define KSTEP_SHM_GROUPS 8   // a domain's balancing groups, at most one per CPU
+#define KSTEP_SHM_DOMAINS (KSTEP_SHM_CPUS * 5) // one per (CPU, level)
+#define KSTEP_SHM_GROUPS KSTEP_SHM_CPUS // a domain's balancing groups, at most one per CPU
 #define KSTEP_COV_SIZE (1 << 16) // cov.c's edge map, saturating byte counts; fuzzer/src/main.rs MAP_SIZE
 
 // The header describes the rest of the region, so the host reads where the tables are and how big
@@ -106,4 +109,4 @@ static_assert(sizeof(struct kstep_shm_cpu) == 72);
 static_assert(sizeof(struct kstep_shm_task) == 104);
 static_assert(sizeof(struct kstep_shm_cgroup) == 56);
 static_assert(sizeof(struct kstep_shm_group) == 24);
-static_assert(sizeof(struct kstep_shm_domain) == 400);
+static_assert(sizeof(struct kstep_shm_domain) == 208 + KSTEP_SHM_GROUPS * 24);

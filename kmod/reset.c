@@ -38,14 +38,12 @@ void kstep_reset_tasks(void) {
   TRACE_INFO("Reset tasks state");
 }
 
-static void kstep_reset_runqueue(struct rq *rq) {
-  // reset rq clocks. The mocked sched clock starts at INIT_TIME_NS, which is behind the real
-  // clock the rq was last updated with when boot took longer than that (e.g. QEMU in a
-  // browser: kmod up at ~12s real time on an iPhone). update_rq_clock() drops a backwards
-  // step, so the rq clock, and with it vruntime, would stay frozen until the mocked clock
-  // caught up. Set the clocks directly instead; on x86 clock_task == clock without irq/steal
-  // time accounting, and clock_pelt == clock_task at capacity 1024.
-  KSYM_IMPORT(sysctl_sched_migration_cost);
+// Rebase an rq's clocks onto the mocked clock's epoch. The rq was last stamped with the real
+// clock, which is ahead of the epoch, and update_rq_clock() drops a backwards step instead of
+// resyncing -- so without this the rq clock, and with it vruntime, stays frozen all session. On
+// x86 clock_task == clock without irq/steal accounting, and clock_pelt == clock_task at capacity
+// 1024. Only the rq clocks: ___update_load_sum() resyncs last_update_time on its own.
+static void reset_rq_clocks(struct rq *rq) {
   rq->clock = INIT_TIME_NS;
   rq->clock_task = INIT_TIME_NS;
 // https://github.com/torvalds/linux/commit/23127296889fe84b0762b191b5d041e8ba6f2599
@@ -58,6 +56,11 @@ static void kstep_reset_runqueue(struct rq *rq) {
   rq->clock_pelt_idle = INIT_TIME_NS;
   rq->clock_idle = INIT_TIME_NS;
 #endif
+}
+
+static void kstep_reset_runqueue(struct rq *rq) {
+  KSYM_IMPORT(sysctl_sched_migration_cost);
+  reset_rq_clocks(rq);
   rq->avg_idle = 2 * *KSYM_sysctl_sched_migration_cost;
   rq->max_idle_balance_cost = *KSYM_sysctl_sched_migration_cost;
   rq->idle_stamp = INIT_TIME_NS;
@@ -125,9 +128,29 @@ static void kstep_reset_task_groups(void) {
   }
 }
 
+// CPU 0 reads the same mocked clock as the test CPUs, so its rq needs the same rebase or nothing
+// on the control CPU is scheduled on an advancing clock again. Clocks only: its tasks keep their
+// real-time vruntime and PELT history (kstep_reset_tasks skips them) and stay consistent among
+// themselves. Under the rq lock, unlike the test CPUs': CPU 0 keeps its timer tick, so it is live.
+static void kstep_reset_control_rq(void) {
+  // raw_spin_rq_lock_irqsave() expands to these two, which the kernel does not export.
+  KSYM_IMPORT(raw_spin_rq_lock_nested);
+  KSYM_IMPORT(raw_spin_rq_unlock);
+  struct rq *rq = cpu_rq(0);
+  unsigned long flags;
+
+  local_irq_save(flags);
+  KSYM_raw_spin_rq_lock_nested(rq, 0);
+  reset_rq_clocks(rq);
+  rq->idle_stamp = 0; // 0 means "not idle"; a real-clock stamp would skew avg_idle on the next wakeup
+  KSYM_raw_spin_rq_unlock(rq);
+  local_irq_restore(flags);
+}
+
 void kstep_reset_runqueues(void) {
   for_each_test_cpu(cpu)
     kstep_reset_runqueue(cpu_rq(cpu));
+  kstep_reset_control_rq();
   kstep_reset_task_groups();
   TRACE_INFO("Reset runqueues state");
 }
