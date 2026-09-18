@@ -1,7 +1,7 @@
 #define _GNU_SOURCE
 
 #include <errno.h>       // EEXIST
-#include <fcntl.h>       // open, O_RDONLY, O_RDWR, O_NOCTTY
+#include <fcntl.h>       // open, O_RDONLY, O_RDWR
 #include <limits.h>      // INT_MAX
 #include <sched.h>       // sched_setaffinity, cpu_set_t
 #include <signal.h>      // sigaction
@@ -10,11 +10,11 @@
 #include <sys/mount.h>   // mount
 #include <sys/reboot.h>  // reboot
 #include <sys/stat.h>    // mkdir
-#include <sys/syscall.h> // SYS_*
 #include <time.h>        // nanosleep, struct timespec
-#include <unistd.h>      // close, getpid, syscall, pause, _exit
+#include <sys/syscall.h> // SYS_*
+#include <unistd.h>      // close, getpid, syscall, read, pause, _exit
 
-#include "user.h" // SIGCODE_*, KSTEP_CTRL_FD
+#include "user.h" // KSTEP_CTRL_*, PIPE_PATH, KSTEP_CTRL_FD
 
 #define panic(msg, ...)                                                        \
   do {                                                                         \
@@ -86,43 +86,53 @@ static int init_main(int argc, char *argv[], char *envp[]) {
 // PROGRAM 2 — /task  (worker, spawned by kmod)
 // ============================================================================
 
-// The pipe is the FIFO init created; a task opens it read-write on first use, so a read
-// blocks instead of hitting EOF and a write never sees EPIPE.
-static int pipe_fd(void) {
-  static int fd;
-  if (!fd && (fd = open(PIPE_PATH, O_RDWR)) < 0)
+// The channel is the FIFO init created; a task opens it read-write on first use, so a read blocks
+// instead of hitting EOF and a write never sees EPIPE. Opened once and kept for the life of the
+// task, which _exit() closes. The sentinel is -1, not 0: 0 is a real descriptor, and on a zero
+// sentinel this would reopen on every call and leak one each time if it ever landed there.
+static int chan_fd(void) {
+  static int fd = -1;
+  if (fd < 0 && (fd = open(PIPE_PATH, O_RDWR)) < 0)
     panic("Failed to open %s", PIPE_PATH);
   return fd;
 }
 
-static void handler(int signum, siginfo_t *info, void *context) {
-  int code = info->si_code;
-  if (code == SIGCODE_WAKEUP)
-    return;
-  else if (code == SIGCODE_WAIT) {
-    char c;
-    read(pipe_fd(), &c, 1); // wait: sleeps in pipe_read() until a token or a signal arrives
-  } else if (code == SIGCODE_POST)
-    write(pipe_fd(), "w", 1); // post: pipe_write() sync-wakes one waiter, from this CPU
-  else if (code == SIGCODE_EXIT)
-    _exit(0);
-  else if (code == SIGCODE_PAUSE)
-    pause();
-  else if (code == SIGCODE_BLOCK)
-    nanosleep(&(struct timespec){.tv_sec = INT_MAX}, NULL);
-  else
-    panic("Unknown signal code: %d", code);
-}
+// A wakeup is a bare SIGUSR1: it says nothing, and only returns the task from whatever it is
+// asleep in. The handler exists so the signal does not kill the task instead.
+static void handler(int signum) {}
 
 __attribute__((noreturn)) static int task_main(void) {
-  struct sigaction sa = {.sa_sigaction = handler,
-                         .sa_flags = SA_SIGINFO | SA_NODEFER};
+  struct sigaction sa = {.sa_handler = handler};
   char c;
+
   sigaction(SIGUSR1, &sa, NULL);
-  // The first read parks until the first wakeup; later ones halt until told otherwise
-  // (see kstep_ctrl_read). The read never yields data; the task's work is the halt itself.
-  while (1)
-    read(KSTEP_CTRL_FD, &c, sizeof(c));
+  // The first read parks until the first wakeup; after that a read returns the next thing the
+  // controller wants done, or halts. The halt is the task's work, so a read that returns nothing
+  // has done it.
+  while (1) {
+    if (read(KSTEP_CTRL_FD, &c, sizeof(c)) <= 0)
+      continue;
+    switch (c) {
+    case KSTEP_CTRL_EXIT:
+      _exit(0);
+    case KSTEP_CTRL_PAUSE:
+      pause(); // interruptible, not freezable: returns when a wakeup interrupts it
+      break;
+    case KSTEP_CTRL_BLOCK:
+      nanosleep(&(struct timespec){.tv_sec = INT_MAX}, NULL);
+      break;
+    case KSTEP_CTRL_CHAN_READ: {
+      char token;
+      read(chan_fd(), &token, 1); // sleeps in pipe_read() until there is a byte, and takes it
+      break;
+    }
+    case KSTEP_CTRL_CHAN_WRITE:
+      write(chan_fd(), "w", 1); // pipe_write() sync-wakes one reader, from this CPU
+      break;
+    default:
+      panic("Unknown control action: %d", c);
+    }
+  }
 }
 
 // ============================================================================

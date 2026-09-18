@@ -171,7 +171,7 @@ fn decode(bytes: &[u8], t: &Target) -> Vec<String> {
                 0 => format!("cgroup-attach / {}", task(a)),
                 g => format!("cgroup-attach {} {}", cgroups[g - 1], task(a)),
             },
-            _ => format!("{verb} {}", task(a)), // pause, wake, block, wait, post, freeze, thaw
+            _ => format!("{verb} {}", task(a)), // pause, wake, block, chan-read, chan-write, freeze, thaw
         };
         lines.push(line);
     }

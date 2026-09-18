@@ -6,8 +6,8 @@
 // believes the waker's CPU will stay busy and places the wakee on its previous CPU; the
 // waker then sleeps and its CPU goes idle while the wakee runs elsewhere.
 //
-// All three actors are user tasks. The sync wakeup is a real one: the waker writes into
-// post (pipe_write -> wake_up_interruptible_sync_poll) from its own CPU.
+// All three actors are user tasks. The sync wakeup is a real one: the waker writes to the
+// channel (pipe_write -> wake_up_interruptible_sync_poll) from its own CPU.
 
 #include "driver.h"
 #include "internal.h" // cpu_rq, for the check after the wakeup
@@ -26,8 +26,6 @@ static void setup(void) {
   // Wakee waits, first restricted to CPU 2 so its wake_cpu is 2
   // (prev_cpu != this_cpu inside the wakeup), then allowed on CPUs 1-2.
   kstep_task_pin(wakee, 2, 2);
-  kstep_task_wait(wakee);
-  kstep_task_pin(wakee, 1, 2);
 }
 
 static void *is_ineligible(void) {
@@ -41,6 +39,10 @@ static void run(void) {
   kstep_task_wakeup(other);
   kstep_task_wakeup(waker);
 
+  kstep_task_pin(wakee, 1, 2);
+  kstep_task_wakeup(wakee);
+  kstep_task_chan_read(wakee);
+
   kstep_tick_repeat(20);
 
   // Tick until `other` is current on CPU 1 and ineligible, then pause it: EEVDF keeps it
@@ -48,9 +50,9 @@ static void run(void) {
   kstep_tick_until(is_ineligible);
   kstep_task_pause(other);
 
-  // Waker (CPU 1) posts: a sync wakeup of the wakee. Then it sleeps, as a sync waker is
-  // expected to (with pause, not wait: it would consume its own token).
-  kstep_task_post(waker);
+  // Waker (CPU 1) writes the channel: a sync wakeup of the wakee. Then it sleeps, as a sync
+  // waker is expected to -- with pause, not a channel read, which would take back its own byte.
+  kstep_task_chan_write(waker);
   kstep_task_pause(waker);
 
   kstep_tick_repeat(1);
