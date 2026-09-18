@@ -12,9 +12,10 @@
 //   policy <n> <normal|batch|idle|fifo|rr>   real-time classes run at one fixed priority
 //   affinity <n> <cpulist>    e.g. 1-2,4
 //   pause <n> / wake <n>      sleep when the task next runs / wake it
-//   block <n>                 like pause, in a freezable sleep (nanosleep)
 //   freeze <n> / thaw <n>     freeze the task where it stands, under the freezer / thaw it
-//   wait <n> / post <n>       semaphore: sleep until a post / wake one waiter with a sync wakeup
+//   block <n>                 like pause, in a freezable sleep (nanosleep), which the freezer takes
+//   chan-read <n>             sleep in the channel until there is a byte, and take it
+//   chan-write <n>            put a byte in, which sync-wakes one reader from this task’s CPU
 //   kill <n>                  exit when the task next runs
 //   cgroup-create /a          the parent must exist; / is the root
 //   cgroup-weight /a <w>      cpu.weight, 1..10000 (default 100)
@@ -286,15 +287,17 @@ static const struct {
     {"check", cmd_check},
 };
 
-// Verbs that act on one task. Most tell it something through its control file (kmod/task.c) and it
-// acts when it next runs; freeze and thaw are done to it, by the freezer, where it stands.
+// Verbs that act on one task. Most queue an action on its control file (kmod/task.c) and it acts
+// when it next reads; wake returns it from whatever it is asleep in; freeze and thaw are done to
+// it, by the freezer, where it stands.
 static const struct {
   const char *verb;
   void (*fn)(struct task_struct *p);
-} signals[] = {
-    {"pause", kstep_task_pause}, {"wake", kstep_task_wakeup}, {"block", kstep_task_block}, {"wait", kstep_task_wait},
-    {"post", kstep_task_post},   {"kill", kstep_task_exit},
-    {"freeze", kstep_freeze_task}, {"thaw", kstep_thaw_task},
+} task_verbs[] = {
+    {"pause", kstep_task_pause},          {"block", kstep_task_block},
+    {"wake", kstep_task_wakeup},          {"kill", kstep_task_exit},
+    {"chan-read", kstep_task_chan_read},  {"chan-write", kstep_task_chan_write},
+    {"freeze", kstep_freeze_task},        {"thaw", kstep_thaw_task},
 };
 
 /* Returns false when the session should end. */
@@ -319,15 +322,15 @@ static bool execute(char *line) {
         reply_error(machine[i].usage);
       return true;
     }
-  for (int i = 0; i < ARRAY_SIZE(signals); i++)
-    if (!strcmp(verb, signals[i].verb)) {
+  for (int i = 0; i < ARRAY_SIZE(task_verbs); i++)
+    if (!strcmp(verb, task_verbs[i].verb)) {
       char usage[32];
       struct task_struct *p;
 
       snprintf(usage, sizeof(usage), "usage: %s <n>", verb);
       p = parse_task(&arg, usage);
       if (p)
-        signals[i].fn(p);
+        task_verbs[i].fn(p);
       return true;
     }
   if (!strcmp(verb, "exit"))
@@ -384,6 +387,7 @@ static void run(void) {
       continue;
     kstep_json_begin(&reply);
     more = execute(l);
+    kstep_settle(); // the command has taken effect on every CPU before the state is read
     kstep_shm_update(tasks, ntasks); // before the reply, so the region is current when it lands
     kstep_json_end(&reply);
   }

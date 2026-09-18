@@ -6,14 +6,7 @@
 #include "internal.h"
 #include "user.h"
 
-// Written by the task itself only, so no two writers race; the controller reads it.
-enum kstep_task_state {
-  KSTEP_TASK_NEW,     // created, not yet at its first control-file read, which parks it
-  KSTEP_TASK_ACTIVE,  // between halts: running in user mode, or asleep in a syscall (pause, wait)
-  KSTEP_TASK_SETTLED, // in the halt of kstep_ctrl_read(): the controller may look at its CPU (see
-                      // kstep_settle). To the scheduler a CPU-bound task, rq->curr consuming its
-                      // slice; the halt only lets the CPU sleep until the next tick instead of spin.
-};
+#define KSTEP_CTRL_QUEUE 8 // deeper than any driver asks for between two reads; full is a bug
 
 // kSTEP's record of every task that uses the control file, created before the task's first
 // instruction (task_init) and never removed, so every later lookup only ever finds one. Keyed by
@@ -22,7 +15,13 @@ enum kstep_task_state {
 // locked) and needs no lock: the only writer is the task's own creation, before it can run.
 struct kstep_task {
   struct task_struct *p; // referenced: stays readable (exit_state) after the task exits
-  enum kstep_task_state state;
+  // In the halt of kstep_ctrl_read(), where the controller may look at its CPU (kstep_settle).
+  // Written by the task itself only; the controller reads it.
+  bool settled;
+  // Asked for, not yet taken, oldest first. A queue, not one slot: two posts are two tokens, and
+  // a kill behind a wait must not swallow it. The two ends never run at once.
+  int queue[KSTEP_CTRL_QUEUE];
+  u32 head, tail;
   struct completion parked; // the first read has parked the task (see kstep_task_create)
 };
 static DEFINE_XARRAY(kstep_tasks);
@@ -32,6 +31,20 @@ static struct kstep_task *kstep_task_find(struct task_struct *p) {
   return t && t->p == p ? t : NULL; // a reused pid does not find the dead task's record
 }
 
+// Take the oldest action, or NONE. Only the task itself calls this, for itself.
+static int kstep_ctrl_take(struct kstep_task *t) {
+  if (t->head == t->tail)
+    return KSTEP_CTRL_NONE;
+  return t->queue[t->head++ % KSTEP_CTRL_QUEUE];
+}
+
+// Add one. Only the controller calls this, between steps.
+static void kstep_ctrl_put(struct kstep_task *t, enum kstep_ctrl act) {
+  if (t->tail - t->head >= KSTEP_CTRL_QUEUE)
+    panic("Task %d has more than %d actions outstanding", t->p->pid, KSTEP_CTRL_QUEUE);
+  t->queue[t->tail++ % KSTEP_CTRL_QUEUE] = act;
+}
+
 // Record p, which has no record yet. Runs in the new task's own context, before it runs.
 static void kstep_task_add(struct task_struct *p) {
   struct kstep_task *t = kzalloc(sizeof(*t), GFP_KERNEL);
@@ -39,8 +52,10 @@ static void kstep_task_add(struct task_struct *p) {
   if (!t)
     panic("Failed to record task %d", p->pid);
   t->p = get_task_struct(p);
-  t->state = KSTEP_TASK_NEW;
   init_completion(&t->parked);
+  // A new task parks on its first read: no state for "created but not yet there", because the
+  // queue already says what it will do when it gets there.
+  kstep_ctrl_put(t, KSTEP_CTRL_PARK);
   // initialized before it is published: lookups take no lock
   if (xa_err(xa_store(&kstep_tasks, p->pid, t, GFP_KERNEL)))
     panic("Failed to record task %d", p->pid);
@@ -48,7 +63,12 @@ static void kstep_task_add(struct task_struct *p) {
 
 bool kstep_task_settled(struct task_struct *p) {
   struct kstep_task *t = kstep_task_find(p);
-  return t && READ_ONCE(t->state) == KSTEP_TASK_SETTLED && !signal_pending(p);
+  // Settled means there is nothing left for this task to do: it is in the halt, no action is
+  // waiting in its queue, and no signal is pending. The queue matters as much as the halt -- an
+  // action is queued while the task is still halted, so without this the controller could see the
+  // CPU as settled and move on before the task had performed what it was asked. That is what
+  // !signal_pending() used to cover, when an ask was a signal.
+  return t && READ_ONCE(t->settled) && t->head == t->tail && !signal_pending(p);
 }
 
 static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *off) {
@@ -57,22 +77,32 @@ static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, lof
   if (!t)
     panic("Task %d has no kSTEP record", current->pid);
 
-  // A new task parks on its first read (TASK_INTERRUPTIBLE, like pause()) until its first
-  // wakeup, and tells kstep_task_create() so. The controller shares this CPU and wakes on
-  // complete(), but runs only once this task has switched out: no preemption point lies between
-  // the two calls (CONFIG_PREEMPT_NONE, see linux/config.kstep). So no spin and no polling.
-  if (t->state == KSTEP_TASK_NEW) {
-    t->state = KSTEP_TASK_ACTIVE;
-    set_current_state(TASK_INTERRUPTIBLE); // before complete(): parked once the controller looks
+  int act = kstep_ctrl_take(t);
+
+  // A new task's first read, held until its first wakeup. kSTEP does this one itself because the
+  // creator has to know when it happened: set_current_state() before complete(), so the creator,
+  // which shares this CPU, runs only once this task has switched out -- no preemption point lies
+  // between the two (CONFIG_PREEMPT_NONE).
+  if (act == KSTEP_CTRL_PARK) {
+    set_current_state(TASK_INTERRUPTIBLE);
     complete(&t->parked);
-    schedule(); // until the first wakeup; nothing else wakes a parked task
+    schedule();
     return 0;
+  }
+
+  // The rest is the task's own to do: hand it over and let it make the syscall.
+  if (act != KSTEP_CTRL_NONE) {
+    char c = act;
+
+    if (!len || copy_to_user(buf, &c, 1))
+      panic("Task %d cannot be given action %d", current->pid, act);
+    return 1;
   }
 
   // Check and halt with interrupts off, so an interrupt in between wakes the halt, not lost.
   local_irq_disable();
   if (!need_resched() && !signal_pending(current)) {
-    WRITE_ONCE(t->state, KSTEP_TASK_SETTLED);
+    WRITE_ONCE(t->settled, true);
 #if defined(CONFIG_X86)
     arch_safe_halt(); // sti; hlt (or the paravirt op): interrupts come on only as it halts
 #elif defined(CONFIG_ARM64)
@@ -80,7 +110,7 @@ static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, lof
 #else
 #error "no halt for this architecture"
 #endif
-    WRITE_ONCE(t->state, KSTEP_TASK_ACTIVE);
+    WRITE_ONCE(t->settled, false);
   }
   local_irq_enable(); // a no-op after arch_safe_halt
   return 0; // back to user mode, where a pending reschedule or signal is acted on
@@ -152,47 +182,54 @@ struct task_struct *kstep_task_create(void) {
   return p;
 }
 
-static void kstep_task_signal(struct task_struct *p, enum sigcode code) {
-  struct kernel_siginfo info = {.si_signo = SIGUSR1, .si_code = code};
+static void kstep_nop(void *unused) {}
+
+// Queue an action for p's next control-file read. Queuing is all this does: a task halted at the
+// read is let out of it; anywhere else it acts when it next reaches a read, and a sleeping task
+// reaches none until a driver wakes it. The IPI is the tick's own call, which sets no reschedule
+// and so moves nothing unasked. Waiting for the action to have happened is the caller's settle.
+static void kstep_task_ctrl(struct task_struct *p, enum kstep_ctrl act) {
+  struct kstep_task *t = kstep_task_find(p);
+
+  if (!t)
+    panic("Task %d has no kSTEP record", p->pid);
+
+  kstep_ctrl_put(t, act);
+  if (!READ_ONCE(t->settled))
+    return;
+
   kstep_cov_controller(true);
-  send_sig_info(SIGUSR1, &info, p);
+  smp_call_function_single(task_cpu(p), kstep_nop, NULL, 1);
   kstep_cov_controller(false);
-  kstep_settle();
-  // Still pending: the task is not current (it acts after a tick) or frozen. Fine for a wakeup,
-  // whose effect is the wakeup itself; settle covers it (rq->ttwu_pending is set before the IPI).
-  if (code != SIGCODE_WAKEUP && signal_pending(p))
-    TRACE_INFO("Task %d has not handled signal code %d yet", p->pid, code);
 }
 
 void kstep_task_pause(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_PAUSE);
+  kstep_task_ctrl(p, KSTEP_CTRL_PAUSE);
   TRACE_INFO("Paused task %d", p->pid);
 }
 
-// Ask the task to exit (it does so the next time it runs and handles the signal).
 void kstep_task_exit(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_EXIT);
+  kstep_task_ctrl(p, KSTEP_CTRL_EXIT);
   TRACE_INFO("Exiting task %d", p->pid);
 }
 
-// wait/post: a counting semaphore shared by all tasks, implemented as one pipe (the FIFO
-// PIPE_PATH, created by init before the module loads) whose bytes are the tokens. wait sleeps in pipe_read() (TASK_INTERRUPTIBLE on the pipe's wait queue)
-// until a token is there and consumes it; post writes a token, and pipe_write() wakes one
-// waiter through wake_up_interruptible_sync_poll(), i.e. a WF_SYNC wakeup issued from the
-// poster's CPU: the production sync-wakeup path. A post with no waiter leaves a token, so the
-// next wait returns at once (a poster that should sleep uses kstep_task_pause).
-void kstep_task_wait(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_WAIT);
+void kstep_task_chan_read(struct task_struct *p) {
+  kstep_task_ctrl(p, KSTEP_CTRL_CHAN_READ);
   TRACE_INFO("Task %d waits", p->pid);
 }
 
-void kstep_task_post(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_POST);
+void kstep_task_chan_write(struct task_struct *p) {
+  kstep_task_ctrl(p, KSTEP_CTRL_CHAN_WRITE);
   TRACE_INFO("Task %d posts (sync wakeup of one waiter)", p->pid);
 }
 
+// Nothing to queue: the point is to return the task from wherever it is asleep, which only a
+// signal does. The handler does nothing; the interruption is the whole of it. As with an action,
+// the caller's settle is what waits for the task to have taken it (kstep_task_settled).
 void kstep_task_wakeup(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_WAKEUP);
+  kstep_cov_controller(true);
+  send_sig(SIGUSR1, p, 0); // no siginfo to fill: the signal says nothing
+  kstep_cov_controller(false);
   TRACE_INFO("Waked up task %d", p->pid);
 }
 
@@ -200,7 +237,7 @@ void kstep_task_wakeup(struct task_struct *p) {
 // TASK_INTERRUPTIBLE | TASK_FREEZABLE. Unlike kstep_task_pause (which uses
 // pause() and only sets TASK_INTERRUPTIBLE), this makes the task freezable.
 void kstep_task_block(struct task_struct *p) {
-  kstep_task_signal(p, SIGCODE_BLOCK);
+  kstep_task_ctrl(p, KSTEP_CTRL_BLOCK);
   TRACE_INFO("Blocked task %d", p->pid);
 }
 
