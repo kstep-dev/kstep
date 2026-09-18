@@ -195,12 +195,17 @@ static void kstep_task_ctrl(struct task_struct *p, enum kstep_ctrl act) {
     panic("Task %d has no kSTEP record", p->pid);
 
   kstep_ctrl_put(t, act);
-  if (!READ_ONCE(t->settled))
-    return;
-
-  kstep_cov_controller(true);
-  smp_call_function_single(task_cpu(p), kstep_nop, NULL, 1);
-  kstep_cov_controller(false);
+  // A halted task is at the read already and only has to be let out of the halt. The IPI is the
+  // tick's own call: it sets no reschedule, so it moves nothing that was not asked for.
+  if (READ_ONCE(t->settled)) {
+    kstep_cov_controller(true);
+    smp_call_function_single(task_cpu(p), kstep_nop, NULL, 1);
+    kstep_cov_controller(false);
+  }
+  // Settle either way, as every verb did when an ask was a signal: the ask is done when the task
+  // has performed it, and the driver's next line is written expecting that. A task asleep
+  // elsewhere never reaches the read, and for that one the settle returns once its CPU is idle.
+  kstep_settle();
 }
 
 void kstep_task_pause(struct task_struct *p) {
@@ -230,6 +235,7 @@ void kstep_task_wakeup(struct task_struct *p) {
   kstep_cov_controller(true);
   send_sig(SIGUSR1, p, 0); // no siginfo to fill: the signal says nothing
   kstep_cov_controller(false);
+  kstep_settle(); // the ask is done when the task is running again, not when the signal is sent
   TRACE_INFO("Waked up task %d", p->pid);
 }
 
