@@ -5,13 +5,13 @@ static struct task_struct *tasks[6];
 static void setup(void) {
   kstep_on_tick_end(kstep_output_nr_running);
   kstep_on_balance_selected(kstep_output_balance);
-  kstep_topo_set("CLS=0|1-2|3-4");
+  kstep_topo_set("CLS=1-2|3-4");
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
   for (int i = 0; i < 3; i++)
-    kstep_task_pin(tasks[i], 4, 4);
+    kstep_task_set_affinity(tasks[i], "4");
   for (int i = 3; i < 6; i++)
-    kstep_task_pin(tasks[i], 1, 2);
+    kstep_task_set_affinity(tasks[i], "1-2");
 }
 
 static void run(void) {
@@ -21,7 +21,7 @@ static void run(void) {
   kstep_tick_repeat(10);
 
   for (int i = 3; i < 6; i++)
-    kstep_task_pin(tasks[i], 1, 4);
+    kstep_task_set_affinity(tasks[i], "1-4");
 
   kstep_tick_repeat(400);
 

@@ -38,7 +38,7 @@ static void setup(void) {
   for (int i = 0; i < NUM_TASKS; i++) {
     struct task_struct *p = kstep_task_create();
 
-    kstep_task_pin(p, 1, 1);
+    kstep_task_set_affinity(p, "1");
     kstep_task_wakeup(p);
   }
 }

@@ -7,7 +7,6 @@
 // whatever it is asleep in. It carries nothing.
 enum kstep_ctrl {
   KSTEP_CTRL_NONE = 0, // nothing asked: the read halts (kmod-side only)
-  KSTEP_CTRL_PARK,     // a new task's first read, parked until its first wakeup (kmod-side only)
   KSTEP_CTRL_EXIT,     // _exit(0)
   KSTEP_CTRL_PAUSE,    // pause(): interruptible, not freezable
   KSTEP_CTRL_BLOCK,    // nanosleep(): do_nanosleep() adds TASK_FREEZABLE, which is the difference

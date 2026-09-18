@@ -8,8 +8,9 @@
 //
 //   create [n]                n new runnable CFS tasks on CPUs 1..N-1 -> {"timestamp":T,"task":N}
 //   tick [n]                  advance n ticks (default 1)
-//   nice <n> <-20..19>        kept across a spell as fifo/rr
-//   policy <n> <normal|batch|idle|fifo|rr>   real-time classes run at one fixed priority
+//   policy-fair <n> <normal|batch|idle> [-20..19]   the class and its nice, as sched_setattr
+//                             takes them; the nice left out is kept (and kept, inert, while rt)
+//   policy-rt <n> <fifo|rr> <1..99>   the class and its priority, which the kernel takes together
 //   affinity <n> <cpulist>    e.g. 1-2,4
 //   pause <n> / wake <n>      sleep when the task next runs / wake it
 //   freeze <n> / thaw <n>     freeze the task where it stands, under the freezer / thaw it
@@ -22,9 +23,9 @@
 //   cgroup-cpus /a <cpulist>  cpuset.cpus
 //   cgroup-destroy /a         it must hold no task and no child
 //   cgroup-attach /a <n>      `cgroup-attach / <n>` moves the task back to the root
-//   cpu-cap <cpu>=<scale>,...   CPU capacity, 1..1024; what the hardware is, so set it first
-//   cpu-topo <lvl>=<g>|<g>;...  e.g. SMT=0|1-2|3-4;CLS=0|1-2|3-4; rebuilds the sched domains
-//   cpu-freq <cpu>=<scale>,...  current frequency, as cpufreq changes it under a running system
+//   cpu-topo KEY=g|g;...      e.g. CLS=1-2|3-4;CAP=2,4:512: groups per level and CAP groups
+//                             cpulist:scale; never CPU 0; rebuilds the sched domains (cpu.c)
+//   cpu-freq <cpu> <scale>      current frequency, as cpufreq changes it under a running system
 //   check <name>              enable a checker (checkers/); a rule that fires emits a warn record
 //   exit                      end the session (the VM reboots)
 #include <linux/cgroup.h>
@@ -55,8 +56,6 @@ static void reply_errno(int err) {
   scnprintf(msg, sizeof(msg), "failed (errno %d)", -err);
   reply_error(msg);
 }
-
-static int last_cpu(void) { return num_online_cpus() - 1; }
 
 // Consume one argument while preserving the rest for command-specific validation.
 static char *take_arg(char **arg) {
@@ -108,8 +107,7 @@ static void cmd_create(char *arg) {
   for (int i = 0; i < n; i++) {
     struct task_struct *p = kstep_task_create();
 
-    tasks[ntasks++] = p; // the task's kSTEP record keeps it referenced
-    kstep_task_pin(p, 1, last_cpu()); // keep off CPU 0, kSTEP's control CPU
+    tasks[ntasks++] = p; // the task's kSTEP record keeps it referenced; created pinned to 1..N-1
     kstep_task_wakeup(p);
   }
   kstep_json_field_s64(&reply, "task", ntasks);
@@ -118,10 +116,8 @@ static void cmd_create(char *arg) {
 static const struct {
   const char *name;
   int policy;
-} policies[] = {
-    {"normal", SCHED_NORMAL}, {"batch", SCHED_BATCH}, {"idle", SCHED_IDLE},
-    {"fifo", SCHED_FIFO},     {"rr", SCHED_RR},
-};
+} fair_policies[] = {{"normal", SCHED_NORMAL}, {"batch", SCHED_BATCH}, {"idle", SCHED_IDLE}},
+  rt_policies[] = {{"fifo", SCHED_FIFO}, {"rr", SCHED_RR}};
 
 static void cmd_tick(char *arg) {
   int n = 1;
@@ -131,51 +127,54 @@ static void cmd_tick(char *arg) {
   kstep_tick_repeat(n);
 }
 
-// Both task affinity and cgroup cpusets must exclude the controller CPU.
-static bool parse_test_cpus(const char *arg, struct cpumask *mask) {
-  return arg && !cpulist_parse(arg, mask) && !cpumask_empty(mask) &&
-         !cpumask_test_cpu(0, mask) && cpumask_last(mask) <= last_cpu();
-}
-
 static void cmd_affinity(char *arg) {
   const char *usage = "usage: affinity <n> <cpulist within 1..N-1>";
   struct task_struct *p = parse_task(&arg, usage);
-  struct cpumask mask;
 
   if (!p)
     return;
-  if (!parse_test_cpus(arg, &mask))
+  int err = kstep_task_set_affinity(p, arg);
+  if (err == -ERANGE)
     return reply_error(usage);
-  int err = kstep_task_set_affinity(p, &mask);
   // sched_setaffinity rejects a mask disjoint from the task's cpuset (cgroup cpuset.cpus) with EINVAL.
   if (err == -EINVAL)
     return reply_error("cpulist has no CPU in the task's cgroup cpuset");
   reply_errno(err);
 }
 
-static void cmd_nice(char *arg) {
-  const char *usage = "usage: nice <n> <-20..19>";
+// The two classes' verbs: each names a policy of its class and the one parameter that class
+// reads, set together as sched_setattr sets them. A fair nice left out is kept; a real-time
+// priority is required, as the kernel requires it.
+static void cmd_policy_fair(char *arg) {
+  const char *usage = "usage: policy-fair <n> <normal|batch|idle> [-20..19]";
   struct task_struct *p = parse_task(&arg, usage);
-  int n;
+  char *name = take_arg(&arg);
+  int nice;
 
   if (!p)
     return;
-  if (!arg || kstrtoint(arg, 10, &n) || n < MIN_NICE || n > MAX_NICE)
+  nice = task_nice(p); // left out: kept
+  if (arg && (kstrtoint(arg, 10, &nice) || nice < MIN_NICE || nice > MAX_NICE))
     return reply_error(usage);
-  kstep_task_set_nice(p, n);
+  for (int i = 0; i < ARRAY_SIZE(fair_policies); i++)
+    if (name && !strcmp(name, fair_policies[i].name))
+      return kstep_task_set_fair(p, fair_policies[i].policy, nice);
+  reply_error(usage);
 }
 
-static void cmd_policy(char *arg) {
-  const char *usage = "usage: policy <n> <normal|batch|idle|fifo|rr>";
+static void cmd_policy_rt(char *arg) {
+  const char *usage = "usage: policy-rt <n> <fifo|rr> <1..99>";
   struct task_struct *p = parse_task(&arg, usage);
+  char *name = take_arg(&arg);
+  int prio;
 
   if (!p)
     return;
-  for (int i = 0; i < ARRAY_SIZE(policies); i++)
-    if (arg && !strcmp(arg, policies[i].name)) {
-      kstep_task_set_policy(p, policies[i].policy);
-      return;
-    }
+  if (!arg || kstrtoint(arg, 10, &prio) || prio < 1 || prio > MAX_RT_PRIO - 1)
+    return reply_error(usage);
+  for (int i = 0; i < ARRAY_SIZE(rt_policies); i++)
+    if (name && !strcmp(name, rt_policies[i].name))
+      return kstep_task_set_rt(p, rt_policies[i].policy, prio);
   reply_error(usage);
 }
 
@@ -222,7 +221,7 @@ static void cmd_cgroup_cpus(char *arg) {
 
   if (!name)
     return;
-  if (!parse_test_cpus(arg, &mask))
+  if (!kstep_parse_cpus(arg, &mask))
     return reply_error(usage);
   reply_errno(kstep_cgroup_set_cpuset(name, arg));
 }
@@ -263,24 +262,42 @@ static void cmd_check(char *arg) {
     reply_error("no such check");
 }
 
-// The machine: capacity and topology are what the hardware is, so a program sets them once,
-// before it starts; frequency changes under a running system, as cpufreq does. Each takes one
-// spec string and hands it to cpu.c, which reports what it could not parse.
-static const struct {
-  const char *verb, *usage;
-  void (*set)(const char *spec);
-} machine[] = {
-    {"cpu-cap", "usage: cpu-cap <cpu>=<scale>[,...]", kstep_cap_set},
-    {"cpu-topo", "usage: cpu-topo <level>=<group>|<group>[;...]", kstep_topo_set},
-    {"cpu-freq", "usage: cpu-freq <cpu>=<scale>[,...]", kstep_freq_set},
-};
+// The machine. Topology and capacity are what the hardware is, so a program sets them once,
+// before it starts, in one cpu-topo spec (cpu.c); frequency changes under a running system, as
+// cpufreq does, so cpu-freq takes one test CPU and a scale in 1..1024, like the task verbs take
+// one task.
+static void cmd_cpu_scale(char *arg, const char *usage, void (*set)(int cpu, int scale)) {
+  char *val = arg ? strchr(arg, ' ') : NULL;
+  int cpu, scale;
+
+  if (!val)
+    return reply_error(usage);
+  *val++ = '\0';
+  if (kstrtoint(arg, 10, &cpu) || cpu < 1 || cpu >= num_online_cpus() || kstrtoint(val, 10, &scale) ||
+      scale < 1 || scale > SCHED_CAPACITY_SCALE)
+    return reply_error(usage);
+  set(cpu, scale);
+}
+
+static void cmd_cpu_freq(char *arg) {
+  cmd_cpu_scale(arg, "usage: cpu-freq <cpu> <1..1024>", kstep_freq_set);
+}
+
+static void cmd_cpu_topo(char *arg) {
+  if (!arg)
+    return reply_error("usage: cpu-topo KEY=group|group[;...] (levels and CAP, see cpu.c)");
+  const char *err = kstep_topo_set(arg);
+  if (err)
+    reply_error(err);
+}
 
 static const struct {
   const char *verb;
   void (*fn)(char *arg);
 } commands[] = {
     {"create", cmd_create}, {"tick", cmd_tick},
-    {"nice", cmd_nice},     {"policy", cmd_policy},     {"affinity", cmd_affinity},
+    {"cpu-topo", cmd_cpu_topo}, {"cpu-freq", cmd_cpu_freq},
+    {"policy-fair", cmd_policy_fair}, {"policy-rt", cmd_policy_rt},     {"affinity", cmd_affinity},
     {"cgroup-create", cmd_cgroup_create}, {"cgroup-weight", cmd_cgroup_weight},
     {"cgroup-cpus", cmd_cgroup_cpus}, {"cgroup-destroy", cmd_cgroup_destroy},
     {"cgroup-attach", cmd_cgroup_attach},
@@ -312,14 +329,6 @@ static bool execute(char *line) {
   for (int i = 0; i < ARRAY_SIZE(commands); i++)
     if (!strcmp(verb, commands[i].verb)) {
       commands[i].fn(arg);
-      return true;
-    }
-  for (int i = 0; i < ARRAY_SIZE(machine); i++)
-    if (!strcmp(verb, machine[i].verb)) {
-      if (arg)
-        machine[i].set(arg);
-      else
-        reply_error(machine[i].usage);
       return true;
     }
   for (int i = 0; i < ARRAY_SIZE(task_verbs); i++)

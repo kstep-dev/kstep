@@ -11,8 +11,8 @@
 #                      are cli verbs, so they belong in fuzz.setup
 #   fuzz:          what the fuzzer needs beyond the machine
 #     checks         checkers/ rules to enable
-#     verbs          cli verbs this bug needs beyond the general table (tick, policy, affinity,
-#                    pause, wake); fifo and rr are the policy verb with those policies
+#     verbs          cli verbs this bug needs beyond the general table (tick, policy-fair,
+#                    affinity, pause, wake), spelled as cli.c spells them
 #     setup          cli lines run before every fuzzed program: the initial condition. It makes the
 #                    tasks: create is not in the general table, so a program's task ids are fixed
 
@@ -23,7 +23,7 @@ sync_wakeup:
   plot_format: curr_task
   fuzz:
     checks: [sync_wakeup]
-    verbs: [wait, post]
+    verbs: [chan-read, chan-write]
     setup: ["create 3"]
 
 vruntime_overflow:
@@ -45,8 +45,8 @@ util_avg:
     # 1010) misses both. pelt's decay bound is the right shape but guards on a saturated CPU, and
     # this one peaks at 908: a rule here has to bound how much catch-up decay one idle tick allows.
     checks: []
-    verbs: [fifo, rr, cpu-freq]
-    setup: ["cpu-freq 1=512", "create 2"]
+    verbs: [policy-rt, cpu-freq]
+    setup: ["cpu-freq 1 512", "create 2"]
 
 freeze:
   fix: cd9626e9ebc77edec33023fe95dab4b04ffc819d
@@ -91,7 +91,7 @@ even_idle_cpu:
     # program has come out silent on fixed), so vetting a candidate against the fixed kernel cannot
     # filter it either -- 24 raw candidates became 2, both spurious. This bug needs a focused rule.
     checks: [work_conserve]
-    setup: ["cpu-cap 2=512,4=512", "cpu-topo CLS=0|1-2|3-4", "create 4"]
+    setup: ["cpu-topo CLS=1-2|3-4;CAP=2,4:512", "create 4"]
 
 local_group_imbalance:
   ref: c369299895a591d96745d6492d4888259b004a9e
@@ -109,8 +109,8 @@ util_avg_jump:
   plot_format: val
   fuzz:
     checks: []   # see util_avg: the same signal, and no rule of the right shape yet
-    verbs: [fifo, rr, cpu-freq]
-    setup: ["cpu-freq 1=512", "create 2"]
+    verbs: [policy-rt, cpu-freq]
+    setup: ["cpu-freq 1 512", "create 2"]
 
 # Outside the paper's main table.
 rt_runtime_toggle: {fix: 9b58e976b3b391c0cf02e038d53dd0478ed3013c, plot_format: curr_task, extra: true}

@@ -106,9 +106,9 @@ __attribute__((noreturn)) static int task_main(void) {
   char c;
 
   sigaction(SIGUSR1, &sa, NULL);
-  // The first read parks until the first wakeup; after that a read returns the next thing the
-  // controller wants done, or halts. The halt is the task's work, so a read that returns nothing
-  // has done it.
+  // A read returns the next thing the controller wants done, or halts. The halt is the task's
+  // work, so a read that returns nothing has done it. The first read says pause: a new task
+  // sleeps until its first wakeup.
   while (1) {
     if (read(KSTEP_CTRL_FD, &c, sizeof(c)) <= 0)
       continue;
