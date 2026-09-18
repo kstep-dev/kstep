@@ -22,7 +22,6 @@ struct kstep_task {
   // a kill behind a wait must not swallow it. The two ends never run at once.
   int queue[KSTEP_CTRL_QUEUE];
   u32 head, tail;
-  struct completion parked; // the first read has parked the task (see kstep_task_create)
 };
 static DEFINE_XARRAY(kstep_tasks);
 
@@ -52,10 +51,9 @@ static void kstep_task_add(struct task_struct *p) {
   if (!t)
     panic("Failed to record task %d", p->pid);
   t->p = get_task_struct(p);
-  init_completion(&t->parked);
-  // A new task parks on its first read: no state for "created but not yet there", because the
-  // queue already says what it will do when it gets there.
-  kstep_ctrl_put(t, KSTEP_CTRL_PARK);
+  // A new task pauses on its first read, like any task asked to: no state for "created but not
+  // yet there", because the queue already says what it will do when it gets there.
+  kstep_ctrl_put(t, KSTEP_CTRL_PAUSE);
   // initialized before it is published: lookups take no lock
   if (xa_err(xa_store(&kstep_tasks, p->pid, t, GFP_KERNEL)))
     panic("Failed to record task %d", p->pid);
@@ -79,18 +77,7 @@ static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, lof
 
   int act = kstep_ctrl_take(t);
 
-  // A new task's first read, held until its first wakeup. kSTEP does this one itself because the
-  // creator has to know when it happened: set_current_state() before complete(), so the creator,
-  // which shares this CPU, runs only once this task has switched out -- no preemption point lies
-  // between the two (CONFIG_PREEMPT_NONE).
-  if (act == KSTEP_CTRL_PARK) {
-    set_current_state(TASK_INTERRUPTIBLE);
-    complete(&t->parked);
-    schedule();
-    return 0;
-  }
-
-  // The rest is the task's own to do: hand it over and let it make the syscall.
+  // An action is the task's own to do: hand it over and let it make the syscall.
   if (act != KSTEP_CTRL_NONE) {
     char c = act;
 
@@ -149,11 +136,11 @@ static int task_init(struct subprocess_info *info, struct cred *new) {
   }
 
   // Start on the controller's CPU: it runs whenever the controller blocks, whatever the other
-  // CPUs are doing. kstep_task_create() moves it once parked.
+  // CPUs are doing. kstep_task_create() moves it once it is asleep.
   if (set_cpus_allowed_ptr(current, cpumask_of(0)))
     panic("Failed to pin task %d to CPU 0", current->pid);
 
-  kstep_task_add(current); // the first read parks
+  kstep_task_add(current); // the first read says pause
   *(struct task_struct **)info->data = current;
   TRACE_INFO("Task created with pid %d", current->pid);
   return 0;
@@ -174,10 +161,18 @@ struct task_struct *kstep_task_create(void) {
   if (p == NULL)
     panic("Failed to get task struct");
 
-  // Parked: off CPU 0 in TASK_INTERRUPTIBLE (see kstep_ctrl_read).
-  wait_for_completion(&kstep_task_find(p)->parked);
+  // The task does its own init and its first read tells it to pause (kstep_task_add). Wait for
+  // that pause to hold: asleep and off CPU 0. It shares this CPU and nothing preempts the
+  // controller (CONFIG_PREEMPT_NONE), so yield to it until it is asleep; wait_task_inactive then
+  // sees it through the switch out, and fails fast while it is still running its init.
+  KSYM_IMPORT(wait_task_inactive);
+  while (!KSYM_wait_task_inactive(p, TASK_INTERRUPTIBLE))
+    schedule();
   TRACE_INFO("Task %d is ready", p->pid);
-  kstep_task_pin(p, 1, num_online_cpus() - 1);
+  char cpus[16];
+  snprintf(cpus, sizeof(cpus), "1-%d", num_online_cpus() - 1);
+  if (kstep_task_set_affinity(p, cpus))
+    panic("Failed to set CPU affinity for task %d to CPUs %s", p->pid, cpus);
   kstep_reset_task(p);
   return p;
 }
@@ -247,46 +242,43 @@ void kstep_task_block(struct task_struct *p) {
   TRACE_INFO("Blocked task %d", p->pid);
 }
 
-// nice applies to the fair classes only; the kernel keeps it across a spell as fifo/rr.
-void kstep_task_set_nice(struct task_struct *p, int nice) {
-  kstep_cov_controller(true);
-  set_user_nice(p, nice);
-  kstep_cov_controller(false);
-  TRACE_INFO("Set nice of task %d to %d", p->pid, nice);
-}
+// A fair policy -- SCHED_NORMAL, SCHED_BATCH or SCHED_IDLE -- and the nice that goes with it,
+// set together as sched_setattr does. SCHED_IDLE ignores the nice and runs at the class's fixed
+// minimal weight.
+void kstep_task_set_fair(struct task_struct *p, int policy, int nice) {
+  struct sched_attr attr = {.sched_policy = policy, .sched_nice = nice};
 
-// Scheduling class: SCHED_NORMAL, SCHED_BATCH, SCHED_IDLE, SCHED_FIFO or SCHED_RR. The fair
-// classes keep the task's nice; the real-time ones get one fixed priority, since priority only
-// orders real-time tasks among themselves and kSTEP studies their effect on the fair class.
-void kstep_task_set_policy(struct task_struct *p, int policy) {
-  struct sched_attr attr = {.sched_policy = policy};
-
-  if (policy == SCHED_FIFO || policy == SCHED_RR)
-    attr.sched_priority = 80;
-  else
-    attr.sched_nice = task_nice(p);
   kstep_cov_controller(true);
   sched_setattr_nocheck(p, &attr);
   kstep_cov_controller(false);
-  TRACE_INFO("Set policy of task %d to %d", p->pid, policy);
+  TRACE_INFO("Set policy of task %d to %d (nice %d)", p->pid, policy, nice);
 }
 
-// Returns -EINVAL when the mask does not intersect the task's cpuset (cgroup cpuset.cpus).
-int kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask) {
+// A real-time policy -- SCHED_FIFO or SCHED_RR -- and the priority that goes with it, 1..99. The
+// kernel takes the two together and has no default priority, and neither does kSTEP. The task's
+// nice is kept meanwhile, inert.
+void kstep_task_set_rt(struct task_struct *p, int policy, int prio) {
+  struct sched_attr attr = {.sched_policy = policy, .sched_priority = prio};
+
+  kstep_cov_controller(true);
+  sched_setattr_nocheck(p, &attr);
+  kstep_cov_controller(false);
+  TRACE_INFO("Set policy of task %d to %d (priority %d)", p->pid, policy, prio);
+}
+
+// Restrict p to the CPUs of cpulist, such as "1", "1-3" or "1,3": test CPUs only, never CPU 0,
+// the controller's. Returns -ERANGE for a list that is not that, and -EINVAL when the list does
+// not intersect the task's cpuset (cgroup cpuset.cpus), as sched_setaffinity does.
+int kstep_task_set_affinity(struct task_struct *p, const char *cpulist) {
   // directly call set_cpus_allowed_ptr is not enough, as it does not update the user_cpus_ptr
   KSYM_IMPORT(sched_setaffinity);
-  kstep_cov_controller(true);
-  int ret = KSYM_sched_setaffinity(p->pid, mask);
-  kstep_cov_controller(false);
-  return ret;
-}
-
-void kstep_task_pin(struct task_struct *p, int begin, int end) {
   struct cpumask mask;
-  cpumask_clear(&mask);
-  for (int i = begin; i <= end; i++)
-    cpumask_set_cpu(i, &mask);
-  if (kstep_task_set_affinity(p, &mask))
-    panic("Failed to set CPU affinity for task %d to CPUs %*pbl", p->pid, cpumask_pr_args(&mask));
-  TRACE_INFO("Pinned task %d to CPUs %d-%d", p->pid, begin, end);
+
+  if (!kstep_parse_cpus(cpulist, &mask))
+    return -ERANGE;
+  kstep_cov_controller(true);
+  int ret = KSYM_sched_setaffinity(p->pid, &mask);
+  kstep_cov_controller(false);
+  TRACE_INFO("Set affinity of task %d to CPUs %s (%d)", p->pid, cpulist, ret);
+  return ret;
 }

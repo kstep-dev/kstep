@@ -65,15 +65,14 @@ void kstep_settle(void);
 // task.c
 struct task_struct *kstep_task_create(void);
 void kstep_task_exit(struct task_struct *p);
-void kstep_task_pin(struct task_struct *p, int begin, int end);
-int kstep_task_set_affinity(struct task_struct *p, const struct cpumask *mask);
-void kstep_task_set_policy(struct task_struct *p, int policy); // SCHED_NORMAL, SCHED_FIFO, ...
+int kstep_task_set_affinity(struct task_struct *p, const char *cpulist); // "1", "1-3", "1,3" within 1..N-1; -EINVAL if outside its cpuset
+void kstep_task_set_fair(struct task_struct *p, int policy, int nice); // normal/batch/idle with its nice
+void kstep_task_set_rt(struct task_struct *p, int policy, int prio);   // fifo/rr with its priority, 1..99
 void kstep_task_pause(struct task_struct *p);
 void kstep_task_wakeup(struct task_struct *p);
 void kstep_task_block(struct task_struct *p);
 void kstep_task_chan_read(struct task_struct *p);
 void kstep_task_chan_write(struct task_struct *p);
-void kstep_task_set_nice(struct task_struct *p, int nice);
 
 // kernel.c
 int kstep_write(const char *path, const char *buf, size_t size);
@@ -100,19 +99,16 @@ void kstep_check_extra_balance(int cpu, struct sched_domain *sd);
 
 // cpu.c
 #define CPU_SPEC_LEN 512
-// String-spec API (parses spec, applies, rebuilds sched-domains as needed).
-//   topo: "<level>=<group>|<group>|...[;<level>=<group>|<group>|...]"
-//         each <group> is a cpulist; every online CPU must belong to one group
-//         per level. Levels applied in order.
-//         e.g. "SMT=0|1-2|3-4;CLS=0|1-2|3-4"
-//   cap:  "<cpu>=<scale>[,<cpu>=<scale>...]" — sparse; unspecified defaults to
-//         SCHED_CAPACITY_SCALE. e.g. "2=512,4=512"
-//   freq: same format as cap
-void kstep_topo_set(const char *spec);
-void kstep_cap_set(const char *spec);
-void kstep_freq_set(const char *spec);
+// The topology spec, parsed and applied in one go, with the sched domains rebuilt as needed:
+//   KEY=group|group;KEY=group|group...   a group is a cpulist; CAP groups are cpulist:scale
+// A key is a level (SMT, CLS, MC, PKG, NODE) or CAP, the capacity of the CPUs named in 1..1024.
+//   e.g. "CLS=1-2|3-4;CAP=2,4:512"       two clusters, a little core in each
+// The grammar and its rules are spelled out at the top of cpu.c. Frequency is not in the spec:
+// it changes under a running system, so it is a per-CPU setter.
+const char *kstep_topo_set(const char *spec); // NULL, or what is wrong with it
+void kstep_freq_set(int cpu, int scale); // 1..1024
 unsigned long kstep_freq_get(int cpu);
-void kstep_cpu_print(void);
+void kstep_topo_print(void);
 void kstep_sd_flags_str(int flags, char *buf, size_t len);
 
 #endif

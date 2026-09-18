@@ -21,12 +21,12 @@ static void setup(void) {
   kstep_on_tick_begin(on_tick_begin);
   task = kstep_task_create();
   // fake the frequency of cpu 1 to 50% of the base frequency
-  kstep_freq_set("1=512");
+  kstep_freq_set(1, 512);
 }
 
 static void run(void) {
   // start the fifo task and let it run for a long busy window
-  kstep_task_set_policy(task, SCHED_FIFO);
+  kstep_task_set_rt(task, SCHED_FIFO, 80);
   kstep_task_wakeup(task);
   kstep_tick_repeat(WAKE_TICKS);
 

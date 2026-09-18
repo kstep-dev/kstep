@@ -9,7 +9,7 @@ static void setup(void) {
   kstep_on_tick_begin(kstep_output_nr_running);
   kstep_on_balance_selected(kstep_check_extra_balance);
   // SMT pairs: [1,2] [3,4], MC: [1-4]
-  kstep_topo_set("SMT=0|1-2|3-4;CLS=0|1-2|3-4");
+  kstep_topo_set("SMT=1,2|3,4;CLS=1-2|3-4");
 
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     tasks[i] = kstep_task_create();
@@ -17,17 +17,17 @@ static void setup(void) {
 
 static void run(void) {
   // nr_running on cpu 1-4: [1, 0, 3, 1]
-  kstep_task_pin(tasks[0], 1, 1);
-  kstep_task_pin(tasks[1], 3, 3);
-  kstep_task_pin(tasks[2], 3, 3);
-  kstep_task_pin(tasks[3], 3, 3);
-  kstep_task_pin(tasks[4], 4, 4);
+  kstep_task_set_affinity(tasks[0], "1");
+  kstep_task_set_affinity(tasks[1], "3");
+  kstep_task_set_affinity(tasks[2], "3");
+  kstep_task_set_affinity(tasks[3], "3");
+  kstep_task_set_affinity(tasks[4], "4");
   for (int i = 0; i < ARRAY_SIZE(tasks); i++)
     kstep_task_wakeup(tasks[i]);
 
   kstep_tick_repeat(500);
   for (int i = 1; i <= 3; i++)
-    kstep_task_pin(tasks[i], 1, 3);
+    kstep_task_set_affinity(tasks[i], "1-3");
   kstep_tick_repeat(500);
 }
 
