@@ -10,9 +10,7 @@ mod checkout;
 #[derive(Parser)]
 #[command(name = "kstep", version, about)]
 enum Cli {
-    /// Fetch a Linux tree into build/<name>/linux (tarball or worktree)
     Checkout(checkout::Args),
-    /// Build the kernel, the kmod, the user binary and rootfs.cpio
     Build(build::Args),
     /// Boot a driver under QEMU and record its output under results/
     Run,

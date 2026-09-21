@@ -1,42 +1,34 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::Subcommand;
 use kstep_build::{build, Build};
 
+/// Build the kmod, the user binary and rootfs.cpio (and the kernel when needed)
 #[derive(clap::Args)]
+#[command(
+    long_about = "Build the kmod, the user binary and rootfs.cpio. The kernel is built too when it is \
+missing, older than its .config, or asked for with --linux.",
+    after_help = "Examples:
+  kstep build                         # build/current
+  kstep build v6.18                   # kmod + user + rootfs for build/v6.18
+  kstep build v6.18 --linux           # reconfigure and rebuild the kernel first
+  kstep build --config linux/config.kstep.cov   # kernel with an extra Kconfig fragment"
+)]
 pub struct Args {
     /// Dir under build/ (default: build/current)
-    #[arg(long = "build", value_name = "NAME")]
     name: Option<String>,
-    #[command(subcommand)]
-    cmd: Option<Cmd>,
-}
-
-#[derive(Subcommand)]
-enum Cmd {
-    /// kmod + user + rootfs.cpio, and the kernel if missing [default]
-    Kstep,
-    /// Configure and build the kernel
-    Linux {
-        /// Extra Kconfig fragment to merge (e.g. linux/config.kstep.cov)
-        #[arg(long)]
-        config: Option<PathBuf>,
-    },
-    /// Remove kmod and rootfs outputs
-    Clean {
-        /// Also the user binary and kbuild objects
-        #[arg(long)]
-        all: bool,
-    },
+    /// Reconfigure and rebuild the kernel (run after editing the tree or the config fragments)
+    #[arg(long)]
+    linux: bool,
+    /// Extra Kconfig fragment to merge; implies --linux
+    #[arg(long, value_name = "FILE")]
+    config: Option<PathBuf>,
 }
 
 pub fn main(a: Args) -> Result<()> {
     let b = Build::new(a.name.as_deref())?;
-    eprintln!("======= BUILD: {} =======", b.name);
-    match a.cmd.unwrap_or(Cmd::Kstep) {
-        Cmd::Kstep => build::build_kstep(&b),
-        Cmd::Linux { config } => build::build_linux(&b, config.as_deref(), true, None),
-        Cmd::Clean { all } => build::clean(&b, all),
+    if a.linux || a.config.is_some() {
+        build::build_linux(&b, a.config.as_deref(), true, None)?;
     }
+    build::build_kstep(&b)
 }

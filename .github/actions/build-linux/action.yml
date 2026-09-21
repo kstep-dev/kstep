@@ -23,8 +23,8 @@ runs:
 
     - if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
-      # `clean --all` drops the kbuild objects before caching; the image and Module.symvers survive it
+      # `make clean` drops the kbuild objects before caching; .config, Module.symvers and the generated headers survive it, which is all the kmod build needs
       run: |
         ./kstep.sh checkout ${{ inputs.version }}
-        ./kstep.sh build --build ${{ inputs.version }} linux ${{ inputs.cov == 'true' && '--config linux/config.kstep.cov' || '' }}
-        ./kstep.sh build --build ${{ inputs.version }} clean --all
+        ./kstep.sh build ${{ inputs.version }} --linux ${{ inputs.cov == 'true' && '--config linux/config.kstep.cov' || '' }}
+        make -C build/${{ inputs.version }}/linux clean

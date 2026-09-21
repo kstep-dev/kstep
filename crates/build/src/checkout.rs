@@ -56,21 +56,14 @@ pub fn set_current_build(name: &str) -> Result<()> {
 
 pub fn download(url: &str, output: &Path) -> Result<()> {
     if output.exists() {
-        eprintln!(
-            "File {} already exists, skipping download",
-            output.display()
-        );
         return Ok(());
     }
+    eprintln!("Downloading {url}");
     run(cmd("wget", ["--no-verbose", url, "-O"]).arg(output), None)
 }
 
 pub fn decompress(tarball: &Path, output_dir: &Path) -> Result<()> {
     if output_dir.exists() {
-        eprintln!(
-            "Directory {} already exists, skipping decompression",
-            output_dir.display()
-        );
         return Ok(());
     }
     fs::create_dir_all(output_dir)?;
@@ -103,7 +96,9 @@ pub fn checkout(
 ) -> Result<()> {
     let dir = build_dir().join(name);
     let linux_dir = dir.join("linux");
-    if !linux_dir.exists() {
+    if linux_dir.exists() {
+        eprintln!("Reusing build/{name}/linux");
+    } else {
         fs::create_dir_all(&dir)?;
         if tarball {
             let tarball_path = dir.join(format!("{git_ref}.tar.xz"));

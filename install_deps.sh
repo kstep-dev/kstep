@@ -5,6 +5,7 @@ set -x
 
 PACKAGES=(
     build-essential
+    wget
     flex
     bison
     bc

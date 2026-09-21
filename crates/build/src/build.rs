@@ -14,13 +14,11 @@ use crate::{build_curr_dir, build_dir};
 
 pub const ARCH: &str = std::env::consts::ARCH;
 
-pub fn kernel_image() -> &'static str {
-    match ARCH {
-        "x86_64" => "arch/x86/boot/bzImage",
-        "aarch64" => "arch/arm64/boot/Image",
-        other => panic!("unsupported host arch {other}"),
-    }
-}
+/// The image QEMU boots, relative to the kernel tree.
+#[cfg(target_arch = "x86_64")]
+pub const KERNEL_IMAGE: &str = "arch/x86/boot/bzImage";
+#[cfg(target_arch = "aarch64")]
+pub const KERNEL_IMAGE: &str = "arch/arm64/boot/Image";
 
 /// One `build/<name>/` directory.
 #[derive(Clone, Debug)]
@@ -40,7 +38,12 @@ impl Build {
             }
         };
         if !build_dir().join(&name).join("linux").exists() {
-            bail!("No kernel tree at build/{name}/linux; run `kstep checkout`");
+            let hint = if name.starts_with('v') {
+                format!("kstep checkout {name}")
+            } else {
+                format!("kstep checkout <ref> {name}")
+            };
+            bail!("no kernel tree at build/{name}/linux; run `{hint}` first");
         }
         Ok(Build { name })
     }
@@ -67,10 +70,11 @@ impl Build {
     pub fn rootfs(&self) -> PathBuf {
         self.dir().join("rootfs.cpio")
     }
-    /// The static user binary, shared by all builds.
-    pub fn user(&self) -> PathBuf {
-        build_dir().join("user")
-    }
+}
+
+/// The static user binary, shared by all builds.
+pub fn user_bin() -> PathBuf {
+    build_dir().join("user")
 }
 
 fn src(sub: &str) -> PathBuf {
@@ -144,7 +148,7 @@ pub fn build_linux(
     ]);
     run(&mut make, log)?;
     // fs::copy gives a fresh mtime, which kernel_stale compares with the .config's
-    fs::copy(b.linux().join(kernel_image()), b.kernel())?;
+    fs::copy(b.linux().join(KERNEL_IMAGE), b.kernel())?;
     fs::copy(b.linux().join("vmlinux"), b.dir().join("vmlinux"))?;
     let _ = fs::remove_dir_all(b.kmod_dir());
     Ok(())
@@ -163,7 +167,7 @@ pub fn kernel_stale(b: &Build) -> bool {
     }
 }
 
-pub fn build_user(b: &Build) -> Result<()> {
+pub fn build_user() -> Result<()> {
     let flags = [
         "-Wall",
         "-Wextra",
@@ -173,7 +177,7 @@ pub fn build_user(b: &Build) -> Result<()> {
         "-o",
     ];
     run(
-        cmd("gcc", flags).arg(b.user()).arg(src("user/user.c")),
+        cmd("gcc", flags).arg(user_bin()).arg(src("user/user.c")),
         None,
     )
 }
@@ -231,7 +235,7 @@ pub fn cpio_header(name: &str, size: usize) -> Vec<u8> {
 
 pub fn build_rootfs(b: &Build) -> Result<()> {
     let mut out = Vec::new();
-    for (name, path) in [("kmod.ko", b.kmod()), ("user", b.user())] {
+    for (name, path) in [("kmod.ko", b.kmod()), ("user", user_bin())] {
         let mut data = fs::read(&path).with_context(|| format!("read {}", path.display()))?;
         out.extend(cpio_header(name, data.len()));
         pad4(&mut data);
@@ -243,21 +247,15 @@ pub fn build_rootfs(b: &Build) -> Result<()> {
 
 pub fn build_kstep(b: &Build) -> Result<()> {
     if kernel_stale(b) {
+        eprintln!(
+            "build/{}: kernel missing or older than its .config, building Linux first",
+            b.name
+        );
         build_linux(b, None, false, None)?; // keep the existing .config
     }
-    build_user(b)?;
+    build_user()?;
     build_kmod(b)?;
     build_rootfs(b)
-}
-
-pub fn clean(b: &Build, full: bool) -> Result<()> {
-    let _ = fs::remove_dir_all(b.kmod_dir());
-    let _ = fs::remove_file(b.rootfs());
-    if full {
-        let _ = fs::remove_file(b.user());
-        run(cmd("make", ["-C"]).arg(b.linux()).arg("clean"), None)?;
-    }
-    Ok(())
 }
 
 #[test]

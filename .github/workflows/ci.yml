@@ -80,7 +80,7 @@ jobs:
           cov: ${{ matrix.fuzz }}
 
       - name: Build kSTEP
-        run: ./kstep.sh build --build ${{ matrix.version }}
+        run: ./kstep.sh build ${{ matrix.version }}
 
       - name: "[Run] Execute driver"
         if: ${{ ! matrix.fuzz }}

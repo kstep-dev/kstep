@@ -8,9 +8,8 @@ use std::process::{Command, Stdio};
 
 use anyhow::{bail, Context, Result};
 
-pub const BLUE: &str = "\x1b[94m";
-pub const GREEN: &str = "\x1b[92m";
-pub const RESET: &str = "\x1b[0m";
+const BLUE: &str = "\x1b[94m";
+const RESET: &str = "\x1b[0m";
 
 fn quote(s: &OsStr) -> String {
     let s = s.to_string_lossy();
@@ -59,19 +58,14 @@ pub fn run(cmd: &mut Command, log: Option<&Path>) -> Result<()> {
     }
     let status = cmd.status().with_context(|| format!("spawn `{shown}`"))?;
     if !status.success() {
-        bail!("`{shown}` failed: {status}");
+        match log {
+            Some(log) => bail!(
+                "`{}` failed ({status}); see {}",
+                shown.split(' ').next().unwrap(),
+                log.display()
+            ),
+            None => bail!("`{}` failed ({status})", shown.split(' ').next().unwrap()),
+        }
     }
     Ok(())
-}
-
-pub fn output(cmd: &mut Command) -> Result<String> {
-    let shown = display(cmd);
-    let out = cmd
-        .stderr(Stdio::inherit())
-        .output()
-        .with_context(|| format!("spawn `{shown}`"))?;
-    if !out.status.success() {
-        bail!("`{shown}` failed: {}", out.status);
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
