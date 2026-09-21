@@ -183,58 +183,107 @@ fn build() -> Result<String> {
     Ok(version)
 }
 
-/// A static file server for site/. Everything the page fetches is versioned (?v=) except
-/// index.html itself, so send no-cache: a browser then revalidates and sees an edit at once.
+/// A static file server for site/, for a browser possibly far away (a VS Code port forward):
+/// keep-alive, so one connection carries the page's ~40 requests, and an ETag from the file's
+/// size and mtime, so a refresh gets 304s instead of the 14 MB QEMU again. Everything the page
+/// fetches is versioned (?v=) except index.html, so no-cache: the browser revalidates every
+/// time and sees an edit at once.
 fn serve(port: u16) -> Result<()> {
     let listener =
         TcpListener::bind(("127.0.0.1", port)).with_context(|| format!("bind port {port}"))?;
     println!("http://localhost:{port}/");
     for stream in listener.incoming().flatten() {
-        let _ = std::thread::spawn(move || -> std::io::Result<()> {
-            let mut stream = stream;
-            let mut reader = BufReader::new(stream.try_clone()?);
-            let mut req = String::new();
-            reader.read_line(&mut req)?;
-            let mut line = String::new();
-            loop {
-                line.clear();
-                if reader.read_line(&mut line)? == 0 || line == "\r\n" || line == "\n" {
-                    break; // the blank line ends the headers, which go unused
-                }
-            }
-            let path = req
-                .split_whitespace()
-                .nth(1)
-                .unwrap_or("/")
-                .split('?')
-                .next()
-                .unwrap_or("/");
-            let rel = path.trim_start_matches('/');
-            let file = site().join(if rel.is_empty() { "index.html" } else { rel });
-            let mime = match file.extension().and_then(|e| e.to_str()) {
-                Some("html") => "text/html",
-                Some("js") | Some("mjs") => "text/javascript",
-                Some("css") => "text/css",
-                Some("json") => "application/json",
-                Some("wasm") => "application/wasm",
-                Some("png") => "image/png",
-                Some("svg") => "image/svg+xml",
-                Some("pdf") => "application/pdf",
-                _ => "application/octet-stream",
-            };
-            match fs::read(&file) {
-                Ok(body) if !rel.contains("..") => {
-                    write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n", body.len())?;
-                    stream.write_all(&body)
-                }
-                _ => write!(
-                    stream,
-                    "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                ),
-            }
+        std::thread::spawn(move || {
+            let _ = connection(stream);
         });
     }
     Ok(())
+}
+
+fn connection(mut stream: std::net::TcpStream) -> std::io::Result<()> {
+    let mut reader = BufReader::new(stream.try_clone()?);
+    loop {
+        let t0 = std::time::Instant::now();
+        let mut req = String::new();
+        if reader.read_line(&mut req)? == 0 {
+            return Ok(()); // the browser closed the connection
+        }
+        let mut etag_seen = None;
+        let mut close = false;
+        let mut line = String::new();
+        loop {
+            line.clear();
+            if reader.read_line(&mut line)? == 0 || line == "\r\n" || line == "\n" {
+                break; // the blank line ends the headers
+            }
+            if let Some((name, value)) = line.split_once(':') {
+                match name.to_ascii_lowercase().as_str() {
+                    "if-none-match" => etag_seen = Some(value.trim().to_string()),
+                    "connection" if value.trim().eq_ignore_ascii_case("close") => close = true,
+                    _ => {}
+                }
+            }
+        }
+        let path = req
+            .split_whitespace()
+            .nth(1)
+            .unwrap_or("/")
+            .split('?')
+            .next()
+            .unwrap_or("/")
+            .to_string();
+        let rel = path.trim_start_matches('/');
+        let file = site().join(if rel.is_empty() { "index.html" } else { rel });
+        let mime = match file.extension().and_then(|e| e.to_str()) {
+            Some("html") => "text/html",
+            Some("js") | Some("mjs") => "text/javascript",
+            Some("css") => "text/css",
+            Some("json") => "application/json",
+            Some("wasm") => "application/wasm",
+            Some("png") => "image/png",
+            Some("svg") => "image/svg+xml",
+            Some("pdf") => "application/pdf",
+            _ => "application/octet-stream",
+        };
+        let meta = fs::metadata(&file)
+            .ok()
+            .filter(|m| m.is_file() && !rel.contains(".."));
+        let etag = meta.as_ref().map(|m| {
+            let mtime = m
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map_or(0, |d| d.as_nanos());
+            format!("\"{}-{mtime:x}\"", m.len())
+        });
+        let (status, bytes) = match (&etag, etag_seen) {
+            (Some(tag), Some(seen)) if *tag == seen => {
+                write!(
+                    stream,
+                    "HTTP/1.1 304 Not Modified\r\nETag: {tag}\r\nCache-Control: no-cache\r\n\r\n"
+                )?;
+                (304, 0)
+            }
+            (Some(tag), _) => {
+                let body = fs::read(&file)?;
+                write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nETag: {tag}\r\nCache-Control: no-cache\r\n\r\n", body.len())?;
+                stream.write_all(&body)?;
+                (200, body.len())
+            }
+            (None, _) => {
+                write!(
+                    stream,
+                    "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n"
+                )?;
+                (404, 0)
+            }
+        };
+        // one line per request: what the browser asked for and how long it took
+        eprintln!("{status} {path} {bytes} B {} ms", t0.elapsed().as_millis());
+        if close {
+            return Ok(());
+        }
+    }
 }
 
 /// Refuse to publish a page whose playground image does not speak its protocol, then push site/

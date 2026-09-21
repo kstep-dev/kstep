@@ -118,7 +118,7 @@ pub struct Cgroup {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Cfs {
     pub cpu: u32,
-    pub min_vruntime: u64,
+    pub min_vruntime: i64,
     pub util_avg: u64,
     pub load_avg: u64,
     pub runnable_avg: u64,
@@ -142,8 +142,8 @@ pub struct Entity {
     pub share: f64,
     pub weight: u64,
     pub sum_exec_runtime: u64,
-    pub vruntime: u64,
-    pub deadline: u64,
+    pub vruntime: i64,
+    pub deadline: i64,
     pub slice: u64,
     /// Queue average vruntime minus this entity's, weighted: 0 fair, positive owed time
     pub lag: i64,

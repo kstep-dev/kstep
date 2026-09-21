@@ -24,7 +24,7 @@
 // host checks both before trusting anything else: bump KSTEP_SHM_LAYOUT whenever a struct below
 // changes, in size or in meaning. gen is the seqlock.
 #define KSTEP_SHM_MAGIC 0x5054536b // "kSTP", little endian
-#define KSTEP_SHM_LAYOUT 7
+#define KSTEP_SHM_LAYOUT 8
 
 // The machine and the tasks first, then one pair of tables per scheduling class: the class's
 // queue on each CPU (ncpus records, like the CPU table), and what is on those queues. A task's
@@ -67,7 +67,11 @@ struct kstep_shm_se {
   u32 flags;
   u32 share; // of the CPU, in 1/1024: this weight over its queue's, times the parent entity's share, up to the root -- the walk update_cfs_rq_h_load makes over load averages, made over weights
   u64 weight; // scale_load_down: the units the nice table is written in, nice 0 being 1024
-  u64 sum_exec_runtime, vruntime, deadline, slice;
+  u64 sum_exec_runtime;
+  // Signed: the kernel keeps vruntimes unsigned and compares them as (s64)(a - b), so a woken task
+  // placed before the queue's average sits just below 2^64 -- a small negative number, shown as one
+  s64 vruntime, deadline;
+  u64 slice;
   // The queue's average vruntime minus this entity's, weighted: the one number comparable across
   // queues, since every cfs_rq has a clock of its own. Zero is fair, positive is owed time, and
   // EEVDF's eligibility is lag >= 0. Live from avg_vruntime while queued; the kernel's saved
@@ -104,7 +108,8 @@ struct kstep_shm_cgroup {
 // real-time task, or one left behind by delayed dequeue, is in one and not the other.
 struct kstep_shm_cfs {
   u32 cpu, reserved;
-  u64 min_vruntime, util_avg, load_avg, runnable_avg;
+  s64 min_vruntime; // signed, as an entity's vruntime
+  u64 util_avg, load_avg, runnable_avg;
   u64 h_nr_runnable; // cfs_rq->h_nr_runnable: runnable tasks as the balancer counts them
 };
 

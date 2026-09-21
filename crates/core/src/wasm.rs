@@ -2,7 +2,6 @@
 //! region out of QEMU's memory after each command and hands the bytes here. JS owns that memory,
 //! so it also owns the seqlock retry: a `null` result means "snapshot again".
 
-use serde::Serialize;
 use wasm_bindgen::prelude::*;
 
 use crate::qemu::{Accel, Boot, Io, Machine};
@@ -35,16 +34,12 @@ pub fn shm_size() -> usize {
 }
 
 /// The machine's state from a snapshot of the region; `null` when the writer was mid-update.
-/// Fails on a region this decoder was not built for. 64-bit fields come out as BigInt: a
-/// vruntime can sit just below 2^64 (a negative value in the kernel's unsigned arithmetic), which
-/// no JS number holds; kstep.mjs turns them into numbers the lossy way the page always did.
+/// Fails on a region this decoder was not built for. Every field fits a JS number: the kernel's
+/// wrapping vruntimes are decoded signed, and nothing else gets near 2^53.
 #[wasm_bindgen]
 pub fn shm_decode(region: &[u8]) -> Result<JsValue, JsError> {
-    let ser = serde_wasm_bindgen::Serializer::new().serialize_large_number_types_as_bigints(true);
     match shm::decode(region) {
-        Ok(state) => state
-            .serialize(&ser)
-            .map_err(|e| JsError::new(&e.to_string())),
+        Ok(state) => serde_wasm_bindgen::to_value(&state).map_err(|e| JsError::new(&e.to_string())),
         Err(shm::Error::Busy) => Ok(JsValue::NULL),
         Err(e) => Err(JsError::new(&e.to_string())),
     }
