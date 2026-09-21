@@ -13,30 +13,25 @@ env:
 
 jobs:
   deps:
-    name: Cache deps (${{ matrix.arm && 'aarch64' || 'x86_64' }})
+    name: Deps (${{ matrix.arm && 'aarch64' || 'x86_64' }})
     strategy:
       matrix:
         arm: [false, true]
     runs-on: ${{ matrix.arm && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v6
-      - name: Cache deps
+
+      - name: Cache apt packages
         uses: ./.github/actions/apt-deps
         with:
           packages: ${{ matrix.arm && env.PACKAGES_AARCH64 || env.PACKAGES_X86_64 }}
 
-  rust:
-    name: Rust (${{ matrix.arm && 'aarch64' || 'x86_64' }})
-    strategy:
-      matrix:
-        arm: [false, true]
-    runs-on: ${{ matrix.arm && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: Swatinem/rust-cache@v2
+      # target/ and the registry, shared with the test jobs (same key), saved only here
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
         with:
           shared-key: kstep
-      - name: Build
+      - name: Build Rust
         run: cargo build --workspace --release --locked
       - name: Format
         run: cargo fmt --all --check
@@ -46,7 +41,7 @@ jobs:
         run: cargo test --workspace --release --locked
 
   test:
-    needs: [deps, rust]
+    needs: deps
     name: ${{ matrix.fuzz && 'Fuzz' || 'Run' }} ${{ matrix.version }} (${{ matrix.arm && 'aarch64' || 'x86_64' }})
     strategy:
       matrix:
