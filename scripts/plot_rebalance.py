@@ -13,7 +13,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from plot_utils import save_fig
-from utils import parse_jsonl, trace
+from utils import kstep_log, parse_jsonl
 
 
 def parse_log_file(path: Path, target_cpu: int):
@@ -48,8 +48,8 @@ def plot_rebalance_comparison(buggy_df, fixed_df):
 
 def main(driver: str):
     target_cpu = 2
-    buggy_df = parse_log_file(trace(f"repro_{driver}/buggy"), target_cpu)
-    fixed_df = parse_log_file(trace(f"repro_{driver}/fixed"), target_cpu)
+    buggy_df = parse_log_file(kstep_log(f"repro_{driver}/buggy"), target_cpu)
+    fixed_df = parse_log_file(kstep_log(f"repro_{driver}/fixed"), target_cpu)
 
     fig = plot_rebalance_comparison(buggy_df, fixed_df)
     save_fig(fig, driver)

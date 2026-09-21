@@ -14,7 +14,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 from plot_utils import save_fig
-from utils import parse_jsonl, trace
+from utils import kstep_log, parse_jsonl
 
 
 def parse_nr_running(path: Path) -> pd.DataFrame:
@@ -109,8 +109,8 @@ def plot_legend(fig, driver, cmap):
 
 
 def main(driver: str):
-    out_file_buggy = trace(f"repro_{driver}/buggy")
-    out_file_fixed = trace(f"repro_{driver}/fixed")
+    out_file_buggy = kstep_log(f"repro_{driver}/buggy")
+    out_file_fixed = kstep_log(f"repro_{driver}/fixed")
 
     nr_running_buggy = parse_nr_running(out_file_buggy)
     nr_running_fixed = parse_nr_running(out_file_fixed)

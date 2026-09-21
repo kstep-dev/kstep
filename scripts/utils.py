@@ -8,7 +8,7 @@ import pandas as pd
 RESULTS_DIR = Path(__file__).parent.parent.resolve() / "results"
 
 
-def trace(name: str) -> Path:
+def kstep_log(name: str) -> Path:
     """`results/<name>/kstep.jsonl`: the driver's records, as `kstep run` and `kstep reproduce` lay them out."""
     return RESULTS_DIR / name / "kstep.jsonl"
 

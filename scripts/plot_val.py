@@ -12,7 +12,7 @@ import argparse
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from plot_utils import save_fig
-from utils import parse_jsonl, trace
+from utils import kstep_log, parse_jsonl
 
 
 def plot_util(buggy_df, fixed_df, ylabel: str):
@@ -68,8 +68,8 @@ def main(driver: str):
     else:
         type = "avg_util"
         ylabel = "Average Utilization"
-    buggy_df = parse_jsonl(trace(f"repro_{driver}/buggy"), type)
-    fixed_df = parse_jsonl(trace(f"repro_{driver}/fixed"), type)
+    buggy_df = parse_jsonl(kstep_log(f"repro_{driver}/buggy"), type)
+    fixed_df = parse_jsonl(kstep_log(f"repro_{driver}/fixed"), type)
 
     fig = plot_util(buggy_df, fixed_df, ylabel)
     save_fig(fig, driver)
