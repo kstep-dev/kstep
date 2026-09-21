@@ -15,7 +15,7 @@
 #define KSTEP_SHM_CPUS 32 // isolated CPUs 1..32
 #define KSTEP_SHM_TASKS 64
 #define KSTEP_SHM_CGROUPS 16
-#define KSTEP_SHM_ENTITIES (KSTEP_SHM_CGROUPS * KSTEP_SHM_CPUS) // one group entity per (cgroup, CPU)
+#define KSTEP_SHM_ENTITIES (KSTEP_SHM_TASKS + KSTEP_SHM_CGROUPS * KSTEP_SHM_CPUS) // every task's, plus one group entity per (cgroup, CPU)
 #define KSTEP_SHM_DOMAINS (KSTEP_SHM_CPUS * 5) // one per (CPU, level)
 #define KSTEP_SHM_GROUPS KSTEP_SHM_CPUS // a domain's balancing groups, at most one per CPU
 #define KSTEP_COV_SIZE (1 << 16) // cov.c's edge map, saturating byte counts; fuzzer/src/main.rs MAP_SIZE
@@ -27,9 +27,18 @@
 // record's fields change meaning without changing its size -- the strides catch everything that
 // resizes, this catches the rest.
 #define KSTEP_SHM_MAGIC 0x5054536b // "kSTP", little endian
-#define KSTEP_SHM_LAYOUT 5
+#define KSTEP_SHM_LAYOUT 6
 
-enum kstep_shm_tables { KSTEP_TBL_CPU, KSTEP_TBL_TASK, KSTEP_TBL_CGROUP, KSTEP_TBL_ENTITY, KSTEP_TBL_DOMAIN, KSTEP_TBL_N };
+// The machine and the tasks first, then one pair of tables per scheduling class: the class's
+// queue on each CPU, and what is on those queues. A task's record says which class it is under;
+// what that class makes of it is in the class's own member table, joined by task number. Nothing
+// about one class sits in the CPU or task record, so adding a class is adding a pair here.
+enum kstep_shm_tables {
+  KSTEP_TBL_CPU, KSTEP_TBL_TASK, KSTEP_TBL_CGROUP, KSTEP_TBL_DOMAIN,
+  KSTEP_TBL_CFS, KSTEP_TBL_ENTITY, // the fair class: the root cfs_rq per CPU, and every entity queued under it
+  KSTEP_TBL_RT, KSTEP_TBL_RT_ENTITY, // the real-time class: the rt_rq per CPU, and the tasks on it
+  KSTEP_TBL_N
+};
 
 struct kstep_shm_table {
   u32 n, max;      // records written by the last update, and the table's capacity
@@ -45,16 +54,14 @@ struct kstep_shm_hdr {
   u32 reserved[2];
 };
 
-// The first block is the runqueue's own state; the second is what the load balancer reads when it
-// runs, which is not the same thing: nr_running counts everything queued, the balancer counts
-// h_nr_runnable, and a task left behind by delayed dequeue is in one and not the other.
+// The runqueue itself, and nothing any one class owns: what the CPU is doing, and when its
+// balancer next runs. What each class queued there looks like is in that class's table.
 struct kstep_shm_cpu {
   u32 cpu, curr; // curr: kSTEP task number running there, 0 for none or another process
   u32 idle, capacity;
   u32 freq; // arch_freq_scale: the current frequency, which cpufreq moves under a running system
-  u64 nr_running, nr_switches, min_vruntime, util_avg, load_avg, runnable_avg;
-  u64 h_nr_runnable;   // cfs_rq->h_nr_runnable: runnable tasks as the balancer counts them
   u32 next_balance_in; // ticks until rq->next_balance comes due, 0 when it already has
+  u64 nr_running, nr_switches;
 };
 
 enum kstep_shm_task_state { KSTEP_TASK_RUNNING, KSTEP_TASK_RUNNABLE, KSTEP_TASK_SLEEPING, KSTEP_TASK_BLOCKED };
@@ -82,14 +89,18 @@ struct kstep_shm_se {
   s64 lag;
 };
 
+// A task's identity and its scheduling attributes -- the sched_attr fields every class reads or
+// ignores but none owns -- plus the one counter that follows a task across classes. Which class
+// holds it is `policy`; that class's view of it is the record with this task number in the
+// class's member table, and a task is in exactly one of those at a time.
 struct kstep_shm_task {
   u32 task, state, cpu, policy; // policy: the kernel's SCHED_* number
   s32 nice;         // kept, though only the fair classes read it
   u32 rt_priority;  // 1..99 under fifo/rr, 0 otherwise: the kernel zeroes it on the way back
   u32 cgroup;       // index into the cgroup table, as an entity's
   u32 reserved;
-  u64 cpus; // allowed CPUs as a bitmask
-  struct kstep_shm_se se;
+  u64 cpus;             // allowed CPUs as a bitmask
+  u64 sum_exec_runtime; // CPU time given so far, under whichever class held it at the time
 };
 
 // One entry per live cgroup, the root ("/") first: what the kernel holds, not what a driver
@@ -102,17 +113,54 @@ struct kstep_shm_cgroup {
   u32 reserved;
 };
 
-// A cgroup's group entity on one CPU. With the cpu controller on, a cgroup owns a sched_entity
-// and a cfs_rq per CPU, and it is those entities -- not the tasks -- that the parent queue picks
-// between: four equal tasks split 1/2 : 1/6 : 1/6 : 1/6 when one sits alone in its cgroup, and
-// nothing in the task table says why. The kernel keeps no per-cgroup total: each CPU's entity has
-// its own weight (tg->shares divided by calc_group_shares), vruntime and runtime, so this is one
-// record per (cgroup, CPU), the same fields a task record carries for its own entity. The root
-// task group owns no entity -- its cfs_rq is the runqueue's own -- so it has no rows.
+// The fair class's root queue on one CPU: rq->cfs. The balancer reads this, not the runqueue:
+// nr_running counts everything queued, h_nr_runnable only what the fair class will run, and a
+// real-time task, or one left behind by delayed dequeue, is in one and not the other.
+struct kstep_shm_cfs {
+  u32 cpu, reserved;
+  u64 min_vruntime, util_avg, load_avg, runnable_avg;
+  u64 h_nr_runnable; // cfs_rq->h_nr_runnable: runnable tasks as the balancer counts them
+};
+
+// One sched_entity as the fair class sees it: a task's, or a cgroup's group entity on one CPU.
+// With the cpu controller on, a cgroup owns a sched_entity and a cfs_rq per CPU, and it is those
+// entities -- not the tasks -- that the parent queue picks between: four equal tasks split
+// 1/2 : 1/6 : 1/6 : 1/6 when one sits alone in its cgroup, and nothing in the task table says
+// why. The kernel keeps no per-cgroup total: each CPU's entity has its own weight (tg->shares
+// divided by calc_group_shares), vruntime and runtime, so this is one record per (cgroup, CPU).
+// The root task group owns no entity -- its cfs_rq is the runqueue's own -- so it has no rows.
+// A task's record is here only while a fair policy holds it; its cgroup is the queue it is on.
 struct kstep_shm_entity {
+  u32 task;   // kSTEP task number, 0 for a cgroup's entity
   u32 cgroup; // index into the cgroup table
-  u32 cpu;
+  u32 cpu, reserved;
   struct kstep_shm_se se;
+};
+
+// The real-time class's queue on one CPU: rq->rt. It picks the head of the highest non-empty
+// priority list, so highest_prio is the whole decision, and bandwidth control can take the class
+// off the CPU altogether: rt_time is what it has used of rt_runtime in the current period
+// (sched_rt_period_us, 1 s), and throttled says the period's share is spent. Under
+// CONFIG_RT_GROUP_SCHED these are the root task group's; the fields are zero without it.
+struct kstep_shm_rt {
+  u32 cpu, nr_running;
+  u32 highest_prio; // rt_rq->highest_prio.curr: the kernel's prio, 0 (highest) .. 98; 100 when empty
+  u32 throttled;
+  u64 rt_time, rt_runtime; // ns
+};
+
+#define KSTEP_RT_ON_RQ 1 // rt.on_rq: enqueued
+#define KSTEP_RT_CURR 2  // running there
+#define KSTEP_RT_PICK 4  // the head of the highest list: what pick_next_task_rt would take
+
+// A task on the real-time class, one record per task under fifo or rr. position is its place in
+// its priority's list, 0 the head, so rows sort by priority then position. FIFO runs the head
+// until it yields or blocks; RR moves the head to the tail when its timeslice runs out, and
+// time_slice is what is left of it in ticks (RR_TIMESLICE is 100 ms).
+struct kstep_shm_rt_entity {
+  u32 task, cpu;
+  u32 flags, position;
+  u32 time_slice, reserved;
 };
 
 // One sched domain as the kernel built it, per CPU, innermost first -- not the topology the cli
@@ -146,15 +194,21 @@ struct kstep_shm {
   struct kstep_shm_cpu cpu[KSTEP_SHM_CPUS];
   struct kstep_shm_task task[KSTEP_SHM_TASKS];
   struct kstep_shm_cgroup cgroup[KSTEP_SHM_CGROUPS];
-  struct kstep_shm_entity entity[KSTEP_SHM_ENTITIES];
   struct kstep_shm_domain domain[KSTEP_SHM_DOMAINS];
+  struct kstep_shm_cfs cfs[KSTEP_SHM_CPUS];
+  struct kstep_shm_entity entity[KSTEP_SHM_ENTITIES];
+  struct kstep_shm_rt rt[KSTEP_SHM_CPUS];
+  struct kstep_shm_rt_entity rt_entity[KSTEP_SHM_TASKS];
 };
 
-static_assert(sizeof(struct kstep_shm_hdr) == 112);
-static_assert(sizeof(struct kstep_shm_cpu) == 88);
+static_assert(sizeof(struct kstep_shm_hdr) == 160);
+static_assert(sizeof(struct kstep_shm_cpu) == 40);
 static_assert(sizeof(struct kstep_shm_se) == 56);
-static_assert(sizeof(struct kstep_shm_task) == 96);
+static_assert(sizeof(struct kstep_shm_task) == 48);
+static_assert(sizeof(struct kstep_shm_cfs) == 48);
+static_assert(sizeof(struct kstep_shm_rt) == 32);
+static_assert(sizeof(struct kstep_shm_rt_entity) == 24);
 static_assert(sizeof(struct kstep_shm_cgroup) == 56);
-static_assert(sizeof(struct kstep_shm_entity) == 64);
+static_assert(sizeof(struct kstep_shm_entity) == 72);
 static_assert(sizeof(struct kstep_shm_group) == 24);
 static_assert(sizeof(struct kstep_shm_domain) == 208 + KSTEP_SHM_GROUPS * 24);
