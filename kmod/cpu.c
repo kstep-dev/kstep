@@ -189,7 +189,10 @@ static void set_cap(int cpu, int scale) {
   KSYM_arch_set_cpu_capacity(cpu, scale, SCHED_CAPACITY_SCALE, scale,
                              SCHED_CAPACITY_SCALE);
 #else
-  panic("arch_set_cpu_capacity not supported for this kernel");
+  // x86 before 6.12: every CPU has SCHED_CAPACITY_SCALE and nothing can change it. The default
+  // spec asks for exactly that, so only a spec naming another capacity is refused.
+  if (scale != SCHED_CAPACITY_SCALE)
+    panic("Setting CPU capacity is not supported for this kernel");
 #endif
 }
 
