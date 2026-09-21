@@ -29,7 +29,7 @@ pub fn main(a: Args) -> Result<()> {
         Some(n) => n.clone(),
         None => a.git_ref.replace(['~', '^'], "-"),
     };
-    kstep_build::checkout(
+    kstep_host::checkout(
         &a.git_ref,
         &name,
         a.patch.as_deref(),

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use kstep_build::{build, Build};
+use kstep_host::{build, Build};
 
 /// Build the kmod, the user binary and rootfs.cpio (and the kernel when needed)
 #[derive(clap::Args)]

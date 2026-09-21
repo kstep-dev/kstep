@@ -6,14 +6,15 @@ use clap::Parser;
 
 mod build;
 mod checkout;
+mod run;
 
 #[derive(Parser)]
-#[command(name = "kstep", version, about)]
+#[command(name = "kstep", bin_name = "kstep", version, about)]
 enum Cli {
     Checkout(checkout::Args),
     Build(build::Args),
-    /// Boot a driver under QEMU and record its output under results/
-    Run,
+    Run(run::Args),
+    Gdb(run::GdbArgs),
     /// Check out, build and run a bugs.yaml entry on its buggy and fixed kernels, then plot
     Reproduce,
     /// Build the website: bug catalog, playground image and the wasm decoder
@@ -24,7 +25,8 @@ fn main() -> Result<()> {
     match Cli::parse() {
         Cli::Checkout(args) => checkout::main(args),
         Cli::Build(args) => build::main(args),
-        Cli::Run => bail!("not ported yet: use ./run.py"),
+        Cli::Run(args) => run::main(args),
+        Cli::Gdb(args) => run::gdb(args),
         Cli::Reproduce => bail!("not ported yet: use ./reproduce.py"),
         Cli::Web => bail!("not ported yet: use website/build.py"),
     }

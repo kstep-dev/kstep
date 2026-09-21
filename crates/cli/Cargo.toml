@@ -1,5 +1,5 @@
 [package]
-name = "kstep"
+name = "kstep-cli"
 description = "kSTEP command line: check out and build kernels, run drivers, reproduce bugs, build the website"
 version.workspace = true
 edition.workspace = true
@@ -7,11 +7,12 @@ license.workspace = true
 repository.workspace = true
 
 [[bin]]
-name = "kstep"
+name = "kstep-cli"
 path = "src/main.rs"
 
 [dependencies]
 kstep-core = { path = "../core" }
-kstep-build = { path = "../build" }
+kstep-host = { path = "../host" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+libc = "0.2"

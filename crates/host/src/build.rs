@@ -78,7 +78,7 @@ pub fn user_bin() -> PathBuf {
 }
 
 fn src(sub: &str) -> PathBuf {
-    kstep_core::proj_dir().join(sub)
+    crate::proj_dir().join(sub)
 }
 
 fn jobs() -> String {

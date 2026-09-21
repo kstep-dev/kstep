@@ -65,7 +65,7 @@ jobs:
           save-if: false
 
       - name: Build kstep CLI
-        run: cargo build --release --locked -p kstep
+        run: cargo build --release --locked -p kstep-cli
 
       - name: Install deps
         uses: ./.github/actions/apt-deps
@@ -85,7 +85,7 @@ jobs:
       - name: "[Run] Execute driver"
         if: ${{ ! matrix.fuzz }}
         timeout-minutes: 1
-        run: ./run.py --build ${{ matrix.version }}
+        run: ./kstep.sh run ${{ matrix.version }}
 
       - name: "[Run] Show driver output"
         if: ${{ ! matrix.fuzz }}

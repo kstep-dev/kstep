@@ -44,6 +44,13 @@ where
     c
 }
 
+/// Echo and run, returning the exit status.
+pub fn status(cmd: &mut Command) -> Result<std::process::ExitStatus> {
+    let shown = display(cmd);
+    eprintln!("$ {BLUE}{shown}{RESET}");
+    cmd.status().with_context(|| format!("spawn `{shown}`"))
+}
+
 pub fn run(cmd: &mut Command, log: Option<&Path>) -> Result<()> {
     let shown = display(cmd);
     eprintln!("$ {BLUE}{shown}{RESET}");

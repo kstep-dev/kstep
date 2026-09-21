@@ -1,6 +1,6 @@
 [package]
 name = "kstep-core"
-description = "kSTEP's shared host-side library: shared-memory decoder, QEMU command line, bug catalog, build and result conventions"
+description = "kSTEP's shared library: shared-memory decoder and QEMU command line"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,7 +8,8 @@ repository.workspace = true
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
 
 [features]
-default = []
+default = ["host"]
+# Everything but the shm decoder: the wasm build turns this off
+host = []

@@ -1,0 +1,40 @@
+//! Host tooling shared by the CLI and the fuzzer: kernel checkout and build (the old checkout.py
+//! and make.py), bugs.yaml, and the results/ convention. Nothing here is built for wasm.
+
+pub mod bugs;
+pub mod build;
+pub mod checkout;
+pub mod cmd;
+pub mod results;
+
+pub use build::Build;
+pub use checkout::checkout;
+pub use results::ResultDir;
+
+use std::path::{Path, PathBuf};
+
+/// The repo root (`KSTEP_DIR` overrides the compiled-in location).
+pub fn proj_dir() -> PathBuf {
+    match std::env::var_os("KSTEP_DIR") {
+        Some(dir) => PathBuf::from(dir),
+        None => Path::new(env!("CARGO_MANIFEST_DIR"))
+            .ancestors()
+            .nth(2)
+            .unwrap()
+            .to_path_buf(),
+    }
+}
+
+pub fn build_dir() -> PathBuf {
+    proj_dir().join("build")
+}
+
+/// The `build/current` symlink, set by `kstep checkout`.
+pub fn build_curr_dir() -> PathBuf {
+    build_dir().join("current")
+}
+
+#[test]
+fn proj_dir_holds_the_bug_catalog() {
+    assert!(proj_dir().join("bugs.yaml").is_file());
+}

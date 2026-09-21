@@ -1,12 +1,12 @@
 # kSTEP's host-side tooling. Everything that used to be Python glue around git, make, gcc and
 # QEMU lives here; plotting stays in scripts/ (matplotlib) and reads what the kstep binary writes.
 #
-#   cargo run -p kstep -- <checkout|build|run|reproduce|web> ...
+#   ./kstep.sh <checkout|build|run|reproduce|web> ...
 #
-# crates/core   kstep-core: what every client shares, wasm included (shm decoder, QEMU argv, bugs.yaml)
-# crates/build  kstep-build: kernel checkout and build, results dirs (host tooling only)
-# crates/cli    the `kstep` binary
-# crates/fuzz   the LibAFL fuzzer (moves here from fuzzer/ in a later step)
+# crates/core   kstep-core: what every client shares, wasm included (shm decoder, QEMU argv)
+# crates/host   kstep-host: kernel checkout and build, bugs.yaml, results dirs (host tooling only)
+# crates/cli    kstep-cli: the `kstep` binary
+# crates/fuzz   kstep-fuzz: the LibAFL fuzzer (moves here from fuzzer/ in a later step)
 [workspace]
 resolver = "2"
 members = ["crates/*"]
