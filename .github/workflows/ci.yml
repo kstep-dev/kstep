@@ -82,6 +82,11 @@ jobs:
       - name: Build kSTEP
         run: ./kstep.sh build ${{ matrix.version }}
 
+      # GitHub's x86_64 runners have nested virtualisation, but /dev/kvm is root-only; the arm
+      # runners have no /dev/kvm, and QEMU falls back to TCG
+      - name: Enable KVM
+        run: '[ -e /dev/kvm ] && sudo chmod 666 /dev/kvm || true'
+
       - name: "[Run] A cli session"
         if: ${{ ! matrix.fuzz }}
         timeout-minutes: 2
@@ -90,6 +95,10 @@ jobs:
       - name: "[Run] Show the driver's records"
         if: ${{ ! matrix.fuzz }}
         run: cat results/latest/kstep.jsonl
+
+      - name: Show the kernel log
+        if: ${{ failure() }}
+        run: cat results/latest/kernel.log
 
       - name: "[Fuzz] Build the fuzzer"
         if: ${{ matrix.fuzz }}

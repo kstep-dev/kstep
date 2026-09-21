@@ -26,3 +26,6 @@ command -v cargo >/dev/null || curl --proto '=https' --tlsv1.2 -sSf https://sh.r
 command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
 
 command -v cargo >/dev/null || echo "cargo installed under ~/.cargo/bin: run 'source ~/.cargo/env' or open a new shell before ./kstep.sh"
+
+# KVM: QEMU needs /dev/kvm read-write, which by default only root and the kvm group have
+[ -e /dev/kvm ] && sudo chmod 666 /dev/kvm

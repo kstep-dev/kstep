@@ -51,9 +51,9 @@ static void kstep_task_add(struct task_struct *p) {
   if (!t)
     panic("Failed to record task %d", p->pid);
   t->p = get_task_struct(p);
-  // A new task pauses on its first read, like any task asked to: no state for "created but not
-  // yet there", because the queue already says what it will do when it gets there.
-  kstep_ctrl_put(t, KSTEP_CTRL_PAUSE);
+  // A new task parks on its first read (see kstep_ctrl_read): no state for "created but not yet
+  // there", because the queue already says what it will do when it gets there.
+  kstep_ctrl_put(t, KSTEP_CTRL_PARK);
   // initialized before it is published: lookups take no lock
   if (xa_err(xa_store(&kstep_tasks, p->pid, t, GFP_KERNEL)))
     panic("Failed to record task %d", p->pid);
@@ -69,6 +69,14 @@ bool kstep_task_settled(struct task_struct *p) {
   return t && READ_ONCE(t->settled) && t->head == t->tail && !signal_pending(p);
 }
 
+// A new task parks here (TASK_INTERRUPTIBLE, like pause()) until its first wakeup, and tells
+// kstep_task_create() so. The controller shares this CPU and wakes on complete(), but runs only
+// once this task has switched out: no preemption point lies between the two calls
+// (CONFIG_PREEMPT_NONE, see linux/config.kstep). So no spin and no polling on either side, and
+// nothing depends on which of the two the scheduler would pick: with the clock frozen, CFS
+// (before 6.6) picks the controller for as long as it yields.
+static DECLARE_COMPLETION(kstep_task_parked);
+
 static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, loff_t *off) {
   struct kstep_task *t = kstep_task_find(current);
 
@@ -76,6 +84,13 @@ static ssize_t kstep_ctrl_read(struct file *f, char __user *buf, size_t len, lof
     panic("Task %d has no kSTEP record", current->pid);
 
   int act = kstep_ctrl_take(t);
+
+  if (act == KSTEP_CTRL_PARK) {
+    set_current_state(TASK_INTERRUPTIBLE); // before complete(): parked once the controller looks
+    complete(&kstep_task_parked);
+    schedule(); // until the first wakeup (SIGUSR1); nothing else wakes a parked task
+    return 0;
+  }
 
   // An action is the task's own to do: hand it over and let it make the syscall.
   if (act != KSTEP_CTRL_NONE) {
@@ -150,6 +165,7 @@ struct task_struct *kstep_task_create(void) {
   char *argv[] = {"task", NULL};
 
   struct task_struct *p = NULL;
+  reinit_completion(&kstep_task_parked);
   struct subprocess_info *info = call_usermodehelper_setup(
       "/user", argv, NULL, GFP_KERNEL, task_init, NULL, &p);
   if (info == NULL)
@@ -161,13 +177,9 @@ struct task_struct *kstep_task_create(void) {
   if (p == NULL)
     panic("Failed to get task struct");
 
-  // The task does its own init and its first read tells it to pause (kstep_task_add). Wait for
-  // that pause to hold: asleep and off CPU 0. It shares this CPU and nothing preempts the
-  // controller (CONFIG_PREEMPT_NONE), so yield to it until it is asleep; wait_task_inactive then
-  // sees it through the switch out, and fails fast while it is still running its init.
-  KSYM_IMPORT(wait_task_inactive);
-  while (!KSYM_wait_task_inactive(p, TASK_INTERRUPTIBLE))
-    schedule();
+  // The task does its own init and its first read parks it (kstep_task_add, kstep_ctrl_read):
+  // asleep, and off this CPU by the time the controller runs again.
+  wait_for_completion(&kstep_task_parked);
   TRACE_INFO("Task %d is ready", p->pid);
   char cpus[16];
   snprintf(cpus, sizeof(cpus), "1-%d", num_online_cpus() - 1);
