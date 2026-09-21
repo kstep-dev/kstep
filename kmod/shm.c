@@ -4,6 +4,7 @@
 #include <linux/cpumask.h>
 #include <linux/gfp.h>
 #include <linux/kstrtox.h>
+#include <linux/sched/rt.h>
 #include <linux/version.h>
 #include <asm/io.h>
 
@@ -25,8 +26,11 @@ phys_addr_t kstep_shm_init(void) {
           [KSTEP_TBL_CPU] = TABLE(cpu, KSTEP_SHM_CPUS),
           [KSTEP_TBL_TASK] = TABLE(task, KSTEP_SHM_TASKS),
           [KSTEP_TBL_CGROUP] = TABLE(cgroup, KSTEP_SHM_CGROUPS),
-          [KSTEP_TBL_ENTITY] = TABLE(entity, KSTEP_SHM_ENTITIES),
           [KSTEP_TBL_DOMAIN] = TABLE(domain, KSTEP_SHM_DOMAINS),
+          [KSTEP_TBL_CFS] = TABLE(cfs, KSTEP_SHM_CPUS),
+          [KSTEP_TBL_ENTITY] = TABLE(entity, KSTEP_SHM_ENTITIES),
+          [KSTEP_TBL_RT] = TABLE(rt, KSTEP_SHM_CPUS),
+          [KSTEP_TBL_RT_ENTITY] = TABLE(rt_entity, KSTEP_SHM_TASKS),
       },
       .max_groups = KSTEP_SHM_GROUPS,
       .group_stride = sizeof(struct kstep_shm_group),
@@ -105,6 +109,62 @@ static struct kstep_shm_se shm_se(struct sched_entity *se) {
   return out;
 }
 
+
+// The real-time class's pick, walked the way pick_next_rt_entity does: the head of the highest
+// non-empty priority list, and through a group entity (CONFIG_RT_GROUP_SCHED) into its own queue
+// until a task is reached. NULL when the class has nothing runnable there -- among other reasons
+// because bandwidth control took it off the CPU, which dequeues it whole (rt_queued 0).
+static struct task_struct *shm_rt_pick(struct rq *rq) {
+  struct rt_rq *rt_rq = &rq->rt;
+
+  if (!rt_rq->rt_queued || !rt_rq->rt_nr_running)
+    return NULL;
+  for (;;) {
+    struct rt_prio_array *array = &rt_rq->active;
+    int idx = sched_find_first_bit(array->bitmap);
+    struct sched_rt_entity *rt_se;
+
+    if (idx >= MAX_RT_PRIO)
+      return NULL;
+    rt_se = list_first_entry(array->queue + idx, struct sched_rt_entity, run_list);
+#ifdef CONFIG_RT_GROUP_SCHED
+    if (rt_se->my_q) {
+      rt_rq = rt_se->my_q;
+      continue;
+    }
+#endif
+    return container_of(rt_se, struct task_struct, rt);
+  }
+}
+
+// A task's place on the real-time class: its queue is its priority's list on the rt_rq holding
+// it (its task group's under CONFIG_RT_GROUP_SCHED, the CPU's otherwise), and position counts
+// the entries ahead of it there.
+static struct kstep_shm_rt_entity shm_rt_entity(struct task_struct *p, u32 task, struct task_struct *pick) {
+  struct rq *rq = cpu_rq(task_cpu(p));
+  struct kstep_shm_rt_entity out = {.task = task, .cpu = task_cpu(p), .time_slice = p->rt.time_slice};
+  struct rt_rq *rt_rq = &rq->rt;
+  struct list_head *pos;
+
+#ifdef CONFIG_RT_GROUP_SCHED
+  if (p->rt.rt_rq)
+    rt_rq = p->rt.rt_rq;
+#endif
+  if (p->rt.on_rq)
+    out.flags |= KSTEP_RT_ON_RQ;
+  if (rq->curr == p)
+    out.flags |= KSTEP_RT_CURR;
+  if (pick == p)
+    out.flags |= KSTEP_RT_PICK;
+  if (p->rt.on_list)
+    list_for_each(pos, rt_rq->active.queue + p->prio) {
+      if (pos == &p->rt.run_list)
+        break;
+      out.position++;
+    }
+  return out;
+}
+
 // The cgroup's group entities, one record per test CPU, appended to `ents` -- the level the pick
 // happens at, which nothing else reports: a task's own counters are kept in its group's queue, so
 // four equal tasks split two cgroups' halves without anything in the task table saying why. The
@@ -133,6 +193,7 @@ static void shm_group_entities(u32 cgroup, struct cgroup *cgrp, struct kstep_shm
     if (!se || *nents == KSTEP_SHM_ENTITIES)
       continue;
     *e = (struct kstep_shm_entity){
+        .task = 0, // a cgroup's, not a task's
         .cgroup = cgroup,
         .cpu = cpu,
         .se = shm_se(se),
@@ -241,9 +302,10 @@ static u32 shm_collect_domains(struct kstep_shm_domain *out, u32 ncpus) {
 // The state after a command. The isolated CPUs are held while a command runs, so their queues
 // can be read directly. tasks[n - 1] is the cli's task number n; exited tasks are skipped.
 void kstep_shm_update(struct task_struct **tasks, int ntasks) {
-  u32 ncpus = min_t(u32, num_online_cpus() - 1, KSTEP_SHM_CPUS), nt = 0; // nt: table entries written
+  u32 ncpus = min_t(u32, num_online_cpus() - 1, KSTEP_SHM_CPUS), nt = 0, nrt = 0; // table entries written
   struct kstep_shm_cgroup cgroups[KSTEP_SHM_CGROUPS];
-  static struct kstep_shm_entity entities[KSTEP_SHM_ENTITIES]; // 32 KB: not for the stack
+  static struct kstep_shm_entity entities[KSTEP_SHM_ENTITIES]; // 40 KB: not for the stack
+  struct task_struct *rt_pick[KSTEP_SHM_CPUS];
   u32 nentities;
   u32 ncgroups = shm_collect_cgroups(cgroups, entities, &nentities); // sleeps: outside the seqlock, where a reader spins
 
@@ -264,6 +326,12 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
         .freq = kstep_freq_get(cpu),
         .nr_running = rq->nr_running,
         .nr_switches = rq->nr_switches,
+        // a deadline in jiffies, reported as the wait rather than the stamp: the page has no clock
+        // of the kernel's, and 0 reads as "due now" whether it is due or overdue
+        .next_balance_in = time_after(rq->next_balance, jiffies) ? rq->next_balance - jiffies : 0,
+    };
+    shm->cfs[cpu - 1] = (struct kstep_shm_cfs){
+        .cpu = cpu,
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0)
         .min_vruntime = rq->cfs.min_vruntime,
 #endif
@@ -278,16 +346,25 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
 #else
         .h_nr_runnable = rq->cfs.h_nr_running,
 #endif
-        // a deadline in jiffies, reported as the wait rather than the stamp: the page has no clock
-        // of the kernel's, and 0 reads as "due now" whether it is due or overdue
-        .next_balance_in = time_after(rq->next_balance, jiffies) ? rq->next_balance - jiffies : 0,
     };
+    shm->rt[cpu - 1] = (struct kstep_shm_rt){
+        .cpu = cpu,
+        .nr_running = rq->rt.rt_nr_running,
+        .highest_prio = rq->rt.highest_prio.curr,
+#ifdef CONFIG_RT_GROUP_SCHED
+        .throttled = rq->rt.rt_throttled,
+        .rt_time = rq->rt.rt_time,
+        .rt_runtime = rq->rt.rt_runtime,
+#endif
+    };
+    rt_pick[cpu - 1] = shm_rt_pick(rq);
   }
   for (int i = 0; i < ntasks && nt < KSTEP_SHM_TASKS; i++) {
     struct task_struct *p = tasks[i];
     struct kstep_shm_task *t = &shm->task[nt];
     char path[sizeof(cgroups[0].path)];
     unsigned int st;
+    u32 cpu = task_cpu(p);
 
     if (p->exit_state)
       continue;
@@ -298,12 +375,12 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
                  : st == TASK_RUNNING ? KSTEP_TASK_RUNNABLE
                  : st & TASK_INTERRUPTIBLE ? KSTEP_TASK_SLEEPING
                  : KSTEP_TASK_BLOCKED,
-        .cpu = task_cpu(p),
+        .cpu = cpu,
         .policy = p->policy,
         .nice = task_nice(p),
         .rt_priority = p->rt_priority,
         .cpus = cpumask_bits(p->cpus_ptr)[0],
-        .se = shm_se(&p->se),
+        .sum_exec_runtime = p->se.sum_exec_runtime,
     };
     // the cgroup by its row in the table walked above; a task in one the walk did not fit is
     // reported as the root's, which is where the tree draws what it cannot place
@@ -315,6 +392,16 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
           break;
         }
     rcu_read_unlock();
+    // the class's own record: one, in the table of the class the policy names
+    if (rt_policy(p->policy))
+      shm->rt_entity[nrt++] = shm_rt_entity(p, i + 1, cpu >= 1 && cpu <= ncpus ? rt_pick[cpu - 1] : NULL);
+    else if ((fair_policy(p->policy) || idle_policy(p->policy)) && nentities < KSTEP_SHM_ENTITIES)
+      entities[nentities++] = (struct kstep_shm_entity){
+          .task = i + 1,
+          .cgroup = t->cgroup,
+          .cpu = cpu,
+          .se = shm_se(&p->se),
+      };
     nt++;
   }
   memcpy(shm->cgroup, cgroups, ncgroups * sizeof(*cgroups));
@@ -323,9 +410,11 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
   shm->hdr.table[KSTEP_TBL_CPU].n = ncpus;
   shm->hdr.table[KSTEP_TBL_TASK].n = nt;
   shm->hdr.table[KSTEP_TBL_CGROUP].n = ncgroups;
-  shm->hdr.table[KSTEP_TBL_ENTITY].n = nentities;
   shm->hdr.table[KSTEP_TBL_DOMAIN].n = shm_collect_domains(shm->domain, ncpus);
+  shm->hdr.table[KSTEP_TBL_CFS].n = ncpus;
+  shm->hdr.table[KSTEP_TBL_ENTITY].n = nentities;
+  shm->hdr.table[KSTEP_TBL_RT].n = ncpus;
+  shm->hdr.table[KSTEP_TBL_RT_ENTITY].n = nrt;
   smp_wmb();
   WRITE_ONCE(shm->hdr.gen, shm->hdr.gen + 1); // even: consistent
 }
-
