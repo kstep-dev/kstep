@@ -45,6 +45,8 @@ phys_addr_t kstep_shm_init(void) {
 #define parent_entity(se) ((struct sched_entity *)NULL)
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+// EEVDF's pick: __pick_eevdf(cfs_rq, protect) from 6.13, pick_eevdf(cfs_rq) before it.
 static struct sched_entity *shm_pick(struct cfs_rq *cfs_rq) {
   static struct sched_entity *(*pick2)(struct cfs_rq *, bool);
   static struct sched_entity *(*pick1)(struct cfs_rq *);
@@ -57,6 +59,7 @@ static struct sched_entity *shm_pick(struct cfs_rq *cfs_rq) {
   }
   return pick2 ? pick2(cfs_rq, true) : pick1 ? pick1(cfs_rq) : NULL;
 }
+#endif
 
 static struct kstep_shm_se shm_se(struct sched_entity *se) {
   struct cfs_rq *cfs_rq = cfs_rq_of(se);
@@ -72,19 +75,19 @@ static struct kstep_shm_se shm_se(struct sched_entity *se) {
 
   if (se->on_rq)
     out.flags |= KSTEP_SE_ON_RQ;
-  if (se->on_rq && kstep_eligible(se))
-    out.flags |= KSTEP_SE_ELIGIBLE;
   if (cfs_rq->curr == se)
     out.flags |= KSTEP_SE_CURR;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
   if (se->sched_delayed)
     out.flags |= KSTEP_SE_DELAYED;
 #endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0) // EEVDF: eligibility, lag and the pick
   {
     KSYM_IMPORT(avg_vruntime); // fair.c's, the same average entity_eligible tests against
     out.lag = se->on_rq ? (s64)KSYM_avg_vruntime(cfs_rq) - (s64)se->vruntime : se->vlag;
   }
+  if (se->on_rq && kstep_eligible(se))
+    out.flags |= KSTEP_SE_ELIGIBLE;
   if (se->on_rq && shm_pick(cfs_rq) == se)
     out.flags |= KSTEP_SE_PICK;
 #endif
