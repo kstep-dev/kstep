@@ -99,11 +99,12 @@ impl Session {
             .and_then(Value::as_u64)
             .context("ready line without shm address")?;
         let shm_at = shm.checked_sub(RAM_BASE).context("shm address below RAM")?;
+        // 0 where the kernel has no coverage map (built without linux/config.kstep.cov)
         let cov_at = ready
             .get("cov")
             .and_then(Value::as_u64)
-            .filter(|&c| c >= RAM_BASE)
-            .map(|c| c - RAM_BASE);
+            .filter(|&c| c != 0)
+            .and_then(|c| c.checked_sub(RAM_BASE));
         let mut hdr = [0u8; HDR_SIZE];
         ram.read_exact_at(&mut hdr, shm_at)
             .context("read shm header")?;

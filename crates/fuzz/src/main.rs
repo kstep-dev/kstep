@@ -215,7 +215,8 @@ enum Outcome {
     Timeout(String),
 }
 
-/// A program's run: what it came to, the transcript, and the coverage map when asked for.
+/// A program's run: what it came to, the transcript, and the coverage map when asked for. A
+/// warn record from a checker or an oops in the console is a `Warn`; a stalled reply a `Timeout`.
 fn run_program(boot: &Boot, lines: &[String], map: Option<&mut [u8]>) -> (Outcome, String) {
     let mut transcript = String::new();
     let mut session = match Session::start(boot, Duration::from_secs(30)) {
@@ -240,42 +241,44 @@ fn run_program(boot: &Boot, lines: &[String], map: Option<&mut [u8]>) -> (Outcom
         let _ = session.coverage(map.try_into().expect("map is COV_SIZE"));
     }
     let _ = session.exit();
+    if warn.is_none() && console_oops(boot) {
+        warn = Some("kernel oops/warning in console".into());
+    }
     (warn.map_or(Outcome::Ok, Outcome::Warn), transcript)
 }
 
-impl QemuExecutor {
-    // Only once the driver runs: a kernel that warns while booting (6.12-rc1 does, in
-    // pick_task_fair) would otherwise turn every test case into a finding.
-    fn console_oops(boot: &Boot) -> bool {
-        let log = fs::read_to_string(&boot.log).unwrap_or_default();
-        let run = log.find("Starting cli").map_or("", |i| &log[i..]);
-        [
-            "Oops",
-            "Kernel panic",
-            "BUG:",
-            "WARNING:",
-            "KASAN:",
-            "UBSAN:",
-            "general protection fault",
-        ]
-        .iter()
-        .any(|m| run.contains(m))
-    }
+// Only once the driver runs: a kernel that warns while booting (6.12-rc1 does, in
+// pick_task_fair) would otherwise turn every test case into a finding.
+fn console_oops(boot: &Boot) -> bool {
+    let log = fs::read_to_string(&boot.log).unwrap_or_default();
+    let run = log.find("Starting cli").map_or("", |i| &log[i..]);
+    [
+        "Oops",
+        "Kernel panic",
+        "BUG:",
+        "WARNING:",
+        "KASAN:",
+        "UBSAN:",
+        "general protection fault",
+    ]
+    .iter()
+    .any(|m| run.contains(m))
+}
 
+impl QemuExecutor {
     /// The same program on the kernel with the fix. Only a run that gets to the end of the program
     /// with nothing to say confirms the candidate: a rule that warns there is describing ordinary
     /// scheduling, and a run that timed out or never booted has not shown anything either way, so
     /// neither is evidence of the bug. Without a fixed build there is nothing to compare against
     /// and the candidate is kept.
-    fn confirmed_on_fixed(&self, lines: &[String]) -> (bool, String) {
+    fn confirmed_on_fixed(&self, lines: &[String]) -> Result<String, String> {
         let Some(fixed) = &self.fixed else {
-            return (true, "not vetted: no fixed build".into());
+            return Ok("not vetted: no fixed build".into());
         };
         match run_program(fixed, lines, None).0 {
-            Outcome::Ok if Self::console_oops(fixed) => (false, "fixed kernel: oops".into()),
-            Outcome::Ok => (true, "fixed kernel: silent".into()),
-            Outcome::Warn(w) => (false, format!("fixed kernel warns too: {w}")),
-            Outcome::Timeout(t) => (false, format!("fixed kernel: {t}")),
+            Outcome::Ok => Ok("fixed kernel: silent".into()),
+            Outcome::Warn(w) => Err(format!("fixed kernel warns too: {w}")),
+            Outcome::Timeout(t) => Err(format!("fixed kernel: {t}")),
         }
     }
 
@@ -304,30 +307,21 @@ impl<EM, S, Z> Executor<EM, BytesInput, S, Z> for QemuExecutor {
         let map = self.observers.0.to_slice_mut();
         map.fill(0);
         let (outcome, transcript) = run_program(&self.boot, &lines, Some(map));
-        // A warn or an oops is a candidate until the fixed kernel has been shown to be quiet on
-        // the same program; one extra boot, and only for a candidate.
-        let candidate = match &outcome {
-            Outcome::Warn(w) => Some(w.clone()),
-            _ if Self::console_oops(&self.boot) => {
-                Some("kernel oops/warning in console".to_string())
-            }
-            _ => None,
-        };
-        if let Some(what) = candidate {
-            return Ok(match self.confirmed_on_fixed(&lines) {
-                (true, how) => {
+        Ok(match outcome {
+            Outcome::Ok => ExitKind::Ok,
+            // A candidate until the fixed kernel has been shown to be quiet on the same program:
+            // one extra boot, and only for a candidate.
+            Outcome::Warn(what) => match self.confirmed_on_fixed(&lines) {
+                Ok(how) => {
                     self.save_finding(&lines, &transcript, &format!("{what} [{how}]"));
                     ExitKind::Crash
                 }
-                (false, _) => ExitKind::Ok, // ordinary scheduling, or nothing shown either way
-            });
-        }
-        Ok(match outcome {
+                Err(_) => ExitKind::Ok, // ordinary scheduling, or nothing shown either way
+            },
             Outcome::Timeout(why) => {
                 self.save_finding(&lines, &transcript, &format!("timeout: {why}"));
                 ExitKind::Timeout
             }
-            _ => ExitKind::Ok,
         })
     }
 }
