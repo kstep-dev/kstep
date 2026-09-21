@@ -24,3 +24,5 @@ sudo apt install -y "${PACKAGES[@]}"
 command -v cargo >/dev/null || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
 # Install uv
 command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+
+command -v cargo >/dev/null || echo "cargo installed under ~/.cargo/bin: run 'source ~/.cargo/env' or open a new shell before ./kstep.sh"

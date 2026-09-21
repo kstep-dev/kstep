@@ -1,7 +1,10 @@
 //! kmod/shm.h, byte for byte: the region of guest memory the cli driver rewrites after every
 //! command. The structs come from the header itself, through bindgen (build.rs), as `raw`, so a
 //! snapshot of the region is read as one `kstep_shm` and each table sliced by its count. `gen` is
-//! a seqlock: odd mid-update, and a read is good only if it is even and unchanged around it.
+//! odd while the writer is mid-update; a snapshot with an odd gen is `Busy`. That is the whole
+//! check: the kmod rewrites the region before it replies, and a host snapshots after the reply,
+//! so a snapshot never straddles an update. A host that read live memory concurrently would have
+//! to compare gen before and after its copy itself.
 
 use serde::Serialize;
 
@@ -337,15 +340,6 @@ pub fn decode(b: &[u8]) -> Result<State, Error> {
             })
             .collect(),
     })?;
-    // the seqlock's second half: the writer did not start again while we read
-    if u32::from_le_bytes(
-        b[std::mem::offset_of!(kstep_shm_hdr, gen_)..][..4]
-            .try_into()
-            .unwrap(),
-    ) != h.gen_
-    {
-        return Err(Error::Busy);
-    }
     Ok(State {
         timestamp: h.timestamp,
         cpus,

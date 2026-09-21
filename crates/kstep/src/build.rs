@@ -9,10 +9,10 @@ use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-use kstep_core::qemu::ARCH;
+use kstep_core::qemu::{Accel, Boot, Io, Machine, ARCH};
 
 use crate::cmd::{cmd, run};
-use crate::{build_dir, proj_dir};
+use crate::{build_dir, proj_dir, ResultDir};
 
 /// One `build/<name>/` directory: a kernel tree and what kSTEP builds against it.
 #[derive(Clone, Debug)]
@@ -32,6 +32,10 @@ fn jobs() -> String {
     )
 }
 
+fn mtime(p: &Path) -> Option<std::time::SystemTime> {
+    fs::metadata(p).and_then(|m| m.modified()).ok()
+}
+
 fn append_once(path: &Path, line: &str) -> Result<()> {
     let text = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     if !text.lines().any(|l| l == line) {
@@ -41,23 +45,29 @@ fn append_once(path: &Path, line: &str) -> Result<()> {
 }
 
 impl Build {
-    /// `build/<name>`, or what `build/current` points at; fails without a kernel tree there.
+    /// `build/<name>`, or what `build/current` points at. A missing tree is checked out when
+    /// the name says where from: a bug's build (`<bug>_buggy`, `<bug>_fixed` in bugs.yaml) or
+    /// a Linux release or commit (`v6.18`, `6.18.2`, `5068d84`). build/current is left alone.
     pub fn new(name: Option<&str>) -> Result<Build> {
         let name = match name {
             Some(n) => n.to_string(),
-            None => {
-                let cur = fs::read_link(build_dir().join("current"))
-                    .context("no build/current; run `kstep checkout`")?;
-                cur.file_name().unwrap().to_string_lossy().into_owned()
-            }
+            None => fs::read_link(build_dir().join("current"))
+                .context("no build/current; run `kstep checkout`")?
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned(),
         };
         if !build_dir().join(&name).join("linux").exists() {
-            let hint = if name.starts_with('v') {
-                format!("kstep checkout {name}")
-            } else {
-                format!("kstep checkout <ref> {name}")
+            let (git_ref, patch) = match crate::bugs::for_build(&name)? {
+                Some(bug) => bug.kernel(&name).map(|k| (k.git_ref, k.patch))?,
+                None if is_linux_ref(&name) => (name.clone(), None),
+                None => bail!(
+                    "no kernel tree at build/{name}/linux, and `{name}` is neither a bug's build \
+(bugs.yaml) nor a Linux version; run `kstep checkout <ref> {name}` first"
+                ),
             };
-            bail!("no kernel tree at build/{name}/linux; run `{hint}` first");
+            crate::checkout(&git_ref, &name, patch.as_deref(), true, false)?;
         }
         Ok(Build { name })
     }
@@ -82,7 +92,41 @@ impl Build {
         self.dir().join("kmod")
     }
 
-    /// Link the coverage files into `kernel/sched` and merge the config fragments.
+    /// `make -C <linux> -jN`, the start of every kbuild invocation.
+    fn make(&self) -> std::process::Command {
+        let mut make = cmd("make", ["-C"]);
+        make.arg(self.linux()).arg(jobs());
+        make
+    }
+
+    /// A native boot of this build: `driver` on `machine`, the console and the JSON stream
+    /// under `results`; with `terminal`, the console on the terminal too. KVM when the host
+    /// offers it.
+    pub fn boot(
+        &self,
+        driver: &str,
+        machine: Machine,
+        results: &ResultDir,
+        terminal: bool,
+    ) -> Boot {
+        Boot {
+            kernel: self.kernel(),
+            rootfs: self.rootfs(),
+            driver: driver.to_string(),
+            machine,
+            io: Io::Native {
+                log: results.log(),
+                jsonl: results.jsonl(),
+                terminal,
+            },
+            accel: Accel::detect(),
+            debug: false,
+            ram_file: None,
+        }
+    }
+
+    /// Link the coverage files into `kernel/sched` and merge the config fragments: the common
+    /// ones, the bug's if this is a bug's build, and `extra_config`.
     fn configure(&self, extra_config: Option<&Path>, log: Option<&Path>) -> Result<()> {
         let sched = self.linux().join("kernel/sched");
         for f in ["cov.c", "Kconfig.kstep", "Makefile.kstep"] {
@@ -103,7 +147,10 @@ impl Build {
             linux.join("config.kstep"),
             linux.join(format!("config.kstep.{}", ARCH.name())),
         ];
-        if let Some(extra) = extra_config {
+        let bug_config = crate::bugs::for_build(&self.name)?
+            .and_then(|b| b.config)
+            .map(|c| proj_dir().join(c));
+        for extra in bug_config.as_deref().into_iter().chain(extra_config) {
             fragments.push(fs::canonicalize(extra)?);
         }
         run(
@@ -125,8 +172,8 @@ impl Build {
         if reconfigure || !self.config().exists() {
             self.configure(extra_config, log)?;
         }
-        let mut make = cmd("make", ["-C"]);
-        make.arg(self.linux()).arg(jobs()).args([
+        let mut make = self.make();
+        make.args([
             "KBUILD_BUILD_TIMESTAMP=1970-01-01",
             "KBUILD_BUILD_VERSION=1",
             &format!("LOCALVERSION=-{}", self.name),
@@ -136,7 +183,6 @@ impl Build {
             "compile_commands.json",
         ]);
         let image = self.linux().join(ARCH.kernel_image());
-        let mtime = |p: &Path| fs::metadata(p).and_then(|m| m.modified()).ok();
         let before = mtime(&image);
         run(&mut make, log)?;
         // fs::copy gives a fresh mtime, which kernel_stale compares with the .config's
@@ -152,10 +198,9 @@ impl Build {
 
     /// Never built, or the .config changed since.
     fn kernel_stale(&self) -> bool {
-        let mtime = |p: PathBuf| fs::metadata(p).and_then(|m| m.modified()).ok();
         match (
-            mtime(self.kernel()),
-            mtime(self.config()),
+            mtime(&self.kernel()),
+            mtime(&self.config()),
             self.linux().join("Module.symvers").exists(),
         ) {
             (Some(kernel), Some(config), true) => kernel < config,
@@ -168,11 +213,7 @@ impl Build {
         mirror(&proj_dir().join("kmod"), &dir)?;
         let m = format!("M={}", dir.display());
         run(
-            cmd("make", ["-C"]).arg(self.linux()).arg(jobs()).args([
-                &m,
-                "modules",
-                "compile_commands.json",
-            ]),
+            self.make().args([&m, "modules", "compile_commands.json"]),
             None,
         )
     }
@@ -221,6 +262,41 @@ impl Build {
     }
 }
 
+/// A release (`v6.18`, `6.18.2`, `v6.19-rc3`) or a commit hash (7+ hex digits).
+fn is_linux_ref(name: &str) -> bool {
+    let digits = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());
+    let ver = name.strip_prefix('v').unwrap_or(name);
+    let (nums, rc) = ver.split_once("-rc").unwrap_or((ver, "1"));
+    let release = nums.contains('.') && nums.split('.').all(digits) && digits(rc);
+    let commit = (7..=40).contains(&name.len()) && name.bytes().all(|b| b.is_ascii_hexdigit());
+    release || commit
+}
+
+#[test]
+fn linux_refs() {
+    for ok in [
+        "v6.18",
+        "6.18.2",
+        "v7.0",
+        "v6.19-rc3",
+        "5068d84a",
+        "c369299812",
+    ] {
+        assert!(is_linux_ref(ok), "{ok}");
+    }
+    for no in [
+        "current",
+        "foo",
+        "sync_wakeup_buggy",
+        "v6",
+        "6.",
+        "v6.18-rc",
+        "abc",
+    ] {
+        assert!(!is_linux_ref(no), "{no}");
+    }
+}
+
 /// `dst` gets a symlink to every file under `src`; stale symlinks in `dst` are dropped first.
 fn mirror(src: &Path, dst: &Path) -> Result<()> {
     fs::create_dir_all(dst)?;
@@ -263,7 +339,7 @@ fn cpio_header(name: &str, size: usize) -> Vec<u8> {
 }
 
 #[test]
-fn cpio_header_matches_make_py() {
+fn cpio_header_is_newc() {
     let h = cpio_header("user", 5);
     assert_eq!(h.len(), 116); // 6 + 13 * 8 + "user\0", padded to 4
     assert_eq!(&h[14..22], b"000081ed"); // mode 0100755

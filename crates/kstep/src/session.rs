@@ -1,19 +1,19 @@
 //! A running `cli` driver: QEMU with guest RAM in a shared file (the session's own, unlinked once
-//! open), the driver's JSON stream on a unix socket, and the machine's state (kmod/shm.h) read out of the RAM file after each command.
-//! The CLI's REPL and the fuzzer both sit on this.
+//! open), the driver's JSON stream on a unix socket, and the machine's state (kmod/shm.h) read
+//! out of the RAM file after each command. The CLI's REPL and the fuzzer both sit on this.
 
 use std::fs::File;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::os::unix::fs::FileExt;
 use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
 use kstep_core::qemu::{Boot, Io, ARCH};
-use kstep_core::shm::{self, State, COV_SIZE};
+use kstep_core::shm::{self, State};
 use serde_json::Value;
 
 pub struct Session {
@@ -24,8 +24,6 @@ pub struct Session {
     shm_at: u64,
     cov_at: Option<u64>,
     snapshot: Vec<u8>,
-    /// The driver's ready line
-    pub ready: Value,
 }
 
 /// One command's answer: the reply, and the trace events that arrived before it.
@@ -46,12 +44,11 @@ impl Session {
     pub fn start(boot: &Boot, timeout: Duration) -> Result<Session> {
         let mut boot = boot.clone();
         // QEMU creates the file (memory-backend-file); once open here it can be unlinked
-        let ram_path = std::env::temp_dir().join(format!("kstep-{}-ram", std::process::id()));
-        let ram_path = if Path::new("/dev/shm").is_dir() {
-            Path::new("/dev/shm").join(ram_path.file_name().unwrap())
-        } else {
-            ram_path
+        let ram_dir = match Path::new("/dev/shm").is_dir() {
+            true => PathBuf::from("/dev/shm"),
+            false => std::env::temp_dir(),
         };
+        let ram_path = ram_dir.join(format!("kstep-{}-ram", std::process::id()));
         boot.ram_file = Some(ram_path.clone());
         let sock_path = Io::socket(
             boot.io
@@ -73,7 +70,7 @@ impl Session {
         };
         let mut child = command.spawn().context("spawn qemu")?;
 
-        // QEMU opens the socket a moment after it starts, and the RAM file with it.
+        // QEMU opens the socket a moment after it starts.
         let deadline = Instant::now() + timeout;
         let stream = loop {
             if let Ok(s) = UnixStream::connect(&sock_path) {
@@ -93,10 +90,11 @@ impl Session {
         };
         stream.set_read_timeout(Some(timeout))?;
         let mut reader = BufReader::new(stream.try_clone()?);
-        let ram = File::open(&ram_path).with_context(|| format!("open {}", ram_path.display()))?;
-        let _ = std::fs::remove_file(&ram_path);
 
         let ready = read_reply(&mut reader)?.reply;
+        // The guest has booted, so its RAM file certainly exists by now.
+        let ram = File::open(&ram_path).with_context(|| format!("open {}", ram_path.display()))?;
+        let _ = std::fs::remove_file(&ram_path);
         let shm = ready
             .get("shm")
             .and_then(Value::as_u64)
@@ -118,7 +116,6 @@ impl Session {
             shm_at,
             cov_at,
             snapshot: vec![0; shm::SIZE],
-            ready,
         };
         s.state().context("read the shared region")?; // magic and layout: the image speaks our version
         Ok(s)
@@ -131,7 +128,7 @@ impl Session {
     }
 
     /// The machine's state as of the last reply. The kmod writes the region before it replies,
-    /// so a snapshot taken now is consistent; the seqlock retry covers the rest.
+    /// so a snapshot taken now is consistent; a `Busy` snapshot is retried a few times anyway.
     pub fn state(&mut self) -> Result<State> {
         for _ in 0..100 {
             self.ram
@@ -145,15 +142,15 @@ impl Session {
         Err(anyhow!("shm stayed mid-update"))
     }
 
-    /// Copy the guest's coverage map out; false when this kernel has none.
-    pub fn coverage(&self, map: &mut [u8; COV_SIZE]) -> Result<bool> {
-        match self.cov_at {
-            Some(at) => self
-                .ram
-                .read_exact_at(map, at)
-                .context("read coverage map")?,
-            None => return Ok(false),
-        }
+    /// Copy the guest's coverage map out (`map` is `shm::COV_SIZE` bytes); false when this
+    /// kernel has none.
+    pub fn coverage(&self, map: &mut [u8]) -> Result<bool> {
+        let Some(at) = self.cov_at else {
+            return Ok(false);
+        };
+        self.ram
+            .read_exact_at(map, at)
+            .context("read coverage map")?;
         Ok(true)
     }
 
@@ -178,7 +175,7 @@ fn read_reply(reader: &mut BufReader<UnixStream>) -> Result<Reply> {
         match reader.read_line(&mut line) {
             Ok(0) => bail!("the driver closed its channel"),
             Ok(_) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(e) if matches!(e.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {
                 bail!("no reply from the driver")
             }
             Err(e) => return Err(e.into()),

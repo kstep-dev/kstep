@@ -1,6 +1,6 @@
 [package]
 name = "kstep"
-description = "kSTEP's host tooling: the `kstep` command line and, with the fuzz feature, the fuzzer"
+description = "kSTEP's host tooling: the `kstep` command line, and the library the fuzzer builds on"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

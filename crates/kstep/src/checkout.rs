@@ -11,6 +11,9 @@ use crate::cmd::{cmd, run};
 
 pub const LINUX_MASTER_URL: &str = "https://github.com/gregkh/linux.git";
 
+/// The LTS releases kSTEP supports (one per year; CI and the README badges list the same).
+pub const LTS: [&str; 5] = ["v5.15", "v6.1", "v6.6", "v6.12", "v6.18"];
+
 /// Releases (`v6.14`, `6.14.2`) come from kernel.org's CDN, commits from GitHub.
 fn download_url(git_ref: &str) -> String {
     if git_ref.contains('.') {
@@ -50,15 +53,14 @@ fn set_current_build(name: &str) -> Result<()> {
     if fs::symlink_metadata(&current).is_ok() {
         fs::remove_file(&current)?;
     }
-    symlink(build_dir().join(name), &current)
-        .with_context(|| format!("symlink {}", current.display()))
+    // relative, like results/latest: the tree can move
+    symlink(name, &current).with_context(|| format!("symlink {}", current.display()))
 }
 
 fn download(url: &str, output: &Path) -> Result<()> {
     if output.exists() {
         return Ok(());
     }
-    eprintln!("Downloading {url}");
     run(cmd("wget", ["--no-verbose", url, "-O"]).arg(output), None)
 }
 
@@ -121,7 +123,7 @@ pub fn checkout(
 }
 
 #[test]
-fn urls_match_checkout_py() {
+fn release_and_commit_urls() {
     assert_eq!(
         download_url("v6.14"),
         "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.14.tar.xz"

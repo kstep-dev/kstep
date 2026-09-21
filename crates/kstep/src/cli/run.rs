@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use kstep::{bugs, Build, ResultDir, Session};
-use kstep_core::qemu::{Accel, Boot, Io, Machine};
+use kstep_core::qemu::{Accel, Boot, Machine};
 use kstep_core::shm::State;
 
 /// Boot a driver under QEMU (building kSTEP first) and record the run under results/
@@ -68,29 +68,16 @@ pub fn main(a: Args) -> Result<()> {
         .or_else(|| bug.map(|b| b.name))
         .unwrap_or_else(|| "cli".into());
     let results = ResultDir::create(a.out.as_deref(), true)?;
-    let accel = Accel::detect();
-    if accel == Accel::Tcg && std::path::Path::new("/dev/kvm").exists() {
-        eprintln!("/dev/kvm is not readable, using TCG (sudo chmod 666 /dev/kvm to use KVM)");
-    }
     let interactive =
         a.input.is_none() && std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
     let cli = driver == "cli";
-    let boot = Boot {
-        kernel: b.kernel(),
-        rootfs: b.rootfs(),
-        driver,
-        machine,
-        // the cli's terminal is ours; another driver's console goes to the terminal when there
-        // is one, and in a script or CI to qemu.log alone
-        io: Io::Native {
-            log: results.log(),
-            jsonl: results.jsonl(),
-            terminal: interactive && !cli,
-        },
-        accel,
-        debug: a.debug,
-        ram_file: None,
-    };
+    // the cli's terminal is ours; another driver's console goes to the terminal when there is
+    // one, and in a script or CI to qemu.log alone
+    let mut boot = b.boot(&driver, machine, &results, interactive && !cli);
+    boot.debug = a.debug;
+    if boot.accel == Accel::Tcg && std::path::Path::new("/dev/kvm").exists() {
+        eprintln!("/dev/kvm is not accessible, using TCG (sudo chmod 666 /dev/kvm to use KVM)");
+    }
     if a.debug {
         eprintln!(
             "gdb stub on :1234, guest stopped; attach with `kstep gdb {}`",

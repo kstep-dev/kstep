@@ -71,7 +71,7 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 ./kstep.sh build [<name>] --linux [--config F]  # reconfigure and rebuild the kernel; run after Linux file changes
 ```
 
-- `[<name>]`: build directory under `build/`; defaults to whatever `build/current` points to.
+- `[<name>]`: build directory under `build/`; defaults to whatever `build/current` points to. A bug's build (`<bug>_buggy`, `<bug>_fixed`) or a Linux version (`v6.18`) is checked out first if missing.
 
 #### 🏃‍♂️ Run kSTEP
 
@@ -84,7 +84,7 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 - `[-o <dir>]`: subdir under `results/` for output; defaults to a timestamped `tmp_*` dir. `results/latest` symlinks to it.
 - `--debug` starts the guest stopped with a gdb stub; `./kstep.sh gdb [<name>]` attaches.
 
-- **Example:** `./kstep.sh run sync_wakeup_buggy` runs the `sync_wakeup` driver on its buggy kernel.
+- **Example:** `./kstep.sh run sync_wakeup_buggy` runs the `sync_wakeup` driver on its buggy kernel, checking it out and building it first if needed.
 
 ## 📁 Directory Structure
 

@@ -4,6 +4,7 @@
 # build/<bug>_fixed. Fields:
 #   fix            the fix commit; buggy = fix~1, fixed = fix
 #   ref, patch     or: buggy = ref, fixed = ref + linux/<patch>
+#   upstream_fix   with ref + patch: the commit that later fixed it upstream (shown by the website)
 #   config         extra kernel config fragment to merge
 #   extra          true for the bugs outside the paper's main table
 #   plot_format    scripts/plot_<format>.py draws the reproduction
@@ -19,6 +20,7 @@
 sync_wakeup:
   ref: v6.14
   patch: sync_wakeup.patch
+  upstream_fix: aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042
   num_cpus: 3
   plot_format: curr_task
   fuzz:

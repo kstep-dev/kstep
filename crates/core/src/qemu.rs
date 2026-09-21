@@ -124,9 +124,14 @@ pub enum Accel {
 }
 
 impl Accel {
-    /// KVM when /dev/kvm exists and is readable, else TCG.
+    /// KVM when /dev/kvm can be opened read-write (what KVM_CREATE_VM needs), else TCG.
     pub fn detect() -> Accel {
-        if std::fs::File::open("/dev/kvm").is_ok() {
+        if std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open("/dev/kvm")
+            .is_ok()
+        {
             Accel::Kvm
         } else {
             Accel::Tcg

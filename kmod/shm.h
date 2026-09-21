@@ -17,7 +17,7 @@
 #define KSTEP_SHM_ENTITIES (KSTEP_SHM_TASKS + KSTEP_SHM_CGROUPS * KSTEP_SHM_CPUS) // every task's, plus one group entity per (cgroup, CPU)
 #define KSTEP_SHM_DOMAINS (KSTEP_SHM_CPUS * 5) // one per (CPU, level)
 #define KSTEP_SHM_GROUPS KSTEP_SHM_CPUS // a domain's balancing groups, at most one per CPU
-#define KSTEP_COV_SIZE (1 << 16) // cov.c's edge map, saturating byte counts; fuzzer/src/main.rs MAP_SIZE
+#define KSTEP_COV_SIZE (1 << 16) // cov.c's edge map, saturating byte counts; crates/core/src/shm.rs COV_SIZE
 
 // The host decodes the region with structs generated from this header (crates/core/src/shm.rs),
 // so the header only says how many records each table holds. magic and layout come first, and a

@@ -19,7 +19,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use kstep::bugs::Bug;
 use kstep::{bugs, Build, ResultDir, Session};
-use kstep_core::qemu::{Accel, Boot, Io};
+use kstep_core::qemu::Boot;
 use kstep_core::shm::COV_SIZE;
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -238,7 +238,7 @@ fn run_program(boot: &Boot, lines: &[String], map: Option<&mut [u8]>) -> (Outcom
     }
     if let Some(map) = map {
         // A kernel built without linux/config.kstep.cov has no map, and the map stays as it was.
-        let _ = session.coverage(map.try_into().expect("map is COV_SIZE"));
+        let _ = session.coverage(map);
     }
     let _ = session.exit();
     if warn.is_none() && console_oops(boot) {
@@ -346,22 +346,8 @@ impl HasObservers for QemuExecutor {
 
 /// A headless cli boot of `build` on the bug's machine, logging under results/<label>.
 fn boot(build: &Build, bug: &Bug, label: &str) -> Result<Boot> {
-    build.build_kstep()?;
     let results = ResultDir::create(Some(label), false)?;
-    Ok(Boot {
-        kernel: build.kernel(),
-        rootfs: build.rootfs(),
-        driver: "cli".into(),
-        machine: bug.machine(),
-        io: Io::Native {
-            log: results.log(),
-            jsonl: results.jsonl(),
-            terminal: false,
-        },
-        accel: Accel::detect(),
-        debug: false,
-        ram_file: None,
-    })
+    Ok(build.boot("cli", bug.machine(), &results, false))
 }
 
 fn main() -> Result<()> {
@@ -372,14 +358,16 @@ fn main() -> Result<()> {
     };
     let bug = bugs::get(&args.bug)?;
     let buggy = Build::new(Some(&bug.build_name("buggy")))?;
+    buggy.build_kstep()?;
     // The bug's other kernel: a candidate that warns there is not this bug. Without it the fuzzer
     // still runs, and every candidate is kept.
     let fixed = Build::new(Some(&bug.build_name("fixed"))).ok();
-    if fixed.is_none() {
-        println!(
+    match &fixed {
+        Some(f) => f.build_kstep()?,
+        None => println!(
             "no fixed build for {}: findings will not be vetted against it",
             bug.name
-        );
+        ),
     }
     let work = kstep::proj_dir().join("fuzz").join(&buggy.name);
     let findings = work.join("findings");
@@ -400,13 +388,8 @@ fn main() -> Result<()> {
         let id = client.id() - 1; // the launcher numbers clients from 1
         let (boot, fixed) = clients.into_iter().nth(id).unwrap();
 
-        // The coverage map lives for the whole run; the observer borrows it, the executor fills it.
-        let map: &'static mut [u8] = Box::leak(vec![0u8; COV_SIZE].into_boxed_slice());
-        let map_ptr = map.as_mut_ptr();
-        // SAFETY: the map is leaked and only the executor writes it, between observer reads.
-        let observer = unsafe {
-            StdMapObserver::new("cov", std::slice::from_raw_parts_mut(map_ptr, COV_SIZE))
-        };
+        // The coverage map: the observer owns it, the executor fills it through the observer.
+        let observer = StdMapObserver::owned("cov", vec![0u8; COV_SIZE]);
         let mut feedback = MaxMapFeedback::new(&observer);
         let mut objective = CrashFeedback::new();
         let mut state = state.unwrap_or_else(|| {

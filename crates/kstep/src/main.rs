@@ -1,5 +1,5 @@
-//! The `kstep` binary: checkout, build, run, reproduce, viz. The fuzzer is a second binary in
-//! this package behind the `fuzz` feature, so this one never compiles LibAFL.
+//! The `kstep` binary: checkout, build, run, reproduce, viz. The fuzzer is its own crate
+//! (crates/fuzz) on top of this package's library, so this one never compiles LibAFL.
 
 use anyhow::Result;
 use clap::Parser;

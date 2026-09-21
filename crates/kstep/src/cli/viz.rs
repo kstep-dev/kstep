@@ -38,9 +38,6 @@ enum Cmd {
 
 const KSTEP_URL: &str = "https://github.com/kstep-dev/kstep/blob/master";
 const RESULTS_URL: &str = "https://raw.githubusercontent.com/kstep-dev/results/main";
-/// Upstream fix of a patch-based bug
-const OFFICIAL_FIX: [(&str, &str); 1] =
-    [("sync_wakeup", "aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042")];
 /// The playground image: Linux v6.18 for arm64, shared with the repro builds
 const IMAGE: &str = "v6.18";
 
@@ -73,10 +70,12 @@ fn node() -> Result<PathBuf> {
 /// What the bug catalog shows (the README's results table says the same by hand).
 fn catalog(bug: &Bug) -> serde_json::Value {
     let commit = |h: &str| json!({ "label": format!("linux@{}", &h[..7]), "url": format!("https://github.com/torvalds/linux/commit/{h}") });
-    let mut fixes: Vec<_> = bug.fix.iter().map(|h| commit(h)).collect();
-    if let Some((_, h)) = OFFICIAL_FIX.iter().find(|(n, _)| *n == bug.name) {
-        fixes.push(commit(h));
-    }
+    let mut fixes: Vec<_> = bug
+        .fix
+        .iter()
+        .chain(&bug.upstream_fix)
+        .map(|h| commit(h))
+        .collect();
     if let Some(p) = &bug.patch {
         fixes.push(json!({ "label": p, "url": format!("{KSTEP_URL}/linux/{p}") }));
     }
@@ -152,12 +151,9 @@ fn build() -> Result<String> {
         .to_string();
     let version = format!("{rev}-{}", chrono::Utc::now().format("%Y%m%d%H%M"));
     let all = bugs::load()?;
-    let bugs: Vec<_> = all
-        .values()
-        .filter(|b| !b.extra)
-        .chain(all.values().filter(|b| b.extra))
-        .map(catalog)
-        .collect();
+    let mut sorted: Vec<&Bug> = all.values().collect();
+    sorted.sort_by_key(|b| b.extra); // the paper's table first, in file order
+    let bugs: Vec<_> = sorted.into_iter().map(catalog).collect();
     fs::write(
         site().join("data.json"),
         serde_json::to_string_pretty(&json!({ "version": version, "bugs": bugs }))?,
@@ -165,9 +161,6 @@ fn build() -> Result<String> {
 
     // The playground image, rebuilt from the current kmod and user.c so the page and the driver
     // it talks to are always published together. First time: a kernel build (~10 min).
-    if Build::new(Some(IMAGE)).is_err() {
-        kstep::checkout(IMAGE, IMAGE, None, true, false)?;
-    }
     let b = Build::new(Some(IMAGE))?;
     b.build_kstep()?;
     let images = site().join("images/cli");
@@ -291,7 +284,7 @@ fn connection(mut stream: std::net::TcpStream) -> std::io::Result<()> {
 fn deploy(version: &str) -> Result<()> {
     let node = node()?;
     run(
-        &mut cmd(node.to_str().unwrap(), [website().join("pagetest.mjs")]),
+        cmd(node.to_str().unwrap(), [website().join("pagetest.mjs")]).current_dir(website()),
         None,
     )
     .context("deploy aborted: site/viz.mjs failed its checks")?;
@@ -308,21 +301,22 @@ fn deploy(version: &str) -> Result<()> {
     let tmp = std::env::temp_dir().join(format!("kstep-site-{}", std::process::id()));
     run(cmd("cp", ["-r"]).arg(site()).arg(&tmp), None)?;
     let git = |args: &[&str]| run(cmd("git", args).current_dir(&tmp), None);
-    let result = git(&["init", "-q", "-b", "gh-pages"])
-        .and_then(|_| git(&["add", "-A"]))
-        .and_then(|_| {
-            git(&[
-                "-c",
-                "user.name=kstep viz",
-                "-c",
-                "user.email=deploy@kstep",
-                "commit",
-                "-q",
-                "-m",
-                &format!("Deploy {version}"),
-            ])
-        })
-        .and_then(|_| git(&["push", "-q", "--force", &origin, "gh-pages"]));
+    let publish = || -> Result<()> {
+        git(&["init", "-q", "-b", "gh-pages"])?;
+        git(&["add", "-A"])?;
+        git(&[
+            "-c",
+            "user.name=kstep viz",
+            "-c",
+            "user.email=deploy@kstep",
+            "commit",
+            "-q",
+            "-m",
+            &format!("Deploy {version}"),
+        ])?;
+        git(&["push", "-q", "--force", &origin, "gh-pages"])
+    };
+    let result = publish();
     let _ = fs::remove_dir_all(&tmp);
     result?;
     println!("pushed gh-pages ({version})");

@@ -59,13 +59,10 @@ pub fn run(cmd: &mut Command, log: Option<&Path>) -> Result<()> {
     }
     let status = cmd.status().with_context(|| format!("spawn `{shown}`"))?;
     if !status.success() {
+        let program = cmd.get_program().to_string_lossy();
         match log {
-            Some(log) => bail!(
-                "`{}` failed ({status}); see {}",
-                shown.split(' ').next().unwrap(),
-                log.display()
-            ),
-            None => bail!("`{}` failed ({status})", shown.split(' ').next().unwrap()),
+            Some(log) => bail!("`{program}` failed ({status}); see {}", log.display()),
+            None => bail!("`{program}` failed ({status})"),
         }
     }
     Ok(())

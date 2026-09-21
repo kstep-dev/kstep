@@ -20,7 +20,9 @@ pub struct Bug {
     #[serde(rename = "ref")]
     pub git_ref: Option<String>,
     pub patch: Option<String>,
-    /// Extra kernel config fragment to merge, relative to the repo root
+    /// With `ref` + `patch`: the commit that later fixed the bug upstream
+    pub upstream_fix: Option<String>,
+    /// Extra kernel config fragment to merge, relative to the repo root (`Build` picks it up)
     pub config: Option<PathBuf>,
     /// Outside the paper's main table
     #[serde(default)]
@@ -64,7 +66,6 @@ pub struct Kernel {
     pub name: &'static str,
     pub git_ref: String,
     pub patch: Option<PathBuf>,
-    pub config: Option<PathBuf>,
 }
 
 impl Bug {
@@ -81,7 +82,6 @@ impl Bug {
             name,
             git_ref,
             patch,
-            config: self.config.clone(),
         };
         match (&self.fix, &self.git_ref, &self.patch) {
             (Some(fix), _, _) => Ok([
@@ -100,6 +100,16 @@ impl Bug {
                 self.name
             ),
         }
+    }
+
+    /// The kernel behind one of this bug's builds, `<bug>_buggy` or `<bug>_fixed`.
+    pub fn kernel(&self, build: &str) -> Result<Kernel> {
+        let [buggy, fixed] = self.kernels()?;
+        Ok(if build.ends_with("_buggy") {
+            buggy
+        } else {
+            fixed
+        })
     }
 
     pub fn build_name(&self, kernel: &str) -> String {
@@ -134,13 +144,17 @@ pub fn for_build(build: &str) -> Result<Option<Bug>> {
     Ok(load()?.get(name).cloned())
 }
 
-/// One bug by name, with a message listing the choices when it is unknown.
-pub fn get(name: &str) -> Result<Bug> {
-    let bugs = load()?;
-    bugs.get(name).cloned().with_context(|| {
+/// One bug of `bugs` by name, with a message listing the choices when it is unknown.
+pub fn lookup<'a>(bugs: &'a IndexMap<String, Bug>, name: &str) -> Result<&'a Bug> {
+    bugs.get(name).with_context(|| {
         let names: Vec<_> = bugs.keys().map(String::as_str).collect();
         format!("no bug '{name}' in bugs.yaml; known: {}", names.join(", "))
     })
+}
+
+/// One bug by name, from the catalog.
+pub fn get(name: &str) -> Result<Bug> {
+    lookup(&load()?, name).cloned()
 }
 
 #[cfg(test)]
@@ -158,6 +172,7 @@ mod tests {
         let sw = &bugs["sync_wakeup"];
         assert_eq!((sw.num_cpus, sw.mem_mb, sw.extra), (3, 128, false));
         assert_eq!(sw.fuzz.setup, ["create 3"]);
+        assert!(sw.upstream_fix.as_deref().unwrap().starts_with("aa3ee4f"));
         assert!(sw.kernels().unwrap()[1]
             .patch
             .as_ref()
