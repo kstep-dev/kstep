@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::fs::FileExt;
 use std::os::unix::net::UnixStream;
+use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, Stdio};
 use std::time::{Duration, Instant};
@@ -55,12 +56,19 @@ impl Session {
         boot.ram_file = Some(ram_path.clone());
         let sock_path = Boot::socket(&boot.jsonl);
         let _ = std::fs::remove_file(&sock_path);
-        let mut child = boot
-            .command()
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .spawn()
-            .context("spawn qemu")?;
+        let mut command = boot.command();
+        command.stdin(Stdio::null()).stdout(Stdio::null());
+        // QEMU dies with us, however we die: a killed fuzzer must not leave guests behind
+        unsafe {
+            command.pre_exec(|| {
+                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) == 0 {
+                    Ok(())
+                } else {
+                    Err(std::io::Error::last_os_error())
+                }
+            })
+        };
+        let mut child = command.spawn().context("spawn qemu")?;
 
         // QEMU opens the socket a moment after it starts, and the RAM file with it.
         let deadline = Instant::now() + timeout;

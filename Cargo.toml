@@ -4,12 +4,14 @@
 #   ./kstep.sh <checkout|build|run|reproduce|web> ...
 #
 # crates/core   kstep-core: what the wasm page shares with the binaries (shm decoder, QEMU argv)
-# crates/kstep  the `kstep` binary and its library (checkout, build, bugs.yaml, results); the
-#               fuzzer is a second binary here behind the `fuzz` feature (a later step)
+# crates/kstep  the `kstep` binary and its library (checkout, build, bugs.yaml, results, sessions)
+# crates/fuzz   kstep-fuzz: the LibAFL fuzzer, a client of the library; not a default member, so a
+#               plain `cargo build` never compiles LibAFL (`cargo build -p kstep-fuzz` does)
 [workspace]
 resolver = "2"
 members = ["crates/*"]
-exclude = ["fuzzer", "build", "website"]
+default-members = ["crates/core", "crates/kstep"]
+exclude = ["build", "website"]
 
 [workspace.package]
 version = "0.1.0"

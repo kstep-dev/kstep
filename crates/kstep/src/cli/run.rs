@@ -123,10 +123,11 @@ fn repl(boot: &Boot, mut input: Box<dyn BufRead>, interactive: bool) -> Result<(
     let timeout = Duration::from_secs(if boot.debug { 3600 } else { 60 });
     let mut s = Session::start(boot, timeout)?;
     eprintln!(
-        "ready ({} CPUs, {} MB); `exit` or ^D ends the session",
+        "ready ({} CPUs, {} MB); enter repeats a command, `exit` or ^D ends the session",
         boot.machine.num_cpus, boot.machine.mem_mb
     );
     let mut out = std::io::stdout().lock();
+    let mut last = String::new();
     loop {
         if interactive {
             write!(out, "kstep> ")?;
@@ -136,14 +137,18 @@ fn repl(boot: &Boot, mut input: Box<dyn BufRead>, interactive: bool) -> Result<(
         if input.read_line(&mut line)? == 0 {
             break;
         }
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        if line == "exit" {
-            break;
-        }
-        let r = s.cmd(line)?;
+        // at the prompt, an empty line repeats the last command (`tick`, `tick`, ...)
+        let line = match line.trim() {
+            "" if interactive && !last.is_empty() => {
+                writeln!(out, "kstep> {last}")?;
+                last.clone()
+            }
+            l if l.is_empty() || l.starts_with('#') => continue,
+            "exit" => break,
+            l => l.to_string(),
+        };
+        last = line.clone();
+        let r = s.cmd(&line)?;
         for e in &r.events {
             writeln!(out, "  {e}")?;
         }
@@ -155,49 +160,60 @@ fn repl(boot: &Boot, mut input: Box<dyn BufRead>, interactive: bool) -> Result<(
     s.exit()
 }
 
-/// The machine at a glance: each CPU, then each task, joined with its class's view.
+/// The machine after a command: one line per CPU and per task, joined with its class's view.
 fn summary(st: &State) -> String {
-    let mut s = format!("[t={}]", st.timestamp);
+    let mut s = format!("t={}\n", st.timestamp);
     for c in &st.cpus {
-        let fair = st.cfs.iter().find(|f| f.cpu == c.cpu);
-        let what = match (c.idle, c.current) {
-            (true, _) => "idle".to_string(),
-            (false, 0) => "other".to_string(),
-            (false, t) => format!("task {t}"),
+        let util = st
+            .cfs
+            .iter()
+            .find(|f| f.cpu == c.cpu)
+            .map_or(0, |f| f.util_avg);
+        let curr = if c.idle {
+            "idle".to_string()
+        } else if c.current == 0 {
+            "other".to_string()
+        } else {
+            format!("task {}", c.current)
         };
-        s += &format!("  cpu{}: {what}, {} running", c.cpu, c.nr_running);
-        if let Some(f) = fair {
-            s += &format!(", util {}", f.util_avg);
-        }
-    }
-    s += "\n";
-    if !st.tasks.is_empty() {
         s += &format!(
-            "  {:>4} {:<8} {:>3} {:<7} {:>4} {:>10} {:>12} {:>8}  {}\n",
-            "task", "state", "cpu", "policy", "nice", "exec(ms)", "vruntime", "lag", "cgroup"
+            "  cpu {}: {curr}, nr_running={} util={} capacity={} freq={}\n",
+            c.cpu, c.nr_running, util, c.capacity, c.freq
         );
     }
     for t in &st.tasks {
-        let policy = match t.policy {
-            "fifo" | "rr" => format!("{}:{}", t.policy, t.rt_priority),
-            p => p.to_string(),
-        };
-        let (vruntime, lag) = match st.entities.iter().find(|e| e.task == t.task) {
-            Some(e) => (e.vruntime.to_string(), e.lag.to_string()),
-            None => ("-".into(), "-".into()),
-        };
-        s += &format!(
-            "  {:>4} {:<8} {:>3} {:<7} {:>4} {:>10.1} {:>12} {:>8}  {}\n",
-            t.task,
-            t.state,
-            t.cpu,
-            policy,
-            t.nice,
-            t.sum_exec_runtime as f64 / 1e6,
-            vruntime,
-            lag,
-            t.cgroup
-        );
+        s += &format!("  task {}: {} cpu={} {}", t.task, t.state, t.cpu, t.policy);
+        if t.rt_priority > 0 {
+            s += &format!(" prio={}", t.rt_priority);
+        } else {
+            s += &format!(" nice={}", t.nice);
+        }
+        s += &format!(" exec={:.1}ms", t.sum_exec_runtime as f64 / 1e6);
+        if let Some(e) = st.entities.iter().find(|e| e.task == t.task) {
+            s += &format!(
+                " vruntime={} lag={} weight={} share={:.2}",
+                e.vruntime, e.lag, e.weight, e.share
+            );
+            for (flag, on) in [
+                ("eligible", e.eligible),
+                ("pick", e.pick),
+                ("delayed", e.delayed),
+            ] {
+                if on {
+                    s += &format!(" {flag}");
+                }
+            }
+        }
+        if let Some(r) = st.rt_entities.iter().find(|r| r.task == t.task) {
+            s += &format!(" position={} time_slice={}", r.position, r.time_slice);
+            if r.pick {
+                s += " pick";
+            }
+        }
+        if t.cgroup != "/" {
+            s += &format!(" cgroup={}", t.cgroup);
+        }
+        s += "\n";
     }
     s
 }
