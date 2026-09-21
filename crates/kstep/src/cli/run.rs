@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use kstep::bugs;
+use kstep::{build, Build, ResultDir};
 use kstep_core::qemu::{Accel, Boot, Console, Machine};
-use kstep_host::bugs;
-use kstep_host::{build, Build, ResultDir};
 
 /// Boot a driver under QEMU (building kSTEP first) and record the run under results/
 #[derive(clap::Args)]
@@ -43,7 +43,7 @@ pub struct Args {
 }
 
 fn is_driver(name: &str) -> bool {
-    let kmod = kstep_host::proj_dir().join("kmod");
+    let kmod = kstep::proj_dir().join("kmod");
     ["drivers", "drivers_generated"]
         .iter()
         .any(|d| kmod.join(d).join(format!("{name}.c")).is_file())
@@ -107,7 +107,7 @@ pub fn main(a: Args) -> Result<()> {
     }
     // ctrl-c belongs to the guest console (QEMU's mux has signal=off); ctrl-a x quits QEMU
     unsafe { libc::signal(libc::SIGINT, libc::SIG_IGN) };
-    let status = kstep_host::cmd::status(&mut boot.command()).context("qemu")?;
+    let status = kstep::cmd::status(&mut boot.command()).context("qemu")?;
     println!("Results saved to {}", results.path().display());
     if !status.success() {
         anyhow::bail!("qemu exited with {status}");

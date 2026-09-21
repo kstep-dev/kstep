@@ -3,10 +3,9 @@
 #
 #   ./kstep.sh <checkout|build|run|reproduce|web> ...
 #
-# crates/core   kstep-core: what every client shares, wasm included (shm decoder, QEMU argv)
-# crates/host   kstep-host: kernel checkout and build, bugs.yaml, results dirs (host tooling only)
-# crates/cli    kstep-cli: the `kstep` binary
-# crates/fuzz   kstep-fuzz: the LibAFL fuzzer (moves here from fuzzer/ in a later step)
+# crates/core   kstep-core: what the wasm page shares with the binaries (shm decoder, QEMU argv)
+# crates/kstep  the `kstep` binary and its library (checkout, build, bugs.yaml, results); the
+#               fuzzer is a second binary here behind the `fuzz` feature (a later step)
 [workspace]
 resolver = "2"
 members = ["crates/*"]

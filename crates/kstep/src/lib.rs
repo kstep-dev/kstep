@@ -1,5 +1,5 @@
-//! Host tooling shared by the CLI and the fuzzer: kernel checkout and build (the old checkout.py
-//! and make.py), bugs.yaml, and the results/ convention. Nothing here is built for wasm.
+//! What the `kstep` binary and the fuzzer share: kernel checkout and build, bugs.yaml, and the
+//! results/ convention. Nothing here is built for wasm; that part is kstep-core.
 
 pub mod bugs;
 pub mod build;

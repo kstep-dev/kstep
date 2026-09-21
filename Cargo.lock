@@ -266,14 +266,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "kstep-cli"
+name = "kstep"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
+ "indexmap",
  "kstep-core",
- "kstep-host",
  "libc",
+ "serde",
+ "serde_yaml_ng",
 ]
 
 [[package]]
@@ -281,18 +284,6 @@ name = "kstep-core"
 version = "0.1.0"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "kstep-host"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "indexmap",
- "kstep-core",
- "serde",
- "serde_yaml_ng",
 ]
 
 [[package]]

@@ -4,17 +4,15 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 
-mod build;
-mod checkout;
-mod run;
+mod cli;
 
 #[derive(Parser)]
 #[command(name = "kstep", bin_name = "kstep", version, about)]
 enum Cli {
-    Checkout(checkout::Args),
-    Build(build::Args),
-    Run(run::Args),
-    Gdb(run::GdbArgs),
+    Checkout(cli::checkout::Args),
+    Build(cli::build::Args),
+    Run(cli::run::Args),
+    Gdb(cli::run::GdbArgs),
     /// Check out, build and run a bugs.yaml entry on its buggy and fixed kernels, then plot
     Reproduce,
     /// Build the website: bug catalog, playground image and the wasm decoder
@@ -23,10 +21,10 @@ enum Cli {
 
 fn main() -> Result<()> {
     match Cli::parse() {
-        Cli::Checkout(args) => checkout::main(args),
-        Cli::Build(args) => build::main(args),
-        Cli::Run(args) => run::main(args),
-        Cli::Gdb(args) => run::gdb(args),
+        Cli::Checkout(args) => cli::checkout::main(args),
+        Cli::Build(args) => cli::build::main(args),
+        Cli::Run(args) => cli::run::main(args),
+        Cli::Gdb(args) => cli::run::gdb(args),
         Cli::Reproduce => bail!("not ported yet: use ./reproduce.py"),
         Cli::Web => bail!("not ported yet: use website/build.py"),
     }

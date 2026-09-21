@@ -1,15 +1,21 @@
 [package]
-name = "kstep-host"
-description = "kSTEP's host-side library: kernel checkout and build, the bug catalog, result dirs. Never part of the wasm build"
+name = "kstep"
+description = "kSTEP's host tooling: the `kstep` command line and, with the fuzz feature, the fuzzer"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "kstep"
+path = "src/main.rs"
+
 [dependencies]
 kstep-core = { path = "../core" }
 anyhow = "1"
+clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_yaml_ng = "0.10"
 indexmap = { version = "2", features = ["serde"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+libc = "0.2"

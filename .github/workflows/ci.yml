@@ -65,7 +65,7 @@ jobs:
           save-if: false
 
       - name: Build kstep CLI
-        run: cargo build --release --locked -p kstep-cli
+        run: cargo build --release --locked -p kstep
 
       - name: Install deps
         uses: ./.github/actions/apt-deps
