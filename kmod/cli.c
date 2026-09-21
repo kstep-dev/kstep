@@ -95,24 +95,6 @@ static struct task_struct *parse_task(char **arg, const char *usage) {
   return tasks[n - 1];
 }
 
-// create [n]: n tasks (default 1). The reply names the last one, so the caller knows the range.
-static void cmd_create(char *arg) {
-  int n = 1;
-
-  if (arg && kstrtoint(arg, 10, &n))
-    return reply_error("usage: create [n]");
-  if (n < 1 || ntasks + n > KSTEP_SHM_TASKS)
-    return reply_error("too many tasks");
-
-  for (int i = 0; i < n; i++) {
-    struct task_struct *p = kstep_task_create();
-
-    tasks[ntasks++] = p; // the task's kSTEP record keeps it referenced; created pinned to 1..N-1
-    kstep_task_wakeup(p);
-  }
-  kstep_json_field_s64(&reply, "task", ntasks);
-}
-
 static const struct {
   const char *name;
   int policy;
@@ -192,6 +174,39 @@ static const char *parse_cgroup(char **arg, const char *usage, bool create) {
     return NULL;
   }
   return path + 1;
+}
+
+// create [n] [/path]: n tasks (default 1), in the cgroup if one is named. The reply names the last
+// one, so the caller knows the range. A task is created parked and unqueued, so moving it before
+// its first wakeup puts that wakeup on the cgroup's queue: the scheduler never sees it at the root.
+static void cmd_create(char *arg) {
+  const char *usage = "usage: create [n] [/path]";
+  const char *name = NULL;
+  int n = 1;
+
+  if (arg && arg[0] != '/' && kstrtoint(take_arg(&arg), 10, &n))
+    return reply_error(usage);
+  if (arg && !*arg)
+    arg = NULL;
+  if (arg && !(name = parse_cgroup(&arg, usage, false)))
+    return;
+  if (arg)
+    return reply_error(usage);
+  if (n < 1 || ntasks + n > KSTEP_SHM_TASKS)
+    return reply_error("too many tasks");
+
+  for (int i = 0; i < n; i++) {
+    struct task_struct *p = kstep_task_create();
+    int err = name ? kstep_cgroup_move_task(name, p->pid) : 0;
+
+    if (err) { // a task the caller was refused is not numbered: let it out of its park to exit
+      kstep_task_exit(p);
+      return reply_errno(err);
+    }
+    tasks[ntasks++] = p; // the task's kSTEP record keeps it referenced; created pinned to 1..N-1
+    kstep_task_wakeup(p);
+  }
+  kstep_json_field_s64(&reply, "task", ntasks);
 }
 
 static void cmd_cgroup_create(char *arg) {
