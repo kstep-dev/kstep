@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["matplotlib==3.10.7", "pandas==2.3.3"]
+# ///
 """
 Plot util_avg for CPU 2 over time from log files
 """
@@ -7,9 +11,8 @@ import argparse
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from parse_log import parse_jsonl
 from plot_utils import save_fig
-from utils import ResultDir
+from utils import ResultDir, parse_jsonl
 
 
 def plot_util(buggy_df, fixed_df, ylabel: str):

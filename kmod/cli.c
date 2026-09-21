@@ -378,7 +378,7 @@ static void run(void) {
   bool more = true;
 
   // From here on, the session's scheduler coverage; 0 where the kernel has none, which is what
-  // tells a coverage-driven host (fuzzer/) it is looking at the wrong kernel rather than at a run
+  // tells a coverage-driven host (crates/fuzz) it is looking at the wrong kernel rather than at a run
   // that found no edges.
   phys_addr_t cov_phys = kstep_cov_init();
 

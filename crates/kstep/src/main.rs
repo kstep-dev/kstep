@@ -13,8 +13,7 @@ enum Cli {
     Build(cli::build::Args),
     Run(cli::run::Args),
     Gdb(cli::run::GdbArgs),
-    /// Check out, build and run a bugs.yaml entry on its buggy and fixed kernels, then plot
-    Reproduce,
+    Reproduce(cli::reproduce::Args),
     /// Build the website: bug catalog, playground image and the wasm decoder
     Web,
 }
@@ -25,7 +24,7 @@ fn main() -> Result<()> {
         Cli::Build(args) => cli::build::main(args),
         Cli::Run(args) => cli::run::main(args),
         Cli::Gdb(args) => cli::run::gdb(args),
-        Cli::Reproduce => bail!("not ported yet: use ./reproduce.py"),
+        Cli::Reproduce(args) => cli::reproduce::main(args),
         Cli::Web => bail!("not ported yet: use website/build.py"),
     }
 }

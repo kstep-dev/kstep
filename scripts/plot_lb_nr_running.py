@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["matplotlib==3.10.7", "pandas==2.3.3"]
+# ///
 
 import argparse
 from pathlib import Path
@@ -9,9 +13,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
-from parse_log import parse_jsonl
 from plot_utils import save_fig
-from utils import ResultDir
+from utils import ResultDir, parse_jsonl
 
 
 def parse_nr_running(path: Path) -> pd.DataFrame:
@@ -36,7 +39,7 @@ def build_cmap(nr_running_df):
     vmin = nr_running_df.min().min()
     vmax = nr_running_df.max().max()
     nr_colors = vmax - vmin + 1
-    cmap = plt.cm.get_cmap("Blues", nr_colors)
+    cmap = plt.get_cmap("Blues", nr_colors)
     return {i: cmap(i) for i in range(vmin, vmax + 1)}
 
 

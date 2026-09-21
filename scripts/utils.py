@@ -1,112 +1,34 @@
+"""What the plot scripts share: where results live, and how to read a trace."""
+
 import json
-import logging
-import subprocess
 from dataclasses import dataclass
-from datetime import datetime
-from enum import StrEnum
 from pathlib import Path
 
-PROJ_DIR = Path(__file__).parent.parent.resolve()
+import pandas as pd
 
-RESULTS_DIR = PROJ_DIR / "results"
-BUILD_DIR = PROJ_DIR / "build"
-BUILD_CURR_DIR = BUILD_DIR / "current"
+RESULTS_DIR = Path(__file__).parent.parent.resolve() / "results"
 
 
 @dataclass(frozen=True)
 class ResultDir:
-    """A per-run directory under RESULTS_DIR with stable child file names."""
-    label: str
-
-    @classmethod
-    def create(cls, label: str | None = None, set_latest: bool = True) -> "ResultDir":
-        """Create `results/<label>/` (defaults to `tmp_<ts>`); optionally point `results/latest` at it."""
-        if label is None:
-            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            label = f"tmp_{ts}"
-        out = cls(label)
-        out.path.mkdir(parents=True, exist_ok=True)
-        if set_latest:
-            latest = RESULTS_DIR / "latest"
-            latest.unlink(missing_ok=True)
-            latest.symlink_to(label)
-        return out
-
-    def __str__(self) -> str: return str(self.path)
+    """`results/<name>/`, as `kstep run` and `kstep reproduce` lay it out."""
+    name: str
 
     @property
-    def path(self) -> Path: return RESULTS_DIR / self.label
+    def path(self) -> Path: return RESULTS_DIR / self.name
     @property
     def log(self) -> Path: return self.path / "qemu.log"
     @property
     def output(self) -> Path: return self.path / "kstep.jsonl"
-    @property
-    def debug_log(self) -> Path: return self.path / "debug.log"
 
 
-class TermColor(StrEnum):
-    GRAY = "\033[90m"
-    RED = "\033[91m"
-    GREEN = "\033[92m"
-    YELLOW = "\033[93m"
-    BLUE = "\033[94m"
-    MAGENTA = "\033[95m"
-    CYAN = "\033[96m"
-    WHITE = "\033[97m"
-    RESET = "\033[0m"
-
-
-def system(cmd: str, log: Path | None = None):
-    """Run a shell command; with `log`, append its output to that file instead of the console."""
-    logging.info(f"$ {TermColor.BLUE}{cmd}{TermColor.RESET}")
-    if log is None:
-        subprocess.run(cmd, shell=True, check=True)
-        return
-    with log.open("a") as f:
-        f.write(f"$ {cmd}\n")
-        f.flush()
-        subprocess.run(cmd, shell=True, check=True, stdout=f, stderr=subprocess.STDOUT)
-
-
-def download(url: str, output_path: Path):
-    if output_path.exists():
-        logging.info(f"File {output_path} already exists, skipping download")
-        return
-    system(f"wget --no-verbose {url} -O {output_path}")
-
-
-def decompress(tarball_path: Path, output_dir: Path):
-    if output_dir.exists():
-        logging.info(f"Directory {output_dir} already exists, skipping decompression")
-        return
-    system(f"mkdir -p {output_dir}")
-    system(f"tar -xf {tarball_path} -C {output_dir} --strip-components=1")
-
-
-TIMESTAMP_LEN = 14
-
-
-# Parse a line from the log file
-def parse_line(line: str, prefix: str) -> dict | None:
-    # Line format: [timestamp] prefix: {json}
-    if len(line) < TIMESTAMP_LEN:
-        return None
-    if line[0] != "[" or line[TIMESTAMP_LEN - 1] != "]":
-        return None
-    if not line.startswith(prefix, TIMESTAMP_LEN + 1):
-        return None
-
-    # Parse JSON
-    json_str = line[TIMESTAMP_LEN + 1 + len(prefix) :].removeprefix(":")
-    try:
-        obj = json.loads(json_str)
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON at line {line}") from e
-
-    # Parse timestamp
-    ts_str = line[1 : TIMESTAMP_LEN - 1]
-    ts = round((float(ts_str) - 10) * 1000)
-
-    # Add timestamp to object
-    obj["timestamp"] = ts
-    return obj
+def parse_jsonl(path: Path, type: str) -> pd.DataFrame:
+    """The records of one `type` in a kstep.jsonl trace, without the type column."""
+    rows = []
+    with open(path) as f:
+        for line in f:
+            record = json.loads(line)
+            if record.get("type") == type:
+                del record["type"]
+                rows.append(record)
+    return pd.DataFrame(rows)

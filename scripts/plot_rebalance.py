@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["matplotlib==3.10.7", "pandas==2.3.3"]
+# ///
 """
 Script to parse rebalance domain logs and plot overhead over time.
 """
@@ -8,9 +12,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from parse_log import parse_jsonl
 from plot_utils import save_fig
-from utils import ResultDir
+from utils import ResultDir, parse_jsonl
 
 
 def parse_log_file(path: Path, target_cpu: int):

@@ -1,13 +1,13 @@
 # The bugs kSTEP reproduces and fuzzes: one entry per bug, the single place that records what a
-# bug needs. Loaded by reproduce.py, which `run.py --bug X` (the X driver, or `run.py cli --bug X`,
-# on X's machine) and `kstep-fuzzer X` read through. Kernels live in build/<bug>_buggy and
+# bug needs. Read by `kstep reproduce X`, `kstep run X_buggy` (the X driver on X's machine; `kstep
+# run X_fixed cli` for a session there) and `kstep-fuzz X`. Kernels live in build/<bug>_buggy and
 # build/<bug>_fixed. Fields:
 #   fix            the fix commit; buggy = fix~1, fixed = fix
 #   ref, patch     or: buggy = ref, fixed = ref + linux/<patch>
 #   config         extra kernel config fragment to merge
 #   extra          true for the bugs outside the paper's main table
 #   plot_format    scripts/plot_<format>.py draws the reproduction
-#   num_cpus, mem_mb   the machine (run.py Driver fields); capacity, topology and frequency
+#   num_cpus, mem_mb   the machine; capacity, topology and frequency
 #                      are cli verbs, so they belong in fuzz.setup
 #   fuzz:          what the fuzzer needs beyond the machine
 #     checks         checkers/ rules to enable

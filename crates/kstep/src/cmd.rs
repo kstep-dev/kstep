@@ -9,7 +9,8 @@ use std::process::{Command, Stdio};
 use anyhow::{bail, Context, Result};
 
 const BLUE: &str = "\x1b[94m";
-const RESET: &str = "\x1b[0m";
+pub const GREEN: &str = "\x1b[92m";
+pub const RESET: &str = "\x1b[0m";
 
 fn quote(s: &OsStr) -> String {
     let s = s.to_string_lossy();

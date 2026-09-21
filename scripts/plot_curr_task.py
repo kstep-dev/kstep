@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.12"
+# dependencies = ["matplotlib==3.10.7", "pandas==2.3.3"]
+# ///
 
 import argparse
 from pathlib import Path
@@ -9,9 +13,8 @@ import matplotlib.ticker as ticker
 import numpy as np
 import pandas as pd
 from matplotlib import colors
-from parse_log import parse_jsonl
 from plot_utils import save_fig
-from utils import ResultDir
+from utils import ResultDir, parse_jsonl
 
 
 def parse_curr_task(path: Path, type: str) -> pd.DataFrame:
