@@ -92,6 +92,23 @@ static void kstep_reset_runqueue(struct rq *rq) {
 #endif
   reset_sched_avg(&rq->cfs.avg);
 
+  // The per-class rq averages (rt, dl, irq, hw) are updated with rq_clock_pelt() too, so they hold
+  // boot's real-clock history: period_contrib is the phase of the 1 ms PELT period at boot's last
+  // update, and the first mocked update sees now < last_update_time and merely restamps
+  // last_update_time -- the stale residue survives and shifts every later period boundary, so
+  // util_avg differed run to run (util_avg repro: period_contrib 71 vs 73 from the first tick).
+  reset_sched_avg(&rq->avg_rt);
+  reset_sched_avg(&rq->avg_dl);
+#ifdef CONFIG_HAVE_SCHED_AVG_IRQ
+  reset_sched_avg(&rq->avg_irq);
+#endif
+// https://github.com/torvalds/linux/commit/d4dbc991714eefcbd8d54a3204bd77a0a52bd32d (thermal -> hw)
+#if defined(CONFIG_SCHED_HW_PRESSURE)
+  reset_sched_avg(&rq->avg_hw);
+#elif defined(CONFIG_SCHED_THERMAL_PRESSURE)
+  reset_sched_avg(&rq->avg_thermal);
+#endif
+
   // reset sched domain
   struct sched_domain *sd;
   for_each_domain(rq->cpu, sd) {

@@ -48,13 +48,14 @@ const MAX_RECORDS: usize = 64; // commands per program
 
 // The general verb table, indexed by the verb byte: what every bug needs, kept small so a bug's
 // alphabet stays close to what its rule is about. A bug's own verbs (bugs.yaml) follow it; any cli
-// verb may appear there, and `fifo` and `rr` stand for the policy verb with those policies.
+// verb may appear there, spelled as cli.c spells it.
 //
 // create is not here: a bug's setup makes the tasks, so the ids a record can name are fixed for
 // the whole program and a mutation stays local. A bug that wants task arrival fuzzed asks for
 // `create` among its own verbs.
-const VERBS: &[&str] = &["tick", "policy", "affinity", "pause", "wake"];
-const POLICIES: &[&str] = &["normal", "batch", "idle"];
+const VERBS: &[&str] = &["tick", "policy-fair", "affinity", "pause", "wake"];
+const FAIR_POLICIES: &[&str] = &["normal", "batch", "idle"];
+const RT_POLICIES: &[&str] = &["fifo", "rr"];
 
 /// What a fuzzing run targets: the build, the machine, and the program's fixed parts.
 #[derive(Clone, Default)]
@@ -128,7 +129,6 @@ fn decode(bytes: &[u8], t: &Target) -> Vec<String> {
         }
         let line = match verb {
             "tick" => format!("tick {}", 1 + a % 128),
-            "fifo" | "rr" => format!("policy {} {verb}", task(a)),
             // One task at a time: the scheduler event is a task arriving, and a count only repeats
             // it, at the price of guest time and of shifting every later task reference (a task is
             // resolved against how many are alive, so a count makes a one-byte mutation global).
@@ -139,9 +139,10 @@ fn decode(bytes: &[u8], t: &Target) -> Vec<String> {
                 "create".to_string()
             }
             // one CPU's frequency, as cpufreq would change it: a scale of 1..1024
-            "cpu-freq" => format!("cpu-freq {}={}", cpu(a), 1 + b % 1024),
-            "nice" => format!("nice {} {}", task(a), b as i32 % 40 - 20),
-            "policy" => format!("policy {} {}", task(a), POLICIES[b % POLICIES.len()]),
+            "cpu-freq" => format!("cpu-freq {} {}", cpu(a), 1 + b % 1024),
+            // a fair policy with a nice, or a real-time one with a priority: what the class reads
+            "policy-fair" => format!("policy-fair {} {} {}", task(a), FAIR_POLICIES[b % FAIR_POLICIES.len()], rec[3] as i32 % 40 - 20),
+            "policy-rt" => format!("policy-rt {} {} {}", task(a), RT_POLICIES[b % RT_POLICIES.len()], 1 + rec[3] as usize % 99),
             "affinity" => {
                 // b's low bits pick the allowed test CPUs; at least one
                 let mut cpus: Vec<String> = (0..test_cpus).filter(|i| b >> i & 1 == 1).map(|i| (i + 1).to_string()).collect();

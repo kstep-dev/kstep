@@ -328,7 +328,7 @@ int kstep_cgroup_create(const char *name) {
 void kstep_cgroup_destroy(const char *name) {
   char path[MAX_PATH_LENGTH] = {0};
   struct cgroup *cgrp;
-  struct cgroup_subsys_state *css = NULL;
+  struct cgroup_subsys_state *css;
   struct task_group *tg = NULL;
   typedef void(unregister_fair_sched_group_type)(struct task_group *tg);
   KSYM_IMPORT_TYPED(unregister_fair_sched_group_type,
@@ -348,6 +348,7 @@ void kstep_cgroup_destroy(const char *name) {
   rcu_read_lock();
   css = rcu_dereference(cgrp->subsys[cpu_cgrp_id]);
   if (css)
+// css_tg() is private to core.c before 6.12, when sched_ext moved it into sched.h
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
     tg = css_tg(css);
 #else

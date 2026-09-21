@@ -19,7 +19,7 @@ static void setup(void) {
 static void run(void) {
   kstep_cgroup_create("g0");
   kstep_cgroup_move_task("g0", target_task->pid);
-  kstep_task_set_nice(other_task, 19);
+  kstep_task_set_fair(other_task, SCHED_NORMAL, 19);
 
   kstep_task_wakeup(other_task);
   kstep_task_wakeup(target_task);

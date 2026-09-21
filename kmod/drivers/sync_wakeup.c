@@ -21,11 +21,11 @@ static void setup(void) {
   wakee = kstep_task_create();
 
   // Waker on CPU 1, where it will issue the sync wakeup.
-  kstep_task_pin(waker, 1, 1);
+  kstep_task_set_affinity(waker, "1");
 
   // Wakee waits, first restricted to CPU 2 so its wake_cpu is 2
   // (prev_cpu != this_cpu inside the wakeup), then allowed on CPUs 1-2.
-  kstep_task_pin(wakee, 2, 2);
+  kstep_task_set_affinity(wakee, "2");
 }
 
 static void *is_ineligible(void) {
@@ -35,11 +35,11 @@ static void *is_ineligible(void) {
 }
 
 static void run(void) {
-  kstep_task_pin(other, 1, 1);
+  kstep_task_set_affinity(other, "1");
   kstep_task_wakeup(other);
   kstep_task_wakeup(waker);
 
-  kstep_task_pin(wakee, 1, 2);
+  kstep_task_set_affinity(wakee, "1-2");
   kstep_task_wakeup(wakee);
   kstep_task_chan_read(wakee);
 

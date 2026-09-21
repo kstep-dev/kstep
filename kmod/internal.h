@@ -20,6 +20,9 @@
 // The test CPUs: every online CPU but 0, which is kstep's controller and runs no session task.
 #define for_each_test_cpu(cpu) for (int cpu = 1, _ncpus = num_online_cpus(); cpu < _ncpus; cpu++)
 
+// cpu.c
+bool kstep_parse_cpus(const char *list, struct cpumask *mask); // a nonempty cpulist of test CPUs
+
 // main.c
 extern struct kstep_driver *kstep_driver;
 

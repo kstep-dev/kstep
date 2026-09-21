@@ -76,7 +76,7 @@ static void run(void)
 {
   // Pin all tasks to CPU 1 and wake them up
   for (int i = 0; i < NUM_TASKS; i++) {
-    kstep_task_pin(tasks[i], 1, 1);
+    kstep_task_set_affinity(tasks[i], "1");
     kstep_task_wakeup(tasks[i]);
   }
 

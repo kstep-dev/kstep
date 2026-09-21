@@ -11,7 +11,7 @@ static void setup(void) {
 
 static void run(void) {
   kstep_sysctl_write("kernel.sched_rt_runtime_us", "%d", -1);
-  kstep_task_set_policy(rt, SCHED_FIFO);
+  kstep_task_set_rt(rt, SCHED_FIFO, 80);
   kstep_task_wakeup(rt);
   kstep_sysctl_write("kernel.sched_rt_runtime_us", "%d", 950000);
   kstep_tick_repeat(1501);

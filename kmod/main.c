@@ -29,8 +29,9 @@ static int __init kstep_main(void) {
   kstep_task_init();
   kstep_cgroup_init();
   kstep_trace_init(); // the group-alloc hook also sets min_vruntime
+  kstep_topo_set(""); // CPU 0 isolated from the test CPUs' sched domains (cpu.c)
   kstep_driver->setup();
-  kstep_cpu_print();
+  kstep_topo_print();
 
   // Control timer ticks and clock
   kstep_tick_init();

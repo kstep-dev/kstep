@@ -17,25 +17,129 @@ phys_addr_t kstep_shm_init(void) {
   if (!shm)
     panic("Failed to allocate the shared region");
   // The shape, written once: it is a property of the build, not of any command.
+#define TABLE(field, cap) { .max = (cap), .off = offsetof(struct kstep_shm, field), .stride = sizeof(shm->field[0]) }
   shm->hdr = (struct kstep_shm_hdr){
       .magic = KSTEP_SHM_MAGIC,
       .layout = KSTEP_SHM_LAYOUT,
-      .cpu_off = offsetof(struct kstep_shm, cpu),
-      .cpu_stride = sizeof(struct kstep_shm_cpu),
-      .task_off = offsetof(struct kstep_shm, task),
-      .task_stride = sizeof(struct kstep_shm_task),
-      .cgroup_off = offsetof(struct kstep_shm, cgroup),
-      .cgroup_stride = sizeof(struct kstep_shm_cgroup),
-      .domain_off = offsetof(struct kstep_shm, domain),
-      .domain_stride = sizeof(struct kstep_shm_domain),
-      .max_cpus = KSTEP_SHM_CPUS,
-      .max_tasks = KSTEP_SHM_TASKS,
-      .max_cgroups = KSTEP_SHM_CGROUPS,
-      .max_domains = KSTEP_SHM_DOMAINS,
+      .table = {
+          [KSTEP_TBL_CPU] = TABLE(cpu, KSTEP_SHM_CPUS),
+          [KSTEP_TBL_TASK] = TABLE(task, KSTEP_SHM_TASKS),
+          [KSTEP_TBL_CGROUP] = TABLE(cgroup, KSTEP_SHM_CGROUPS),
+          [KSTEP_TBL_ENTITY] = TABLE(entity, KSTEP_SHM_ENTITIES),
+          [KSTEP_TBL_DOMAIN] = TABLE(domain, KSTEP_SHM_DOMAINS),
+      },
       .max_groups = KSTEP_SHM_GROUPS,
       .group_stride = sizeof(struct kstep_shm_group),
   };
+#undef TABLE
   return virt_to_phys(shm);
+}
+
+// The block both tables share, read straight off the entity and its queue. Eligibility, the pick
+// and curr are the kernel's own answers -- entity_eligible, pick_eevdf, cfs_rq->curr -- so the
+// page shows what the scheduler would do rather than a re-derivation of it. pick_eevdf is inlined
+// into __pick_eevdf(cfs_rq, protect) from 6.16, where protect is RUN_TO_PARITY's guard of curr.
+#ifdef CONFIG_FAIR_GROUP_SCHED
+#define parent_entity(se) ((se)->parent)
+#else
+#define parent_entity(se) ((struct sched_entity *)NULL)
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+// EEVDF's pick: __pick_eevdf(cfs_rq, protect) from 6.13, pick_eevdf(cfs_rq) before it.
+static struct sched_entity *shm_pick(struct cfs_rq *cfs_rq) {
+  static struct sched_entity *(*pick2)(struct cfs_rq *, bool);
+  static struct sched_entity *(*pick1)(struct cfs_rq *);
+  static bool looked_up;
+
+  if (!looked_up) {
+    pick2 = kstep_ksym_lookup("__pick_eevdf");
+    pick1 = pick2 ? NULL : kstep_ksym_lookup("pick_eevdf");
+    looked_up = true;
+  }
+  return pick2 ? pick2(cfs_rq, true) : pick1 ? pick1(cfs_rq) : NULL;
+}
+#endif
+
+static struct kstep_shm_se shm_se(struct sched_entity *se) {
+  struct cfs_rq *cfs_rq = cfs_rq_of(se);
+  struct kstep_shm_se out = {
+      .weight = scale_load_down(se->load.weight),
+      .sum_exec_runtime = se->sum_exec_runtime,
+      .vruntime = se->vruntime,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+      .deadline = se->deadline,
+      .slice = se->slice,
+#endif
+  };
+
+  if (se->on_rq)
+    out.flags |= KSTEP_SE_ON_RQ;
+  if (cfs_rq->curr == se)
+    out.flags |= KSTEP_SE_CURR;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+  if (se->sched_delayed)
+    out.flags |= KSTEP_SE_DELAYED;
+#endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0) // EEVDF: eligibility, lag and the pick
+  {
+    KSYM_IMPORT(avg_vruntime); // fair.c's, the same average entity_eligible tests against
+    out.lag = se->on_rq ? (s64)KSYM_avg_vruntime(cfs_rq) - (s64)se->vruntime : se->vlag;
+  }
+  if (se->on_rq && kstep_eligible(se))
+    out.flags |= KSTEP_SE_ELIGIBLE;
+  if (se->on_rq && shm_pick(cfs_rq) == se)
+    out.flags |= KSTEP_SE_PICK;
+#endif
+  // the share of the CPU: at each level this entity's weight over everything queued there,
+  // multiplied up to the root; 0 when not queued, since a queue's total counts only what is on it
+  if (se->on_rq) {
+    u64 share = 1024;
+
+    for (struct sched_entity *s = se; s; s = parent_entity(s)) {
+      struct cfs_rq *q = cfs_rq_of(s);
+      share = q->load.weight ? div64_u64(share * s->load.weight, q->load.weight) : 0;
+    }
+    out.share = share;
+  }
+  return out;
+}
+
+// The cgroup's group entities, one record per test CPU, appended to `ents` -- the level the pick
+// happens at, which nothing else reports: a task's own counters are kept in its group's queue, so
+// four equal tasks split two cgroups' halves without anything in the task table saying why. The
+// cpu controller's css is taken from the cgroup rather than the walk's, which is cgroup->self.
+// Called under RCU, from a walk that runs before the seqlock is taken; the entities are stable
+// because the isolated CPUs are held for the whole command.
+static void shm_group_entities(u32 cgroup, struct cgroup *cgrp, struct kstep_shm_entity *ents, u32 *nents) {
+#ifdef CONFIG_FAIR_GROUP_SCHED
+  struct cgroup_subsys_state *css = rcu_dereference(cgrp->subsys[cpu_cgrp_id]);
+  struct task_group *tg;
+
+  if (!css)
+    return;
+// css_tg() is private to core.c before 6.12, when sched_ext moved it into sched.h
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
+  tg = css_tg(css);
+#else
+  tg = container_of(css, struct task_group, css);
+#endif
+  if (!tg->parent) // the root task group owns no entity: its cfs_rq is the runqueue's own
+    return;
+  for_each_test_cpu(cpu) {
+    struct sched_entity *se = tg->se[cpu];
+    struct kstep_shm_entity *e = &ents[*nents];
+
+    if (!se || *nents == KSTEP_SHM_ENTITIES)
+      continue;
+    *e = (struct kstep_shm_entity){
+        .cgroup = cgroup,
+        .cpu = cpu,
+        .se = shm_se(se),
+    };
+    (*nents)++;
+  }
+#endif
 }
 
 // The cgroups: the root and every live cgroup under it, in tree order, collected into `out`.
@@ -44,11 +148,12 @@ phys_addr_t kstep_shm_init(void) {
 // values -- the cpu controller's weight could come from the task_group, but a cpuset's effective
 // mask lives in struct cpuset, which is private to kernel/cgroup/cpuset.c. A cgroup with no cpu
 // controller (the root among them, which has no cpu.weight) keeps weight 0.
-static u32 shm_collect_cgroups(struct kstep_shm_cgroup *out) {
+static u32 shm_collect_cgroups(struct kstep_shm_cgroup *out, struct kstep_shm_entity *ents, u32 *nents) {
   struct cgroup_subsys_state *pos;
   struct cgroup *root;
   u32 n = 0;
 
+  *nents = 0;
   root = cgroup_get_from_path("/");
   if (IS_ERR(root))
     return 0;
@@ -61,6 +166,7 @@ static u32 shm_collect_cgroups(struct kstep_shm_cgroup *out) {
     memset(&out[n], 0, sizeof(out[n]));
     if (cgroup_path(pos->cgroup, out[n].path, sizeof(out[n].path)) < 0)
       continue; // a path that does not fit is one no kSTEP driver made
+    shm_group_entities(n, pos->cgroup, ents, nents);
     n++;
   }
   rcu_read_unlock();
@@ -137,7 +243,9 @@ static u32 shm_collect_domains(struct kstep_shm_domain *out, u32 ncpus) {
 void kstep_shm_update(struct task_struct **tasks, int ntasks) {
   u32 ncpus = min_t(u32, num_online_cpus() - 1, KSTEP_SHM_CPUS), nt = 0; // nt: table entries written
   struct kstep_shm_cgroup cgroups[KSTEP_SHM_CGROUPS];
-  u32 ncgroups = shm_collect_cgroups(cgroups); // sleeps: outside the seqlock, where a reader spins
+  static struct kstep_shm_entity entities[KSTEP_SHM_ENTITIES]; // 32 KB: not for the stack
+  u32 nentities;
+  u32 ncgroups = shm_collect_cgroups(cgroups, entities, &nentities); // sleeps: outside the seqlock, where a reader spins
 
   WRITE_ONCE(shm->hdr.gen, shm->hdr.gen + 1); // odd: updating
   smp_wmb();
@@ -178,19 +286,12 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
   for (int i = 0; i < ntasks && nt < KSTEP_SHM_TASKS; i++) {
     struct task_struct *p = tasks[i];
     struct kstep_shm_task *t = &shm->task[nt];
+    char path[sizeof(cgroups[0].path)];
     unsigned int st;
-    u32 flags = 0;
 
     if (p->exit_state)
       continue;
     st = READ_ONCE(p->__state);
-    // EEVDF: eligible = vruntime <= the queue's average; delayed = kept on the queue until eligible
-    if (p->se.on_rq && kstep_eligible(&p->se))
-      flags |= KSTEP_TASK_ELIGIBLE;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
-    if (p->se.sched_delayed)
-      flags |= KSTEP_TASK_DELAYED;
-#endif
     *t = (struct kstep_shm_task){
         .task = i + 1,
         .state = p->on_cpu ? KSTEP_TASK_RUNNING
@@ -200,28 +301,30 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
         .cpu = task_cpu(p),
         .policy = p->policy,
         .nice = task_nice(p),
-        .flags = flags,
+        .rt_priority = p->rt_priority,
         .cpus = cpumask_bits(p->cpus_ptr)[0],
-        .weight = p->se.load.weight,
-        .sum_exec_runtime = p->se.sum_exec_runtime,
-        .vruntime = p->se.vruntime,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-        .deadline = p->se.deadline,
-        .slice = p->se.slice,
-#endif
+        .se = shm_se(&p->se),
     };
+    // the cgroup by its row in the table walked above; a task in one the walk did not fit is
+    // reported as the root's, which is where the tree draws what it cannot place
     rcu_read_lock();
-    if (cgroup_path(task_dfl_cgroup(p), t->cgroup, sizeof(t->cgroup)) < 0)
-      strscpy(t->cgroup, "?", sizeof(t->cgroup));
+    if (cgroup_path(task_dfl_cgroup(p), path, sizeof(path)) >= 0)
+      for (u32 g = 0; g < ncgroups; g++)
+        if (!strcmp(cgroups[g].path, path)) {
+          t->cgroup = g;
+          break;
+        }
     rcu_read_unlock();
     nt++;
   }
   memcpy(shm->cgroup, cgroups, ncgroups * sizeof(*cgroups));
+  memcpy(shm->entity, entities, nentities * sizeof(*entities));
   shm->hdr.timestamp = kstep_jiffies_get();
-  shm->hdr.ncpus = ncpus;
-  shm->hdr.ntasks = nt;
-  shm->hdr.ncgroups = ncgroups;
-  shm->hdr.ndomains = shm_collect_domains(shm->domain, ncpus);
+  shm->hdr.table[KSTEP_TBL_CPU].n = ncpus;
+  shm->hdr.table[KSTEP_TBL_TASK].n = nt;
+  shm->hdr.table[KSTEP_TBL_CGROUP].n = ncgroups;
+  shm->hdr.table[KSTEP_TBL_ENTITY].n = nentities;
+  shm->hdr.table[KSTEP_TBL_DOMAIN].n = shm_collect_domains(shm->domain, ncpus);
   smp_wmb();
   WRITE_ONCE(shm->hdr.gen, shm->hdr.gen + 1); // even: consistent
 }
