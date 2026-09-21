@@ -1,4 +1,5 @@
 #include <linux/ftrace.h>
+#include <linux/kallsyms.h>
 
 #include "event.h"
 #include "internal.h"
@@ -42,8 +43,9 @@ static struct ftrace_ops kstep_ftrace_ops = {
 // an observer that arrives mid-session (the `check` verb enabling a rule) arm what it needs: the
 // entry is published before the filter, so a callback can never find the table short of its ip.
 static void kstep_hook(const char *name, ftrace_func_t func) {
-  KSYM_IMPORT(ftrace_location);
-  unsigned long addr, ip;
+  KSYM_IMPORT(ftrace_location_range);
+  KSYM_IMPORT(kallsyms_lookup_size_offset);
+  unsigned long addr, ip, size = 0, offset;
 
   for (int i = 0; i < kstep_nhooks; i++)
     if (!strcmp(kstep_hooks[i].name, name))
@@ -51,13 +53,17 @@ static void kstep_hook(const char *name, ftrace_func_t func) {
   if (WARN_ON(kstep_nhooks == ARRAY_SIZE(kstep_hooks)))
     return;
 
+  // The traced ip is not the entry: on arm64 it is the second patchable nop, entry + 4. Before
+  // 5.19 ftrace_location() is an exact match, so find the record anywhere in the function.
   addr = (unsigned long)kstep_ksym_lookup(name);
-  ip = addr ? KSYM_ftrace_location(addr) : 0;
+  if (addr && !KSYM_kallsyms_lookup_size_offset(addr, &size, &offset))
+    size = 0;
+  ip = size ? KSYM_ftrace_location_range(addr, addr + size - 1) : 0;
   if (!ip)
     panic("Cannot trace %s", name);
   kstep_hooks[kstep_nhooks] = (struct kstep_hook){name, func, ip};
   smp_store_release(&kstep_nhooks, kstep_nhooks + 1);
-  if (ftrace_set_filter_ip(&kstep_ftrace_ops, addr, 0, 0))
+  if (ftrace_set_filter_ip(&kstep_ftrace_ops, ip, 0, 0))
     panic("Failed to set filter for %s", name);
   TRACE_INFO("Traced %s", name);
 }
