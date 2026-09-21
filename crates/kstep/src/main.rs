@@ -1,5 +1,5 @@
-//! The `kstep` binary: checkout, build, run, reproduce, web. Fuzzing is the separate
-//! `kstep-fuzz` binary so this one never compiles LibAFL.
+//! The `kstep` binary: checkout, build, run, reproduce, web. The fuzzer is a second binary in
+//! this package behind the `fuzz` feature, so this one never compiles LibAFL.
 
 use anyhow::{bail, Result};
 use clap::Parser;
