@@ -294,7 +294,7 @@ fn deploy(version: &str) -> Result<()> {
         &mut cmd(node.to_str().unwrap(), [website().join("pagetest.mjs")]),
         None,
     )
-    .context("deploy aborted: site/playground.mjs failed its checks")?;
+    .context("deploy aborted: site/viz.mjs failed its checks")?;
     run(
         cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
             .arg(website().join("run.mjs"))
