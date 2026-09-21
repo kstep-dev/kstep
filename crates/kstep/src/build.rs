@@ -1,6 +1,7 @@
 //! Configure and build Linux, then the kmod, the static user binary and the initramfs. Native
-//! only: the target is the host arch. Dependency tracking is kbuild's, except that every kernel
-//! build drops the kmod mirror (kbuild does not rebuild an external module after a reconfig).
+//! only: the target is the host arch. Dependency tracking is kbuild's, except that a kernel build
+//! producing a new image drops the kmod mirror (kbuild does not rebuild an external module after
+//! a reconfig).
 
 use std::fs;
 use std::io::Write;
@@ -114,7 +115,7 @@ impl Build {
     }
 
     /// Configure (unless told not to and a .config exists) and build the kernel; the image and
-    /// vmlinux are copied out, and the kmod mirror dropped for the next `build_kstep`.
+    /// vmlinux are copied out, and if the image changed the kmod mirror is dropped.
     pub fn build_linux(
         &self,
         extra_config: Option<&Path>,
@@ -134,11 +135,18 @@ impl Build {
             "all",
             "compile_commands.json",
         ]);
+        let image = self.linux().join(ARCH.kernel_image());
+        let mtime = |p: &Path| fs::metadata(p).and_then(|m| m.modified()).ok();
+        let before = mtime(&image);
         run(&mut make, log)?;
         // fs::copy gives a fresh mtime, which kernel_stale compares with the .config's
-        fs::copy(self.linux().join(ARCH.kernel_image()), self.kernel())?;
+        fs::copy(&image, self.kernel())?;
         fs::copy(self.linux().join("vmlinux"), self.dir().join("vmlinux"))?;
-        let _ = fs::remove_dir_all(self.kmod_dir());
+        // A new kernel invalidates the module's objects, which kbuild would not notice; a make
+        // that had nothing to do leaves them.
+        if mtime(&image) != before {
+            let _ = fs::remove_dir_all(self.kmod_dir());
+        }
         Ok(())
     }
 

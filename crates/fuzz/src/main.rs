@@ -104,7 +104,7 @@ fn decode(bytes: &[u8], bug: &Bug) -> Vec<String> {
     }
 
     let verbs = &bug.fuzz.verbs;
-    for rec in bytes.chunks_exact(4).take(MAX_RECORDS) {
+    for rec in bytes.as_chunks::<4>().0.iter().take(MAX_RECORDS) {
         let (index, a, b) = (
             rec[0] as usize % (VERBS.len() + verbs.len()),
             rec[1] as usize,
