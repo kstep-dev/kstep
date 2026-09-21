@@ -8,3 +8,6 @@ __pycache__
 build/
 fuzzer/target
 fuzzer/out
+
+# Rust
+/target
