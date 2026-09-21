@@ -18,5 +18,7 @@ PACKAGES=(
 sudo apt update
 sudo apt install -y "${PACKAGES[@]}"
 
+# Install Rust
+command -v cargo >/dev/null || curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
 # Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
+command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh

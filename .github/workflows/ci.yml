@@ -34,15 +34,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: kstep
+      - name: Build
+        run: cargo build --workspace --release --locked
       - name: Format
         run: cargo fmt --all --check
       - name: Lint
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        run: cargo clippy --workspace --all-targets --release --locked -- -D warnings
       - name: Test
-        run: cargo test --workspace --locked
+        run: cargo test --workspace --release --locked
 
   test:
-    needs: deps
+    needs: [deps, rust]
     name: ${{ matrix.fuzz && 'Fuzz' || 'Run' }} ${{ matrix.version }} (${{ matrix.arm && 'aarch64' || 'x86_64' }})
     strategy:
       matrix:
@@ -61,6 +65,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: kstep
+          save-if: false
+
+      - name: Build kstep CLI
+        run: cargo build --release --locked -p kstep
 
       - name: Install deps
         uses: ./.github/actions/apt-deps
