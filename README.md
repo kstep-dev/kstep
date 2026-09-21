@@ -21,7 +21,7 @@ git clone --recurse-submodules https://github.com/kstep-dev/kstep && cd kstep
 
 ```sh
 # 💾 Install dependencies
-./install_deps.sh
+./setup.sh
 ```
 
 ```sh
