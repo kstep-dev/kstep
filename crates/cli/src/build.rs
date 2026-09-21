@@ -1,23 +1,21 @@
-//! `kstep build`: what `make.py` did.
-
 use std::path::PathBuf;
 
 use anyhow::Result;
-use clap::{Args, Subcommand};
+use clap::Subcommand;
 use kstep_build::{build, Build};
 
-#[derive(Args)]
-pub struct BuildArgs {
-    /// dir under build/ (default: build/current)
+#[derive(clap::Args)]
+pub struct Args {
+    /// Dir under build/ (default: build/current)
     #[arg(long = "build", value_name = "NAME")]
     name: Option<String>,
     #[command(subcommand)]
-    cmd: Option<BuildCmd>,
+    cmd: Option<Cmd>,
 }
 
 #[derive(Subcommand)]
-enum BuildCmd {
-    /// Build kmod, user, and rootfs.cpio (and the kernel if missing) [default]
+enum Cmd {
+    /// kmod + user + rootfs.cpio, and the kernel if missing [default]
     Kstep,
     /// Configure and build the kernel
     Linux {
@@ -33,12 +31,12 @@ enum BuildCmd {
     },
 }
 
-pub fn main(args: BuildArgs) -> Result<()> {
-    let b = Build::new(args.name.as_deref())?;
+pub fn main(a: Args) -> Result<()> {
+    let b = Build::new(a.name.as_deref())?;
     eprintln!("======= BUILD: {} =======", b.name);
-    match args.cmd.unwrap_or(BuildCmd::Kstep) {
-        BuildCmd::Kstep => build::build_kstep(&b),
-        BuildCmd::Linux { config } => build::build_linux(&b, config.as_deref(), true, None),
-        BuildCmd::Clean { all } => build::clean(&b, all),
+    match a.cmd.unwrap_or(Cmd::Kstep) {
+        Cmd::Kstep => build::build_kstep(&b),
+        Cmd::Linux { config } => build::build_linux(&b, config.as_deref(), true, None),
+        Cmd::Clean { all } => build::clean(&b, all),
     }
 }

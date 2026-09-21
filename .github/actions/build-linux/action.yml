@@ -25,6 +25,6 @@ runs:
       shell: bash
       # `clean --all` drops the kbuild objects before caching; the image and Module.symvers survive it
       run: |
-        ./checkout.py ${{ inputs.version }} --tar
-        ./make.py --build ${{ inputs.version }} linux ${{ inputs.cov == 'true' && '--config linux/config.kstep.cov' || '' }}
-        ./make.py --build ${{ inputs.version }} clean --all
+        ./kstep.sh checkout ${{ inputs.version }}
+        ./kstep.sh build --build ${{ inputs.version }} linux ${{ inputs.cov == 'true' && '--config linux/config.kstep.cov' || '' }}
+        ./kstep.sh build --build ${{ inputs.version }} clean --all

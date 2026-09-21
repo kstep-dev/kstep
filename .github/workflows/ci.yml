@@ -60,6 +60,7 @@ jobs:
     runs-on: ${{ matrix.arm && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     steps:
       - uses: actions/checkout@v6
+      - uses: Swatinem/rust-cache@v2
 
       - name: Install deps
         uses: ./.github/actions/apt-deps
@@ -74,7 +75,7 @@ jobs:
           cov: ${{ matrix.fuzz }}
 
       - name: Build kSTEP
-        run: ./make.py --build ${{ matrix.version }} kstep
+        run: ./kstep.sh build --build ${{ matrix.version }}
 
       - name: "[Run] Execute driver"
         if: ${{ ! matrix.fuzz }}

@@ -1,0 +1,11 @@
+[package]
+name = "kstep-build"
+description = "kSTEP's kernel checkout and build steps: git worktrees or tarballs, kconfig fragments, the kmod, the user binary and the initramfs. Host tooling only; never part of the wasm build"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+kstep-core = { path = "../core" }
+anyhow = "1"
