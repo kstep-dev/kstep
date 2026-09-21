@@ -8,22 +8,35 @@ use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
+use kstep_core::qemu::ARCH;
 
 use crate::cmd::{cmd, run};
-use crate::{build_curr_dir, build_dir};
+use crate::{build_dir, proj_dir};
 
-pub const ARCH: &str = std::env::consts::ARCH;
-
-/// The image QEMU boots, relative to the kernel tree.
-#[cfg(target_arch = "x86_64")]
-pub const KERNEL_IMAGE: &str = "arch/x86/boot/bzImage";
-#[cfg(target_arch = "aarch64")]
-pub const KERNEL_IMAGE: &str = "arch/arm64/boot/Image";
-
-/// One `build/<name>/` directory.
+/// One `build/<name>/` directory: a kernel tree and what kSTEP builds against it.
 #[derive(Clone, Debug)]
 pub struct Build {
     pub name: String,
+}
+
+/// The static user binary, shared by all builds.
+pub fn user_bin() -> PathBuf {
+    build_dir().join("user")
+}
+
+fn jobs() -> String {
+    format!(
+        "-j{}",
+        std::thread::available_parallelism().map_or(1, |n| n.get())
+    )
+}
+
+fn append_once(path: &Path, line: &str) -> Result<()> {
+    let text = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    if !text.lines().any(|l| l == line) {
+        writeln!(fs::OpenOptions::new().append(true).open(path)?, "{line}")?;
+    }
+    Ok(())
 }
 
 impl Build {
@@ -32,7 +45,7 @@ impl Build {
         let name = match name {
             Some(n) => n.to_string(),
             None => {
-                let cur = fs::read_link(build_curr_dir())
+                let cur = fs::read_link(build_dir().join("current"))
                     .context("no build/current; run `kstep checkout`")?;
                 cur.file_name().unwrap().to_string_lossy().into_owned()
             }
@@ -54,162 +67,171 @@ impl Build {
     pub fn linux(&self) -> PathBuf {
         self.dir().join("linux")
     }
-    pub fn config(&self) -> PathBuf {
-        self.linux().join(".config")
-    }
     pub fn kernel(&self) -> PathBuf {
         self.dir().join("kernel")
-    }
-    /// Symlink mirror of `kmod/`: kbuild puts objects next to sources.
-    pub fn kmod_dir(&self) -> PathBuf {
-        self.dir().join("kmod")
-    }
-    pub fn kmod(&self) -> PathBuf {
-        self.kmod_dir().join("kmod.ko")
     }
     pub fn rootfs(&self) -> PathBuf {
         self.dir().join("rootfs.cpio")
     }
-}
-
-/// The static user binary, shared by all builds.
-pub fn user_bin() -> PathBuf {
-    build_dir().join("user")
-}
-
-fn src(sub: &str) -> PathBuf {
-    crate::proj_dir().join(sub)
-}
-
-fn jobs() -> String {
-    format!(
-        "-j{}",
-        std::thread::available_parallelism().map_or(1, |n| n.get())
-    )
-}
-
-fn append_once(path: &Path, line: &str) -> Result<()> {
-    let text = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
-    if !text.lines().any(|l| l == line) {
-        writeln!(fs::OpenOptions::new().append(true).open(path)?, "{line}")?;
+    fn config(&self) -> PathBuf {
+        self.linux().join(".config")
     }
-    Ok(())
-}
+    /// Symlink mirror of `kmod/`: kbuild puts objects next to sources.
+    fn kmod_dir(&self) -> PathBuf {
+        self.dir().join("kmod")
+    }
 
-/// Link the coverage files into `kernel/sched` and merge the config fragments.
-pub fn configure(b: &Build, extra_config: Option<&Path>, log: Option<&Path>) -> Result<()> {
-    let sched = b.linux().join("kernel/sched");
-    for f in ["cov.c", "Kconfig.kstep", "Makefile.kstep"] {
-        let link = sched.join(f);
-        if fs::symlink_metadata(&link).is_ok() {
-            fs::remove_file(&link)?;
+    /// Link the coverage files into `kernel/sched` and merge the config fragments.
+    fn configure(&self, extra_config: Option<&Path>, log: Option<&Path>) -> Result<()> {
+        let sched = self.linux().join("kernel/sched");
+        for f in ["cov.c", "Kconfig.kstep", "Makefile.kstep"] {
+            let link = sched.join(f);
+            if fs::symlink_metadata(&link).is_ok() {
+                fs::remove_file(&link)?;
+            }
+            symlink(proj_dir().join("linux").join(f), &link)?;
         }
-        symlink(src("linux").join(f), &link)?;
-    }
-    append_once(&sched.join("Makefile"), "include $(src)/Makefile.kstep")?;
-    append_once(
-        &b.linux().join("init/Kconfig"),
-        "source \"kernel/sched/Kconfig.kstep\"",
-    )?;
+        append_once(&sched.join("Makefile"), "include $(src)/Makefile.kstep")?;
+        append_once(
+            &self.linux().join("init/Kconfig"),
+            "source \"kernel/sched/Kconfig.kstep\"",
+        )?;
 
-    let mut fragments = vec![
-        src("linux/config.kstep"),
-        src(&format!("linux/config.kstep.{ARCH}")),
-    ];
-    if let Some(extra) = extra_config {
-        fragments.push(fs::canonicalize(extra)?);
+        let linux = proj_dir().join("linux");
+        let mut fragments = vec![
+            linux.join("config.kstep"),
+            linux.join(format!("config.kstep.{}", ARCH.name())),
+        ];
+        if let Some(extra) = extra_config {
+            fragments.push(fs::canonicalize(extra)?);
+        }
+        run(
+            cmd("./scripts/kconfig/merge_config.sh", ["-n"])
+                .args(fragments)
+                .current_dir(self.linux()),
+            log,
+        )
     }
-    run(
-        cmd("./scripts/kconfig/merge_config.sh", ["-n"])
-            .args(fragments)
-            .current_dir(b.linux()),
-        log,
-    )
-}
 
-pub fn build_linux(
-    b: &Build,
-    extra_config: Option<&Path>,
-    reconfigure: bool,
-    log: Option<&Path>,
-) -> Result<()> {
-    if reconfigure || !b.config().exists() {
-        configure(b, extra_config, log)?;
-    }
-    let mut make = cmd("make", ["-C"]);
-    make.arg(b.linux()).arg(jobs()).args([
-        "KBUILD_BUILD_TIMESTAMP=1970-01-01",
-        "KBUILD_BUILD_VERSION=1",
-        &format!("LOCALVERSION=-{}", b.name),
-        "WERROR=0",
-        "HOSTCFLAGS=-Wno-error",
-        "all",
-        "compile_commands.json",
-    ]);
-    run(&mut make, log)?;
-    // fs::copy gives a fresh mtime, which kernel_stale compares with the .config's
-    fs::copy(b.linux().join(KERNEL_IMAGE), b.kernel())?;
-    fs::copy(b.linux().join("vmlinux"), b.dir().join("vmlinux"))?;
-    let _ = fs::remove_dir_all(b.kmod_dir());
-    Ok(())
-}
-
-/// Never built, or the .config changed since.
-pub fn kernel_stale(b: &Build) -> bool {
-    let mtime = |p: PathBuf| fs::metadata(p).and_then(|m| m.modified()).ok();
-    match (
-        mtime(b.kernel()),
-        mtime(b.config()),
-        b.linux().join("Module.symvers").exists(),
-    ) {
-        (Some(kernel), Some(config), true) => kernel < config,
-        _ => true,
-    }
-}
-
-pub fn build_user() -> Result<()> {
-    let flags = [
-        "-Wall",
-        "-Wextra",
-        "-Wno-unused-parameter",
-        "-std=c99",
-        "-static",
-        "-o",
-    ];
-    run(
-        cmd("gcc", flags).arg(user_bin()).arg(src("user/user.c")),
-        None,
-    )
-}
-
-pub fn build_kmod(b: &Build) -> Result<()> {
-    let dir = b.kmod_dir();
-    fs::create_dir_all(&dir)?;
-    remove_symlinks(&dir)?;
-    let mut cp = cmd("cp", ["-rs"]);
-    for entry in fs::read_dir(src("kmod"))? {
-        cp.arg(entry?.path());
-    }
-    run(cp.arg(&dir), None)?;
-    let m = format!("M={}", dir.display());
-    run(
-        cmd("make", ["-C"]).arg(b.linux()).arg(jobs()).args([
-            &m,
-            "modules",
+    /// Configure (unless told not to and a .config exists) and build the kernel; the image and
+    /// vmlinux are copied out, and the kmod mirror dropped for the next `build_kstep`.
+    pub fn build_linux(
+        &self,
+        extra_config: Option<&Path>,
+        reconfigure: bool,
+        log: Option<&Path>,
+    ) -> Result<()> {
+        if reconfigure || !self.config().exists() {
+            self.configure(extra_config, log)?;
+        }
+        let mut make = cmd("make", ["-C"]);
+        make.arg(self.linux()).arg(jobs()).args([
+            "KBUILD_BUILD_TIMESTAMP=1970-01-01",
+            "KBUILD_BUILD_VERSION=1",
+            &format!("LOCALVERSION=-{}", self.name),
+            "WERROR=0",
+            "HOSTCFLAGS=-Wno-error",
+            "all",
             "compile_commands.json",
-        ]),
-        None,
-    )
+        ]);
+        run(&mut make, log)?;
+        // fs::copy gives a fresh mtime, which kernel_stale compares with the .config's
+        fs::copy(self.linux().join(ARCH.kernel_image()), self.kernel())?;
+        fs::copy(self.linux().join("vmlinux"), self.dir().join("vmlinux"))?;
+        let _ = fs::remove_dir_all(self.kmod_dir());
+        Ok(())
+    }
+
+    /// Never built, or the .config changed since.
+    fn kernel_stale(&self) -> bool {
+        let mtime = |p: PathBuf| fs::metadata(p).and_then(|m| m.modified()).ok();
+        match (
+            mtime(self.kernel()),
+            mtime(self.config()),
+            self.linux().join("Module.symvers").exists(),
+        ) {
+            (Some(kernel), Some(config), true) => kernel < config,
+            _ => true,
+        }
+    }
+
+    fn build_kmod(&self) -> Result<()> {
+        let dir = self.kmod_dir();
+        mirror(&proj_dir().join("kmod"), &dir)?;
+        let m = format!("M={}", dir.display());
+        run(
+            cmd("make", ["-C"]).arg(self.linux()).arg(jobs()).args([
+                &m,
+                "modules",
+                "compile_commands.json",
+            ]),
+            None,
+        )
+    }
+
+    /// rootfs.cpio: kmod.ko and user, as a newc archive of root-owned 0755 files (reproducible).
+    fn build_rootfs(&self) -> Result<()> {
+        let mut out = Vec::new();
+        for (name, path) in [
+            ("kmod.ko", self.kmod_dir().join("kmod.ko")),
+            ("user", user_bin()),
+        ] {
+            let mut data = fs::read(&path).with_context(|| format!("read {}", path.display()))?;
+            out.extend(cpio_header(name, data.len()));
+            pad4(&mut data);
+            out.extend(data);
+        }
+        out.extend(cpio_header("TRAILER!!!", 0));
+        Ok(fs::write(self.rootfs(), out)?)
+    }
+
+    /// What `kstep build` does: the kernel if it is stale (keeping its .config), then the rest.
+    pub fn build_kstep(&self) -> Result<()> {
+        if self.kernel_stale() {
+            eprintln!(
+                "build/{}: kernel missing or older than its .config, building Linux first",
+                self.name
+            );
+            self.build_linux(None, false, None)?;
+        }
+        let flags = [
+            "-Wall",
+            "-Wextra",
+            "-Wno-unused-parameter",
+            "-std=c99",
+            "-static",
+            "-o",
+        ];
+        run(
+            cmd("gcc", flags)
+                .arg(user_bin())
+                .arg(proj_dir().join("user/user.c")),
+            None,
+        )?;
+        self.build_kmod()?;
+        self.build_rootfs()
+    }
 }
 
-fn remove_symlinks(dir: &Path) -> Result<()> {
-    for entry in fs::read_dir(dir)? {
+/// `dst` gets a symlink to every file under `src`; stale symlinks in `dst` are dropped first.
+fn mirror(src: &Path, dst: &Path) -> Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(dst)? {
         let p = entry?.path();
         let ft = fs::symlink_metadata(&p)?.file_type();
         if ft.is_symlink() {
             fs::remove_file(&p)?;
         } else if ft.is_dir() {
-            remove_symlinks(&p)?;
+            mirror(&src.join(p.file_name().unwrap()), &p)?;
+        }
+    }
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let target = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            mirror(&entry.path(), &target)?;
+        } else if fs::symlink_metadata(&target).is_err() {
+            symlink(entry.path(), &target)?;
         }
     }
     Ok(())
@@ -219,8 +241,7 @@ fn pad4(data: &mut Vec<u8>) {
     data.resize(data.len().next_multiple_of(4), 0);
 }
 
-/// A newc header: every file a root-owned 0755 regular file, so the archive is reproducible.
-pub fn cpio_header(name: &str, size: usize) -> Vec<u8> {
+fn cpio_header(name: &str, size: usize) -> Vec<u8> {
     // ino, mode, uid, gid, nlink, mtime, filesize, devmajor, devminor, rdevmajor, rdevminor, namesize, check
     let fields = [0, 0o100755, 0, 0, 1, 0, size, 0, 0, 0, 0, name.len() + 1, 0];
     let mut out = b"070701".to_vec();
@@ -231,31 +252,6 @@ pub fn cpio_header(name: &str, size: usize) -> Vec<u8> {
     out.push(0);
     pad4(&mut out);
     out
-}
-
-pub fn build_rootfs(b: &Build) -> Result<()> {
-    let mut out = Vec::new();
-    for (name, path) in [("kmod.ko", b.kmod()), ("user", user_bin())] {
-        let mut data = fs::read(&path).with_context(|| format!("read {}", path.display()))?;
-        out.extend(cpio_header(name, data.len()));
-        pad4(&mut data);
-        out.extend(data);
-    }
-    out.extend(cpio_header("TRAILER!!!", 0));
-    Ok(fs::write(b.rootfs(), out)?)
-}
-
-pub fn build_kstep(b: &Build) -> Result<()> {
-    if kernel_stale(b) {
-        eprintln!(
-            "build/{}: kernel missing or older than its .config, building Linux first",
-            b.name
-        );
-        build_linux(b, None, false, None)?; // keep the existing .config
-    }
-    build_user()?;
-    build_kmod(b)?;
-    build_rootfs(b)
 }
 
 #[test]

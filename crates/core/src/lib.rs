@@ -1,5 +1,6 @@
 //! Shared by the `kstep` CLI, the fuzzer and (through wasm) the website: the shm decoder and the
-//! QEMU command line. No clap, no LibAFL, no file system beyond what QEMU needs.
+//! QEMU command line. No clap, no LibAFL.
 
 #[cfg(feature = "host")]
 pub mod qemu;
+pub mod shm;

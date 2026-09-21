@@ -1,118 +1,205 @@
+use std::io::{BufRead, IsTerminal, Write};
 use std::path::PathBuf;
+use std::time::Duration;
 
 use anyhow::{Context, Result};
-use kstep::bugs;
-use kstep::{build, Build, ResultDir};
+use kstep::{bugs, Build, ResultDir, Session};
 use kstep_core::qemu::{Accel, Boot, Console, Machine};
+use kstep_core::shm::State;
 
 /// Boot a driver under QEMU (building kSTEP first) and record the run under results/
 #[derive(clap::Args)]
 #[command(after_help = "Examples:
-  kstep run                               # the default driver on build/current
-  kstep run foo_buggy sync_wakeup         # a driver on another build
-  kstep run --bug freeze                  # freeze's driver and machine on build/freeze_buggy
-  kstep run freeze_fixed --bug freeze     # the same on the fixed kernel
-  kstep run v6.18 cli -- foo=1            # module parameters after --
-  kstep run --debug                       # start stopped with a gdb stub; then `kstep gdb`")]
+  kstep run                               # the cli driver on build/current: type commands, see the machine
+  kstep run freeze_buggy                  # a bug's build: its driver on its machine (bugs.yaml)
+  kstep run freeze_fixed cli              # the cli driver on that machine
+  echo 'create 2\\ntick 3' | kstep run     # a scripted cli session
+  kstep run -i findings/0001.cli          # the same, from a file
+  kstep run --debug                       # start stopped with a gdb stub; then `kstep gdb`
+
+With the cli driver, commands are read from stdin (kmod/cli.c lists them) and each reply is
+printed with the machine's state.")]
 pub struct Args {
-    /// Build under build/ (default: build/current, or <bug>_buggy with --bug)
+    /// Build under build/ (default: build/current). A bug's build, <bug>_buggy or <bug>_fixed,
+    /// brings the bug's driver and machine from bugs.yaml
     build: Option<String>,
-    /// Driver to run (kmod/drivers/*.c; default: `default`, or the bug's)
+    /// Driver to run (kmod/drivers/*.c; default: cli, or the bug's)
     driver: Option<String>,
-    /// Take the driver, machine and build from this bugs.yaml entry
-    #[arg(long, value_name = "BUG")]
-    bug: Option<String>,
     /// CPUs; 0 runs the driver, the rest are isolated for the test (default 2, or the bug's)
     #[arg(long, value_name = "N")]
     num_cpus: Option<u32>,
     /// Guest memory (default 512, or the bug's)
     #[arg(long, value_name = "MB")]
     mem_mb: Option<u32>,
-    /// Subdir under results/ (default: a timestamped tmp_* dir, linked as results/latest)
-    #[arg(short, long)]
-    label: Option<String>,
+    /// Output dir under results/ (default: a timestamped tmp_*, linked as results/latest)
+    #[arg(short, long, value_name = "NAME")]
+    out: Option<String>,
+    /// cli commands from this file instead of stdin
+    #[arg(short, long, value_name = "FILE")]
+    input: Option<PathBuf>,
     /// Start stopped, with the gdb stub on :1234
     #[arg(long)]
     debug: bool,
-    /// Back guest RAM with this shared file (the host reads kmod/shm.h out of it)
-    #[arg(long, value_name = "FILE")]
-    ram_file: Option<PathBuf>,
-    /// kSTEP module parameters, key=value
-    #[arg(last = true)]
-    params: Vec<String>,
 }
 
 fn is_driver(name: &str) -> bool {
     let kmod = kstep::proj_dir().join("kmod");
-    ["drivers", "drivers_generated"]
-        .iter()
-        .any(|d| kmod.join(d).join(format!("{name}.c")).is_file())
-        || name == "cli"
+    name == "cli"
+        || ["drivers", "drivers_generated"]
+            .iter()
+            .any(|d| kmod.join(d).join(format!("{name}.c")).is_file())
 }
 
 pub fn main(a: Args) -> Result<()> {
-    let bug = a.bug.as_deref().map(bugs::get).transpose()?;
-    let build_name = a
-        .build
-        .clone()
-        .or_else(|| bug.as_ref().map(|b| b.build_name("buggy")));
-    let b = Build::new(build_name.as_deref()).map_err(|e| match &a.build {
-        // a driver name in the build slot: say what was meant
+    let b = Build::new(a.build.as_deref()).map_err(|e| match &a.build {
         Some(name) if is_driver(name) => {
             e.context(format!("`{name}` is a driver: kstep run <build> {name}"))
         }
         _ => e,
     })?;
-    build::build_kstep(&b)?;
+    b.build_kstep()?;
+    let bug = bugs::for_build(&b.name)?;
 
     let mut machine = bug.as_ref().map_or_else(Machine::default, |b| b.machine());
-    if let Some(n) = a.num_cpus {
-        machine.num_cpus = n;
-    }
-    if let Some(m) = a.mem_mb {
-        machine.mem_mb = m;
-    }
+    machine.num_cpus = a.num_cpus.unwrap_or(machine.num_cpus);
+    machine.mem_mb = a.mem_mb.unwrap_or(machine.mem_mb);
     let driver = a
         .driver
         .or_else(|| bug.map(|b| b.name))
-        .unwrap_or_else(|| "default".into());
-    let results = ResultDir::create(a.label.as_deref(), true)?;
+        .unwrap_or_else(|| "cli".into());
+    let results = ResultDir::create(a.out.as_deref(), true)?;
     let accel = Accel::detect();
     if accel == Accel::Tcg && std::path::Path::new("/dev/kvm").exists() {
         eprintln!("/dev/kvm is not readable, using TCG (sudo chmod 666 /dev/kvm to use KVM)");
     }
+    let interactive =
+        a.input.is_none() && std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
+    let cli = driver == "cli";
     let boot = Boot {
         kernel: b.kernel(),
         rootfs: b.rootfs(),
         driver,
-        params: a.params,
         machine,
         log: results.log(),
         jsonl: results.jsonl(),
-        // the console on the terminal when there is one; in a script or CI, qemu.log alone
-        console: if unsafe { libc::isatty(0) == 1 && libc::isatty(1) == 1 } {
+        // the cli's terminal is ours; another driver's console goes to the terminal when there
+        // is one, and in a script or CI to qemu.log alone
+        console: if interactive && !cli {
             Console::Terminal
         } else {
             Console::Headless
         },
         accel,
         debug: a.debug,
-        ram_file: a.ram_file,
+        ram_file: None,
     };
     if a.debug {
         eprintln!(
-            "gdb stub on :1234, guest stopped; attach with `kstep gdb -b {}`",
+            "gdb stub on :1234, guest stopped; attach with `kstep gdb {}`",
             b.name
         );
     }
-    // ctrl-c belongs to the guest console (QEMU's mux has signal=off); ctrl-a x quits QEMU
-    unsafe { libc::signal(libc::SIGINT, libc::SIG_IGN) };
-    let status = kstep::cmd::status(&mut boot.command()).context("qemu")?;
-    println!("Results saved to {}", results.path().display());
-    if !status.success() {
-        anyhow::bail!("qemu exited with {status}");
+    if cli {
+        let input: Box<dyn BufRead> = match &a.input {
+            Some(f) => Box::new(std::io::BufReader::new(
+                std::fs::File::open(f).with_context(|| f.display().to_string())?,
+            )),
+            None => Box::new(std::io::stdin().lock()),
+        };
+        repl(&boot, input, interactive)?;
+    } else {
+        // ctrl-c belongs to the guest console (QEMU's mux has signal=off); ctrl-a x quits QEMU
+        unsafe { libc::signal(libc::SIGINT, libc::SIG_IGN) };
+        kstep::cmd::run(&mut boot.command(), None)
+            .with_context(|| format!("see {}", results.log().display()))?;
     }
+    println!("Results saved to {}", results.path().display());
     Ok(())
+}
+
+/// Drive the cli driver from stdin: each line is a command, answered with its reply and the
+/// machine's state.
+fn repl(boot: &Boot, mut input: Box<dyn BufRead>, interactive: bool) -> Result<()> {
+    let timeout = Duration::from_secs(if boot.debug { 3600 } else { 60 });
+    let mut s = Session::start(boot, timeout)?;
+    eprintln!(
+        "ready ({} CPUs, {} MB); `exit` or ^D ends the session",
+        boot.machine.num_cpus, boot.machine.mem_mb
+    );
+    let mut out = std::io::stdout().lock();
+    loop {
+        if interactive {
+            write!(out, "kstep> ")?;
+            out.flush()?;
+        }
+        let mut line = String::new();
+        if input.read_line(&mut line)? == 0 {
+            break;
+        }
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if line == "exit" {
+            break;
+        }
+        let r = s.cmd(line)?;
+        for e in &r.events {
+            writeln!(out, "  {e}")?;
+        }
+        writeln!(out, "{}", r.reply)?;
+        if r.error().is_none() {
+            write!(out, "{}", summary(&s.state()?))?;
+        }
+    }
+    s.exit()
+}
+
+/// The machine at a glance: each CPU, then each task, joined with its class's view.
+fn summary(st: &State) -> String {
+    let mut s = format!("[t={}]", st.timestamp);
+    for c in &st.cpus {
+        let fair = st.cfs.iter().find(|f| f.cpu == c.cpu);
+        let what = match (c.idle, c.current) {
+            (true, _) => "idle".to_string(),
+            (false, 0) => "other".to_string(),
+            (false, t) => format!("task {t}"),
+        };
+        s += &format!("  cpu{}: {what}, {} running", c.cpu, c.nr_running);
+        if let Some(f) = fair {
+            s += &format!(", util {}", f.util_avg);
+        }
+    }
+    s += "\n";
+    if !st.tasks.is_empty() {
+        s += &format!(
+            "  {:>4} {:<8} {:>3} {:<7} {:>4} {:>10} {:>12} {:>8}  {}\n",
+            "task", "state", "cpu", "policy", "nice", "exec(ms)", "vruntime", "lag", "cgroup"
+        );
+    }
+    for t in &st.tasks {
+        let policy = match t.policy {
+            "fifo" | "rr" => format!("{}:{}", t.policy, t.rt_priority),
+            p => p.to_string(),
+        };
+        let (vruntime, lag) = match st.entities.iter().find(|e| e.task == t.task) {
+            Some(e) => (e.vruntime.to_string(), e.lag.to_string()),
+            None => ("-".into(), "-".into()),
+        };
+        s += &format!(
+            "  {:>4} {:<8} {:>3} {:<7} {:>4} {:>10.1} {:>12} {:>8}  {}\n",
+            t.task,
+            t.state,
+            t.cpu,
+            policy,
+            t.nice,
+            t.sum_exec_runtime as f64 / 1e6,
+            vruntime,
+            lag,
+            t.cgroup
+        );
+    }
+    s
 }
 
 /// Attach gdb to a `kstep run --debug` guest

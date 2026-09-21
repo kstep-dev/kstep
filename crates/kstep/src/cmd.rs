@@ -21,7 +21,7 @@ fn quote(s: &OsStr) -> String {
 }
 
 /// The command as a shell would show it.
-pub fn display(cmd: &Command) -> String {
+fn display(cmd: &Command) -> String {
     let mut out = match cmd.get_current_dir() {
         Some(dir) => format!("cd {} && ", quote(dir.as_os_str())),
         None => String::new(),
@@ -42,13 +42,6 @@ where
     let mut c = Command::new(program);
     c.args(args);
     c
-}
-
-/// Echo and run, returning the exit status.
-pub fn status(cmd: &mut Command) -> Result<std::process::ExitStatus> {
-    let shown = display(cmd);
-    eprintln!("$ {BLUE}{shown}{RESET}");
-    cmd.status().with_context(|| format!("spawn `{shown}`"))
 }
 
 pub fn run(cmd: &mut Command, log: Option<&Path>) -> Result<()> {

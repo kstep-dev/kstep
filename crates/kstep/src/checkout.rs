@@ -6,13 +6,13 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
+use crate::build_dir;
 use crate::cmd::{cmd, run};
-use crate::{build_curr_dir, build_dir};
 
 pub const LINUX_MASTER_URL: &str = "https://github.com/gregkh/linux.git";
 
 /// Releases (`v6.14`, `6.14.2`) come from kernel.org's CDN, commits from GitHub.
-pub fn download_url(git_ref: &str) -> String {
+fn download_url(git_ref: &str) -> String {
     if git_ref.contains('.') {
         let ver = git_ref.strip_prefix('v').unwrap_or(git_ref);
         let major = ver.split('.').next().unwrap();
@@ -44,8 +44,8 @@ fn add_worktree(git_ref: &str, linux_dir: &Path) -> Result<()> {
     )
 }
 
-pub fn set_current_build(name: &str) -> Result<()> {
-    let current = build_curr_dir();
+fn set_current_build(name: &str) -> Result<()> {
+    let current = build_dir().join("current");
     fs::create_dir_all(build_dir())?;
     if fs::symlink_metadata(&current).is_ok() {
         fs::remove_file(&current)?;
@@ -54,7 +54,7 @@ pub fn set_current_build(name: &str) -> Result<()> {
         .with_context(|| format!("symlink {}", current.display()))
 }
 
-pub fn download(url: &str, output: &Path) -> Result<()> {
+fn download(url: &str, output: &Path) -> Result<()> {
     if output.exists() {
         return Ok(());
     }
@@ -62,7 +62,7 @@ pub fn download(url: &str, output: &Path) -> Result<()> {
     run(cmd("wget", ["--no-verbose", url, "-O"]).arg(output), None)
 }
 
-pub fn decompress(tarball: &Path, output_dir: &Path) -> Result<()> {
+fn decompress(tarball: &Path, output_dir: &Path) -> Result<()> {
     if output_dir.exists() {
         return Ok(());
     }
@@ -77,7 +77,7 @@ pub fn decompress(tarball: &Path, output_dir: &Path) -> Result<()> {
     )
 }
 
-pub fn patch_linux(linux_dir: &Path, patch: &Path) -> Result<()> {
+fn patch_linux(linux_dir: &Path, patch: &Path) -> Result<()> {
     let patch = fs::File::open(patch).with_context(|| format!("open {}", patch.display()))?;
     run(
         cmd("patch", ["-p1", "--forward", "--batch"])

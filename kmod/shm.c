@@ -5,6 +5,7 @@
 #include <linux/gfp.h>
 #include <linux/kstrtox.h>
 #include <linux/sched/rt.h>
+#include <linux/stddef.h>
 #include <linux/version.h>
 #include <asm/io.h>
 

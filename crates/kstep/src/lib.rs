@@ -6,10 +6,12 @@ pub mod build;
 pub mod checkout;
 pub mod cmd;
 pub mod results;
+pub mod session;
 
 pub use build::Build;
 pub use checkout::checkout;
 pub use results::ResultDir;
+pub use session::Session;
 
 use std::path::{Path, PathBuf};
 
@@ -27,11 +29,6 @@ pub fn proj_dir() -> PathBuf {
 
 pub fn build_dir() -> PathBuf {
     proj_dir().join("build")
-}
-
-/// The `build/current` symlink, set by `kstep checkout`.
-pub fn build_curr_dir() -> PathBuf {
-    build_dir().join("current")
 }
 
 #[test]

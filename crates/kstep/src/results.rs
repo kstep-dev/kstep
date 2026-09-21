@@ -1,4 +1,4 @@
-//! `results/<label>/`: one directory per run with fixed file names, `results/latest` pointing at
+//! `results/<name>/`: one directory per run with fixed file names, `results/latest` pointing at
 //! the newest ad-hoc one.
 
 use std::fs;
@@ -7,43 +7,37 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 
-pub fn results_dir() -> PathBuf {
+fn results_dir() -> PathBuf {
     crate::proj_dir().join("results")
 }
 
 #[derive(Debug, Clone)]
 pub struct ResultDir {
-    pub label: String,
+    pub name: String,
 }
 
 impl ResultDir {
-    pub fn new(label: &str) -> ResultDir {
-        ResultDir {
-            label: label.to_string(),
-        }
-    }
-
-    /// Create `results/<label>/`, `tmp_<timestamp>` without a label; with `set_latest`, point
+    /// Create `results/<name>/`, `tmp_<timestamp>` without a name; with `set_latest`, point
     /// `results/latest` at it.
-    pub fn create(label: Option<&str>, set_latest: bool) -> Result<ResultDir> {
-        let label = match label {
+    pub fn create(name: Option<&str>, set_latest: bool) -> Result<ResultDir> {
+        let name = match name {
             Some(l) => l.to_string(),
             None => chrono::Local::now().format("tmp_%Y%m%d_%H%M%S").to_string(),
         };
-        let r = ResultDir::new(&label);
+        let r = ResultDir { name };
         fs::create_dir_all(r.path())?;
         if set_latest {
             let latest = results_dir().join("latest");
             if fs::symlink_metadata(&latest).is_ok() {
                 fs::remove_file(&latest)?;
             }
-            symlink(&label, &latest)?;
+            symlink(&r.name, &latest)?;
         }
         Ok(r)
     }
 
     pub fn path(&self) -> PathBuf {
-        results_dir().join(&self.label)
+        results_dir().join(&self.name)
     }
     /// The kernel console
     pub fn log(&self) -> PathBuf {

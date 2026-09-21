@@ -1,9 +1,9 @@
 //! bugs.yaml: one entry per bug, the single place that records what a bug needs. The fields are
 //! documented at the top of that file.
 
-use std::fmt;
 use std::path::PathBuf;
 
+use anyhow::{bail, Context, Result};
 use indexmap::IndexMap;
 use serde::Deserialize;
 
@@ -67,16 +67,6 @@ pub struct Kernel {
     pub config: Option<PathBuf>,
 }
 
-#[derive(Debug)]
-pub struct Error(pub String);
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-impl std::error::Error for Error {}
-
 impl Bug {
     pub fn machine(&self) -> Machine {
         Machine {
@@ -86,7 +76,7 @@ impl Bug {
     }
 
     /// The buggy and the fixed kernel, from `fix` or from `ref` + `patch`.
-    pub fn kernels(&self) -> Result<[Kernel; 2], Error> {
+    pub fn kernels(&self) -> Result<[Kernel; 2]> {
         let kernel = |name, git_ref: String, patch| Kernel {
             name,
             git_ref,
@@ -105,10 +95,10 @@ impl Bug {
                     kernel("fixed", r.clone(), Some(patch)),
                 ])
             }
-            _ => Err(Error(format!(
+            _ => bail!(
                 "bug '{}': specify either 'fix' or 'ref' + 'patch'",
                 self.name
-            ))),
+            ),
         }
     }
 
@@ -118,12 +108,11 @@ impl Bug {
 }
 
 /// All bugs, in file order.
-pub fn load() -> Result<IndexMap<String, Bug>, Error> {
+pub fn load() -> Result<IndexMap<String, Bug>> {
     let path = crate::proj_dir().join("bugs.yaml");
-    let text =
-        std::fs::read_to_string(&path).map_err(|e| Error(format!("{}: {e}", path.display())))?;
+    let text = std::fs::read_to_string(&path).with_context(|| path.display().to_string())?;
     let raw: IndexMap<String, Option<Bug>> =
-        serde_yaml_ng::from_str(&text).map_err(|e| Error(format!("{}: {e}", path.display())))?;
+        serde_yaml_ng::from_str(&text).with_context(|| path.display().to_string())?;
     Ok(raw
         .into_iter()
         .map(|(name, bug)| {
@@ -134,15 +123,23 @@ pub fn load() -> Result<IndexMap<String, Bug>, Error> {
         .collect())
 }
 
+/// The bug a build belongs to: `<bug>_buggy` or `<bug>_fixed` with `<bug>` in bugs.yaml.
+pub fn for_build(build: &str) -> Result<Option<Bug>> {
+    let Some(name) = build
+        .strip_suffix("_buggy")
+        .or_else(|| build.strip_suffix("_fixed"))
+    else {
+        return Ok(None);
+    };
+    Ok(load()?.get(name).cloned())
+}
+
 /// One bug by name, with a message listing the choices when it is unknown.
-pub fn get(name: &str) -> Result<Bug, Error> {
+pub fn get(name: &str) -> Result<Bug> {
     let bugs = load()?;
-    bugs.get(name).cloned().ok_or_else(|| {
+    bugs.get(name).cloned().with_context(|| {
         let names: Vec<_> = bugs.keys().map(String::as_str).collect();
-        Error(format!(
-            "no bug '{name}' in bugs.yaml; known: {}",
-            names.join(", ")
-        ))
+        format!("no bug '{name}' in bugs.yaml; known: {}", names.join(", "))
     })
 }
 
@@ -167,6 +164,6 @@ mod tests {
             .unwrap()
             .ends_with("linux/sync_wakeup.patch"));
         assert!(bugs["vlag_overflow"].extra);
-        assert!(get("nope").unwrap_err().0.contains("sync_wakeup"));
+        assert!(get("nope").unwrap_err().to_string().contains("sync_wakeup"));
     }
 }

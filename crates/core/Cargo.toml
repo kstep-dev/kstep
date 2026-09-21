@@ -9,6 +9,9 @@ repository.workspace = true
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 
+[build-dependencies]
+bindgen = "0.72"
+
 [features]
 default = ["host"]
 # Everything but the shm decoder: the wasm build turns this off

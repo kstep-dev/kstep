@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use kstep::{build, Build};
+use kstep::Build;
 
 /// Build the kmod, the user binary and rootfs.cpio (and the kernel when needed)
 #[derive(clap::Args)]
@@ -28,7 +28,7 @@ pub struct Args {
 pub fn main(a: Args) -> Result<()> {
     let b = Build::new(a.name.as_deref())?;
     if a.linux || a.config.is_some() {
-        build::build_linux(&b, a.config.as_deref(), true, None)?;
+        b.build_linux(a.config.as_deref(), true, None)?;
     }
-    build::build_kstep(&b)
+    b.build_kstep()
 }

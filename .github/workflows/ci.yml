@@ -82,12 +82,12 @@ jobs:
       - name: Build kSTEP
         run: ./kstep.sh build ${{ matrix.version }}
 
-      - name: "[Run] Execute driver"
+      - name: "[Run] A cli session"
         if: ${{ ! matrix.fuzz }}
-        timeout-minutes: 1
-        run: ./kstep.sh run ${{ matrix.version }}
+        timeout-minutes: 2
+        run: printf 'create 2\ntick 5\npolicy-rt 1 fifo 50\ntick 5\n' | ./kstep.sh run ${{ matrix.version }}
 
-      - name: "[Run] Show driver output"
+      - name: "[Run] Show the driver's records"
         if: ${{ ! matrix.fuzz }}
         run: cat results/latest/kstep.jsonl
 

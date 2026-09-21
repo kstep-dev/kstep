@@ -6,6 +6,7 @@ set -x
 PACKAGES=(
     build-essential
     wget
+    libclang-dev
     flex
     bison
     bc

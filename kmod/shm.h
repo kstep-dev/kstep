@@ -1,12 +1,11 @@
-// The region of guest memory the host reads directly (shm.c writes it, website/site/kstep.mjs
-// decodes it; keep the two in step): the machine's state, rewritten after every cli command. gen
-// is a seqlock over the state: odd while an update is in progress,
+// The region of guest memory the host reads directly (shm.c writes it; crates/core/src/shm.rs
+// decodes it, with these structs generated from this header): the machine's state, rewritten
+// after every cli command. gen is a seqlock over the state: odd while an update is in progress,
 // even and unchanged around a consistent read. The coverage map (cov.c) is a region of its own,
 // so adding a field here never moves it; both addresses are reported on the cli's ready line. Trace events are not here: scheduler hooks write
 // them as JSON records on the driver's channel (io.c).
 #pragma once
 
-#include <linux/stddef.h>
 #include <linux/types.h>
 
 // As many as the module itself allows (KSTEP_NR_CPUS): the cap is the kmod's, not this region's.
@@ -200,15 +199,3 @@ struct kstep_shm {
   struct kstep_shm_rt rt[KSTEP_SHM_CPUS];
   struct kstep_shm_rt_entity rt_entity[KSTEP_SHM_TASKS];
 };
-
-static_assert(sizeof(struct kstep_shm_hdr) == 160);
-static_assert(sizeof(struct kstep_shm_cpu) == 40);
-static_assert(sizeof(struct kstep_shm_se) == 56);
-static_assert(sizeof(struct kstep_shm_task) == 48);
-static_assert(sizeof(struct kstep_shm_cfs) == 48);
-static_assert(sizeof(struct kstep_shm_rt) == 32);
-static_assert(sizeof(struct kstep_shm_rt_entity) == 24);
-static_assert(sizeof(struct kstep_shm_cgroup) == 56);
-static_assert(sizeof(struct kstep_shm_entity) == 72);
-static_assert(sizeof(struct kstep_shm_group) == 24);
-static_assert(sizeof(struct kstep_shm_domain) == 208 + KSTEP_SHM_GROUPS * 24);
