@@ -248,14 +248,11 @@ fn run_program(boot: &Boot, lines: &[String], map: Option<&mut [u8]>) -> (Outcom
 }
 
 // Only once the driver runs: a kernel that warns while booting (6.12-rc1 does, in
-// pick_task_fair) would otherwise turn every test case into a finding.
+// pick_task_fair) would otherwise turn every test case into a finding. A resumed machine's log
+// holds nothing but the run.
 fn console_oops(boot: &Boot) -> bool {
-    let log = boot
-        .io
-        .log()
-        .and_then(|l| fs::read_to_string(l).ok())
-        .unwrap_or_default();
-    let run = log.find("Starting cli").map_or("", |i| &log[i..]);
+    let log = fs::read_to_string(&boot.kernel_log).unwrap_or_default();
+    let run = log.find("Starting cli").map_or(log.as_str(), |i| &log[i..]);
     [
         "Oops",
         "Kernel panic",
@@ -294,9 +291,7 @@ impl QemuExecutor {
             format!("# {why}\n{}\n", lines.join("\n")),
         );
         let _ = fs::write(base.with_extension("jsonl"), transcript);
-        if let Some(log) = self.boot.io.log() {
-            let _ = fs::copy(log, base.with_extension("log"));
-        }
+        let _ = fs::copy(&self.boot.kernel_log, base.with_extension("log"));
         println!("finding {}: {why}", base.display());
     }
 }
@@ -344,10 +339,14 @@ impl HasObservers for QemuExecutor {
 
 // ---- main ------------------------------------------------------------------------------------
 
-/// A headless cli boot of `build` on the bug's machine, logging under results/<label>.
+/// A headless cli boot of `build` on the bug's machine, logging under results/<label>, resumed
+/// from the build's snapshot at the ready line: a program's run starts in well under a second
+/// instead of after a kernel boot.
 fn boot(build: &Build, bug: &Bug, label: &str) -> Result<Boot> {
     let results = ResultDir::create(Some(label), false)?;
-    Ok(build.boot("cli", bug.machine(), &results, false))
+    let mut boot = build.boot("cli", bug.machine(), &results, false);
+    boot.snapshot = Some(build.snapshot(&boot)?);
+    Ok(boot)
 }
 
 fn main() -> Result<()> {

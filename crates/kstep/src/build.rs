@@ -9,7 +9,7 @@ use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
 use anyhow::{bail, Context, Result};
-use kstep_core::qemu::{Accel, Boot, Io, Machine, ARCH};
+use kstep_core::qemu::{Boot, Machine, ARCH};
 
 use crate::cmd::{cmd, run};
 use crate::{build_dir, proj_dir, ResultDir};
@@ -100,8 +100,7 @@ impl Build {
     }
 
     /// A native boot of this build: `driver` on `machine`, the console and the JSON stream
-    /// under `results`; with `terminal`, the console on the terminal too. KVM when the host
-    /// offers it.
+    /// under `results`; with `terminal`, the console on the terminal too.
     pub fn boot(
         &self,
         driver: &str,
@@ -110,19 +109,50 @@ impl Build {
         terminal: bool,
     ) -> Boot {
         Boot {
+            arch: ARCH,
             kernel: self.kernel(),
             rootfs: self.rootfs(),
             driver: driver.to_string(),
             machine,
-            io: Io::Native {
-                log: results.log(),
-                jsonl: results.jsonl(),
-                terminal,
-            },
-            accel: Accel::detect(),
+            kernel_log: results.kernel_log(),
+            kstep_socket: results.kstep_socket(),
+            kstep_log: Some(results.kstep_log()),
+            monitor_socket: results.monitor_socket(),
+            terminal,
             debug: false,
             ram_file: None,
+            snapshot: None,
         }
+    }
+
+    /// A snapshot of `boot` at its ready line to resume later boots of this build from
+    /// (`Boot::snapshot`): `build/<name>/snap-<cpus>-<mem>.bin`, taken now unless one newer than
+    /// the kernel and the initramfs is there, with that boot's kernel log as `.log` next to it
+    /// (a resumed machine's own log starts after the ready line). The stream fits this machine
+    /// size and QEMU.
+    pub fn snapshot(&self, boot: &Boot) -> Result<PathBuf> {
+        let m = boot.machine;
+        let path = self
+            .dir()
+            .join(format!("snap-{}-{}.bin", m.num_cpus, m.mem_mb));
+        let mtime = |p: &Path| std::fs::metadata(p).and_then(|m| m.modified()).ok();
+        let fresh = mtime(&path).is_some_and(|t| {
+            [self.kernel(), self.rootfs()]
+                .iter()
+                .all(|f| mtime(f).is_some_and(|k| k < t))
+        });
+        if !fresh {
+            println!(
+                "Snapshotting {} at the ready line to {}",
+                self.name,
+                path.display()
+            );
+            let mut cold = boot.clone();
+            cold.snapshot = None;
+            crate::Session::start(&cold, std::time::Duration::from_secs(120))?.snapshot(&path)?;
+            fs::copy(&boot.kernel_log, path.with_extension("log"))?;
+        }
+        Ok(path)
     }
 
     /// Link the coverage files into `kernel/sched` and merge the config fragments: the common

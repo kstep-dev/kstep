@@ -13,25 +13,25 @@ use kstep::Build;
 use kstep_core::qemu::{Arch, ARCH};
 use serde_json::json;
 
-/// Build the website: bug catalog, playground image and the wasm decoder; then serve or deploy
+/// Serve the website at http://localhost:PORT/ (built first if it never was); `build` and `deploy`
 #[derive(clap::Args)]
 #[command(
-    after_help = "The site is website/site: the tracked page plus qemu/ (from website/setup.sh) and what this
-writes there: data.json, images/cli (the playground image, kSTEP's build/v6.18) and kstep_core.js
-+ kstep_core_bg.wasm (crates/core for wasm32). Run it after changing the page, the kmod or bugs.yaml."
+    after_help = "The site is website/site: the tracked page plus qemu/ (from website/setup.sh) and what `build`
+writes there: data.json, images/cli (the playground image, kSTEP's build/v6.18, and its snapshot)
+and kstep_core.js + kstep_core_bg.wasm (crates/core for wasm32). Edits to the page show on a
+reload; `build` again after changing the kmod, user.c, crates/core or bugs.yaml."
 )]
 pub struct Args {
     #[command(subcommand)]
     cmd: Option<Cmd>,
+    #[arg(long, default_value_t = 8080)]
+    port: u16,
 }
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Build, then serve site/ at http://localhost:PORT/
-    Serve {
-        #[arg(default_value_t = 8080)]
-        port: u16,
-    },
+    /// Rebuild the bug catalog, the wasm decoder, the playground image and its snapshot
+    Build,
     /// Build, gate on pagetest.mjs and `run.mjs --check`, force-push site/ as gh-pages
     Deploy,
 }
@@ -167,6 +167,19 @@ fn build() -> Result<String> {
     fs::create_dir_all(&images)?;
     fs::copy(b.kernel(), images.join("kernel"))?;
     fs::copy(b.rootfs(), images.join("rootfs.cpio"))?;
+    // The machine at the driver's ready line for the page's default CPU count, so the page resumes
+    // it instead of booting (~0.3 s instead of ~4 s). The stream fits this QEMU build and image
+    // only, hence next to the image and regenerated with it. Needs site/qemu (website/setup.sh).
+    let node = node()?;
+    run(
+        cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
+            .arg(website().join("run.mjs"))
+            .args(["--snapshot", "--image"])
+            .arg(&images)
+            .current_dir(website()),
+        None,
+    )
+    .context("snapshot of the playground image (website/run.mjs --snapshot)")?;
     let size = output(cmd("du", ["-sh"]).arg(site()))?
         .split_whitespace()
         .next()
@@ -236,6 +249,7 @@ fn connection(mut stream: std::net::TcpStream) -> std::io::Result<()> {
             Some("png") => "image/png",
             Some("svg") => "image/svg+xml",
             Some("pdf") => "application/pdf",
+            Some("gz") => "application/gzip", // the snapshot: raw bytes, the page gunzips them itself
             _ => "application/octet-stream",
         };
         let meta = fs::metadata(&file)
@@ -324,10 +338,14 @@ fn deploy(version: &str) -> Result<()> {
 }
 
 pub fn main(a: Args) -> Result<()> {
-    let version = build()?;
     match a.cmd {
-        None => Ok(()),
-        Some(Cmd::Serve { port }) => serve(port),
-        Some(Cmd::Deploy) => deploy(&version),
+        Some(Cmd::Build) => build().map(|_| ()),
+        Some(Cmd::Deploy) => deploy(&build()?),
+        None => {
+            if !site().join("data.json").exists() {
+                build()?;
+            }
+            serve(a.port)
+        }
     }
 }

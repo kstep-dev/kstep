@@ -1,9 +1,11 @@
 //! A running `cli` driver: QEMU with guest RAM in a shared file (the session's own, unlinked once
 //! open), the driver's JSON stream on a unix socket, and the machine's state (kmod/shm.h) read
 //! out of the RAM file after each command. The CLI's REPL and the fuzzer both sit on this.
+//! A session at the ready line can be snapshotted (a migration stream, taken over QEMU's
+//! monitor) and later sessions of the same boot resumed from it, skipping the kernel boot.
 
 use std::fs::File;
-use std::io::{BufRead, BufReader, ErrorKind, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::os::unix::fs::FileExt;
 use std::os::unix::net::UnixStream;
 use std::os::unix::process::CommandExt;
@@ -12,7 +14,7 @@ use std::process::{Child, Stdio};
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
-use kstep_core::qemu::{Boot, Io, ARCH};
+use kstep_core::qemu::{Boot, ARCH};
 use kstep_core::shm::{self, State};
 use serde_json::Value;
 
@@ -20,6 +22,8 @@ pub struct Session {
     child: Child,
     reader: BufReader<UnixStream>,
     writer: UnixStream,
+    monitor: PathBuf,
+    ready: Value,
     ram: File,
     shm_at: u64,
     cov_at: Option<u64>,
@@ -50,12 +54,7 @@ impl Session {
         };
         let ram_path = ram_dir.join(format!("kstep-{}-ram", std::process::id()));
         boot.ram_file = Some(ram_path.clone());
-        let sock_path = Io::socket(
-            boot.io
-                .jsonl()
-                .context("a session needs the driver's socket")?,
-        );
-        let _ = std::fs::remove_file(&sock_path);
+        let _ = std::fs::remove_file(&boot.kstep_socket);
         let mut command = boot.command();
         command.stdin(Stdio::null()).stdout(Stdio::null());
         // QEMU dies with us, however we die: a killed fuzzer must not leave guests behind
@@ -73,25 +72,45 @@ impl Session {
         // QEMU opens the socket a moment after it starts.
         let deadline = Instant::now() + timeout;
         let stream = loop {
-            if let Ok(s) = UnixStream::connect(&sock_path) {
+            if let Ok(s) = UnixStream::connect(&boot.kstep_socket) {
                 break s;
             }
             if let Some(status) = child.try_wait()? {
                 bail!(
                     "qemu exited before opening {}: {status}",
-                    sock_path.display()
+                    boot.kstep_socket.display()
                 );
             }
             if Instant::now() > deadline {
                 let _ = child.kill();
-                bail!("no socket at {} after {timeout:?}", sock_path.display());
+                bail!(
+                    "no socket at {} after {timeout:?}",
+                    boot.kstep_socket.display()
+                );
             }
             std::thread::sleep(Duration::from_millis(20));
         };
         stream.set_read_timeout(Some(timeout))?;
         let mut reader = BufReader::new(stream.try_clone()?);
 
-        let ready = read_reply(&mut reader)?.reply;
+        // A resumed machine's driver printed its ready line before the snapshot: it is in the
+        // stream's sidecar (`snapshot()` wrote it), and the driver is waiting for a command. The
+        // socket opens before the stream is loaded, so wait for the machine to run.
+        let ready = match &boot.snapshot {
+            Some(snap) => {
+                let sidecar = std::fs::read(sidecar(snap))
+                    .with_context(|| format!("read {}", sidecar(snap).display()))?;
+                let mut mon = monitor(&boot.monitor_socket)?;
+                while !hmp(&mut mon, "info status")?.contains("running") {
+                    if Instant::now() > deadline {
+                        bail!("{} not running after {timeout:?}", snap.display());
+                    }
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                serde_json::from_slice(&sidecar)?
+            }
+            None => read_reply(&mut reader)?.reply,
+        };
         // The guest has booted, so its RAM file certainly exists by now.
         let ram = File::open(&ram_path).with_context(|| format!("open {}", ram_path.display()))?;
         let _ = std::fs::remove_file(&ram_path);
@@ -112,6 +131,8 @@ impl Session {
             child,
             reader,
             writer: stream,
+            monitor: boot.monitor_socket.clone(),
+            ready,
             ram,
             shm_at,
             cov_at,
@@ -119,6 +140,23 @@ impl Session {
         };
         s.state().context("read the shared region")?; // magic and layout: the image speaks our version
         Ok(s)
+    }
+
+    /// The machine as it is now, as a migration stream at `path` with the ready line in a
+    /// sidecar next to it, for `Boot::snapshot` to resume from. Taken at the ready line, before
+    /// any command, it stands for the boot itself. QEMU's monitor blocks on `migrate` until the
+    /// stream is complete; the guest is idle between commands, so that is one pass. The machine
+    /// is left stopped: this session is over.
+    pub fn snapshot(mut self, path: &Path) -> Result<()> {
+        let mut mon = monitor(&self.monitor)?;
+        hmp(&mut mon, &format!("migrate file:{}", path.display()))?;
+        let status = hmp(&mut mon, "info migrate")?;
+        if !status.contains("Migration status: completed") {
+            bail!("snapshot to {} did not complete:\n{status}", path.display());
+        }
+        std::fs::write(sidecar(path), serde_json::to_vec(&self.ready)?)?;
+        let _ = self.child.kill();
+        Ok(())
     }
 
     /// Send one cli line and collect its answer.
@@ -163,6 +201,38 @@ impl Session {
             std::thread::sleep(Duration::from_millis(20));
         }
         Ok(())
+    }
+}
+
+/// The ready line a snapshot was taken at, next to the stream
+fn sidecar(snapshot: &Path) -> PathBuf {
+    snapshot.with_extension("json")
+}
+
+/// QEMU's monitor at `path`, past its banner
+fn monitor(path: &Path) -> Result<UnixStream> {
+    let mut mon =
+        UnixStream::connect(path).with_context(|| format!("connect {}", path.display()))?;
+    mon.set_read_timeout(Some(Duration::from_secs(120)))?;
+    hmp(&mut mon, "")?;
+    Ok(mon)
+}
+
+/// One HMP command and everything up to the next prompt (the echo, with terminal escapes, and
+/// the answer). `migrate` blocks until the stream is complete.
+fn hmp(mon: &mut UnixStream, cmd: &str) -> Result<String> {
+    writeln!(mon, "{cmd}")?;
+    let mut out = String::new();
+    let mut buf = [0u8; 4096];
+    loop {
+        let n = mon.read(&mut buf).context("read the monitor")?;
+        if n == 0 {
+            bail!("the monitor closed");
+        }
+        out.push_str(&String::from_utf8_lossy(&buf[..n]));
+        if out.ends_with("(qemu) ") {
+            return Ok(out);
+        }
     }
 }
 

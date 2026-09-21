@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use kstep::{bugs, Build, ResultDir, Session};
-use kstep_core::qemu::{Accel, Boot, Machine};
+use kstep_core::qemu::{kvm_available, Boot, Machine};
 use kstep_core::shm::State;
 
 /// Boot a driver under QEMU (building kSTEP first) and record the run under results/
@@ -72,10 +72,10 @@ pub fn main(a: Args) -> Result<()> {
         a.input.is_none() && std::io::stdin().is_terminal() && std::io::stdout().is_terminal();
     let cli = driver == "cli";
     // the cli's terminal is ours; another driver's console goes to the terminal when there is
-    // one, and in a script or CI to qemu.log alone
+    // one, and in a script or CI to kernel.log alone
     let mut boot = b.boot(&driver, machine, &results, interactive && !cli);
     boot.debug = a.debug;
-    if boot.accel == Accel::Tcg && std::path::Path::new("/dev/kvm").exists() {
+    if !kvm_available() && std::path::Path::new("/dev/kvm").exists() {
         eprintln!("/dev/kvm is not accessible, using TCG (sudo chmod 666 /dev/kvm to use KVM)");
     }
     if a.debug {
@@ -96,7 +96,7 @@ pub fn main(a: Args) -> Result<()> {
         // ctrl-c belongs to the guest console (QEMU's mux has signal=off); ctrl-a x quits QEMU
         unsafe { libc::signal(libc::SIGINT, libc::SIG_IGN) };
         kstep::cmd::run(&mut boot.command(), None)
-            .with_context(|| format!("see {}", results.log().display()))?;
+            .with_context(|| format!("see {}", results.kernel_log().display()))?;
     }
     println!("Results saved to {}", results.path().display());
     Ok(())

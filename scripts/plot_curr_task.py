@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import colors
 from plot_utils import save_fig
-from utils import ResultDir, parse_jsonl
+from utils import parse_jsonl, trace
 
 
 def parse_curr_task(path: Path, type: str) -> pd.DataFrame:
@@ -176,8 +176,8 @@ def main(driver: str):
         title_fixed = "Fixed"
 
     fig = plot_curr_task(
-        output_buggy=ResultDir(f"repro_{driver}/buggy").output,
-        output_fixed=ResultDir(f"repro_{driver}/fixed").output,
+        output_buggy=trace(f"repro_{driver}/buggy"),
+        output_fixed=trace(f"repro_{driver}/fixed"),
         title_buggy=title_buggy,
         title_fixed=title_fixed,
         color_map=COLOR_MAPS.get(driver, {}),

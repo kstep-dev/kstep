@@ -20,7 +20,7 @@ To reproduce a bug fixed in commit `[hash]`, follow these steps:
 - Build and execute the driver on the buggy kernel with:
   `./kstep.sh checkout [hash]~1 [name]_buggy --git && ./kstep.sh run [name]_buggy [driver_name]`
 - Determine whether the bug is reproduced by examining the output logs:
-  `cat results/latest/qemu.log` and `results/latest/kstep.jsonl`
+  `cat results/latest/kernel.log` and `results/latest/kstep.jsonl`
 - If you do not observe the bug, refine your implementation and repeat the process.
 - After confirming that your driver triggers the bug, rerun the same driver on the fixed kernel:
   `./kstep.sh checkout [hash] [name]_fixed --git && ./kstep.sh run [name]_fixed [driver_name]`

@@ -11,7 +11,7 @@ import argparse
 
 import matplotlib.pyplot as plt
 from plot_utils import save_fig
-from utils import ResultDir, parse_jsonl
+from utils import parse_jsonl, trace
 
 
 def plot_min_vruntime(buggy_df, fixed_df):
@@ -59,8 +59,8 @@ def plot_min_vruntime(buggy_df, fixed_df):
 
 
 def main(driver: str):
-    buggy_df = parse_jsonl(ResultDir(f"repro_{driver}/buggy").output, "min_vruntime")
-    fixed_df = parse_jsonl(ResultDir(f"repro_{driver}/fixed").output, "min_vruntime")
+    buggy_df = parse_jsonl(trace(f"repro_{driver}/buggy"), "min_vruntime")
+    fixed_df = parse_jsonl(trace(f"repro_{driver}/fixed"), "min_vruntime")
 
     fig = plot_min_vruntime(buggy_df, fixed_df)
     save_fig(fig, driver)

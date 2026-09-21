@@ -1,7 +1,6 @@
 """What the plot scripts share: where results live, and how to read a trace."""
 
 import json
-from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -9,17 +8,9 @@ import pandas as pd
 RESULTS_DIR = Path(__file__).parent.parent.resolve() / "results"
 
 
-@dataclass(frozen=True)
-class ResultDir:
-    """`results/<name>/`, as `kstep run` and `kstep reproduce` lay it out."""
-    name: str
-
-    @property
-    def path(self) -> Path: return RESULTS_DIR / self.name
-    @property
-    def log(self) -> Path: return self.path / "qemu.log"
-    @property
-    def output(self) -> Path: return self.path / "kstep.jsonl"
+def trace(name: str) -> Path:
+    """`results/<name>/kstep.jsonl`: the driver's records, as `kstep run` and `kstep reproduce` lay them out."""
+    return RESULTS_DIR / name / "kstep.jsonl"
 
 
 def parse_jsonl(path: Path, type: str) -> pd.DataFrame:

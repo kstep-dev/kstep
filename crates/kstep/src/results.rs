@@ -39,12 +39,22 @@ impl ResultDir {
     pub fn path(&self) -> PathBuf {
         results_dir().join(&self.name)
     }
-    /// The kernel console
-    pub fn log(&self) -> PathBuf {
-        self.path().join("qemu.log")
+    // The file names are a published format: the results repo and scripts/utils.py read them.
+
+    /// The kernel's console output
+    pub fn kernel_log(&self) -> PathBuf {
+        self.path().join("kernel.log")
     }
-    /// The driver's JSON records
-    pub fn jsonl(&self) -> PathBuf {
+    /// Every record the driver wrote on kSTEP's channel
+    pub fn kstep_log(&self) -> PathBuf {
         self.path().join("kstep.jsonl")
+    }
+    /// kSTEP's channel (kmod/io.c): the driver's records out, the cli driver's commands in
+    pub fn kstep_socket(&self) -> PathBuf {
+        self.path().join("kstep.sock")
+    }
+    /// QEMU's monitor (`socat - UNIX:results/<run>/monitor.sock` to attach)
+    pub fn monitor_socket(&self) -> PathBuf {
+        self.path().join("monitor.sock")
     }
 }

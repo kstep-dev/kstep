@@ -45,12 +45,13 @@ fn reproduce(bug: &Bug, kernel: &Kernel) -> Result<()> {
         &name,
         &format!(
             "Run kSTEP (log: {}, output: {})",
-            results.log().display(),
-            results.jsonl().display()
+            results.kernel_log().display(),
+            results.kstep_log().display()
         ),
     );
     let boot = b.boot(&bug.name, bug.machine(), &results, false);
-    run(&mut boot.command(), None).with_context(|| format!("see {}", results.log().display()))
+    run(&mut boot.command(), None)
+        .with_context(|| format!("see {}", results.kernel_log().display()))
 }
 
 pub fn main(a: Args) -> Result<()> {

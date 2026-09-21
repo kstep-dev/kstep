@@ -4,14 +4,17 @@
 
 use wasm_bindgen::prelude::*;
 
-use crate::qemu::{Accel, Boot, Io, Machine};
+use crate::qemu::{Arch, Boot, Machine};
 use crate::shm;
 
 /// The argv for the page's QEMU (an aarch64 build): the cli driver on `smp` CPUs with `mem` MB,
-/// the kernel and initramfs at fixed paths in the module's file system.
+/// the kernel and initramfs at fixed paths in the module's file system; with `snapshot`, resumed
+/// from the migration stream at /snap instead (run.mjs --snapshot writes it, at the ready line).
 #[wasm_bindgen]
-pub fn qemu_args(smp: u32, mem: u32) -> Vec<String> {
+pub fn qemu_args(smp: u32, mem: u32, snapshot: bool) -> Vec<String> {
     Boot {
+        arch: Arch::Aarch64,
+        snapshot: snapshot.then(|| "/snap".into()),
         kernel: "/kernel".into(),
         rootfs: "/rootfs.cpio".into(),
         driver: "cli".into(),
@@ -19,8 +22,12 @@ pub fn qemu_args(smp: u32, mem: u32) -> Vec<String> {
             num_cpus: smp,
             mem_mb: mem,
         },
-        accel: Accel::Tcg,
-        io: Io::Emscripten,
+        // the device nodes kstep.mjs registers (its pipe() and createDevice calls)
+        kernel_log: "/kernel.log".into(),
+        kstep_socket: "/kstep".into(),
+        kstep_log: None,
+        monitor_socket: "/monitor".into(),
+        terminal: false,
         debug: false,
         ram_file: None,
     }
