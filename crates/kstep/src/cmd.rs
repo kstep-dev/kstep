@@ -70,3 +70,17 @@ pub fn run(cmd: &mut Command, log: Option<&Path>) -> Result<()> {
     }
     Ok(())
 }
+
+/// Echo and run, returning stdout; fails on a non-zero exit.
+pub fn output(cmd: &mut Command) -> Result<String> {
+    let shown = display(cmd);
+    eprintln!("$ {BLUE}{shown}{RESET}");
+    let out = cmd
+        .stderr(Stdio::inherit())
+        .output()
+        .with_context(|| format!("spawn `{shown}`"))?;
+    if !out.status.success() {
+        bail!("`{shown}` failed ({})", out.status);
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}

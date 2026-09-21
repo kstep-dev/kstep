@@ -1,11 +1,7 @@
 //! kmod/shm.h, byte for byte: the region of guest memory the cli driver rewrites after every
-//! command. Little-endian u32/u64 at natural alignment. The header describes the tables (offset,
-//! stride, count), so only magic, layout and gen sit at fixed places; LAYOUT is bumped when a
-//! record's fields change meaning without changing size. `gen` is a seqlock: odd mid-update,
-//! and a read is good only if it is even and unchanged around it.
-//!
-//! The structs come from the header itself, through bindgen (build.rs), as `raw`; records are
-//! read straight out of a snapshot with them.
+//! command. The structs come from the header itself, through bindgen (build.rs), as `raw`, so a
+//! snapshot of the region is read as one `kstep_shm` and each table sliced by its count. `gen` is
+//! a seqlock: odd mid-update, and a read is good only if it is even and unchanged around it.
 
 use serde::Serialize;
 
@@ -18,11 +14,10 @@ use raw::*;
 
 pub const MAGIC: u32 = KSTEP_SHM_MAGIC;
 pub const LAYOUT: u32 = KSTEP_SHM_LAYOUT;
-pub const HDR_SIZE: usize = std::mem::size_of::<kstep_shm_hdr>();
+/// The whole region: what to snapshot
+pub const SIZE: usize = std::mem::size_of::<kstep_shm>();
 /// cov.c's edge map: saturating byte counts
 pub const COV_SIZE: usize = KSTEP_COV_SIZE as usize;
-const MAX_SIZE: usize = 1 << 20; // sanity bound on what a header may claim
-const NTABLES: usize = KSTEP_TBL_N as usize;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
@@ -30,11 +25,9 @@ pub enum Error {
     Magic(u32),
     /// A region this decoder was not built for: rebuild the image from the current kmod
     Layout(u32),
-    /// The header claims an implausible size
-    Size(usize),
     /// Mid-update: read again
     Busy,
-    /// The snapshot is shorter than the layout says
+    /// The snapshot is shorter than the region
     Short,
 }
 
@@ -43,44 +36,12 @@ impl std::fmt::Display for Error {
         match self {
             Error::Magic(m) => write!(f, "not a kSTEP shared region (magic {m:#x})"),
             Error::Layout(l) => write!(f, "shm layout {l}, this decoder speaks {LAYOUT}: rebuild the image from the current kmod"),
-            Error::Size(n) => write!(f, "shm header claims {n} bytes"),
             Error::Busy => f.write_str("shm mid-update"),
-            Error::Short => f.write_str("shm snapshot shorter than its header says"),
+            Error::Short => write!(f, "shm snapshot shorter than the region ({SIZE} bytes)"),
         }
     }
 }
 impl std::error::Error for Error {}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Table {
-    pub count_at: usize,
-    pub max: usize,
-    pub off: usize,
-    pub stride: usize,
-}
-
-/// The shape of a region, read once from its header.
-#[derive(Debug, Clone)]
-pub struct Layout {
-    /// kmod/shm.h's enum kstep_shm_tables order: cpu, task, cgroup, domain, cfs, entity, rt, rt_entity
-    pub tables: [Table; NTABLES],
-    pub max_groups: usize,
-    pub group_stride: usize,
-    /// Bytes to snapshot: the end of the farthest table
-    pub size: usize,
-}
-
-fn u32_at(b: &[u8], o: usize) -> u32 {
-    u32::from_le_bytes(b[o..o + 4].try_into().unwrap())
-}
-/// One record out of a snapshot. The generated structs hold only integers and byte arrays, so
-/// any bytes are a valid value; the bounds check is the one thing that can fail.
-fn rec<T: Copy>(b: &[u8], o: usize) -> T {
-    let n = std::mem::size_of::<T>();
-    assert!(o + n <= b.len(), "shm record at {o} runs past the snapshot");
-    // SAFETY: T is a repr(C) struct of integers, read unaligned from a checked byte range.
-    unsafe { std::ptr::read_unaligned(b.as_ptr().add(o) as *const T) }
-}
 
 #[allow(clippy::unnecessary_cast)] // c_char is u8 on aarch64 and i8 on x86_64
 fn cstr(s: &[std::os::raw::c_char]) -> String {
@@ -90,43 +51,6 @@ fn cstr(s: &[std::os::raw::c_char]) -> String {
         .map(|&c| c as u8)
         .collect();
     String::from_utf8_lossy(&bytes).into_owned()
-}
-
-impl Layout {
-    /// From the first HDR_SIZE bytes of a region.
-    pub fn parse(hdr: &[u8]) -> Result<Layout, Error> {
-        if hdr.len() < HDR_SIZE {
-            return Err(Error::Short);
-        }
-        let h: kstep_shm_hdr = rec(hdr, 0);
-        if h.magic != MAGIC {
-            return Err(Error::Magic(h.magic));
-        }
-        if h.layout != LAYOUT {
-            return Err(Error::Layout(h.layout));
-        }
-        let tables = std::array::from_fn(|i| Table {
-            count_at: std::mem::offset_of!(kstep_shm_hdr, table)
-                + i * std::mem::size_of::<kstep_shm_table>(),
-            max: h.table[i].max as usize,
-            off: h.table[i].off as usize,
-            stride: h.table[i].stride as usize,
-        });
-        let size = tables
-            .iter()
-            .map(|t| t.off + t.max * t.stride)
-            .max()
-            .unwrap();
-        if size == 0 || size > MAX_SIZE {
-            return Err(Error::Size(size));
-        }
-        Ok(Layout {
-            tables,
-            max_groups: h.max_groups as usize,
-            group_stride: h.group_stride as usize,
-            size,
-        })
-    }
 }
 
 // ---- the decoded state: field names as kstep.mjs reports them, so the page can switch ----------
@@ -291,123 +215,119 @@ fn policy(n: u32) -> &'static str {
     }
 }
 
-const GEN: usize = std::mem::offset_of!(kstep_shm_hdr, gen_);
-const TIMESTAMP: usize = std::mem::offset_of!(kstep_shm_hdr, timestamp);
+/// The first `n` records of a table, or `Busy` when a half-written header claims more than fit.
+fn table<R, T>(rows: &[R], n: u32, f: impl Fn(&R) -> T) -> Result<Vec<T>, Error> {
+    rows.get(..n as usize)
+        .ok_or(Error::Busy)
+        .map(|rows| rows.iter().map(f).collect())
+}
 
-/// Decode one snapshot of the region. `Busy` means the writer was mid-update: snapshot again.
-pub fn decode(b: &[u8], l: &Layout) -> Result<State, Error> {
-    if b.len() < l.size {
+/// Decode one snapshot of the region (`SIZE` bytes). `Busy` means the writer was mid-update:
+/// snapshot again.
+pub fn decode(b: &[u8]) -> Result<State, Error> {
+    if b.len() < SIZE {
         return Err(Error::Short);
     }
-    let gen = u32_at(b, GEN);
-    if gen & 1 == 1 {
+    // SAFETY: kstep_shm is a repr(C) struct of integers and byte arrays, so any SIZE bytes are a
+    // valid value; read unaligned from a checked range.
+    let r: kstep_shm = unsafe { std::ptr::read_unaligned(b.as_ptr() as *const kstep_shm) };
+    let h = &r.hdr;
+    if h.magic != MAGIC {
+        return Err(Error::Magic(h.magic));
+    }
+    if h.layout != LAYOUT {
+        return Err(Error::Layout(h.layout));
+    }
+    if h.gen_ & 1 == 1 {
         return Err(Error::Busy);
     }
-    // one table's records at the stride the kmod declared; a count past the capacity is a
-    // half-written header
-    fn table<R: Copy, T>(b: &[u8], t: &Table, f: impl Fn(usize, R) -> T) -> Result<Vec<T>, Error> {
-        let n = u32_at(b, t.count_at) as usize;
-        if n > t.max {
-            return Err(Error::Busy);
-        }
-        Ok((0..n)
-            .map(|i| t.off + i * t.stride)
-            .map(|o| f(o, rec(b, o)))
-            .collect())
-    }
-    let [t_cpu, t_task, t_cgroup, t_domain, t_cfs, t_entity, t_rt, t_rte] = &l.tables;
 
-    let cpus = table(b, t_cpu, |_, r: kstep_shm_cpu| Cpu {
-        cpu: r.cpu,
-        current: r.curr,
-        idle: r.idle != 0,
-        capacity: r.capacity,
-        freq: r.freq,
-        next_balance_in: r.next_balance_in,
-        nr_running: r.nr_running,
-        nr_switches: r.nr_switches,
+    let cpus = table(&r.cpu, h.ncpus, |c| Cpu {
+        cpu: c.cpu,
+        current: c.curr,
+        idle: c.idle != 0,
+        capacity: c.capacity,
+        freq: c.freq,
+        next_balance_in: c.next_balance_in,
+        nr_running: c.nr_running,
+        nr_switches: c.nr_switches,
     })?;
-    let groups = table(b, t_cgroup, |_, r: kstep_shm_cgroup| Cgroup {
-        path: cstr(&r.path),
-        cpus: r.cpus,
-        weight: r.weight,
+    let groups = table(&r.cgroup, h.ncgroups, |g| Cgroup {
+        path: cstr(&g.path),
+        cpus: g.cpus,
+        weight: g.weight,
     })?;
     let group_path = |i: u32| {
         groups
             .get(i as usize)
             .map_or_else(|| "/".to_string(), |g| g.path.clone())
     };
-    let tasks = table(b, t_task, |_, r: kstep_shm_task| Task {
-        task: r.task,
-        state: TASK_STATES.get(r.state as usize).copied().unwrap_or("?"),
-        cpu: r.cpu,
-        policy: policy(r.policy),
-        nice: r.nice,
-        rt_priority: r.rt_priority,
-        cgroup: group_path(r.cgroup),
-        cpus: r.cpus,
-        sum_exec_runtime: r.sum_exec_runtime,
+    let tasks = table(&r.task, h.ntasks, |t| Task {
+        task: t.task,
+        state: TASK_STATES.get(t.state as usize).copied().unwrap_or("?"),
+        cpu: t.cpu,
+        policy: policy(t.policy),
+        nice: t.nice,
+        rt_priority: t.rt_priority,
+        cgroup: group_path(t.cgroup),
+        cpus: t.cpus,
+        sum_exec_runtime: t.sum_exec_runtime,
     })?;
-    let cfs = table(b, t_cfs, |_, r: kstep_shm_cfs| Cfs {
-        cpu: r.cpu,
-        min_vruntime: r.min_vruntime,
-        util_avg: r.util_avg,
-        load_avg: r.load_avg,
-        runnable_avg: r.runnable_avg,
-        h_nr_runnable: r.h_nr_runnable,
+    let cfs = table(&r.cfs, h.ncpus, |q| Cfs {
+        cpu: q.cpu,
+        min_vruntime: q.min_vruntime,
+        util_avg: q.util_avg,
+        load_avg: q.load_avg,
+        runnable_avg: q.runnable_avg,
+        h_nr_runnable: q.h_nr_runnable,
     })?;
-    let entities = table(b, t_entity, |_, r: kstep_shm_entity| Entity {
-        task: r.task,
-        cgroup: group_path(r.cgroup),
-        cpu: r.cpu,
-        eligible: r.se.flags & KSTEP_SE_ELIGIBLE != 0,
-        delayed: r.se.flags & KSTEP_SE_DELAYED != 0,
-        on_rq: r.se.flags & KSTEP_SE_ON_RQ != 0,
-        curr: r.se.flags & KSTEP_SE_CURR != 0,
-        pick: r.se.flags & KSTEP_SE_PICK != 0,
-        share: r.se.share as f64 / 1024.0,
-        weight: r.se.weight,
-        sum_exec_runtime: r.se.sum_exec_runtime,
-        vruntime: r.se.vruntime,
-        deadline: r.se.deadline,
-        slice: r.se.slice,
-        lag: r.se.lag,
+    let entities = table(&r.entity, h.nentities, |e| Entity {
+        task: e.task,
+        cgroup: group_path(e.cgroup),
+        cpu: e.cpu,
+        eligible: e.se.flags & KSTEP_SE_ELIGIBLE != 0,
+        delayed: e.se.flags & KSTEP_SE_DELAYED != 0,
+        on_rq: e.se.flags & KSTEP_SE_ON_RQ != 0,
+        curr: e.se.flags & KSTEP_SE_CURR != 0,
+        pick: e.se.flags & KSTEP_SE_PICK != 0,
+        share: e.se.share as f64 / 1024.0,
+        weight: e.se.weight,
+        sum_exec_runtime: e.se.sum_exec_runtime,
+        vruntime: e.se.vruntime,
+        deadline: e.se.deadline,
+        slice: e.se.slice,
+        lag: e.se.lag,
     })?;
-    let rt = table(b, t_rt, |_, r: kstep_shm_rt| Rt {
-        cpu: r.cpu,
-        nr_running: r.nr_running,
-        highest_prio: r.highest_prio,
-        throttled: r.throttled != 0,
-        rt_time: r.rt_time,
-        rt_runtime: r.rt_runtime,
+    let rt = table(&r.rt, h.ncpus, |q| Rt {
+        cpu: q.cpu,
+        nr_running: q.nr_running,
+        highest_prio: q.highest_prio,
+        throttled: q.throttled != 0,
+        rt_time: q.rt_time,
+        rt_runtime: q.rt_runtime,
     })?;
-    let rt_entities = table(b, t_rte, |_, r: kstep_shm_rt_entity| RtEntity {
-        task: r.task,
-        cpu: r.cpu,
-        on_rq: r.flags & KSTEP_RT_ON_RQ != 0,
-        curr: r.flags & KSTEP_RT_CURR != 0,
-        pick: r.flags & KSTEP_RT_PICK != 0,
-        position: r.position,
-        time_slice: r.time_slice,
+    let rt_entities = table(&r.rt_entity, h.nrt_entities, |e| RtEntity {
+        task: e.task,
+        cpu: e.cpu,
+        on_rq: e.flags & KSTEP_RT_ON_RQ != 0,
+        curr: e.flags & KSTEP_RT_CURR != 0,
+        pick: e.flags & KSTEP_RT_PICK != 0,
+        position: e.position,
+        time_slice: e.time_slice,
     })?;
-    let domains = table(b, t_domain, |o, r: kstep_shm_domain| Domain {
-        cpu: r.cpu,
-        span: r.span,
-        name: cstr(&r.name),
-        flags: cstr(&r.flags),
-        imbalance_pct: r.imbalance_pct,
-        balance_interval: r.balance_interval,
-        busy_factor: r.busy_factor,
-        cache_nice_tries: r.cache_nice_tries,
-        nr_balance_failed: r.nr_balance_failed,
-        last_balance_ago: r.last_balance_ago,
-        groups: (0..(r.ngroups as usize).min(l.max_groups))
-            .map(|j| {
-                rec::<kstep_shm_group>(
-                    b,
-                    o + std::mem::offset_of!(kstep_shm_domain, group) + j * l.group_stride,
-                )
-            })
+    let domains = table(&r.domain, h.ndomains, |d| Domain {
+        cpu: d.cpu,
+        span: d.span,
+        name: cstr(&d.name),
+        flags: cstr(&d.flags),
+        imbalance_pct: d.imbalance_pct,
+        balance_interval: d.balance_interval,
+        busy_factor: d.busy_factor,
+        cache_nice_tries: d.cache_nice_tries,
+        nr_balance_failed: d.nr_balance_failed,
+        last_balance_ago: d.last_balance_ago,
+        groups: d.group[..(d.ngroups as usize).min(d.group.len())]
+            .iter()
             .map(|g| Group {
                 span: g.span,
                 capacity: g.capacity,
@@ -417,11 +337,17 @@ pub fn decode(b: &[u8], l: &Layout) -> Result<State, Error> {
             })
             .collect(),
     })?;
-    if u32_at(b, GEN) != gen {
+    // the seqlock's second half: the writer did not start again while we read
+    if u32::from_le_bytes(
+        b[std::mem::offset_of!(kstep_shm_hdr, gen_)..][..4]
+            .try_into()
+            .unwrap(),
+    ) != h.gen_
+    {
         return Err(Error::Busy);
     }
     Ok(State {
-        timestamp: u32_at(b, TIMESTAMP),
+        timestamp: h.timestamp,
         cpus,
         tasks,
         groups,
@@ -433,71 +359,82 @@ pub fn decode(b: &[u8], l: &Layout) -> Result<State, Error> {
     })
 }
 
-/// Parse the header and decode, for a whole-region snapshot.
-pub fn decode_region(b: &[u8]) -> Result<State, Error> {
-    decode(b, &Layout::parse(b)?)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// A region built by hand: the header as shm.c writes it, one CPU, one task, one cgroup.
-    #[test]
-    fn decodes_a_hand_built_region() {
-        let mut b = vec![0u8; 4096];
-        let put32 = |b: &mut [u8], o: usize, v: u32| b[o..o + 4].copy_from_slice(&v.to_le_bytes());
-        let put64 = |b: &mut [u8], o: usize, v: u64| b[o..o + 8].copy_from_slice(&v.to_le_bytes());
-        put32(&mut b, 0, MAGIC);
-        put32(&mut b, 4, LAYOUT);
-        put32(&mut b, 8, 2); // gen: even
-        put32(&mut b, 12, 7); // timestamp
-                              // tables: (n, max, off, stride)
-        let tables = [
-            (1, 2, 160, 40),
-            (1, 2, 240, 48),
-            (1, 2, 336, 56),
-            (0, 1, 448, 208 + 24),
-            (1, 2, 680, 48),
-            (1, 2, 776, 72),
-            (1, 2, 920, 32),
-            (0, 2, 984, 24),
-        ];
-        for (i, (n, max, off, stride)) in tables.iter().enumerate() {
-            let o = 16 + i * 16;
-            put32(&mut b, o, *n);
-            put32(&mut b, o + 4, *max);
-            put32(&mut b, o + 8, *off);
-            put32(&mut b, o + 12, *stride);
-        }
-        put32(&mut b, 16 + 8 * 16, 1); // max_groups
-        put32(&mut b, 20 + 8 * 16, 24); // group_stride
-                                        // cpu 1 running task 1, 2 runnable
-        put32(&mut b, 160, 1);
-        put32(&mut b, 164, 1);
-        put64(&mut b, 184, 2);
-        // task 1: running, cpu 1, rr prio 5, cgroup 0
-        put32(&mut b, 240, 1);
-        put32(&mut b, 244, 0);
-        put32(&mut b, 248, 1);
-        put32(&mut b, 252, 2);
-        put32(&mut b, 256, (-3i32) as u32);
-        put32(&mut b, 260, 5);
-        put64(&mut b, 272, 0b110);
-        b[336..338].copy_from_slice(b"/a");
-        put32(&mut b, 384, 100);
-        // cfs cpu 1, entity task 1 eligible+curr with lag -8
-        put32(&mut b, 680, 1);
-        put64(&mut b, 688, 1000);
-        put32(&mut b, 776, 1);
-        put32(&mut b, 784, 1);
-        put32(&mut b, 792, 1 | 8);
-        put32(&mut b, 796, 512);
-        put64(&mut b, 792 + 48, (-8i64) as u64);
-        put32(&mut b, 920, 1);
-        put32(&mut b, 928, 100);
+    fn bytes(r: &kstep_shm) -> Vec<u8> {
+        // SAFETY: a plain repr(C) struct of integers, viewed as its bytes
+        unsafe { std::slice::from_raw_parts(r as *const kstep_shm as *const u8, SIZE) }.to_vec()
+    }
 
-        let st = decode_region(&b).unwrap();
+    /// A region built through the generated structs: one CPU running one rr task in cgroup /a.
+    #[test]
+    fn decodes_a_region() {
+        let mut r = kstep_shm {
+            hdr: kstep_shm_hdr {
+                magic: MAGIC,
+                layout: LAYOUT,
+                gen_: 2,
+                timestamp: 7,
+                ncpus: 1,
+                ntasks: 1,
+                ncgroups: 1,
+                ndomains: 0,
+                nentities: 1,
+                nrt_entities: 1,
+            },
+            ..Default::default()
+        };
+        r.cpu[0] = kstep_shm_cpu {
+            cpu: 1,
+            curr: 1,
+            nr_running: 2,
+            ..Default::default()
+        };
+        r.task[0] = kstep_shm_task {
+            task: 1,
+            state: 0,
+            cpu: 1,
+            policy: 2,
+            nice: -3,
+            rt_priority: 5,
+            cgroup: 0,
+            cpus: 0b110,
+            ..Default::default()
+        };
+        r.cgroup[0].path[..2].copy_from_slice(&[b'/' as _, b'a' as _]);
+        r.cgroup[0].weight = 100;
+        r.cfs[0] = kstep_shm_cfs {
+            cpu: 1,
+            min_vruntime: 1000,
+            ..Default::default()
+        };
+        r.entity[0] = kstep_shm_entity {
+            task: 1,
+            cpu: 1,
+            se: kstep_shm_se {
+                flags: KSTEP_SE_ELIGIBLE | KSTEP_SE_CURR,
+                share: 512,
+                lag: -8,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        r.rt[0] = kstep_shm_rt {
+            cpu: 1,
+            highest_prio: 100,
+            ..Default::default()
+        };
+        r.rt_entity[0] = kstep_shm_rt_entity {
+            task: 1,
+            cpu: 1,
+            flags: KSTEP_RT_ON_RQ | KSTEP_RT_PICK,
+            time_slice: 99,
+            ..Default::default()
+        };
+
+        let st = decode(&bytes(&r)).unwrap();
         assert_eq!(st.timestamp, 7);
         assert_eq!(
             st.cpus,
@@ -543,12 +480,23 @@ mod tests {
             ),
             (1, "/a", true, true, false, 0.5, -8)
         );
-        assert_eq!(st.rt[0].highest_prio, 100);
-        assert!(st.domains.is_empty() && st.rt_entities.is_empty());
+        assert_eq!(
+            (
+                st.rt[0].highest_prio,
+                st.rt_entities[0].pick,
+                st.rt_entities[0].time_slice
+            ),
+            (100, true, 99)
+        );
+        assert!(st.domains.is_empty());
 
-        put32(&mut b, 8, 3);
-        assert_eq!(decode_region(&b), Err(Error::Busy));
-        put32(&mut b, 4, LAYOUT + 1);
-        assert_eq!(decode_region(&b), Err(Error::Layout(LAYOUT + 1)));
+        r.hdr.gen_ = 3;
+        assert_eq!(decode(&bytes(&r)), Err(Error::Busy));
+        r.hdr.gen_ = 2;
+        r.hdr.ntasks = KSTEP_SHM_TASKS + 1;
+        assert_eq!(decode(&bytes(&r)), Err(Error::Busy));
+        r.hdr.layout = LAYOUT + 1;
+        assert_eq!(decode(&bytes(&r)), Err(Error::Layout(LAYOUT + 1)));
+        assert_eq!(decode(&bytes(&r)[..100]), Err(Error::Short));
     }
 }

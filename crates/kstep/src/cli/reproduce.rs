@@ -3,7 +3,7 @@ use clap::ValueEnum;
 use kstep::bugs::{self, Bug, Kernel};
 use kstep::cmd::{cmd, run, GREEN, RESET};
 use kstep::{Build, ResultDir};
-use kstep_core::qemu::{Accel, Boot, Console};
+use kstep_core::qemu::{Accel, Boot, Io};
 
 /// Check out, build and run a bug on its buggy and fixed kernels, then plot the two traces
 #[derive(clap::Args)]
@@ -57,9 +57,11 @@ fn reproduce(bug: &Bug, kernel: &Kernel) -> Result<()> {
         rootfs: b.rootfs(),
         driver: bug.name.clone(),
         machine: bug.machine(),
-        log: results.log(),
-        jsonl: results.jsonl(),
-        console: Console::Headless,
+        io: Io::Native {
+            log: results.log(),
+            jsonl: results.jsonl(),
+            terminal: false,
+        },
         accel: Accel::detect(),
         debug: false,
         ram_file: None,

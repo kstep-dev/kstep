@@ -19,7 +19,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use kstep::bugs::Bug;
 use kstep::{bugs, Build, ResultDir, Session};
-use kstep_core::qemu::{Accel, Boot, Console};
+use kstep_core::qemu::{Accel, Boot, Io};
 use kstep_core::shm::COV_SIZE;
 use libafl::{
     corpus::{InMemoryOnDiskCorpus, OnDiskCorpus},
@@ -250,7 +250,11 @@ fn run_program(boot: &Boot, lines: &[String], map: Option<&mut [u8]>) -> (Outcom
 // Only once the driver runs: a kernel that warns while booting (6.12-rc1 does, in
 // pick_task_fair) would otherwise turn every test case into a finding.
 fn console_oops(boot: &Boot) -> bool {
-    let log = fs::read_to_string(&boot.log).unwrap_or_default();
+    let log = boot
+        .io
+        .log()
+        .and_then(|l| fs::read_to_string(l).ok())
+        .unwrap_or_default();
     let run = log.find("Starting cli").map_or("", |i| &log[i..]);
     [
         "Oops",
@@ -290,7 +294,9 @@ impl QemuExecutor {
             format!("# {why}\n{}\n", lines.join("\n")),
         );
         let _ = fs::write(base.with_extension("jsonl"), transcript);
-        let _ = fs::copy(&self.boot.log, base.with_extension("log"));
+        if let Some(log) = self.boot.io.log() {
+            let _ = fs::copy(log, base.with_extension("log"));
+        }
         println!("finding {}: {why}", base.display());
     }
 }
@@ -347,9 +353,11 @@ fn boot(build: &Build, bug: &Bug, label: &str) -> Result<Boot> {
         rootfs: build.rootfs(),
         driver: "cli".into(),
         machine: bug.machine(),
-        log: results.log(),
-        jsonl: results.jsonl(),
-        console: Console::Headless,
+        io: Io::Native {
+            log: results.log(),
+            jsonl: results.jsonl(),
+            terminal: false,
+        },
         accel: Accel::detect(),
         debug: false,
         ram_file: None,

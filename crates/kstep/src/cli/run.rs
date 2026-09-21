@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::{Context, Result};
 use kstep::{bugs, Build, ResultDir, Session};
-use kstep_core::qemu::{Accel, Boot, Console, Machine};
+use kstep_core::qemu::{Accel, Boot, Io, Machine};
 use kstep_core::shm::State;
 
 /// Boot a driver under QEMU (building kSTEP first) and record the run under results/
@@ -80,14 +80,12 @@ pub fn main(a: Args) -> Result<()> {
         rootfs: b.rootfs(),
         driver,
         machine,
-        log: results.log(),
-        jsonl: results.jsonl(),
         // the cli's terminal is ours; another driver's console goes to the terminal when there
         // is one, and in a script or CI to qemu.log alone
-        console: if interactive && !cli {
-            Console::Terminal
-        } else {
-            Console::Headless
+        io: Io::Native {
+            log: results.log(),
+            jsonl: results.jsonl(),
+            terminal: interactive && !cli,
         },
         accel,
         debug: a.debug,

@@ -1,7 +1,7 @@
-//! The `kstep` binary: checkout, build, run, reproduce, web. The fuzzer is a second binary in
+//! The `kstep` binary: checkout, build, run, reproduce, viz. The fuzzer is a second binary in
 //! this package behind the `fuzz` feature, so this one never compiles LibAFL.
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
 
 mod cli;
@@ -14,8 +14,7 @@ enum Cli {
     Run(cli::run::Args),
     Gdb(cli::run::GdbArgs),
     Reproduce(cli::reproduce::Args),
-    /// Build the website: bug catalog, playground image and the wasm decoder
-    Web,
+    Viz(cli::viz::Args),
 }
 
 fn main() -> Result<()> {
@@ -25,6 +24,6 @@ fn main() -> Result<()> {
         Cli::Run(args) => cli::run::main(args),
         Cli::Gdb(args) => cli::run::gdb(args),
         Cli::Reproduce(args) => cli::reproduce::main(args),
-        Cli::Web => bail!("not ported yet: use website/build.py"),
+        Cli::Viz(args) => cli::viz::main(args),
     }
 }

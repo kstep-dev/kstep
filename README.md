@@ -111,7 +111,7 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 
 - **results/**: Run outputs. See [`results/README.md`](https://github.com/kstep-dev/results). `repro_<bug>/` is tracked; `tmp_*` are gitignored. The fuzzer's per-client runs land in `fuzz_<build>_<n>/`.
 
-- **crates/**: the Rust tooling. `core/` is what the website's wasm decoder shares with the binaries (the `kmod/shm.h` decoder, generated from the header, and the QEMU command line); `kstep/` is the `kstep` command (`./kstep.sh`): checkout, build, run, reproduce, web; `fuzz/` is the LibAFL fuzzer (`./kstep-fuzz.sh <bug>`), a host-side client of the `cli` driver, with corpora and findings under `fuzz/` (gitignored)
+- **crates/**: the Rust tooling. `core/` is what the website's wasm decoder shares with the binaries (the `kmod/shm.h` decoder, generated from the header, and the QEMU command line); `kstep/` is the `kstep` command (`./kstep.sh`): checkout, build, run, reproduce, viz; `fuzz/` is the LibAFL fuzzer (`./kstep-fuzz.sh <bug>`), a host-side client of the `cli` driver, with corpora and findings under `fuzz/` (gitignored)
   - the earlier in-guest fuzzer is kept for reference in [`docs/archive/old_fuzzer/`](docs/archive/old_fuzzer/)
 
 - **scripts/**: the plot scripts (Python, self-contained: `uv run --script scripts/plot_<format>.py <bug>`), which `kstep reproduce` runs.

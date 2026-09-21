@@ -1,0 +1,290 @@
+//! `kstep viz`: build the visualization website (website/site), serve it, or publish it.
+
+use std::fs;
+use std::io::{BufRead, BufReader, Write};
+use std::net::TcpListener;
+use std::path::PathBuf;
+
+use anyhow::{bail, Context, Result};
+use clap::Subcommand;
+use kstep::bugs::{self, Bug};
+use kstep::cmd::{cmd, output, run};
+use kstep::Build;
+use kstep_core::qemu::{Arch, ARCH};
+use serde_json::json;
+
+/// Build the website: bug catalog, playground image and the wasm decoder; then serve or deploy
+#[derive(clap::Args)]
+#[command(
+    after_help = "The site is website/site: the tracked page plus qemu/ (from website/setup.sh) and what this
+writes there: data.json, images/cli (the playground image, kSTEP's build/v6.18) and kstep_core.js
++ kstep_core_bg.wasm (crates/core for wasm32). Run it after changing the page, the kmod or bugs.yaml."
+)]
+pub struct Args {
+    #[command(subcommand)]
+    cmd: Option<Cmd>,
+}
+
+#[derive(Subcommand)]
+enum Cmd {
+    /// Build, then serve site/ at http://localhost:PORT/
+    Serve {
+        #[arg(default_value_t = 8080)]
+        port: u16,
+    },
+    /// Build, gate on pagetest.mjs and `run.mjs --check`, force-push site/ as gh-pages
+    Deploy,
+}
+
+const KSTEP_URL: &str = "https://github.com/kstep-dev/kstep/blob/master";
+const RESULTS_URL: &str = "https://raw.githubusercontent.com/kstep-dev/results/main";
+/// Upstream fix of a patch-based bug
+const OFFICIAL_FIX: [(&str, &str); 1] =
+    [("sync_wakeup", "aa3ee4f0b7541382c9f6f43f7408d73a5d4f4042")];
+/// The playground image: Linux v6.18 for arm64, shared with the repro builds
+const IMAGE: &str = "v6.18";
+
+fn website() -> PathBuf {
+    kstep::proj_dir().join("website")
+}
+
+fn site() -> PathBuf {
+    website().join("site")
+}
+
+/// emsdk's node (website/setup.sh installs one) or the system's.
+fn node() -> Result<PathBuf> {
+    let emsdk = website().join("build/emsdk/node");
+    if let Ok(versions) = fs::read_dir(&emsdk) {
+        for v in versions.flatten() {
+            let node = v.path().join("bin/node");
+            if node.is_file() {
+                return Ok(node);
+            }
+        }
+    }
+    let path = std::env::var_os("PATH").unwrap_or_default();
+    std::env::split_paths(&path)
+        .map(|p| p.join("node"))
+        .find(|p| p.is_file())
+        .context("no node: run website/setup.sh or install Node >= 20")
+}
+
+/// What the bug catalog shows (the README's results table says the same by hand).
+fn catalog(bug: &Bug) -> serde_json::Value {
+    let commit = |h: &str| json!({ "label": format!("linux@{}", &h[..7]), "url": format!("https://github.com/torvalds/linux/commit/{h}") });
+    let mut fixes: Vec<_> = bug.fix.iter().map(|h| commit(h)).collect();
+    if let Some((_, h)) = OFFICIAL_FIX.iter().find(|(n, _)| *n == bug.name) {
+        fixes.push(commit(h));
+    }
+    if let Some(p) = &bug.patch {
+        fixes.push(json!({ "label": p, "url": format!("{KSTEP_URL}/linux/{p}") }));
+    }
+    let driver = ["drivers", "drivers_generated"]
+        .iter()
+        .map(|d| format!("kmod/{d}/{}.c", bug.name))
+        .find(|p| kstep::proj_dir().join(p).is_file())
+        .unwrap_or_else(|| format!("kmod/drivers/{}.c", bug.name));
+    json!({
+        "name": bug.name, "num_cpus": bug.num_cpus, "mem_mb": bug.mem_mb,
+        "driver_url": format!("{KSTEP_URL}/{driver}"),
+        "fixes": fixes,
+        // results are published for every bug with a plot format
+        "plot": bug.plot_format.as_ref().map(|_| format!("{RESULTS_URL}/repro_{}/plot.png", bug.name)),
+    })
+}
+
+/// crates/core for wasm32 through wasm-bindgen, into site/.
+fn build_decoder() -> Result<()> {
+    let root = kstep::proj_dir();
+    run(
+        cmd(
+            "cargo",
+            [
+                "build",
+                "-p",
+                "kstep-core",
+                "--profile",
+                "wasm",
+                "--target",
+                "wasm32-unknown-unknown",
+                "--features",
+                "wasm",
+            ],
+        )
+        .current_dir(&root),
+        None,
+    )
+    .context("the wasm target: rustup target add wasm32-unknown-unknown")?;
+    let wasm = root.join("target/wasm32-unknown-unknown/wasm/kstep_core.wasm");
+    // the CLI must match the wasm-bindgen crate in Cargo.lock exactly
+    let lock = fs::read_to_string(root.join("Cargo.lock"))?;
+    let version = lock
+        .split("name = \"wasm-bindgen\"\n")
+        .nth(1)
+        .and_then(|s| s.lines().next())
+        .map(|l| l.trim_start_matches("version = ").trim_matches('"'))
+        .unwrap_or("?");
+    run(
+        cmd(
+            "wasm-bindgen",
+            ["--target", "web", "--no-typescript", "--out-dir"],
+        )
+        .arg(site())
+        .arg(&wasm),
+        None,
+    )
+    .with_context(|| format!("wasm-bindgen: cargo install wasm-bindgen-cli --version {version}"))
+}
+
+fn build() -> Result<String> {
+    if !site().join("qemu/qemu-system-aarch64.wasm").exists() {
+        bail!("no wasm QEMU in website/site/qemu; run website/setup.sh");
+    }
+    if ARCH != Arch::Aarch64 {
+        bail!("the playground image is arm64; build the site on an arm64 host");
+    }
+    build_decoder()?;
+
+    // data.json: a cache-busting version and the bug catalog
+    let rev = output(cmd("git", ["rev-parse", "--short", "HEAD"]).current_dir(website()))?
+        .trim()
+        .to_string();
+    let version = format!("{rev}-{}", chrono::Utc::now().format("%Y%m%d%H%M"));
+    let all = bugs::load()?;
+    let bugs: Vec<_> = all
+        .values()
+        .filter(|b| !b.extra)
+        .chain(all.values().filter(|b| b.extra))
+        .map(catalog)
+        .collect();
+    fs::write(
+        site().join("data.json"),
+        serde_json::to_string_pretty(&json!({ "version": version, "bugs": bugs }))?,
+    )?;
+
+    // The playground image, rebuilt from the current kmod and user.c so the page and the driver
+    // it talks to are always published together. First time: a kernel build (~10 min).
+    if Build::new(Some(IMAGE)).is_err() {
+        kstep::checkout(IMAGE, IMAGE, None, true, false)?;
+    }
+    let b = Build::new(Some(IMAGE))?;
+    b.build_kstep()?;
+    let images = site().join("images/cli");
+    fs::create_dir_all(&images)?;
+    fs::copy(b.kernel(), images.join("kernel"))?;
+    fs::copy(b.rootfs(), images.join("rootfs.cpio"))?;
+    let size = output(cmd("du", ["-sh"]).arg(site()))?
+        .split_whitespace()
+        .next()
+        .unwrap_or("?")
+        .to_string();
+    println!("site/: {size}; {} bugs; version {version}", all.len());
+    Ok(version)
+}
+
+/// A static file server for site/. Everything the page fetches is versioned (?v=) except
+/// index.html itself, so send no-cache: a browser then revalidates and sees an edit at once.
+fn serve(port: u16) -> Result<()> {
+    let listener =
+        TcpListener::bind(("127.0.0.1", port)).with_context(|| format!("bind port {port}"))?;
+    println!("http://localhost:{port}/");
+    for stream in listener.incoming().flatten() {
+        let _ = std::thread::spawn(move || -> std::io::Result<()> {
+            let mut stream = stream;
+            let mut reader = BufReader::new(stream.try_clone()?);
+            let mut req = String::new();
+            reader.read_line(&mut req)?;
+            let mut line = String::new();
+            loop {
+                line.clear();
+                if reader.read_line(&mut line)? == 0 || line == "\r\n" || line == "\n" {
+                    break; // the blank line ends the headers, which go unused
+                }
+            }
+            let path = req
+                .split_whitespace()
+                .nth(1)
+                .unwrap_or("/")
+                .split('?')
+                .next()
+                .unwrap_or("/");
+            let rel = path.trim_start_matches('/');
+            let file = site().join(if rel.is_empty() { "index.html" } else { rel });
+            let mime = match file.extension().and_then(|e| e.to_str()) {
+                Some("html") => "text/html",
+                Some("js") | Some("mjs") => "text/javascript",
+                Some("css") => "text/css",
+                Some("json") => "application/json",
+                Some("wasm") => "application/wasm",
+                Some("png") => "image/png",
+                Some("svg") => "image/svg+xml",
+                Some("pdf") => "application/pdf",
+                _ => "application/octet-stream",
+            };
+            match fs::read(&file) {
+                Ok(body) if !rel.contains("..") => {
+                    write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n", body.len())?;
+                    stream.write_all(&body)
+                }
+                _ => write!(
+                    stream,
+                    "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                ),
+            }
+        });
+    }
+    Ok(())
+}
+
+/// Refuse to publish a page whose playground image does not speak its protocol, then push site/
+/// as the orphan gh-pages branch.
+fn deploy(version: &str) -> Result<()> {
+    let node = node()?;
+    run(
+        &mut cmd(node.to_str().unwrap(), [website().join("pagetest.mjs")]),
+        None,
+    )
+    .context("deploy aborted: site/playground.mjs failed its checks")?;
+    run(
+        cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
+            .arg(website().join("run.mjs"))
+            .arg("--check"),
+        None,
+    )
+    .context("deploy aborted: rebuild the playground image from the current kmod and user.c")?;
+    let origin = output(cmd("git", ["remote", "get-url", "origin"]).current_dir(website()))?
+        .trim()
+        .to_string();
+    let tmp = std::env::temp_dir().join(format!("kstep-site-{}", std::process::id()));
+    run(cmd("cp", ["-r"]).arg(site()).arg(&tmp), None)?;
+    let git = |args: &[&str]| run(cmd("git", args).current_dir(&tmp), None);
+    let result = git(&["init", "-q", "-b", "gh-pages"])
+        .and_then(|_| git(&["add", "-A"]))
+        .and_then(|_| {
+            git(&[
+                "-c",
+                "user.name=kstep viz",
+                "-c",
+                "user.email=deploy@kstep",
+                "commit",
+                "-q",
+                "-m",
+                &format!("Deploy {version}"),
+            ])
+        })
+        .and_then(|_| git(&["push", "-q", "--force", &origin, "gh-pages"]));
+    let _ = fs::remove_dir_all(&tmp);
+    result?;
+    println!("pushed gh-pages ({version})");
+    Ok(())
+}
+
+pub fn main(a: Args) -> Result<()> {
+    let version = build()?;
+    match a.cmd {
+        None => Ok(()),
+        Some(Cmd::Serve { port }) => serve(port),
+        Some(Cmd::Deploy) => deploy(&version),
+    }
+}

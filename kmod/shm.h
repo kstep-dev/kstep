@@ -19,38 +19,25 @@
 #define KSTEP_SHM_GROUPS KSTEP_SHM_CPUS // a domain's balancing groups, at most one per CPU
 #define KSTEP_COV_SIZE (1 << 16) // cov.c's edge map, saturating byte counts; fuzzer/src/main.rs MAP_SIZE
 
-// The header describes the rest of the region: one descriptor per table, so the host reads where
-// each table starts, how wide its records are and how many are there instead of hardcoding any of
-// it. Only the first three fields are a fixed contract: magic, then layout, then gen. A host
-// checks magic and layout before trusting anything else. Bump KSTEP_SHM_LAYOUT whenever a
-// record's fields change meaning without changing its size -- the strides catch everything that
-// resizes, this catches the rest.
+// The host decodes the region with structs generated from this header (crates/core/src/shm.rs),
+// so the header only says how many records each table holds. magic and layout come first, and a
+// host checks both before trusting anything else: bump KSTEP_SHM_LAYOUT whenever a struct below
+// changes, in size or in meaning. gen is the seqlock.
 #define KSTEP_SHM_MAGIC 0x5054536b // "kSTP", little endian
-#define KSTEP_SHM_LAYOUT 6
+#define KSTEP_SHM_LAYOUT 7
 
 // The machine and the tasks first, then one pair of tables per scheduling class: the class's
-// queue on each CPU, and what is on those queues. A task's record says which class it is under;
-// what that class makes of it is in the class's own member table, joined by task number. Nothing
-// about one class sits in the CPU or task record, so adding a class is adding a pair here.
-enum kstep_shm_tables {
-  KSTEP_TBL_CPU, KSTEP_TBL_TASK, KSTEP_TBL_CGROUP, KSTEP_TBL_DOMAIN,
-  KSTEP_TBL_CFS, KSTEP_TBL_ENTITY, // the fair class: the root cfs_rq per CPU, and every entity queued under it
-  KSTEP_TBL_RT, KSTEP_TBL_RT_ENTITY, // the real-time class: the rt_rq per CPU, and the tasks on it
-  KSTEP_TBL_N
-};
-
-struct kstep_shm_table {
-  u32 n, max;      // records written by the last update, and the table's capacity
-  u32 off, stride; // where the table starts in the region, and a record's size
-};
-
+// queue on each CPU (ncpus records, like the CPU table), and what is on those queues. A task's
+// record says which class it is under; what that class makes of it is in the class's own member
+// table, joined by task number. Nothing about one class sits in the CPU or task record, so adding
+// a class is adding a pair here.
 struct kstep_shm_hdr {
   u32 magic, layout;
   u32 gen;
   u32 timestamp; // logical ticks
-  struct kstep_shm_table table[KSTEP_TBL_N];
-  u32 max_groups, group_stride; // the one nested table: a domain record's balancing groups
-  u32 reserved[2];
+  u32 ncpus, ntasks, ncgroups, ndomains;
+  u32 nentities;    // the fair class: entities queued under the root cfs_rq of any CPU
+  u32 nrt_entities; // the real-time class: tasks on any rt_rq
 };
 
 // The runqueue itself, and nothing any one class owns: what the CPU is doing, and when its

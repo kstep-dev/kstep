@@ -5,7 +5,6 @@
 #include <linux/gfp.h>
 #include <linux/kstrtox.h>
 #include <linux/sched/rt.h>
-#include <linux/stddef.h>
 #include <linux/version.h>
 #include <asm/io.h>
 
@@ -18,25 +17,7 @@ phys_addr_t kstep_shm_init(void) {
   shm = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, get_order(sizeof(*shm)));
   if (!shm)
     panic("Failed to allocate the shared region");
-  // The shape, written once: it is a property of the build, not of any command.
-#define TABLE(field, cap) { .max = (cap), .off = offsetof(struct kstep_shm, field), .stride = sizeof(shm->field[0]) }
-  shm->hdr = (struct kstep_shm_hdr){
-      .magic = KSTEP_SHM_MAGIC,
-      .layout = KSTEP_SHM_LAYOUT,
-      .table = {
-          [KSTEP_TBL_CPU] = TABLE(cpu, KSTEP_SHM_CPUS),
-          [KSTEP_TBL_TASK] = TABLE(task, KSTEP_SHM_TASKS),
-          [KSTEP_TBL_CGROUP] = TABLE(cgroup, KSTEP_SHM_CGROUPS),
-          [KSTEP_TBL_DOMAIN] = TABLE(domain, KSTEP_SHM_DOMAINS),
-          [KSTEP_TBL_CFS] = TABLE(cfs, KSTEP_SHM_CPUS),
-          [KSTEP_TBL_ENTITY] = TABLE(entity, KSTEP_SHM_ENTITIES),
-          [KSTEP_TBL_RT] = TABLE(rt, KSTEP_SHM_CPUS),
-          [KSTEP_TBL_RT_ENTITY] = TABLE(rt_entity, KSTEP_SHM_TASKS),
-      },
-      .max_groups = KSTEP_SHM_GROUPS,
-      .group_stride = sizeof(struct kstep_shm_group),
-  };
-#undef TABLE
+  shm->hdr = (struct kstep_shm_hdr){.magic = KSTEP_SHM_MAGIC, .layout = KSTEP_SHM_LAYOUT};
   return virt_to_phys(shm);
 }
 
@@ -408,14 +389,12 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
   memcpy(shm->cgroup, cgroups, ncgroups * sizeof(*cgroups));
   memcpy(shm->entity, entities, nentities * sizeof(*entities));
   shm->hdr.timestamp = kstep_jiffies_get();
-  shm->hdr.table[KSTEP_TBL_CPU].n = ncpus;
-  shm->hdr.table[KSTEP_TBL_TASK].n = nt;
-  shm->hdr.table[KSTEP_TBL_CGROUP].n = ncgroups;
-  shm->hdr.table[KSTEP_TBL_DOMAIN].n = shm_collect_domains(shm->domain, ncpus);
-  shm->hdr.table[KSTEP_TBL_CFS].n = ncpus;
-  shm->hdr.table[KSTEP_TBL_ENTITY].n = nentities;
-  shm->hdr.table[KSTEP_TBL_RT].n = ncpus;
-  shm->hdr.table[KSTEP_TBL_RT_ENTITY].n = nrt;
+  shm->hdr.ncpus = ncpus;
+  shm->hdr.ntasks = nt;
+  shm->hdr.ncgroups = ncgroups;
+  shm->hdr.ndomains = shm_collect_domains(shm->domain, ncpus);
+  shm->hdr.nentities = nentities;
+  shm->hdr.nrt_entities = nrt;
   smp_wmb();
   WRITE_ONCE(shm->hdr.gen, shm->hdr.gen + 1); // even: consistent
 }

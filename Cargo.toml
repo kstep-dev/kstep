@@ -1,7 +1,7 @@
 # kSTEP's host-side tooling. Everything that used to be Python glue around git, make, gcc and
 # QEMU lives here; plotting stays in scripts/ (matplotlib) and reads what the kstep binary writes.
 #
-#   ./kstep.sh <checkout|build|run|reproduce|web> ...
+#   ./kstep.sh <checkout|build|run|reproduce|viz> ...
 #
 # crates/core   kstep-core: what the wasm page shares with the binaries (shm decoder, QEMU argv)
 # crates/kstep  the `kstep` binary and its library (checkout, build, bugs.yaml, results, sessions)
@@ -22,3 +22,12 @@ repository = "https://github.com/kstep-dev/kstep"
 # Symbols in optimized binaries: the fuzzer's panics and perf profiles should name functions.
 [profile.release]
 debug = 1
+
+# The website's decoder: small above all
+[profile.wasm]
+inherits = "release"
+debug = 0
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

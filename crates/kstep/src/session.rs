@@ -12,8 +12,8 @@ use std::process::{Child, Stdio};
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, bail, Context, Result};
-use kstep_core::qemu::{Boot, RAM_BASE};
-use kstep_core::shm::{self, Layout, State, COV_SIZE, HDR_SIZE};
+use kstep_core::qemu::{Boot, Io, ARCH};
+use kstep_core::shm::{self, State, COV_SIZE};
 use serde_json::Value;
 
 pub struct Session {
@@ -21,7 +21,6 @@ pub struct Session {
     reader: BufReader<UnixStream>,
     writer: UnixStream,
     ram: File,
-    layout: Layout,
     shm_at: u64,
     cov_at: Option<u64>,
     snapshot: Vec<u8>,
@@ -54,7 +53,11 @@ impl Session {
             ram_path
         };
         boot.ram_file = Some(ram_path.clone());
-        let sock_path = Boot::socket(&boot.jsonl);
+        let sock_path = Io::socket(
+            boot.io
+                .jsonl()
+                .context("a session needs the driver's socket")?,
+        );
         let _ = std::fs::remove_file(&sock_path);
         let mut command = boot.command();
         command.stdin(Stdio::null()).stdout(Stdio::null());
@@ -98,29 +101,27 @@ impl Session {
             .get("shm")
             .and_then(Value::as_u64)
             .context("ready line without shm address")?;
-        let shm_at = shm.checked_sub(RAM_BASE).context("shm address below RAM")?;
+        let shm_at = shm
+            .checked_sub(ARCH.ram_base())
+            .context("shm address below RAM")?;
         // 0 where the kernel has no coverage map (built without linux/config.kstep.cov)
         let cov_at = ready
             .get("cov")
             .and_then(Value::as_u64)
             .filter(|&c| c != 0)
-            .and_then(|c| c.checked_sub(RAM_BASE));
-        let mut hdr = [0u8; HDR_SIZE];
-        ram.read_exact_at(&mut hdr, shm_at)
-            .context("read shm header")?;
-        let layout = Layout::parse(&hdr)?;
-        let snapshot = vec![0; layout.size];
-        Ok(Session {
+            .and_then(|c| c.checked_sub(ARCH.ram_base()));
+        let mut s = Session {
             child,
             reader,
             writer: stream,
             ram,
-            layout,
             shm_at,
             cov_at,
-            snapshot,
+            snapshot: vec![0; shm::SIZE],
             ready,
-        })
+        };
+        s.state().context("read the shared region")?; // magic and layout: the image speaks our version
+        Ok(s)
     }
 
     /// Send one cli line and collect its answer.
@@ -136,7 +137,7 @@ impl Session {
             self.ram
                 .read_exact_at(&mut self.snapshot, self.shm_at)
                 .context("read shm")?;
-            match shm::decode(&self.snapshot, &self.layout) {
+            match shm::decode(&self.snapshot) {
                 Err(shm::Error::Busy) => std::thread::sleep(Duration::from_millis(1)),
                 r => return r.map_err(Into::into),
             }
