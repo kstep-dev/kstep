@@ -23,7 +23,7 @@
 //   cgroup-cpus /a <cpulist>  cpuset.cpus
 //   cgroup-destroy /a         it must hold no task and no child
 //   cgroup-attach /a <n>      `cgroup-attach / <n>` moves the task back to the root
-//   cpu-topo KEY=g|g;...      e.g. CLS=1-2|3-4;CAP=2,4:512: groups per level and CAP groups
+//   cpu-topo KEY=g|g;...      e.g. CPUS=4;CLS=1-2|3-4;CAP=2,4:512: the test CPU count, groups per level and CAP groups
 //                             cpulist:scale; never CPU 0; rebuilds the sched domains (cpu.c)
 //   cpu-freq <cpu> <scale>      current frequency, as cpufreq changes it under a running system
 //   check <name>              enable a checker (checkers/); a rule that fires emits a warn record
@@ -110,7 +110,7 @@ static void cmd_tick(char *arg) {
 }
 
 static void cmd_affinity(char *arg) {
-  const char *usage = "usage: affinity <n> <cpulist within 1..N-1>";
+  const char *usage = "usage: affinity <n> <cpulist within 1..CPUS>";
   struct task_struct *p = parse_task(&arg, usage);
 
   if (!p)
@@ -230,7 +230,7 @@ static void cmd_cgroup_weight(char *arg) {
 }
 
 static void cmd_cgroup_cpus(char *arg) {
-  const char *usage = "usage: cgroup-cpus /path <cpulist within 1..N-1>";
+  const char *usage = "usage: cgroup-cpus /path <cpulist within 1..CPUS>";
   const char *name = parse_cgroup(&arg, usage, false);
   struct cpumask mask;
 
@@ -288,7 +288,7 @@ static void cmd_cpu_scale(char *arg, const char *usage, void (*set)(int cpu, int
   if (!val)
     return reply_error(usage);
   *val++ = '\0';
-  if (kstrtoint(arg, 10, &cpu) || cpu < 1 || cpu >= num_online_cpus() || kstrtoint(val, 10, &scale) ||
+  if (kstrtoint(arg, 10, &cpu) || cpu < 1 || cpu > kstep_test_ncpus || kstrtoint(val, 10, &scale) ||
       scale < 1 || scale > SCHED_CAPACITY_SCALE)
     return reply_error(usage);
   set(cpu, scale);
@@ -300,7 +300,7 @@ static void cmd_cpu_freq(char *arg) {
 
 static void cmd_cpu_topo(char *arg) {
   if (!arg)
-    return reply_error("usage: cpu-topo KEY=group|group[;...] (levels and CAP, see cpu.c)");
+    return reply_error("usage: cpu-topo KEY=group|group[;...] (levels, CAP and CPUS=K, see cpu.c)");
   const char *err = kstep_topo_set(arg);
   if (err)
     reply_error(err);

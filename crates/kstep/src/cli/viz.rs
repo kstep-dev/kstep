@@ -1,8 +1,6 @@
 //! `kstep viz`: build the visualization website (website/site), serve it, or publish it.
 
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpListener;
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
@@ -10,36 +8,40 @@ use clap::Subcommand;
 use kstep::bugs::{self, Bug};
 use kstep::cmd::{cmd, output, run};
 use kstep::Build;
-use kstep_core::qemu::{Arch, ARCH};
+use kstep_core::qemu::{AARCH64, ARCH};
 use serde_json::json;
 
-/// Serve the website at http://localhost:PORT/ (built first if it never was); `build` and `deploy`
+/// Build the website and serve it at http://localhost:PORT/; `build`, `serve` and `deploy` do one thing each
 #[derive(clap::Args)]
 #[command(
     after_help = "The site is website/site: the tracked page plus qemu/ (from website/setup.sh) and what `build`
-writes there: data.json, images/cli (the playground image, kSTEP's build/v6.18, and its snapshot)
-and kstep_core.js + kstep_core_bg.wasm (crates/core for wasm32). Edits to the page show on a
-reload; `build` again after changing the kmod, user.c, crates/core or bugs.yaml."
+writes there: data.json, images/<kernel>/ (a playground image per supported LTS kernel, from
+kSTEP's build/<kernel>, and its snapshot) and kstep_core.js + kstep_core_bg.wasm (crates/core for
+wasm32). Plain `kstep viz` builds first, incrementally (an unchanged image keeps its snapshot), then
+serves; `serve` skips the build, for page edits, which show on a reload."
 )]
 pub struct Args {
     #[command(subcommand)]
     cmd: Option<Cmd>,
-    #[arg(long, default_value_t = 8080)]
+    #[arg(long, global = true, default_value_t = 8080)]
     port: u16,
 }
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Rebuild the bug catalog, the wasm decoder, the playground image and its snapshot
+    /// Rebuild the bug catalog, the wasm decoder, the playground images and their snapshots
     Build,
+    /// Serve site/ as it is, without building
+    Serve,
     /// Build, gate on pagetest.mjs and `run.mjs --check`, force-push site/ as gh-pages
     Deploy,
 }
 
 const KSTEP_URL: &str = "https://github.com/kstep-dev/kstep/blob/master";
 const RESULTS_URL: &str = "https://raw.githubusercontent.com/kstep-dev/results/main";
-/// The playground image: Linux v6.18 for arm64, shared with the repro builds
-const IMAGE: &str = "v6.18";
+/// The playground images: every supported LTS kernel for arm64, shared with the repro builds;
+/// the page boots this one unless the URL says otherwise
+const DEFAULT_IMAGE: &str = "v6.18";
 
 fn website() -> PathBuf {
     kstep::proj_dir().join("website")
@@ -65,6 +67,15 @@ fn node() -> Result<PathBuf> {
         .map(|p| p.join("node"))
         .find(|p| p.is_file())
         .context("no node: run website/setup.sh or install Node >= 20")
+}
+
+/// One of website/'s scripts under node, from website/.
+fn mjs(node: &std::path::Path, script: &str, args: &[&str]) -> std::process::Command {
+    let mut c = cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"]);
+    c.arg(website().join(script))
+        .args(args)
+        .current_dir(website());
+    c
 }
 
 /// What the bug catalog shows (the README's results table says the same by hand).
@@ -116,14 +127,6 @@ fn build_decoder() -> Result<()> {
     )
     .context("the wasm target: rustup target add wasm32-unknown-unknown")?;
     let wasm = root.join("target/wasm32-unknown-unknown/wasm/kstep_core.wasm");
-    // the CLI must match the wasm-bindgen crate in Cargo.lock exactly
-    let lock = fs::read_to_string(root.join("Cargo.lock"))?;
-    let version = lock
-        .split("name = \"wasm-bindgen\"\n")
-        .nth(1)
-        .and_then(|s| s.lines().next())
-        .map(|l| l.trim_start_matches("version = ").trim_matches('"'))
-        .unwrap_or("?");
     run(
         cmd(
             "wasm-bindgen",
@@ -133,14 +136,14 @@ fn build_decoder() -> Result<()> {
         .arg(&wasm),
         None,
     )
-    .with_context(|| format!("wasm-bindgen: cargo install wasm-bindgen-cli --version {version}"))
+    .context("wasm-bindgen: cargo install wasm-bindgen-cli at the version in Cargo.lock")
 }
 
 fn build() -> Result<String> {
-    if !site().join("qemu/qemu-system-aarch64.wasm").exists() {
+    if !site().join(format!("qemu/{}.wasm", AARCH64.qemu)).exists() {
         bail!("no wasm QEMU in website/site/qemu; run website/setup.sh");
     }
-    if ARCH != Arch::Aarch64 {
+    if *ARCH != AARCH64 {
         bail!("the playground image is arm64; build the site on an arm64 host");
     }
     build_decoder()?;
@@ -156,30 +159,45 @@ fn build() -> Result<String> {
     let bugs: Vec<_> = sorted.into_iter().map(catalog).collect();
     fs::write(
         site().join("data.json"),
-        serde_json::to_string_pretty(&json!({ "version": version, "bugs": bugs }))?,
+        serde_json::to_string_pretty(&json!({
+            "version": version, "bugs": bugs,
+            "kernels": kstep::checkout::LTS, "kernel": DEFAULT_IMAGE,
+        }))?,
     )?;
 
-    // The playground image, rebuilt from the current kmod and user.c so the page and the driver
-    // it talks to are always published together. First time: a kernel build (~10 min).
-    let b = Build::new(Some(IMAGE))?;
-    b.build_kstep()?;
-    let images = site().join("images/cli");
-    fs::create_dir_all(&images)?;
-    fs::copy(b.kernel(), images.join("kernel"))?;
-    fs::copy(b.rootfs(), images.join("rootfs.cpio"))?;
-    // The machine at the driver's ready line for the page's default CPU count, so the page resumes
-    // it instead of booting (~0.3 s instead of ~4 s). The stream fits this QEMU build and image
-    // only, hence next to the image and regenerated with it. Needs site/qemu (website/setup.sh).
+    // The playground images, one per supported LTS kernel, rebuilt from the current kmod and
+    // user.c so the page and the driver it talks to are always published together. First time:
+    // a kernel build each (~10 min). The machine at the driver's ready line for the page's
+    // default CPU count goes next to each, so the page resumes it instead of booting (~0.3 s
+    // instead of ~4 s); the stream fits this QEMU build and image only, so it is taken again
+    // exactly when the image changed. Needs site/qemu (website/setup.sh).
     let node = node()?;
-    run(
-        cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
-            .arg(website().join("run.mjs"))
-            .args(["--snapshot", "--image"])
-            .arg(&images)
-            .current_dir(website()),
-        None,
-    )
-    .context("snapshot of the playground image (website/run.mjs --snapshot)")?;
+    for kernel in kstep::checkout::LTS {
+        let b = Build::new(Some(kernel))?;
+        b.build_kstep()?;
+        let images = site().join("images").join(kernel);
+        fs::create_dir_all(&images)?;
+        let same = |src: PathBuf, dst: &str| fs::read(&src).ok() == fs::read(images.join(dst)).ok();
+        if same(b.kernel(), "kernel")
+            && same(b.rootfs(), "rootfs.cpio")
+            && images.join("snap-5.json").is_file()
+        {
+            continue;
+        }
+        fs::copy(b.kernel(), images.join("kernel"))?;
+        fs::copy(b.rootfs(), images.join("rootfs.cpio"))?;
+        run(
+            &mut mjs(
+                &node,
+                "run.mjs",
+                &["--snapshot", "--image", images.to_str().unwrap()],
+            ),
+            None,
+        )
+        .with_context(|| {
+            format!("snapshot of the {kernel} playground image (website/run.mjs --snapshot)")
+        })?;
+    }
     let size = output(cmd("du", ["-sh"]).arg(site()))?
         .split_whitespace()
         .next()
@@ -189,126 +207,41 @@ fn build() -> Result<String> {
     Ok(version)
 }
 
-/// A static file server for site/, for a browser possibly far away (a VS Code port forward):
-/// keep-alive, so one connection carries the page's ~40 requests, and an ETag from the file's
-/// size and mtime, so a refresh gets 304s instead of the 14 MB QEMU again. Everything the page
-/// fetches is versioned (?v=) except index.html, so no-cache: the browser revalidates every
-/// time and sees an edit at once.
+/// Python's static file server on site/, bound to localhost. It answers conditional requests with
+/// 304s, so a refresh does not fetch the 14 MB QEMU again, and a browser revalidates the document
+/// itself on every reload, so an edit to index.html shows at once. No keep-alive (HTTP/1.0): the
+/// page's ~40 requests each open a connection, which over a local port forward is not felt.
 fn serve(port: u16) -> Result<()> {
-    let listener =
-        TcpListener::bind(("127.0.0.1", port)).with_context(|| format!("bind port {port}"))?;
     println!("http://localhost:{port}/");
-    for stream in listener.incoming().flatten() {
-        std::thread::spawn(move || {
-            let _ = connection(stream);
-        });
-    }
-    Ok(())
+    run(
+        cmd("python3", ["-m", "http.server", "-b", "127.0.0.1", "-d"])
+            .arg(site())
+            .arg(port.to_string()),
+        None,
+    )
+    .context("python3 -m http.server")
 }
 
-fn connection(mut stream: std::net::TcpStream) -> std::io::Result<()> {
-    let mut reader = BufReader::new(stream.try_clone()?);
-    loop {
-        let t0 = std::time::Instant::now();
-        let mut req = String::new();
-        if reader.read_line(&mut req)? == 0 {
-            return Ok(()); // the browser closed the connection
-        }
-        let mut etag_seen = None;
-        let mut close = false;
-        let mut line = String::new();
-        loop {
-            line.clear();
-            if reader.read_line(&mut line)? == 0 || line == "\r\n" || line == "\n" {
-                break; // the blank line ends the headers
-            }
-            if let Some((name, value)) = line.split_once(':') {
-                match name.to_ascii_lowercase().as_str() {
-                    "if-none-match" => etag_seen = Some(value.trim().to_string()),
-                    "connection" if value.trim().eq_ignore_ascii_case("close") => close = true,
-                    _ => {}
-                }
-            }
-        }
-        let path = req
-            .split_whitespace()
-            .nth(1)
-            .unwrap_or("/")
-            .split('?')
-            .next()
-            .unwrap_or("/")
-            .to_string();
-        let rel = path.trim_start_matches('/');
-        let file = site().join(if rel.is_empty() { "index.html" } else { rel });
-        let mime = match file.extension().and_then(|e| e.to_str()) {
-            Some("html") => "text/html",
-            Some("js") | Some("mjs") => "text/javascript",
-            Some("css") => "text/css",
-            Some("json") => "application/json",
-            Some("wasm") => "application/wasm",
-            Some("png") => "image/png",
-            Some("svg") => "image/svg+xml",
-            Some("pdf") => "application/pdf",
-            Some("gz") => "application/gzip", // the snapshot: raw bytes, the page gunzips them itself
-            _ => "application/octet-stream",
-        };
-        let meta = fs::metadata(&file)
-            .ok()
-            .filter(|m| m.is_file() && !rel.contains(".."));
-        let etag = meta.as_ref().map(|m| {
-            let mtime = m
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map_or(0, |d| d.as_nanos());
-            format!("\"{}-{mtime:x}\"", m.len())
-        });
-        let (status, bytes) = match (&etag, etag_seen) {
-            (Some(tag), Some(seen)) if *tag == seen => {
-                write!(
-                    stream,
-                    "HTTP/1.1 304 Not Modified\r\nETag: {tag}\r\nCache-Control: no-cache\r\n\r\n"
-                )?;
-                (304, 0)
-            }
-            (Some(tag), _) => {
-                let body = fs::read(&file)?;
-                write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nETag: {tag}\r\nCache-Control: no-cache\r\n\r\n", body.len())?;
-                stream.write_all(&body)?;
-                (200, body.len())
-            }
-            (None, _) => {
-                write!(
-                    stream,
-                    "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n"
-                )?;
-                (404, 0)
-            }
-        };
-        // one line per request: what the browser asked for and how long it took
-        eprintln!("{status} {path} {bytes} B {} ms", t0.elapsed().as_millis());
-        if close {
-            return Ok(());
-        }
-    }
-}
-
-/// Refuse to publish a page whose playground image does not speak its protocol, then push site/
+/// Refuse to publish a page whose playground images do not speak its protocol, then push site/
 /// as the orphan gh-pages branch.
 fn deploy(version: &str) -> Result<()> {
     let node = node()?;
-    run(
-        cmd(node.to_str().unwrap(), [website().join("pagetest.mjs")]).current_dir(website()),
-        None,
-    )
-    .context("deploy aborted: site/viz.mjs failed its checks")?;
-    run(
-        cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
-            .arg(website().join("run.mjs"))
-            .arg("--check"),
-        None,
-    )
-    .context("deploy aborted: rebuild the playground image from the current kmod and user.c")?;
+    run(&mut mjs(&node, "pagetest.mjs", &[]), None)
+        .context("deploy aborted: site/viz.mjs failed its checks")?;
+    for kernel in kstep::checkout::LTS {
+        let image = site().join("images").join(kernel);
+        run(
+            &mut mjs(
+                &node,
+                "run.mjs",
+                &["--check", "--image", image.to_str().unwrap()],
+            ),
+            None,
+        )
+        .with_context(|| {
+            format!("deploy aborted: the {kernel} playground image failed its check")
+        })?;
+    }
     let origin = output(cmd("git", ["remote", "get-url", "origin"]).current_dir(website()))?
         .trim()
         .to_string();
@@ -340,11 +273,10 @@ fn deploy(version: &str) -> Result<()> {
 pub fn main(a: Args) -> Result<()> {
     match a.cmd {
         Some(Cmd::Build) => build().map(|_| ()),
+        Some(Cmd::Serve) => serve(a.port),
         Some(Cmd::Deploy) => deploy(&build()?),
         None => {
-            if !site().join("data.json").exists() {
-                build()?;
-            }
+            build()?; // incremental: what is current stays as it is
             serve(a.port)
         }
     }

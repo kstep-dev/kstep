@@ -17,7 +17,20 @@ phys_addr_t kstep_shm_init(void) {
   shm = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, get_order(sizeof(*shm)));
   if (!shm)
     panic("Failed to allocate the shared region");
-  shm->hdr = (struct kstep_shm_hdr){.magic = KSTEP_SHM_MAGIC, .layout = KSTEP_SHM_LAYOUT};
+  shm->hdr = (struct kstep_shm_hdr){.layout = KSTEP_SHM_LAYOUT};
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
+  shm->hdr.features |= KSTEP_SHM_EEVDF;
+#endif
+  // the sched-domain flag names in this kernel's bit order, so a domain's flags word decodes here
+  {
+    int bit = 0;
+#define SD_FLAG(name, meta_flag)                                                                    \
+    if (bit < KSTEP_SHM_SD_FLAGS)                                                                  \
+      strscpy(shm->sd_flag[bit], &#name[3], KSTEP_SHM_SD_FLAG_LEN);                                \
+    bit++;
+#include <linux/sched/sd_flags.h>
+#undef SD_FLAG
+  }
   return virt_to_phys(shm);
 }
 
@@ -151,8 +164,8 @@ static struct kstep_shm_rt_entity shm_rt_entity(struct task_struct *p, u32 task,
 // happens at, which nothing else reports: a task's own counters are kept in its group's queue, so
 // four equal tasks split two cgroups' halves without anything in the task table saying why. The
 // cpu controller's css is taken from the cgroup rather than the walk's, which is cgroup->self.
-// Called under RCU, from a walk that runs before the seqlock is taken; the entities are stable
-// because the isolated CPUs are held for the whole command.
+// Called under RCU; the entities are stable because the isolated CPUs are held for the whole
+// command.
 static void shm_group_entities(u32 cgroup, struct cgroup *cgrp, struct kstep_shm_entity *ents, u32 *nents) {
 #ifdef CONFIG_FAIR_GROUP_SCHED
   struct cgroup_subsys_state *css = rcu_dereference(cgrp->subsys[cpu_cgrp_id]);
@@ -233,13 +246,14 @@ static u32 shm_collect_cgroups(struct kstep_shm_cgroup *out, struct kstep_shm_en
   return n;
 }
 
-// The sched domains the kernel actually built, per CPU and innermost first. Read under RCU, like
-// any other walk of rq->sd. A group's span comes from sched_group_span (the CPUs it covers), not
-// its balance mask; sd->groups starts at the CPU's own group, so the order is the order that CPU's
-// balancer sees.
-static u32 shm_collect_domains(struct kstep_shm_domain *out, u32 ncpus) {
+// The sched domains the kernel actually built, per CPU and innermost first, and their groups into
+// the flat group table. Read under RCU, like any other walk of rq->sd. A group's span comes from
+// sched_group_span (the CPUs it covers), not its balance mask; sd->groups starts at the CPU's own
+// group, so the order is the order that CPU's balancer sees.
+static u32 shm_collect_domains(struct kstep_shm_domain *out, struct kstep_shm_group *groups, u32 *ngroups, u32 ncpus) {
   u32 n = 0;
 
+  *ngroups = 0;
   rcu_read_lock();
   for (int cpu = 1; cpu <= ncpus && n < KSTEP_SHM_DOMAINS; cpu++) {
     struct sched_domain *sd;
@@ -253,8 +267,8 @@ static u32 shm_collect_domains(struct kstep_shm_domain *out, u32 ncpus) {
       memset(d, 0, sizeof(*d));
       d->cpu = cpu;
       d->span = cpumask_bits(sched_domain_span(sd))[0];
+      d->flags = sd->flags;
       strscpy(d->name, sd->name, sizeof(d->name));
-      kstep_sd_flags_str(sd->flags, d->flags, sizeof(d->flags));
       d->imbalance_pct = sd->imbalance_pct;
       d->balance_interval = sd->balance_interval;
       d->nr_balance_failed = sd->nr_balance_failed;
@@ -262,18 +276,23 @@ static u32 shm_collect_domains(struct kstep_shm_domain *out, u32 ncpus) {
       d->cache_nice_tries = sd->cache_nice_tries;
       // jiffies is the mocked clock plus a fixed offset (tick_jiffies.c), so this is logical ticks
       d->last_balance_ago = jiffies - sd->last_balance;
+      d->group = *ngroups;
       first = sd->groups;
       sg = first;
       do {
-        struct kstep_shm_group *g = &d->group[d->ngroups];
+        struct kstep_shm_group *g = &groups[*ngroups];
 
+        if (*ngroups == KSTEP_SHM_GROUPS)
+          break;
         g->span = cpumask_bits(sched_group_span(sg))[0];
         g->capacity = sg->sgc->capacity;
         g->min_capacity = sg->sgc->min_capacity;
         g->max_capacity = sg->sgc->max_capacity;
         g->weight = sg->group_weight;
+        (*ngroups)++;
+        d->ngroups++;
         sg = sg->next;
-      } while (++d->ngroups < KSTEP_SHM_GROUPS && sg != first);
+      } while (sg != first);
       n++;
     }
   }
@@ -284,15 +303,13 @@ static u32 shm_collect_domains(struct kstep_shm_domain *out, u32 ncpus) {
 // The state after a command. The isolated CPUs are held while a command runs, so their queues
 // can be read directly. tasks[n - 1] is the cli's task number n; exited tasks are skipped.
 void kstep_shm_update(struct task_struct **tasks, int ntasks) {
-  u32 ncpus = min_t(u32, num_online_cpus() - 1, KSTEP_SHM_CPUS), nt = 0, nrt = 0; // table entries written
+  u32 ncpus = kstep_test_ncpus, nt = 0, nrt = 0; // table entries written
   struct kstep_shm_cgroup cgroups[KSTEP_SHM_CGROUPS];
   static struct kstep_shm_entity entities[KSTEP_SHM_ENTITIES]; // 40 KB: not for the stack
   struct task_struct *rt_pick[KSTEP_SHM_CPUS];
   u32 nentities;
-  u32 ncgroups = shm_collect_cgroups(cgroups, entities, &nentities); // sleeps: outside the seqlock, where a reader spins
+  u32 ncgroups = shm_collect_cgroups(cgroups, entities, &nentities);
 
-  WRITE_ONCE(shm->hdr.gen, shm->hdr.gen + 1); // odd: updating
-  smp_wmb();
   for (int cpu = 1; cpu <= ncpus; cpu++) {
     struct rq *rq = cpu_rq(cpu);
     int curr = 0;
@@ -392,9 +409,7 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
   shm->hdr.ncpus = ncpus;
   shm->hdr.ntasks = nt;
   shm->hdr.ncgroups = ncgroups;
-  shm->hdr.ndomains = shm_collect_domains(shm->domain, ncpus);
+  shm->hdr.ndomains = shm_collect_domains(shm->domain, shm->group, &shm->hdr.ngroups, ncpus);
   shm->hdr.nentities = nentities;
   shm->hdr.nrt_entities = nrt;
-  smp_wmb();
-  WRITE_ONCE(shm->hdr.gen, shm->hdr.gen + 1); // even: consistent
 }

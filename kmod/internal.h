@@ -18,7 +18,13 @@
 #define KSTEP_NR_CPUS (32)
 
 // The test CPUs: every online CPU but 0, which is kstep's controller and runs no session task.
-#define for_each_test_cpu(cpu) for (int cpu = 1, _ncpus = num_online_cpus(); cpu < _ncpus; cpu++)
+// The test CPUs, 1..kstep_test_ncpus: where tasks run and what the scheduler's domains, the ticks
+// and the statistics span. All of 1..N-1 from boot, so everything set up before the driver runs
+// covers the whole machine; a cpu-topo spec's CPUS=K then narrows it, and the CPUs left over sit
+// idle, alone at every topology level like CPU 0, with nothing sent their way.
+extern int kstep_test_ncpus;
+void kstep_cpu_init(void);
+#define for_each_test_cpu(cpu) for (int cpu = 1, _ncpus = kstep_test_ncpus; cpu <= _ncpus; cpu++)
 
 // cpu.c
 bool kstep_parse_cpus(const char *list, struct cpumask *mask); // a nonempty cpulist of test CPUs

@@ -6,70 +6,56 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-/// A guest arch. Natively it is the host's (`ARCH`): kSTEP never cross-compiles or
-/// cross-emulates; the website's QEMU is always aarch64. Every arch-specific fact lives here.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Arch {
-    X86_64,
-    Aarch64,
-}
-
+/// The guest arch this build boots. Natively it is the host's: kSTEP never cross-compiles or
+/// cross-emulates. The website's wasm build always boots aarch64.
 #[cfg(target_arch = "x86_64")]
-pub const ARCH: Arch = Arch::X86_64;
-#[cfg(target_arch = "aarch64")]
-pub const ARCH: Arch = Arch::Aarch64;
+pub const ARCH: &ArchSpec = &X86_64;
+#[cfg(any(target_arch = "aarch64", target_arch = "wasm32"))]
+pub const ARCH: &ArchSpec = &AARCH64;
 
-impl Arch {
-    /// As `uname -m` spells it: the config fragment suffix and the qemu-system binary
-    pub const fn name(self) -> &'static str {
-        match self {
-            Arch::X86_64 => "x86_64",
-            Arch::Aarch64 => "aarch64",
-        }
-    }
+/// What differs between the arches, side by side. Read as a table: each field is one fact, the
+/// two constants below are its two values.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ArchSpec {
+    /// As `uname -m` spells it: the config fragment suffix
+    pub name: &'static str,
+    /// The QEMU binary: natively on PATH, and the website's Emscripten build of the same name
+    pub qemu: &'static str,
     /// The image QEMU boots, relative to the kernel tree
-    pub const fn kernel_image(self) -> &'static str {
-        match self {
-            Arch::X86_64 => "arch/x86/boot/bzImage",
-            Arch::Aarch64 => "arch/arm64/boot/Image",
-        }
-    }
+    pub kernel_image: &'static str,
     /// Guest-physical address of the first byte of RAM: offset 0 of a RAM file
-    pub const fn ram_base(self) -> u64 {
-        match self {
-            Arch::X86_64 => 0,
-            Arch::Aarch64 => 0x4000_0000,
-        }
-    }
-    /// QEMU's machine type; None for the arch's default (pc)
-    const fn machine(self) -> Option<&'static str> {
-        match self {
-            Arch::X86_64 => None,
-            Arch::Aarch64 => Some("virt"),
-        }
-    }
+    pub ram_base: u64,
+    /// QEMU's machine type: named on both arches, so a QEMU changing its default changes nothing here
+    machine: &'static str,
     /// The CPU model under TCG (KVM uses `host`)
-    const fn tcg_cpu(self) -> &'static str {
-        match self {
-            Arch::X86_64 => "max",
-            Arch::Aarch64 => "cortex-a57",
-        }
-    }
+    tcg_cpu: &'static str,
     /// The virtio-serial transport: PCI on pc, MMIO on virt (no PCI host there)
-    const fn virtio_serial(self) -> &'static str {
-        match self {
-            Arch::X86_64 => "virtio-serial-pci",
-            Arch::Aarch64 => "virtio-serial-device",
-        }
-    }
+    virtio_serial: &'static str,
     /// The kernel console on the machine's UART, and what the clock needs under emulation
-    const fn console_args(self) -> &'static [&'static str] {
-        match self {
-            Arch::X86_64 => &["console=ttyS0", "tsc=nowatchdog", "tsc=reliable"],
-            Arch::Aarch64 => &["console=ttyAMA0"],
-        }
-    }
+    console_args: &'static [&'static str],
 }
+
+pub const X86_64: ArchSpec = ArchSpec {
+    name: "x86_64",
+    qemu: "qemu-system-x86_64",
+    kernel_image: "arch/x86/boot/bzImage",
+    ram_base: 0,
+    machine: "pc",
+    tcg_cpu: "max",
+    virtio_serial: "virtio-serial-pci",
+    console_args: &["console=ttyS0", "tsc=nowatchdog", "tsc=reliable"],
+};
+
+pub const AARCH64: ArchSpec = ArchSpec {
+    name: "aarch64",
+    qemu: "qemu-system-aarch64",
+    kernel_image: "arch/arm64/boot/Image",
+    ram_base: 0x4000_0000,
+    machine: "virt",
+    tcg_cpu: "cortex-a57",
+    virtio_serial: "virtio-serial-device",
+    console_args: &["console=ttyAMA0"],
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Machine {
@@ -111,7 +97,7 @@ fn served(path: &Path) -> String {
 #[derive(Debug, Clone)]
 pub struct Boot {
     /// The guest's arch: the host's natively, aarch64 in the browser
-    pub arch: Arch,
+    pub arch: &'static ArchSpec,
     pub kernel: PathBuf,
     pub rootfs: PathBuf,
     pub driver: String,
@@ -144,23 +130,21 @@ impl Boot {
     /// instead of one port I/O exit per byte on a 16550), then where the channels go. QEMU
     /// creates chardevs before devices, whatever the order.
     pub fn argv(&self) -> Vec<String> {
-        let mut machine: Vec<&str> = self.arch.machine().into_iter().collect();
-        if self.ram_file.is_some() {
-            machine.push("memory-backend=ram");
-        }
+        // Guest RAM as a file the host can read the shared region out of: the backend object, and
+        // the machine told to use it. The browser has neither and reads the wasm heap directly.
         let mut argv: Vec<String> = vec![];
-        if !machine.is_empty() {
-            argv.extend(["-machine".into(), machine.join(",")]);
-        }
-        if let Some(ram) = &self.ram_file {
-            let m = self.machine.mem_mb;
-            argv.extend([
+        match &self.ram_file {
+            Some(ram) => argv.extend([
+                "-machine".into(),
+                format!("{},memory-backend=ram", self.arch.machine),
                 "-object".into(),
                 format!(
-                    "memory-backend-file,id=ram,size={m}M,mem-path={},share=on",
+                    "memory-backend-file,id=ram,size={}M,mem-path={},share=on",
+                    self.machine.mem_mb,
                     ram.display()
                 ),
-            ]);
+            ]),
+            None => argv.extend(["-machine".into(), self.arch.machine.into()]),
         }
         // KVM where the host offers it, else TCG: one host thread per vCPU (MTTCG) and a 64 MB
         // translation cache, enough for kSTEP's small kernels and what fits next to guest RAM in
@@ -168,7 +152,7 @@ impl Boot {
         let (accel, cpu) = if kvm_available() {
             ("kvm", "host")
         } else {
-            ("tcg,tb-size=64,thread=multi", self.arch.tcg_cpu())
+            ("tcg,tb-size=64,thread=multi", self.arch.tcg_cpu)
         };
         argv.extend(
             [
@@ -204,7 +188,7 @@ impl Boot {
                 "-serial",
                 "chardev:console",
                 "-device",
-                &format!("{},id=vs0", self.arch.virtio_serial()),
+                &format!("{},id=vs0", self.arch.virtio_serial),
                 "-device",
                 "virtconsole,bus=vs0.0,nr=0,chardev=port",
             ]
@@ -275,14 +259,14 @@ impl Boot {
             "init=/user".into(),
             "panic=-1".into(), // exit immediately on panic
         ];
-        args.extend(self.arch.console_args().iter().map(|s| s.to_string()));
+        args.extend(self.arch.console_args.iter().map(|s| s.to_string()));
         args.push("--".into());
         args.push(format!("driver={}", self.driver));
         args.join(" ")
     }
 
     pub fn command(&self) -> Command {
-        let mut c = Command::new(format!("qemu-system-{}", self.arch.name()));
+        let mut c = Command::new(self.arch.qemu);
         c.args(self.argv());
         c
     }
@@ -295,7 +279,7 @@ mod tests {
     /// The page's boot, as wasm.rs makes it
     fn browser(smp: u32) -> Boot {
         Boot {
-            arch: Arch::Aarch64,
+            arch: &AARCH64,
             kernel: "/kernel".into(),
             rootfs: "/rootfs.cpio".into(),
             driver: "cli".into(),
@@ -320,7 +304,7 @@ mod tests {
         let c = boot.cmdline();
         assert!(c.contains("isolcpus=nohz,managed_irq,1-2 "), "{c}");
         assert!(c.ends_with("console=ttyAMA0 -- driver=cli"), "{c}");
-        boot.arch = Arch::X86_64;
+        boot.arch = &X86_64;
         boot.machine.num_cpus = 2;
         boot.driver = "default".into();
         let x = boot.cmdline();
@@ -348,7 +332,7 @@ mod tests {
     #[test]
     fn native_boot_wires_the_channels() {
         let mut boot = Boot {
-            arch: Arch::X86_64,
+            arch: &X86_64,
             kernel: "/b/kernel".into(),
             rootfs: "/b/rootfs.cpio".into(),
             driver: "cli".into(),

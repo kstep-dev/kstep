@@ -182,7 +182,7 @@ struct task_struct *kstep_task_create(void) {
   wait_for_completion(&kstep_task_parked);
   TRACE_INFO("Task %d is ready", p->pid);
   char cpus[16];
-  snprintf(cpus, sizeof(cpus), "1-%d", num_online_cpus() - 1);
+  snprintf(cpus, sizeof(cpus), "1-%d", kstep_test_ncpus);
   if (kstep_task_set_affinity(p, cpus))
     panic("Failed to set CPU affinity for task %d to CPUs %s", p->pid, cpus);
   kstep_reset_task(p);

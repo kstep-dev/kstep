@@ -13,12 +13,9 @@ module_param_string(driver, driver_name, DRIVER_NAME_LEN, 0644);
 static int __init kstep_main(void) {
   kstep_io_init();
 
-  if (num_online_cpus() > KSTEP_NR_CPUS)
-    panic("Number of online CPUs (%d) exceeds KSTEP_NR_CPUS (%d)", num_online_cpus(),
-          KSTEP_NR_CPUS);
-
   TRACE_INFO("Starting %s on Linux %s", driver_name, UTS_RELEASE);
   kstep_driver = kstep_sym_init(driver_name);
+  kstep_cpu_init();
 
   // Isolate the CPUs to avoid interference
   kstep_prealloc_kworkers();
@@ -29,7 +26,6 @@ static int __init kstep_main(void) {
   kstep_task_init();
   kstep_cgroup_init();
   kstep_trace_init(); // the group-alloc hook also sets min_vruntime
-  kstep_topo_set(""); // CPU 0 isolated from the test CPUs' sched domains (cpu.c)
   kstep_driver->setup();
   kstep_topo_print();
 
