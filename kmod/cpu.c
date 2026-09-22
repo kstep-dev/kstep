@@ -288,27 +288,35 @@ static int topo_cpus(const char *spec) {
   return n;
 }
 
-// The fair class scales its slice by the machine's size at boot: sysctl_sched_base_slice =
-// normalized_sysctl_sched_base_slice * (1 + ilog2(min(num_online_cpus(), 8))), from update_sysctl
-// and get_update_sysctl_factor in kernel/sched/fair.c (SCHED_TUNABLESCALING_LOG, the default,
-// unchanged since 2.6.32). A layout resumed from a larger boot would otherwise run a longer slice
-// than the same layout booted cold, so the value is redone for the test CPUs plus the controller.
-// After the domain rebuild, which attaches the runqueues to their root domain and reruns the
-// kernel's own scaling (rq_online_fair). The one EEVDF tunable: the page's image is v6.18. The
-// boot's value is checked against the formula first, so a kernel that scales differently is
-// refused rather than given a wrong slice.
+// The fair class scales its tunables by the machine's size at boot: sysctl_X = normalized_sysctl_X
+// * (1 + ilog2(min(num_online_cpus(), 8))), from update_sysctl and get_update_sysctl_factor in
+// kernel/sched/fair.c (SCHED_TUNABLESCALING_LOG, the default, unchanged since 2.6.32). A layout
+// resumed from a larger boot would otherwise run a longer slice than the same layout booted cold,
+// so the values are redone for the test CPUs plus the controller. After the domain rebuild, which
+// attaches the runqueues to their root domain and reruns the kernel's own scaling (rq_online_fair).
+// EEVDF has one tunable and CFS three; a kernel has one set or the other, and each value is checked
+// against the formula first, so a kernel that scales differently is refused, not given a wrong one.
 static unsigned int slice_factor(unsigned int cpus) { return 1 + ilog2(min_t(unsigned int, cpus, 8)); }
 static void set_slice_scaling(void) {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
-  KSYM_IMPORT(sysctl_sched_base_slice);
-  KSYM_IMPORT_TYPED(unsigned int, normalized_sysctl_sched_base_slice);
-  static bool checked;
-  if (!checked && *KSYM_sysctl_sched_base_slice != *KSYM_normalized_sysctl_sched_base_slice * slice_factor(num_online_cpus()))
-    panic("sysctl_sched_base_slice %u is not normalized %u * factor(%d): this kernel scales the slice differently",
-          *KSYM_sysctl_sched_base_slice, *KSYM_normalized_sysctl_sched_base_slice, num_online_cpus());
-  checked = true;
-  *KSYM_sysctl_sched_base_slice = *KSYM_normalized_sysctl_sched_base_slice * slice_factor(kstep_test_ncpus + 1);
-#endif
+  static const char *names[] = {"sched_base_slice", "sched_min_granularity", "sched_latency", "sched_wakeup_granularity"};
+  static unsigned int *sysctl[ARRAY_SIZE(names)], *normalized[ARRAY_SIZE(names)];
+  static bool looked_up;
+
+  for (int i = 0; i < ARRAY_SIZE(names); i++) {
+    char buf[48];
+    if (!looked_up) {
+      snprintf(buf, sizeof(buf), "sysctl_%s", names[i]);
+      sysctl[i] = kstep_ksym_lookup(buf);
+      snprintf(buf, sizeof(buf), "normalized_sysctl_%s", names[i]);
+      normalized[i] = kstep_ksym_lookup(buf);
+      if (sysctl[i] && normalized[i] && *sysctl[i] != *normalized[i] * slice_factor(num_online_cpus()))
+        panic("sysctl_%s %u is not normalized %u * factor(%d): this kernel scales it differently", names[i],
+              *sysctl[i], *normalized[i], num_online_cpus());
+    }
+    if (sysctl[i] && normalized[i])
+      *sysctl[i] = *normalized[i] * slice_factor(kstep_test_ncpus + 1);
+  }
+  looked_up = true;
 }
 
 // NULL once applied, or what is wrong with the spec, which then changes nothing the kernel

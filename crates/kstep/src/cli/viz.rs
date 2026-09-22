@@ -13,13 +13,14 @@ use kstep::Build;
 use kstep_core::qemu::{Arch, ARCH};
 use serde_json::json;
 
-/// Serve the website at http://localhost:PORT/ (built first if it never was); `build` and `deploy`
+/// Build the website and serve it at http://localhost:PORT/; `build`, `serve` and `deploy` do one thing each
 #[derive(clap::Args)]
 #[command(
     after_help = "The site is website/site: the tracked page plus qemu/ (from website/setup.sh) and what `build`
-writes there: data.json, images/cli (the playground image, kSTEP's build/v6.18, and its snapshot)
-and kstep_core.js + kstep_core_bg.wasm (crates/core for wasm32). Edits to the page show on a
-reload; `build` again after changing the kmod, user.c, crates/core or bugs.yaml."
+writes there: data.json, images/<kernel>/ (a playground image per supported LTS kernel, from
+kSTEP's build/<kernel>, and its snapshot) and kstep_core.js + kstep_core_bg.wasm (crates/core for
+wasm32). Plain `kstep viz` builds first, incrementally (an unchanged image keeps its snapshot), then
+serves; `serve` skips the build, for page edits, which show on a reload."
 )]
 pub struct Args {
     #[command(subcommand)]
@@ -30,16 +31,19 @@ pub struct Args {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Rebuild the bug catalog, the wasm decoder, the playground image and its snapshot
+    /// Rebuild the bug catalog, the wasm decoder, the playground images and their snapshots
     Build,
+    /// Serve site/ as it is, without building
+    Serve,
     /// Build, gate on pagetest.mjs and `run.mjs --check`, force-push site/ as gh-pages
     Deploy,
 }
 
 const KSTEP_URL: &str = "https://github.com/kstep-dev/kstep/blob/master";
 const RESULTS_URL: &str = "https://raw.githubusercontent.com/kstep-dev/results/main";
-/// The playground image: Linux v6.18 for arm64, shared with the repro builds
-const IMAGE: &str = "v6.18";
+/// The playground images: every supported LTS kernel for arm64, shared with the repro builds;
+/// the page boots this one unless the URL says otherwise
+const DEFAULT_IMAGE: &str = "v6.18";
 
 fn website() -> PathBuf {
     kstep::proj_dir().join("website")
@@ -156,30 +160,40 @@ fn build() -> Result<String> {
     let bugs: Vec<_> = sorted.into_iter().map(catalog).collect();
     fs::write(
         site().join("data.json"),
-        serde_json::to_string_pretty(&json!({ "version": version, "bugs": bugs }))?,
+        serde_json::to_string_pretty(&json!({
+            "version": version, "bugs": bugs,
+            "kernels": kstep::checkout::LTS, "kernel": DEFAULT_IMAGE,
+        }))?,
     )?;
 
-    // The playground image, rebuilt from the current kmod and user.c so the page and the driver
-    // it talks to are always published together. First time: a kernel build (~10 min).
-    let b = Build::new(Some(IMAGE))?;
-    b.build_kstep()?;
-    let images = site().join("images/cli");
-    fs::create_dir_all(&images)?;
-    fs::copy(b.kernel(), images.join("kernel"))?;
-    fs::copy(b.rootfs(), images.join("rootfs.cpio"))?;
-    // The machine at the driver's ready line for the page's default CPU count, so the page resumes
-    // it instead of booting (~0.3 s instead of ~4 s). The stream fits this QEMU build and image
-    // only, hence next to the image and regenerated with it. Needs site/qemu (website/setup.sh).
+    // The playground images, one per supported LTS kernel, rebuilt from the current kmod and
+    // user.c so the page and the driver it talks to are always published together. First time:
+    // a kernel build each (~10 min). The machine at the driver's ready line for the page's
+    // default CPU count goes next to each, so the page resumes it instead of booting (~0.3 s
+    // instead of ~4 s); the stream fits this QEMU build and image only, so it is taken again
+    // exactly when the image changed. Needs site/qemu (website/setup.sh).
     let node = node()?;
-    run(
-        cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
-            .arg(website().join("run.mjs"))
-            .args(["--snapshot", "--image"])
-            .arg(&images)
-            .current_dir(website()),
-        None,
-    )
-    .context("snapshot of the playground image (website/run.mjs --snapshot)")?;
+    for kernel in kstep::checkout::LTS {
+        let b = Build::new(Some(kernel))?;
+        b.build_kstep()?;
+        let images = site().join("images").join(kernel);
+        fs::create_dir_all(&images)?;
+        let same = |src: PathBuf, dst: &str| fs::read(&src).ok() == fs::read(images.join(dst)).ok();
+        if same(b.kernel(), "kernel") && same(b.rootfs(), "rootfs.cpio") && images.join("snap-5.json").is_file() {
+            continue;
+        }
+        fs::copy(b.kernel(), images.join("kernel"))?;
+        fs::copy(b.rootfs(), images.join("rootfs.cpio"))?;
+        run(
+            cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
+                .arg(website().join("run.mjs"))
+                .args(["--snapshot", "--image"])
+                .arg(&images)
+                .current_dir(website()),
+            None,
+        )
+        .with_context(|| format!("snapshot of the {kernel} playground image (website/run.mjs --snapshot)"))?;
+    }
     let size = output(cmd("du", ["-sh"]).arg(site()))?
         .split_whitespace()
         .next()
@@ -293,7 +307,7 @@ fn connection(mut stream: std::net::TcpStream) -> std::io::Result<()> {
     }
 }
 
-/// Refuse to publish a page whose playground image does not speak its protocol, then push site/
+/// Refuse to publish a page whose playground images do not speak its protocol, then push site/
 /// as the orphan gh-pages branch.
 fn deploy(version: &str) -> Result<()> {
     let node = node()?;
@@ -302,13 +316,17 @@ fn deploy(version: &str) -> Result<()> {
         None,
     )
     .context("deploy aborted: site/viz.mjs failed its checks")?;
-    run(
-        cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
-            .arg(website().join("run.mjs"))
-            .arg("--check"),
-        None,
-    )
-    .context("deploy aborted: rebuild the playground image from the current kmod and user.c")?;
+    for kernel in kstep::checkout::LTS {
+        run(
+            cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
+                .arg(website().join("run.mjs"))
+                .args(["--check", "--image"])
+                .arg(site().join("images").join(kernel))
+                .current_dir(website()),
+            None,
+        )
+        .with_context(|| format!("deploy aborted: the {kernel} playground image failed its check"))?;
+    }
     let origin = output(cmd("git", ["remote", "get-url", "origin"]).current_dir(website()))?
         .trim()
         .to_string();
@@ -340,11 +358,10 @@ fn deploy(version: &str) -> Result<()> {
 pub fn main(a: Args) -> Result<()> {
     match a.cmd {
         Some(Cmd::Build) => build().map(|_| ()),
+        Some(Cmd::Serve) => serve(a.port),
         Some(Cmd::Deploy) => deploy(&build()?),
         None => {
-            if !site().join("data.json").exists() {
-                build()?;
-            }
+            build()?; // incremental: what is current stays as it is
             serve(a.port)
         }
     }
