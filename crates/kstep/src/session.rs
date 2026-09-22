@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Stdio};
 use std::time::{Duration, Instant};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use kstep_core::qemu::{Boot, ARCH};
 use kstep_core::shm::{self, State};
 use serde_json::Value;
@@ -119,14 +119,14 @@ impl Session {
             .and_then(Value::as_u64)
             .context("ready line without shm address")?;
         let shm_at = shm
-            .checked_sub(ARCH.ram_base())
+            .checked_sub(ARCH.ram_base)
             .context("shm address below RAM")?;
         // 0 where the kernel has no coverage map (built without linux/config.kstep.cov)
         let cov_at = ready
             .get("cov")
             .and_then(Value::as_u64)
             .filter(|&c| c != 0)
-            .and_then(|c| c.checked_sub(ARCH.ram_base()));
+            .and_then(|c| c.checked_sub(ARCH.ram_base));
         let mut s = Session {
             child,
             reader,
@@ -165,19 +165,13 @@ impl Session {
         read_reply(&mut self.reader)
     }
 
-    /// The machine's state as of the last reply. The kmod writes the region before it replies,
-    /// so a snapshot taken now is consistent; a `Busy` snapshot is retried a few times anyway.
+    /// The machine's state as of the last reply: the kmod writes the region before it replies,
+    /// so a snapshot taken now is consistent.
     pub fn state(&mut self) -> Result<State> {
-        for _ in 0..100 {
-            self.ram
-                .read_exact_at(&mut self.snapshot, self.shm_at)
-                .context("read shm")?;
-            match shm::decode(&self.snapshot) {
-                Err(shm::Error::Busy) => std::thread::sleep(Duration::from_millis(1)),
-                r => return r.map_err(Into::into),
-            }
-        }
-        Err(anyhow!("shm stayed mid-update"))
+        self.ram
+            .read_exact_at(&mut self.snapshot, self.shm_at)
+            .context("read shm")?;
+        shm::decode(&self.snapshot).map_err(Into::into)
     }
 
     /// Copy the guest's coverage map out (`map` is `shm::COV_SIZE` bytes); false when this

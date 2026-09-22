@@ -1,10 +1,9 @@
 //! kmod/shm.h, byte for byte: the region of guest memory the cli driver rewrites after every
 //! command. The structs come from the header itself, through bindgen (build.rs), as `raw`, so a
-//! snapshot of the region is read as one `kstep_shm` and each table sliced by its count. `gen` is
-//! odd while the writer is mid-update; a snapshot with an odd gen is `Busy`. That is the whole
-//! check: the kmod rewrites the region before it replies, and a host snapshots after the reply,
-//! so a snapshot never straddles an update. A host that read live memory concurrently would have
-//! to compare gen before and after its copy itself.
+//! snapshot of the region is read as one `kstep_shm` and each table sliced by its count. The kmod
+//! rewrites the region before it replies and a host snapshots after the reply, so a snapshot never
+//! straddles an update; the one check is the layout number, against a region written by another
+//! revision of the header.
 
 use serde::Serialize;
 
@@ -15,7 +14,6 @@ pub mod raw {
 }
 use raw::*;
 
-pub const MAGIC: u32 = KSTEP_SHM_MAGIC;
 pub const LAYOUT: u32 = KSTEP_SHM_LAYOUT;
 /// The whole region: what to snapshot
 pub const SIZE: usize = std::mem::size_of::<kstep_shm>();
@@ -24,12 +22,10 @@ pub const COV_SIZE: usize = KSTEP_COV_SIZE as usize;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
-    /// Not a kSTEP region
-    Magic(u32),
     /// A region this decoder was not built for: rebuild the image from the current kmod
     Layout(u32),
-    /// Mid-update: read again
-    Busy,
+    /// A table's count exceeds its capacity: not a region the kmod wrote
+    Count,
     /// The snapshot is shorter than the region
     Short,
 }
@@ -37,9 +33,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Error::Magic(m) => write!(f, "not a kSTEP shared region (magic {m:#x})"),
             Error::Layout(l) => write!(f, "shm layout {l}, this decoder speaks {LAYOUT}: rebuild the image from the current kmod"),
-            Error::Busy => f.write_str("shm mid-update"),
+            Error::Count => f.write_str("shm table count over its capacity"),
             Error::Short => write!(f, "shm snapshot shorter than the region ({SIZE} bytes)"),
         }
     }
@@ -62,6 +57,8 @@ fn cstr(s: &[std::os::raw::c_char]) -> String {
 pub struct State {
     /// Logical ticks
     pub timestamp: u32,
+    /// The fair class is EEVDF (6.6+): entities carry lag, deadline, eligibility and the pick
+    pub eevdf: bool,
     pub cpus: Vec<Cpu>,
     pub tasks: Vec<Task>,
     /// The cgroups, root first
@@ -218,15 +215,14 @@ fn policy(n: u32) -> &'static str {
     }
 }
 
-/// The first `n` records of a table, or `Busy` when a half-written header claims more than fit.
+/// The first `n` records of a table, or `Count` when the header claims more than fit.
 fn table<R, T>(rows: &[R], n: u32, f: impl Fn(&R) -> T) -> Result<Vec<T>, Error> {
     rows.get(..n as usize)
-        .ok_or(Error::Busy)
+        .ok_or(Error::Count)
         .map(|rows| rows.iter().map(f).collect())
 }
 
-/// Decode one snapshot of the region (`SIZE` bytes). `Busy` means the writer was mid-update:
-/// snapshot again.
+/// Decode one snapshot of the region (`SIZE` bytes).
 pub fn decode(b: &[u8]) -> Result<State, Error> {
     if b.len() < SIZE {
         return Err(Error::Short);
@@ -235,14 +231,8 @@ pub fn decode(b: &[u8]) -> Result<State, Error> {
     // valid value; read unaligned from a checked range.
     let r: kstep_shm = unsafe { std::ptr::read_unaligned(b.as_ptr() as *const kstep_shm) };
     let h = &r.hdr;
-    if h.magic != MAGIC {
-        return Err(Error::Magic(h.magic));
-    }
     if h.layout != LAYOUT {
         return Err(Error::Layout(h.layout));
-    }
-    if h.gen_ & 1 == 1 {
-        return Err(Error::Busy);
     }
 
     let cpus = table(&r.cpu, h.ncpus, |c| Cpu {
@@ -318,30 +308,41 @@ pub fn decode(b: &[u8]) -> Result<State, Error> {
         position: e.position,
         time_slice: e.time_slice,
     })?;
+    // a domain's flags word, as the names the kernel wrote for its bits, "A, B, C"
+    let flag_names = |mask: u64| {
+        (0..r.sd_flag.len())
+            .filter(|&bit| mask >> bit & 1 == 1)
+            .map(|bit| cstr(&r.sd_flag[bit]))
+            .filter(|n| !n.is_empty())
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let all_groups = table(&r.group, h.ngroups, |g| Group {
+        span: g.span,
+        capacity: g.capacity,
+        min_capacity: g.min_capacity,
+        max_capacity: g.max_capacity,
+        weight: g.weight,
+    })?;
     let domains = table(&r.domain, h.ndomains, |d| Domain {
         cpu: d.cpu,
         span: d.span,
         name: cstr(&d.name),
-        flags: cstr(&d.flags),
+        flags: flag_names(d.flags),
         imbalance_pct: d.imbalance_pct,
         balance_interval: d.balance_interval,
         busy_factor: d.busy_factor,
         cache_nice_tries: d.cache_nice_tries,
         nr_balance_failed: d.nr_balance_failed,
         last_balance_ago: d.last_balance_ago,
-        groups: d.group[..(d.ngroups as usize).min(d.group.len())]
-            .iter()
-            .map(|g| Group {
-                span: g.span,
-                capacity: g.capacity,
-                min_capacity: g.min_capacity,
-                max_capacity: g.max_capacity,
-                weight: g.weight,
-            })
-            .collect(),
+        groups: all_groups
+            .get(d.group as usize..(d.group + d.ngroups) as usize)
+            .map(<[Group]>::to_vec)
+            .unwrap_or_default(),
     })?;
     Ok(State {
         timestamp: h.timestamp,
+        eevdf: h.features & KSTEP_SHM_EEVDF != 0,
         cpus,
         tasks,
         groups,
@@ -367,14 +368,14 @@ mod tests {
     fn decodes_a_region() {
         let mut r = kstep_shm {
             hdr: kstep_shm_hdr {
-                magic: MAGIC,
                 layout: LAYOUT,
-                gen_: 2,
+                features: KSTEP_SHM_EEVDF,
                 timestamp: 7,
                 ncpus: 1,
                 ntasks: 1,
                 ncgroups: 1,
-                ndomains: 0,
+                ndomains: 1,
+                ngroups: 2,
                 nentities: 1,
                 nrt_entities: 1,
             },
@@ -427,9 +428,24 @@ mod tests {
             time_slice: 99,
             ..Default::default()
         };
+        // one domain with two groups, and flag bits 0 and 2 named by the kernel
+        r.sd_flag[0][..3].copy_from_slice(&[b'S' as _, b'M' as _, b'T' as _]);
+        r.sd_flag[2][..3].copy_from_slice(&[b'L' as _, b'L' as _, b'C' as _]);
+        r.domain[0] = kstep_shm_domain {
+            cpu: 1,
+            span: 0b110,
+            flags: 0b101,
+            group: 0,
+            ngroups: 2,
+            ..Default::default()
+        };
+        r.domain[0].name[..2].copy_from_slice(&[b'M' as _, b'C' as _]);
+        r.group[0].span = 0b010;
+        r.group[1].span = 0b100;
 
         let st = decode(&bytes(&r)).unwrap();
         assert_eq!(st.timestamp, 7);
+        assert!(st.eevdf);
         assert_eq!(
             st.cpus,
             [Cpu {
@@ -482,13 +498,12 @@ mod tests {
             ),
             (100, true, 99)
         );
-        assert!(st.domains.is_empty());
+        let d = &st.domains[0];
+        assert_eq!((d.name.as_str(), d.flags.as_str()), ("MC", "SMT, LLC"));
+        assert_eq!(d.groups.iter().map(|g| g.span).collect::<Vec<_>>(), [0b010, 0b100]);
 
-        r.hdr.gen_ = 3;
-        assert_eq!(decode(&bytes(&r)), Err(Error::Busy));
-        r.hdr.gen_ = 2;
         r.hdr.ntasks = KSTEP_SHM_TASKS + 1;
-        assert_eq!(decode(&bytes(&r)), Err(Error::Busy));
+        assert_eq!(decode(&bytes(&r)), Err(Error::Count));
         r.hdr.layout = LAYOUT + 1;
         assert_eq!(decode(&bytes(&r)), Err(Error::Layout(LAYOUT + 1)));
         assert_eq!(decode(&bytes(&r)[..100]), Err(Error::Short));

@@ -10,7 +10,7 @@ use clap::Subcommand;
 use kstep::bugs::{self, Bug};
 use kstep::cmd::{cmd, output, run};
 use kstep::Build;
-use kstep_core::qemu::{Arch, ARCH};
+use kstep_core::qemu::{AARCH64, ARCH};
 use serde_json::json;
 
 /// Build the website and serve it at http://localhost:PORT/; `build`, `serve` and `deploy` do one thing each
@@ -141,10 +141,10 @@ fn build_decoder() -> Result<()> {
 }
 
 fn build() -> Result<String> {
-    if !site().join("qemu/qemu-system-aarch64.wasm").exists() {
+    if !site().join(format!("qemu/{}.wasm", AARCH64.qemu)).exists() {
         bail!("no wasm QEMU in website/site/qemu; run website/setup.sh");
     }
-    if ARCH != Arch::Aarch64 {
+    if *ARCH != AARCH64 {
         bail!("the playground image is arm64; build the site on an arm64 host");
     }
     build_decoder()?;

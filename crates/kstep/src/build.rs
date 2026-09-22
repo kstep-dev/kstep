@@ -175,7 +175,7 @@ impl Build {
         let linux = proj_dir().join("linux");
         let mut fragments = vec![
             linux.join("config.kstep"),
-            linux.join(format!("config.kstep.{}", ARCH.name())),
+            linux.join(format!("config.kstep.{}", ARCH.name)),
         ];
         let bug_config = crate::bugs::for_build(&self.name)?
             .and_then(|b| b.config)
@@ -212,7 +212,7 @@ impl Build {
             "all",
             "compile_commands.json",
         ]);
-        let image = self.linux().join(ARCH.kernel_image());
+        let image = self.linux().join(ARCH.kernel_image);
         let before = mtime(&image);
         run(&mut make, log)?;
         // fs::copy gives a fresh mtime, which kernel_stale compares with the .config's

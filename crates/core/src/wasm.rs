@@ -4,7 +4,7 @@
 
 use wasm_bindgen::prelude::*;
 
-use crate::qemu::{Arch, Boot, Machine};
+use crate::qemu::{Boot, Machine, ARCH};
 use crate::shm;
 
 /// The argv for the page's QEMU (an aarch64 build): the cli driver on `smp` CPUs with `mem` MB,
@@ -13,7 +13,7 @@ use crate::shm;
 #[wasm_bindgen]
 pub fn qemu_args(smp: u32, mem: u32, snapshot: bool) -> Vec<String> {
     Boot {
-        arch: Arch::Aarch64,
+        arch: ARCH,
         snapshot: snapshot.then(|| "/snap".into()),
         kernel: "/kernel".into(),
         rootfs: "/rootfs.cpio".into(),
@@ -40,14 +40,13 @@ pub fn shm_size() -> usize {
     shm::SIZE
 }
 
-/// The machine's state from a snapshot of the region; `null` when the writer was mid-update.
-/// Fails on a region this decoder was not built for. Every field fits a JS number: the kernel's
+/// The machine's state from a snapshot of the region. Fails on a region this decoder was not
+/// built for. Every field fits a JS number: the kernel's
 /// wrapping vruntimes are decoded signed, and nothing else gets near 2^53.
 #[wasm_bindgen]
 pub fn shm_decode(region: &[u8]) -> Result<JsValue, JsError> {
     match shm::decode(region) {
         Ok(state) => serde_wasm_bindgen::to_value(&state).map_err(|e| JsError::new(&e.to_string())),
-        Err(shm::Error::Busy) => Ok(JsValue::NULL),
         Err(e) => Err(JsError::new(&e.to_string())),
     }
 }
