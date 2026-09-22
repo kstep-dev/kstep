@@ -12,6 +12,7 @@ enum kstep_ctrl {
   KSTEP_CTRL_BLOCK,    // nanosleep(): do_nanosleep() adds TASK_FREEZABLE, which is the difference
   KSTEP_CTRL_CHAN_READ,  // read the channel: sleeps in pipe_read() until there is a byte
   KSTEP_CTRL_CHAN_WRITE, // write it: pipe_write() sync-wakes one reader from this CPU
+  KSTEP_CTRL_YIELD,      // sched_yield(): give the CPU up, staying runnable -- rr goes to the tail of its list, fair skips the entity once
   KSTEP_CTRL_PARK, // a new task's first read: sleeps in the read itself (kmod-side only)
 };
 

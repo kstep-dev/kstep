@@ -129,6 +129,9 @@ __attribute__((noreturn)) static int task_main(void) {
     case KSTEP_CTRL_CHAN_WRITE:
       write(chan_fd(), "w", 1); // pipe_write() sync-wakes one reader, from this CPU
       break;
+    case KSTEP_CTRL_YIELD:
+      sched_yield(); // stays runnable: the class decides who runs instead, if anyone
+      break;
     default:
       panic("Unknown control action: %d", c);
     }

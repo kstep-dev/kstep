@@ -225,6 +225,11 @@ void kstep_task_exit(struct task_struct *p) {
   TRACE_INFO("Exiting task %d", p->pid);
 }
 
+void kstep_task_yield(struct task_struct *p) {
+  kstep_task_ctrl(p, KSTEP_CTRL_YIELD);
+  TRACE_INFO("Task %d yields", p->pid);
+}
+
 void kstep_task_chan_read(struct task_struct *p) {
   kstep_task_ctrl(p, KSTEP_CTRL_CHAN_READ);
   TRACE_INFO("Task %d waits", p->pid);

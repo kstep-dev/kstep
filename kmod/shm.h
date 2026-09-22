@@ -11,7 +11,7 @@
 
 // Bump whenever a struct below changes, in size or in meaning: a decoder built from another
 // revision of this header refuses the region instead of misreading it.
-#define KSTEP_SHM_LAYOUT 10
+#define KSTEP_SHM_LAYOUT 14
 
 // hdr.features: what this kernel's scheduler has, so a reader shows what exists rather than
 // knowing kernel versions. EEVDF (6.6+): the fair entities' lag, deadline, eligibility and pick.
@@ -82,7 +82,6 @@ struct kstep_shm_se {
   // se->vlag, which place_entity will restore, while not.
   s64 lag;
   u32 flags;
-  u32 share; // of the CPU, in 1/1024: this weight over its queue's, times the parent entity's share, up to the root -- the walk update_cfs_rq_h_load makes over load averages, made over weights
 };
 
 // A task's identity and its scheduling attributes -- the sched_attr fields every class reads or
@@ -111,7 +110,6 @@ struct kstep_shm_cgroup {
 // nr_running counts everything queued, h_nr_runnable only what the fair class will run, and a
 // real-time task, or one left behind by delayed dequeue, is in one and not the other.
 struct kstep_shm_cfs {
-  s64 min_vruntime; // signed, as an entity's vruntime
   u64 util_avg, load_avg, runnable_avg;
   u64 h_nr_runnable; // cfs_rq->h_nr_runnable: runnable tasks as the balancer counts them
   u32 cpu;
@@ -174,7 +172,11 @@ struct kstep_shm_domain {
   u32 group, ngroups; // this domain's balancing groups: the group table from `group`, `ngroups` of them, the CPU's own group first as sd->groups has it
   u32 imbalance_pct, balance_interval, busy_factor, cache_nice_tries;
   u32 nr_balance_failed; // per CPU: consecutive failures here, which escalate to active balancing
-  u32 last_balance_ago;  // ticks since this CPU last balanced at this level
+  // When and by whom this CPU's group is next balanced at this level: ticks until last_balance plus
+  // the interval (busy_factor times longer while the CPU is busy, get_sd_balance_interval) falls
+  // due, and the CPU that will run it -- should_we_balance's pick for the group: its first idle CPU,
+  // on an idle core where the level is above SMT, else the group's first CPU.
+  u32 next_balance_in, balancer;
   char name[8];          // the topology level: SMT, CLS, MC, PKG, NODE
 };
 

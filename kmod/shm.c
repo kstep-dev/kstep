@@ -38,12 +38,6 @@ phys_addr_t kstep_shm_init(void) {
 // and curr are the kernel's own answers -- entity_eligible, pick_eevdf, cfs_rq->curr -- so the
 // page shows what the scheduler would do rather than a re-derivation of it. pick_eevdf is inlined
 // into __pick_eevdf(cfs_rq, protect) from 6.16, where protect is RUN_TO_PARITY's guard of curr.
-#ifdef CONFIG_FAIR_GROUP_SCHED
-#define parent_entity(se) ((se)->parent)
-#else
-#define parent_entity(se) ((struct sched_entity *)NULL)
-#endif
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 // EEVDF's pick: __pick_eevdf(cfs_rq, protect) from 6.13, pick_eevdf(cfs_rq) before it.
 static struct sched_entity *shm_pick(struct cfs_rq *cfs_rq) {
@@ -90,17 +84,6 @@ static struct kstep_shm_se shm_se(struct sched_entity *se) {
   if (se->on_rq && shm_pick(cfs_rq) == se)
     out.flags |= KSTEP_SE_PICK;
 #endif
-  // the share of the CPU: at each level this entity's weight over everything queued there,
-  // multiplied up to the root; 0 when not queued, since a queue's total counts only what is on it
-  if (se->on_rq) {
-    u64 share = 1024;
-
-    for (struct sched_entity *s = se; s; s = parent_entity(s)) {
-      struct cfs_rq *q = cfs_rq_of(s);
-      share = q->load.weight ? div64_u64(share * s->load.weight, q->load.weight) : 0;
-    }
-    out.share = share;
-  }
   return out;
 }
 
@@ -246,6 +229,13 @@ static u32 shm_collect_cgroups(struct kstep_shm_cgroup *out, struct kstep_shm_en
   return n;
 }
 
+// idle_cpu(), which not every kernel exports: nothing runs, nothing is queued, no wakeup pending
+static bool shm_idle_cpu(int cpu) {
+  struct rq *rq = cpu_rq(cpu);
+
+  return rq->curr == rq->idle && !rq->nr_running && !rq->ttwu_pending;
+}
+
 // The sched domains the kernel actually built, per CPU and innermost first, and their groups into
 // the flat group table. Read under RCU, like any other walk of rq->sd. A group's span comes from
 // sched_group_span (the CPUs it covers), not its balance mask; sd->groups starts at the CPU's own
@@ -274,8 +264,47 @@ static u32 shm_collect_domains(struct kstep_shm_domain *out, struct kstep_shm_gr
       d->nr_balance_failed = sd->nr_balance_failed;
       d->busy_factor = sd->busy_factor;
       d->cache_nice_tries = sd->cache_nice_tries;
-      // jiffies is the mocked clock plus a fixed offset (tick_jiffies.c), so this is logical ticks
-      d->last_balance_ago = jiffies - sd->last_balance;
+      // the level's next balance for this CPU, as sched_balance_domains will compute it: the
+      // interval in ms, busy_factor times longer on a busy CPU (and one less, to unlock the levels'
+      // periods from each other), in jiffies, clamped to HZ/10 -- max_load_balance_interval
+      {
+        struct rq *rq = cpu_rq(cpu);
+        bool busy = rq->curr != rq->idle;
+        unsigned long interval = sd->balance_interval;
+
+        if (busy)
+          interval *= sd->busy_factor;
+        interval = msecs_to_jiffies(interval);
+        if (busy)
+          interval -= 1;
+        interval = clamp(interval, 1UL, (unsigned long)HZ / 10);
+        d->next_balance_in = time_after(sd->last_balance + interval, jiffies) ? sd->last_balance + interval - jiffies : 0;
+      }
+      // who runs it for this CPU's group (should_we_balance): the first idle CPU of the group,
+      // preferring one on a wholly idle core above the SMT level, else the group's first CPU
+      {
+        const struct cpumask *bal = group_balance_mask(sd->groups);
+        int first_idle = -1, idle_core = -1, pick, c, s;
+
+        for_each_cpu(c, bal) {
+          bool core_idle = true;
+
+          if (!shm_idle_cpu(c))
+            continue;
+          if (first_idle < 0)
+            first_idle = c;
+          for_each_cpu(s, cpu_smt_mask(c))
+            core_idle &= shm_idle_cpu(s);
+          if (core_idle) {
+            idle_core = c;
+            break;
+          }
+        }
+        pick = sd->flags & SD_SHARE_CPUCAPACITY ? first_idle   // within a core, any idle thread
+               : idle_core >= 0 ? idle_core                      // above it, an idle core first
+               : first_idle;                                     // else an idle thread of a busy core
+        d->balancer = pick >= 0 ? pick : cpumask_first(bal);   // nobody idle: the group's first CPU
+      }
       d->group = *ngroups;
       first = sd->groups;
       sg = first;
@@ -331,9 +360,6 @@ void kstep_shm_update(struct task_struct **tasks, int ntasks) {
     };
     shm->cfs[cpu - 1] = (struct kstep_shm_cfs){
         .cpu = cpu,
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 19, 0)
-        .min_vruntime = rq->cfs.min_vruntime,
-#endif
 #ifdef CONFIG_SMP
         .util_avg = rq->cfs.avg.util_avg,
         .load_avg = rq->cfs.avg.load_avg,

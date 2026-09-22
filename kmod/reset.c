@@ -185,7 +185,10 @@ void kstep_reset_cpumask(void) {
   KSYM_IMPORT_TYPED(int, distribute_cpu_mask_prev);
 // https://github.com/torvalds/linux/commit/46a87b3851f0d6eb05e6d83d5c5a30df0eca8f76
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 7, 0)
-  for_each_test_cpu(cpu) {
+  // Every CPU, the controller's included: a new task's first CPU is picked from CPU 0, where
+  // kstep_task_create sets its affinity, by cpumask_any_and_distribute rotating from this
+  // counter. Left at whatever the boot made of it, the task's first CPU varied from boot to boot.
+  for (int cpu = 0; cpu < num_online_cpus(); cpu++) {
     int *ptr = per_cpu_ptr(KSYM_distribute_cpu_mask_prev, cpu);
     *ptr = 0;
   }

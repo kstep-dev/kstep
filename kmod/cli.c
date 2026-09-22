@@ -17,6 +17,7 @@
 //   block <n>                 like pause, in a freezable sleep (nanosleep), which the freezer takes
 //   chan-read <n>             sleep in the channel until there is a byte, and take it
 //   chan-write <n>            put a byte in, which sync-wakes one reader from this task’s CPU
+//   yield <n>                 sched_yield(): the task gives the CPU up but stays runnable
 //   kill <n>                  exit when the task next runs
 //   cgroup-create /a          the parent must exist; / is the root
 //   cgroup-weight /a <w>      cpu.weight, 1..10000 (default 100)
@@ -330,6 +331,7 @@ static const struct {
     {"wake", kstep_task_wakeup},          {"kill", kstep_task_exit},
     {"chan-read", kstep_task_chan_read},  {"chan-write", kstep_task_chan_write},
     {"freeze", kstep_freeze_task},        {"thaw", kstep_thaw_task},
+    {"yield", kstep_task_yield},
 };
 
 /* Returns false when the session should end. */

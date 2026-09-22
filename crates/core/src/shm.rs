@@ -118,7 +118,6 @@ pub struct Cgroup {
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Cfs {
     pub cpu: u32,
-    pub min_vruntime: i64,
     pub util_avg: u64,
     pub load_avg: u64,
     pub runnable_avg: u64,
@@ -138,8 +137,6 @@ pub struct Entity {
     pub on_rq: bool,
     pub curr: bool,
     pub pick: bool,
-    /// Of the CPU, 1.0 being all of it
-    pub share: f64,
     pub weight: u64,
     pub sum_exec_runtime: u64,
     pub vruntime: i64,
@@ -189,7 +186,9 @@ pub struct Domain {
     pub busy_factor: u32,
     pub cache_nice_tries: u32,
     pub nr_balance_failed: u32,
-    pub last_balance_ago: u32,
+    /// Ticks until this CPU's group is balanced at this level, and the CPU that will do it
+    pub next_balance_in: u32,
+    pub balancer: u32,
     pub groups: Vec<Group>,
 }
 
@@ -268,7 +267,6 @@ pub fn decode(b: &[u8]) -> Result<State, Error> {
     })?;
     let cfs = table(&r.cfs, h.ncpus, |q| Cfs {
         cpu: q.cpu,
-        min_vruntime: q.min_vruntime,
         util_avg: q.util_avg,
         load_avg: q.load_avg,
         runnable_avg: q.runnable_avg,
@@ -283,7 +281,6 @@ pub fn decode(b: &[u8]) -> Result<State, Error> {
         on_rq: e.se.flags & KSTEP_SE_ON_RQ != 0,
         curr: e.se.flags & KSTEP_SE_CURR != 0,
         pick: e.se.flags & KSTEP_SE_PICK != 0,
-        share: e.se.share as f64 / 1024.0,
         weight: e.se.weight,
         sum_exec_runtime: e.se.sum_exec_runtime,
         vruntime: e.se.vruntime,
@@ -334,7 +331,8 @@ pub fn decode(b: &[u8]) -> Result<State, Error> {
         busy_factor: d.busy_factor,
         cache_nice_tries: d.cache_nice_tries,
         nr_balance_failed: d.nr_balance_failed,
-        last_balance_ago: d.last_balance_ago,
+        next_balance_in: d.next_balance_in,
+        balancer: d.balancer,
         groups: all_groups
             .get(d.group as usize..(d.group + d.ngroups) as usize)
             .map(<[Group]>::to_vec)
@@ -402,7 +400,7 @@ mod tests {
         r.cgroup[0].weight = 100;
         r.cfs[0] = kstep_shm_cfs {
             cpu: 1,
-            min_vruntime: 1000,
+            util_avg: 1000,
             ..Default::default()
         };
         r.entity[0] = kstep_shm_entity {
@@ -410,7 +408,6 @@ mod tests {
             cpu: 1,
             se: kstep_shm_se {
                 flags: KSTEP_SE_ELIGIBLE | KSTEP_SE_CURR,
-                share: 512,
                 lag: -8,
                 ..Default::default()
             },
@@ -476,19 +473,11 @@ mod tests {
             (st.groups[0].path.as_str(), st.groups[0].weight),
             ("/a", 100)
         );
-        assert_eq!(st.cfs[0].min_vruntime, 1000);
+        assert_eq!(st.cfs[0].util_avg, 1000);
         let e = &st.entities[0];
         assert_eq!(
-            (
-                e.task,
-                e.cgroup.as_str(),
-                e.eligible,
-                e.curr,
-                e.pick,
-                e.share,
-                e.lag
-            ),
-            (1, "/a", true, true, false, 0.5, -8)
+            (e.task, e.cgroup.as_str(), e.eligible, e.curr, e.pick, e.lag),
+            (1, "/a", true, true, false, -8)
         );
         assert_eq!(
             (
