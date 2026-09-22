@@ -284,7 +284,7 @@ static u32 shm_collect_domains(struct kstep_shm_domain *out, u32 ncpus) {
 // The state after a command. The isolated CPUs are held while a command runs, so their queues
 // can be read directly. tasks[n - 1] is the cli's task number n; exited tasks are skipped.
 void kstep_shm_update(struct task_struct **tasks, int ntasks) {
-  u32 ncpus = min_t(u32, num_online_cpus() - 1, KSTEP_SHM_CPUS), nt = 0, nrt = 0; // table entries written
+  u32 ncpus = kstep_test_ncpus, nt = 0, nrt = 0; // table entries written
   struct kstep_shm_cgroup cgroups[KSTEP_SHM_CGROUPS];
   static struct kstep_shm_entity entities[KSTEP_SHM_ENTITIES]; // 40 KB: not for the stack
   struct task_struct *rt_pick[KSTEP_SHM_CPUS];

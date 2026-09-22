@@ -27,6 +27,10 @@ void kstep_reset_task(struct task_struct *p) {
 // https://github.com/torvalds/linux/commit/86bfbb7ce4f67a88df2639198169b685668e7349
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
   p->se.vlag = 0;
+  // A fork inherits the parent's slice and the kernel rereads the sysctl only when that first slice
+  // ends; the parent here is a kworker with the boot's value, which cpu-topo CPUS may have changed.
+  KSYM_IMPORT(sysctl_sched_base_slice);
+  p->se.slice = *KSYM_sysctl_sched_base_slice;
 #endif
 
   // reset sched avg stats

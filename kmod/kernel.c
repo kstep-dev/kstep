@@ -311,7 +311,7 @@ int kstep_cgroup_create(const char *name) {
   char path[MAX_PATH_LENGTH];
   int err;
 
-  if (scnprintf(cpuset, sizeof(cpuset), "%d-%d", 1, num_online_cpus() - 1) >= sizeof(cpuset) ||
+  if (scnprintf(cpuset, sizeof(cpuset), "%d-%d", 1, kstep_test_ncpus) >= sizeof(cpuset) ||
       scnprintf(path, sizeof(path), CGROUP_ROOT "%s", name) >= sizeof(path))
     panic("failed to form cpuset for %s", name);
 
