@@ -500,7 +500,10 @@ mod tests {
         );
         let d = &st.domains[0];
         assert_eq!((d.name.as_str(), d.flags.as_str()), ("MC", "SMT, LLC"));
-        assert_eq!(d.groups.iter().map(|g| g.span).collect::<Vec<_>>(), [0b010, 0b100]);
+        assert_eq!(
+            d.groups.iter().map(|g| g.span).collect::<Vec<_>>(),
+            [0b010, 0b100]
+        );
 
         r.hdr.ntasks = KSTEP_SHM_TASKS + 1;
         assert_eq!(decode(&bytes(&r)), Err(Error::Count));

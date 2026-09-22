@@ -179,7 +179,10 @@ fn build() -> Result<String> {
         let images = site().join("images").join(kernel);
         fs::create_dir_all(&images)?;
         let same = |src: PathBuf, dst: &str| fs::read(&src).ok() == fs::read(images.join(dst)).ok();
-        if same(b.kernel(), "kernel") && same(b.rootfs(), "rootfs.cpio") && images.join("snap-5.json").is_file() {
+        if same(b.kernel(), "kernel")
+            && same(b.rootfs(), "rootfs.cpio")
+            && images.join("snap-5.json").is_file()
+        {
             continue;
         }
         fs::copy(b.kernel(), images.join("kernel"))?;
@@ -192,7 +195,9 @@ fn build() -> Result<String> {
                 .current_dir(website()),
             None,
         )
-        .with_context(|| format!("snapshot of the {kernel} playground image (website/run.mjs --snapshot)"))?;
+        .with_context(|| {
+            format!("snapshot of the {kernel} playground image (website/run.mjs --snapshot)")
+        })?;
     }
     let size = output(cmd("du", ["-sh"]).arg(site()))?
         .split_whitespace()
@@ -325,7 +330,9 @@ fn deploy(version: &str) -> Result<()> {
                 .current_dir(website()),
             None,
         )
-        .with_context(|| format!("deploy aborted: the {kernel} playground image failed its check"))?;
+        .with_context(|| {
+            format!("deploy aborted: the {kernel} playground image failed its check")
+        })?;
     }
     let origin = output(cmd("git", ["remote", "get-url", "origin"]).current_dir(website()))?
         .trim()
