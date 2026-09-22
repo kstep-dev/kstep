@@ -175,18 +175,21 @@ fn build() -> Result<String> {
     // a kernel build each (~10 min). The machine at the driver's ready line for the page's
     // default CPU count goes next to each, so the page resumes it instead of booting (~0.3 s
     // instead of ~4 s); the stream fits this QEMU build and image only, so it is taken again
-    // exactly when the image changed. Needs site/qemu (website/setup.sh).
+    // when the image changed or QEMU was rebuilt since (a stale stream hangs the resume
+    // silently). Needs site/qemu (website/setup.sh).
     let node = node()?;
+    let qemu_built = fs::metadata(site().join("qemu/qemu-system-aarch64.wasm"))?.modified()?;
     for kernel in kstep::checkout::LTS {
         let b = Build::new(Some(kernel))?;
         b.build_kstep()?;
         let images = site().join("images").join(kernel);
         fs::create_dir_all(&images)?;
         let same = |src: PathBuf, dst: &str| fs::read(&src).ok() == fs::read(images.join(dst)).ok();
-        if same(b.kernel(), "kernel")
-            && same(b.rootfs(), "rootfs.cpio")
-            && images.join(format!("snap-{SNAPSHOT_SMP}.json")).is_file()
-        {
+        let snap = images.join(format!("snap-{SNAPSHOT_SMP}.json"));
+        let snap_fresh = fs::metadata(&snap)
+            .and_then(|m| m.modified())
+            .is_ok_and(|t| t > qemu_built);
+        if same(b.kernel(), "kernel") && same(b.rootfs(), "rootfs.cpio") && snap_fresh {
             continue;
         }
         fs::copy(b.kernel(), images.join("kernel"))?;
@@ -195,7 +198,13 @@ fn build() -> Result<String> {
             &mut mjs(
                 &node,
                 "run.mjs",
-                &["--snapshot", "--smp", &SNAPSHOT_SMP.to_string(), "--image", images.to_str().unwrap()],
+                &[
+                    "--snapshot",
+                    "--smp",
+                    &SNAPSHOT_SMP.to_string(),
+                    "--image",
+                    images.to_str().unwrap(),
+                ],
             ),
             None,
         )
