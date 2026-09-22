@@ -1,8 +1,6 @@
 //! `kstep viz`: build the visualization website (website/site), serve it, or publish it.
 
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
-use std::net::TcpListener;
 use std::path::PathBuf;
 
 use anyhow::{bail, Context, Result};
@@ -25,7 +23,7 @@ serves; `serve` skips the build, for page edits, which show on a reload."
 pub struct Args {
     #[command(subcommand)]
     cmd: Option<Cmd>,
-    #[arg(long, default_value_t = 8080)]
+    #[arg(long, global = true, default_value_t = 8080)]
     port: u16,
 }
 
@@ -69,6 +67,15 @@ fn node() -> Result<PathBuf> {
         .map(|p| p.join("node"))
         .find(|p| p.is_file())
         .context("no node: run website/setup.sh or install Node >= 20")
+}
+
+/// One of website/'s scripts under node, from website/.
+fn mjs(node: &std::path::Path, script: &str, args: &[&str]) -> std::process::Command {
+    let mut c = cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"]);
+    c.arg(website().join(script))
+        .args(args)
+        .current_dir(website());
+    c
 }
 
 /// What the bug catalog shows (the README's results table says the same by hand).
@@ -120,14 +127,6 @@ fn build_decoder() -> Result<()> {
     )
     .context("the wasm target: rustup target add wasm32-unknown-unknown")?;
     let wasm = root.join("target/wasm32-unknown-unknown/wasm/kstep_core.wasm");
-    // the CLI must match the wasm-bindgen crate in Cargo.lock exactly
-    let lock = fs::read_to_string(root.join("Cargo.lock"))?;
-    let version = lock
-        .split("name = \"wasm-bindgen\"\n")
-        .nth(1)
-        .and_then(|s| s.lines().next())
-        .map(|l| l.trim_start_matches("version = ").trim_matches('"'))
-        .unwrap_or("?");
     run(
         cmd(
             "wasm-bindgen",
@@ -137,7 +136,7 @@ fn build_decoder() -> Result<()> {
         .arg(&wasm),
         None,
     )
-    .with_context(|| format!("wasm-bindgen: cargo install wasm-bindgen-cli --version {version}"))
+    .context("wasm-bindgen: cargo install wasm-bindgen-cli at the version in Cargo.lock")
 }
 
 fn build() -> Result<String> {
@@ -188,11 +187,11 @@ fn build() -> Result<String> {
         fs::copy(b.kernel(), images.join("kernel"))?;
         fs::copy(b.rootfs(), images.join("rootfs.cpio"))?;
         run(
-            cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
-                .arg(website().join("run.mjs"))
-                .args(["--snapshot", "--image"])
-                .arg(&images)
-                .current_dir(website()),
+            &mut mjs(
+                &node,
+                "run.mjs",
+                &["--snapshot", "--image", images.to_str().unwrap()],
+            ),
             None,
         )
         .with_context(|| {
@@ -208,126 +207,35 @@ fn build() -> Result<String> {
     Ok(version)
 }
 
-/// A static file server for site/, for a browser possibly far away (a VS Code port forward):
-/// keep-alive, so one connection carries the page's ~40 requests, and an ETag from the file's
-/// size and mtime, so a refresh gets 304s instead of the 14 MB QEMU again. Everything the page
-/// fetches is versioned (?v=) except index.html, so no-cache: the browser revalidates every
-/// time and sees an edit at once.
+/// Python's static file server on site/, bound to localhost. It answers conditional requests with
+/// 304s, so a refresh does not fetch the 14 MB QEMU again, and a browser revalidates the document
+/// itself on every reload, so an edit to index.html shows at once. No keep-alive (HTTP/1.0): the
+/// page's ~40 requests each open a connection, which over a local port forward is not felt.
 fn serve(port: u16) -> Result<()> {
-    let listener =
-        TcpListener::bind(("127.0.0.1", port)).with_context(|| format!("bind port {port}"))?;
     println!("http://localhost:{port}/");
-    for stream in listener.incoming().flatten() {
-        std::thread::spawn(move || {
-            let _ = connection(stream);
-        });
-    }
-    Ok(())
-}
-
-fn connection(mut stream: std::net::TcpStream) -> std::io::Result<()> {
-    let mut reader = BufReader::new(stream.try_clone()?);
-    loop {
-        let t0 = std::time::Instant::now();
-        let mut req = String::new();
-        if reader.read_line(&mut req)? == 0 {
-            return Ok(()); // the browser closed the connection
-        }
-        let mut etag_seen = None;
-        let mut close = false;
-        let mut line = String::new();
-        loop {
-            line.clear();
-            if reader.read_line(&mut line)? == 0 || line == "\r\n" || line == "\n" {
-                break; // the blank line ends the headers
-            }
-            if let Some((name, value)) = line.split_once(':') {
-                match name.to_ascii_lowercase().as_str() {
-                    "if-none-match" => etag_seen = Some(value.trim().to_string()),
-                    "connection" if value.trim().eq_ignore_ascii_case("close") => close = true,
-                    _ => {}
-                }
-            }
-        }
-        let path = req
-            .split_whitespace()
-            .nth(1)
-            .unwrap_or("/")
-            .split('?')
-            .next()
-            .unwrap_or("/")
-            .to_string();
-        let rel = path.trim_start_matches('/');
-        let file = site().join(if rel.is_empty() { "index.html" } else { rel });
-        let mime = match file.extension().and_then(|e| e.to_str()) {
-            Some("html") => "text/html",
-            Some("js") | Some("mjs") => "text/javascript",
-            Some("css") => "text/css",
-            Some("json") => "application/json",
-            Some("wasm") => "application/wasm",
-            Some("png") => "image/png",
-            Some("svg") => "image/svg+xml",
-            Some("pdf") => "application/pdf",
-            Some("gz") => "application/gzip", // the snapshot: raw bytes, the page gunzips them itself
-            _ => "application/octet-stream",
-        };
-        let meta = fs::metadata(&file)
-            .ok()
-            .filter(|m| m.is_file() && !rel.contains(".."));
-        let etag = meta.as_ref().map(|m| {
-            let mtime = m
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map_or(0, |d| d.as_nanos());
-            format!("\"{}-{mtime:x}\"", m.len())
-        });
-        let (status, bytes) = match (&etag, etag_seen) {
-            (Some(tag), Some(seen)) if *tag == seen => {
-                write!(
-                    stream,
-                    "HTTP/1.1 304 Not Modified\r\nETag: {tag}\r\nCache-Control: no-cache\r\n\r\n"
-                )?;
-                (304, 0)
-            }
-            (Some(tag), _) => {
-                let body = fs::read(&file)?;
-                write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nETag: {tag}\r\nCache-Control: no-cache\r\n\r\n", body.len())?;
-                stream.write_all(&body)?;
-                (200, body.len())
-            }
-            (None, _) => {
-                write!(
-                    stream,
-                    "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n"
-                )?;
-                (404, 0)
-            }
-        };
-        // one line per request: what the browser asked for and how long it took
-        eprintln!("{status} {path} {bytes} B {} ms", t0.elapsed().as_millis());
-        if close {
-            return Ok(());
-        }
-    }
+    run(
+        cmd("python3", ["-m", "http.server", "-b", "127.0.0.1", "-d"])
+            .arg(site())
+            .arg(port.to_string()),
+        None,
+    )
+    .context("python3 -m http.server")
 }
 
 /// Refuse to publish a page whose playground images do not speak its protocol, then push site/
 /// as the orphan gh-pages branch.
 fn deploy(version: &str) -> Result<()> {
     let node = node()?;
-    run(
-        cmd(node.to_str().unwrap(), [website().join("pagetest.mjs")]).current_dir(website()),
-        None,
-    )
-    .context("deploy aborted: site/viz.mjs failed its checks")?;
+    run(&mut mjs(&node, "pagetest.mjs", &[]), None)
+        .context("deploy aborted: site/viz.mjs failed its checks")?;
     for kernel in kstep::checkout::LTS {
+        let image = site().join("images").join(kernel);
         run(
-            cmd(node.to_str().unwrap(), ["--wasm-lazy-compilation"])
-                .arg(website().join("run.mjs"))
-                .args(["--check", "--image"])
-                .arg(site().join("images").join(kernel))
-                .current_dir(website()),
+            &mut mjs(
+                &node,
+                "run.mjs",
+                &["--check", "--image", image.to_str().unwrap()],
+            ),
             None,
         )
         .with_context(|| {
