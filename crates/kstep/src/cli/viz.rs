@@ -42,6 +42,9 @@ const RESULTS_URL: &str = "https://raw.githubusercontent.com/kstep-dev/results/m
 /// The playground images: every supported LTS kernel for arm64, shared with the repro builds;
 /// the page boots this one unless the URL says otherwise
 const DEFAULT_IMAGE: &str = "v6.18";
+/// The snapshot's machine: the page's default four test CPUs plus CPU 0 for the driver. A layout
+/// of up to that many CPUs resumes it, the driver keeping the CPUs beyond the layout idle.
+const SNAPSHOT_SMP: u32 = 5;
 
 fn website() -> PathBuf {
     kstep::proj_dir().join("website")
@@ -148,11 +151,12 @@ fn build() -> Result<String> {
     }
     build_decoder()?;
 
-    // data.json: a cache-busting version and the bug catalog
+    // data.json: a cache-busting version and the bug catalog. Every URL the page fetches carries the
+    // version, so two builds must never share one: the stamp goes to the second
     let rev = output(cmd("git", ["rev-parse", "--short", "HEAD"]).current_dir(website()))?
         .trim()
         .to_string();
-    let version = format!("{rev}-{}", chrono::Utc::now().format("%Y%m%d%H%M"));
+    let version = format!("{rev}-{}", chrono::Utc::now().format("%Y%m%d%H%M%S"));
     let all = bugs::load()?;
     let mut sorted: Vec<&Bug> = all.values().collect();
     sorted.sort_by_key(|b| b.extra); // the paper's table first, in file order
@@ -162,6 +166,7 @@ fn build() -> Result<String> {
         serde_json::to_string_pretty(&json!({
             "version": version, "bugs": bugs,
             "kernels": kstep::checkout::LTS, "kernel": DEFAULT_IMAGE,
+            "snapshot_cpus": SNAPSHOT_SMP - 1,
         }))?,
     )?;
 
@@ -180,7 +185,7 @@ fn build() -> Result<String> {
         let same = |src: PathBuf, dst: &str| fs::read(&src).ok() == fs::read(images.join(dst)).ok();
         if same(b.kernel(), "kernel")
             && same(b.rootfs(), "rootfs.cpio")
-            && images.join("snap-5.json").is_file()
+            && images.join(format!("snap-{SNAPSHOT_SMP}.json")).is_file()
         {
             continue;
         }
@@ -190,7 +195,7 @@ fn build() -> Result<String> {
             &mut mjs(
                 &node,
                 "run.mjs",
-                &["--snapshot", "--image", images.to_str().unwrap()],
+                &["--snapshot", "--smp", &SNAPSHOT_SMP.to_string(), "--image", images.to_str().unwrap()],
             ),
             None,
         )
