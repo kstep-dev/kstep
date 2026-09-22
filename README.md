@@ -21,16 +21,16 @@ git clone --recurse-submodules https://github.com/kstep-dev/kstep && cd kstep
 
 ```sh
 # 💾 Install dependencies
-./install_deps.sh
+./setup.sh
 ```
 
 ```sh
 # 🐞 Reproduce bugs
-# ./reproduce.py <name|all> [--run <buggy|fixed|plot>]
-#   1. Checks out the buggy and/or fixed kernels
-#   2. Builds and runs the specified driver (or all drivers)
-#   3. Plots the results
-./reproduce.py sync_wakeup
+# ./kstep.sh reproduce <name|all|extra> [--steps buggy fixed plot]
+#   1. Checks out the buggy and fixed kernels
+#   2. Builds and runs the bug's driver on each
+#   3. Plots the two traces
+./kstep.sh reproduce sync_wakeup
 ```
 
 ## 📊 Results
@@ -58,35 +58,33 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
 #### 🐧 Checkout Linux source code
 
 ```sh
-./checkout.py <version> [<name>] [--tar | --git]
+./kstep.sh checkout <ref> [<name>] [--git] [--patch <file>] [--keep-current]
 ```
 
-- `<version>`: Linux tag (e.g., `v6.14`) or commit hash (e.g., `6d7e478`, `5068d84~1`).
-- `--tar` (default): download tarball from kernel.org / GitHub (fast, one-shot).
-- `--git`: add a worktree from `build/master` (multi-version dev, supports `git log`/`git diff`).
-
-- **Example:** `./checkout.py v6.14 foo_buggy` checks out Linux v6.14 under `build/foo_buggy/linux/` and points `build/current` at `build/foo_buggy/`.
+- `<ref>`: Linux tag (e.g., `v6.14`) or commit hash (e.g., `6d7e478`, `5068d84~1`).
+- Default: download a tarball from kernel.org / GitHub (fast, one-shot). `--git`: add a worktree of `build/master` (multi-version dev, supports `git log`/`git diff`).
+- **Example:** `./kstep.sh checkout v6.14 foo_buggy` checks out Linux v6.14 under `build/foo_buggy/linux/` and points `build/current` at `build/foo_buggy/`.
 
 #### 🛠️ Build kSTEP
 ```sh
-./make.py [--build <name>]        # Build kSTEP rootfs (kmod + user). Builds the kernel first if needed.
-./make.py [--build <name>] linux  # Full kernel build. Run this after Linux file changes.
+./kstep.sh build [<name>]                      # kmod + user + rootfs.cpio; builds the kernel first if needed
+./kstep.sh build [<name>] --linux [--config F]  # reconfigure and rebuild the kernel; run after Linux file changes
 ```
 
-- `[--build <name>]`: build directory name under `build/`; defaults to whatever `build/current` points to.
+- `[<name>]`: build directory under `build/`; defaults to whatever `build/current` points to. A bug's build (`<bug>_buggy`, `<bug>_fixed`) or a Linux version (`v6.18`) is checked out first if missing.
 
 #### 🏃‍♂️ Run kSTEP
 
 ```sh
-./run.py <name> [--num_cpus <n>] [--mem_mb <mb>] [--build <name>] [--label <dir>]
+./kstep.sh run [<name>] [<driver>] [--num-cpus <n>] [--mem-mb <mb>] [-o <dir>] [-i <file>]
 ```
 
-- `<name>`: Driver to run (see `*.c` files in [`kmod/drivers/`](kmod/drivers/)).
-- `[--build <name>]`: kernel build to run against (defaults to `build/current`).
-- `[--label <dir>]`: subdir under `results/` for output; defaults to a timestamped `tmp_*` dir. `results/latest` symlinks to it.
-- See `./run.py --help` for `--topology`, `--frequency`, `--capacity`, `--debug`, etc.
+- `[<name>]`: kernel build to run against (defaults to `build/current`). A bug's build, `<bug>_buggy` or `<bug>_fixed`, brings the bug's driver and machine from `bugs.yaml`.
+- `[<driver>]`: driver to run (see `*.c` files in [`kmod/drivers/`](kmod/drivers/)); defaults to `cli`, an interactive session: type commands (listed at the top of [`kmod/cli.c`](kmod/cli.c)), see the machine after each. `-i <file>` or a pipe scripts one.
+- `[-o <dir>]`: subdir under `results/` for output; defaults to a timestamped `tmp_*` dir. `results/latest` symlinks to it.
+- `--debug` starts the guest stopped with a gdb stub; `./kstep.sh gdb [<name>]` attaches.
 
-- **Example:** `./run.py sync_wakeup` runs the `sync_wakeup` driver with default parameters.
+- **Example:** `./kstep.sh run sync_wakeup_buggy` runs the `sync_wakeup` driver on its buggy kernel, checking it out and building it first if needed.
 
 ## 📁 Directory Structure
 
@@ -106,16 +104,16 @@ For driver development, please refer to [AGENTS.md](AGENTS.md) for recommended w
   - `*.patch`: Fixes for specific bugs
 
 - **build/**: Per-kernel build artifacts (gitignored, regenerable)
-  - `current`: symlink to the active `<name>/` (set by `checkout.py`)
-  - `master/`: bare kernel clone reused by `checkout.py --git`
+  - `current`: symlink to the active `<name>/` (set by `kstep checkout`)
+  - `master/`: kernel clone reused by `kstep checkout --git`
   - `user`: statically linked userspace binary
   - `<name>/`: `kernel` (the image QEMU boots: the bzImage on x86, the Image on arm64; plus `vmlinux` for gdb/addr2line) and `rootfs.cpio` (kmod.ko + user); `linux/` source tree; `kmod/` module build dir with `kmod.ko` and the clangd `compile_commands.json` (the project root symlinks to it)
 
 - **results/**: Run outputs. See [`results/README.md`](https://github.com/kstep-dev/results). `repro_<bug>/` is tracked; `tmp_*` are gitignored. The fuzzer's per-client runs land in `fuzz_<build>_<n>/`.
 
-- **fuzzer/**: LibAFL fuzzer (`./fuzz.sh <bug>`), a host-side client of the `cli` driver; corpora and findings under `fuzzer/out/` (gitignored)
-  - the earlier in-guest fuzzer it replaced is kept for reference in [`docs/archive/old_fuzzer/`](docs/archive/old_fuzzer/)
+- **crates/**: the Rust tooling. `core/` is what the website's wasm decoder shares with the binaries (the `kmod/shm.h` decoder, generated from the header, and the QEMU command line); `kstep/` is the `kstep` command (`./kstep.sh`): checkout, build, run, reproduce, viz; `fuzz/` is the LibAFL fuzzer (`./kstep-fuzz.sh <bug>`), a host-side client of the `cli` driver, with corpora and findings under `fuzz/` (gitignored)
+  - the earlier in-guest fuzzer is kept for reference in [`docs/archive/old_fuzzer/`](docs/archive/old_fuzzer/)
 
-- **scripts/**: Python utilities for log parsing and plotting.
+- **scripts/**: the plot scripts (Python, self-contained: `uv run --script scripts/plot_<format>.py <bug>`), which `kstep reproduce` runs.
 
-- **bugs.yaml**: one entry per bug -- how to build, run, reproduce and fuzz it; read by `reproduce.py`, `run.py --bug` and the fuzzer
+- **bugs.yaml**: one entry per bug -- how to build, run, reproduce and fuzz it; read by `kstep run`, `kstep reproduce` and the fuzzer

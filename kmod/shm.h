@@ -1,12 +1,11 @@
-// The region of guest memory the host reads directly (shm.c writes it, website/site/kstep.mjs
-// decodes it; keep the two in step): the machine's state, rewritten after every cli command. gen
-// is a seqlock over the state: odd while an update is in progress,
+// The region of guest memory the host reads directly (shm.c writes it; crates/core/src/shm.rs
+// decodes it, with these structs generated from this header): the machine's state, rewritten
+// after every cli command. gen is a seqlock over the state: odd while an update is in progress,
 // even and unchanged around a consistent read. The coverage map (cov.c) is a region of its own,
 // so adding a field here never moves it; both addresses are reported on the cli's ready line. Trace events are not here: scheduler hooks write
 // them as JSON records on the driver's channel (io.c).
 #pragma once
 
-#include <linux/stddef.h>
 #include <linux/types.h>
 
 // As many as the module itself allows (KSTEP_NR_CPUS): the cap is the kmod's, not this region's.
@@ -18,40 +17,27 @@
 #define KSTEP_SHM_ENTITIES (KSTEP_SHM_TASKS + KSTEP_SHM_CGROUPS * KSTEP_SHM_CPUS) // every task's, plus one group entity per (cgroup, CPU)
 #define KSTEP_SHM_DOMAINS (KSTEP_SHM_CPUS * 5) // one per (CPU, level)
 #define KSTEP_SHM_GROUPS KSTEP_SHM_CPUS // a domain's balancing groups, at most one per CPU
-#define KSTEP_COV_SIZE (1 << 16) // cov.c's edge map, saturating byte counts; fuzzer/src/main.rs MAP_SIZE
+#define KSTEP_COV_SIZE (1 << 16) // cov.c's edge map, saturating byte counts; crates/core/src/shm.rs COV_SIZE
 
-// The header describes the rest of the region: one descriptor per table, so the host reads where
-// each table starts, how wide its records are and how many are there instead of hardcoding any of
-// it. Only the first three fields are a fixed contract: magic, then layout, then gen. A host
-// checks magic and layout before trusting anything else. Bump KSTEP_SHM_LAYOUT whenever a
-// record's fields change meaning without changing its size -- the strides catch everything that
-// resizes, this catches the rest.
+// The host decodes the region with structs generated from this header (crates/core/src/shm.rs),
+// so the header only says how many records each table holds. magic and layout come first, and a
+// host checks both before trusting anything else: bump KSTEP_SHM_LAYOUT whenever a struct below
+// changes, in size or in meaning. gen is the seqlock.
 #define KSTEP_SHM_MAGIC 0x5054536b // "kSTP", little endian
-#define KSTEP_SHM_LAYOUT 6
+#define KSTEP_SHM_LAYOUT 8
 
 // The machine and the tasks first, then one pair of tables per scheduling class: the class's
-// queue on each CPU, and what is on those queues. A task's record says which class it is under;
-// what that class makes of it is in the class's own member table, joined by task number. Nothing
-// about one class sits in the CPU or task record, so adding a class is adding a pair here.
-enum kstep_shm_tables {
-  KSTEP_TBL_CPU, KSTEP_TBL_TASK, KSTEP_TBL_CGROUP, KSTEP_TBL_DOMAIN,
-  KSTEP_TBL_CFS, KSTEP_TBL_ENTITY, // the fair class: the root cfs_rq per CPU, and every entity queued under it
-  KSTEP_TBL_RT, KSTEP_TBL_RT_ENTITY, // the real-time class: the rt_rq per CPU, and the tasks on it
-  KSTEP_TBL_N
-};
-
-struct kstep_shm_table {
-  u32 n, max;      // records written by the last update, and the table's capacity
-  u32 off, stride; // where the table starts in the region, and a record's size
-};
-
+// queue on each CPU (ncpus records, like the CPU table), and what is on those queues. A task's
+// record says which class it is under; what that class makes of it is in the class's own member
+// table, joined by task number. Nothing about one class sits in the CPU or task record, so adding
+// a class is adding a pair here.
 struct kstep_shm_hdr {
   u32 magic, layout;
   u32 gen;
   u32 timestamp; // logical ticks
-  struct kstep_shm_table table[KSTEP_TBL_N];
-  u32 max_groups, group_stride; // the one nested table: a domain record's balancing groups
-  u32 reserved[2];
+  u32 ncpus, ntasks, ncgroups, ndomains;
+  u32 nentities;    // the fair class: entities queued under the root cfs_rq of any CPU
+  u32 nrt_entities; // the real-time class: tasks on any rt_rq
 };
 
 // The runqueue itself, and nothing any one class owns: what the CPU is doing, and when its
@@ -81,7 +67,11 @@ struct kstep_shm_se {
   u32 flags;
   u32 share; // of the CPU, in 1/1024: this weight over its queue's, times the parent entity's share, up to the root -- the walk update_cfs_rq_h_load makes over load averages, made over weights
   u64 weight; // scale_load_down: the units the nice table is written in, nice 0 being 1024
-  u64 sum_exec_runtime, vruntime, deadline, slice;
+  u64 sum_exec_runtime;
+  // Signed: the kernel keeps vruntimes unsigned and compares them as (s64)(a - b), so a woken task
+  // placed before the queue's average sits just below 2^64 -- a small negative number, shown as one
+  s64 vruntime, deadline;
+  u64 slice;
   // The queue's average vruntime minus this entity's, weighted: the one number comparable across
   // queues, since every cfs_rq has a clock of its own. Zero is fair, positive is owed time, and
   // EEVDF's eligibility is lag >= 0. Live from avg_vruntime while queued; the kernel's saved
@@ -118,7 +108,8 @@ struct kstep_shm_cgroup {
 // real-time task, or one left behind by delayed dequeue, is in one and not the other.
 struct kstep_shm_cfs {
   u32 cpu, reserved;
-  u64 min_vruntime, util_avg, load_avg, runnable_avg;
+  s64 min_vruntime; // signed, as an entity's vruntime
+  u64 util_avg, load_avg, runnable_avg;
   u64 h_nr_runnable; // cfs_rq->h_nr_runnable: runnable tasks as the balancer counts them
 };
 
@@ -200,15 +191,3 @@ struct kstep_shm {
   struct kstep_shm_rt rt[KSTEP_SHM_CPUS];
   struct kstep_shm_rt_entity rt_entity[KSTEP_SHM_TASKS];
 };
-
-static_assert(sizeof(struct kstep_shm_hdr) == 160);
-static_assert(sizeof(struct kstep_shm_cpu) == 40);
-static_assert(sizeof(struct kstep_shm_se) == 56);
-static_assert(sizeof(struct kstep_shm_task) == 48);
-static_assert(sizeof(struct kstep_shm_cfs) == 48);
-static_assert(sizeof(struct kstep_shm_rt) == 32);
-static_assert(sizeof(struct kstep_shm_rt_entity) == 24);
-static_assert(sizeof(struct kstep_shm_cgroup) == 56);
-static_assert(sizeof(struct kstep_shm_entity) == 72);
-static_assert(sizeof(struct kstep_shm_group) == 24);
-static_assert(sizeof(struct kstep_shm_domain) == 208 + KSTEP_SHM_GROUPS * 24);

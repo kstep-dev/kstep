@@ -1,0 +1,19 @@
+[package]
+name = "kstep-fuzz"
+description = "kSTEP's LibAFL fuzzer: a client of the cli driver"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "kstep-fuzz"
+path = "src/main.rs"
+
+[dependencies]
+kstep = { path = "../kstep" }
+kstep-core = { path = "../core" }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+libafl = "0.16"
+libafl_bolts = "0.16"

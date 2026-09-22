@@ -1,0 +1,22 @@
+[package]
+name = "kstep-core"
+description = "kSTEP's shared library: shared-memory decoder and QEMU command line"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["rlib", "cdylib"] # cdylib for the wasm build
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+wasm-bindgen = { version = "0.2", optional = true }
+serde-wasm-bindgen = { version = "0.6", optional = true }
+
+[build-dependencies]
+bindgen = "0.72"
+
+[features]
+# The website's module: cargo build -p kstep-core --profile wasm --target wasm32-unknown-unknown --features wasm
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen"]
