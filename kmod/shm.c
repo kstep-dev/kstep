@@ -3,7 +3,6 @@
 #include <linux/cgroup.h>
 #include <linux/cpumask.h>
 #include <linux/gfp.h>
-#include <linux/kstrtox.h>
 #include <linux/sched/rt.h>
 #include <linux/version.h>
 #include <asm/io.h>
@@ -143,26 +142,51 @@ static struct kstep_shm_rt_entity shm_rt_entity(struct task_struct *p, u32 task,
   return out;
 }
 
-// The cgroup's group entities, one record per test CPU, appended to `ents` -- the level the pick
-// happens at, which nothing else reports: a task's own counters are kept in its group's queue, so
-// four equal tasks split two cgroups' halves without anything in the task table saying why. The
-// cpu controller's css is taken from the cgroup rather than the walk's, which is cgroup->self.
-// Called under RCU; the entities are stable because the isolated CPUs are held for the whole
-// command.
-static void shm_group_entities(u32 cgroup, struct cgroup *cgrp, struct kstep_shm_entity *ents, u32 *nents) {
-#ifdef CONFIG_FAIR_GROUP_SCHED
+// The cgroup's task group, the cpu controller's state; NULL where the controller is off. The css
+// is taken from the cgroup rather than the walk's, which is cgroup->self. Under RCU.
+static struct task_group *shm_tg(struct cgroup *cgrp) {
+#ifdef CONFIG_CGROUP_SCHED
   struct cgroup_subsys_state *css = rcu_dereference(cgrp->subsys[cpu_cgrp_id]);
-  struct task_group *tg;
 
   if (!css)
-    return;
+    return NULL;
 // css_tg() is private to core.c before 6.12, when sched_ext moved it into sched.h
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 12, 0)
-  tg = css_tg(css);
+  return css_tg(css);
 #else
-  tg = container_of(css, struct task_group, css);
+  return container_of(css, struct task_group, css);
 #endif
-  if (!tg->parent) // the root task group owns no entity: its cfs_rq is the runqueue's own
+#else
+  return NULL;
+#endif
+}
+
+#ifdef CONFIG_CPUSETS
+// The head of struct cpuset, private to kernel/cgroup/cpuset.c (cpuset-internal.h on newer
+// kernels) and the same on every kernel kSTEP builds: enough to read the mask that
+// cpuset.cpus.effective shows without opening the file, which under emulation costs more than
+// the rest of an update together.
+struct kstep_cpuset_head {
+  struct cgroup_subsys_state css;
+  unsigned long flags;
+  cpumask_var_t cpus_allowed;
+  nodemask_t mems_allowed;
+  cpumask_var_t effective_cpus;
+};
+#if __has_include(<kernel/cgroup/cpuset-internal.h>)
+#include <kernel/cgroup/cpuset-internal.h>
+static_assert(offsetof(struct kstep_cpuset_head, effective_cpus) == offsetof(struct cpuset, effective_cpus));
+#endif
+#endif
+
+// The cgroup's group entities, one record per test CPU, appended to `ents` -- the level the pick
+// happens at, which nothing else reports: a task's own counters are kept in its group's queue, so
+// four equal tasks split two cgroups' halves without anything in the task table saying why.
+// Called under RCU; the entities are stable because the isolated CPUs are held for the whole
+// command.
+static void shm_group_entities(u32 cgroup, struct task_group *tg, struct kstep_shm_entity *ents, u32 *nents) {
+#ifdef CONFIG_FAIR_GROUP_SCHED
+  if (!tg || !tg->parent) // the root task group owns no entity: its cfs_rq is the runqueue's own
     return;
   for_each_test_cpu(cpu) {
     struct sched_entity *se = tg->se[cpu];
@@ -181,12 +205,9 @@ static void shm_group_entities(u32 cgroup, struct cgroup *cgrp, struct kstep_shm
 #endif
 }
 
-// The cgroups: the root and every live cgroup under it, in tree order, collected into `out`.
-// The tree walk needs RCU and the two control files sleep, so the walk takes the paths first and
-// the files are read after it. Reading the files is how the kernel's own interface reports these
-// values -- the cpu controller's weight could come from the task_group, but a cpuset's effective
-// mask lives in struct cpuset, which is private to kernel/cgroup/cpuset.c. A cgroup with no cpu
-// controller (the root among them, which has no cpu.weight) keeps weight 0.
+// The cgroups: the root and every live cgroup under it, in tree order, collected into `out` with
+// what their cpu.weight and cpuset.cpus.effective files show, read off the controllers' state. A
+// cgroup without the controller (the root among them, which has no cpu.weight) keeps 0.
 static u32 shm_collect_cgroups(struct kstep_shm_cgroup *out, struct kstep_shm_entity *ents, u32 *nents) {
   struct cgroup_subsys_state *pos;
   struct cgroup *root;
@@ -198,6 +219,8 @@ static u32 shm_collect_cgroups(struct kstep_shm_cgroup *out, struct kstep_shm_en
     return 0;
   rcu_read_lock();
   css_for_each_descendant_pre(pos, &root->self) {
+    struct task_group *tg = shm_tg(pos->cgroup);
+
     if (n == KSTEP_SHM_CGROUPS)
       break;
     if (!(pos->flags & CSS_ONLINE))
@@ -205,27 +228,24 @@ static u32 shm_collect_cgroups(struct kstep_shm_cgroup *out, struct kstep_shm_en
     memset(&out[n], 0, sizeof(out[n]));
     if (cgroup_path(pos->cgroup, out[n].path, sizeof(out[n].path)) < 0)
       continue; // a path that does not fit is one no kSTEP driver made
-    shm_group_entities(n, pos->cgroup, ents, nents);
+#ifdef CONFIG_FAIR_GROUP_SCHED
+    if (tg && tg->parent) // cpu.weight's own conversion of the shares
+      out[n].weight = clamp_t(u64, DIV_ROUND_CLOSEST_ULL(scale_load_down(tg->shares) * CGROUP_WEIGHT_DFL, 1024),
+                              CGROUP_WEIGHT_MIN, CGROUP_WEIGHT_MAX);
+#endif
+#ifdef CONFIG_CPUSETS
+    {
+      struct cgroup_subsys_state *cs = rcu_dereference(pos->cgroup->subsys[cpuset_cgrp_id]);
+
+      if (cs)
+        out[n].cpus = cpumask_bits(container_of(cs, struct kstep_cpuset_head, css)->effective_cpus)[0];
+    }
+#endif
+    shm_group_entities(n, tg, ents, nents);
     n++;
   }
   rcu_read_unlock();
   cgroup_put(root);
-
-  for (u32 i = 0; i < n; i++) {
-    const char *name = out[i].path[1] ? out[i].path : ""; // the root's files live at CGROUP_ROOT
-    char buf[64];
-    cpumask_var_t mask;
-
-    if (kstep_cgroup_read(name, "cpu.weight", buf, sizeof(buf)) > 0 &&
-        kstrtouint(buf, 10, &out[i].weight))
-      out[i].weight = 0; // a value that does not parse is one this kernel does not report
-    if (kstep_cgroup_read(name, "cpuset.cpus.effective", buf, sizeof(buf)) > 0 &&
-        zalloc_cpumask_var(&mask, GFP_KERNEL)) {
-      if (!cpulist_parse(buf, mask))
-        out[i].cpus = cpumask_bits(mask)[0];
-      free_cpumask_var(mask);
-    }
-  }
   return n;
 }
 
