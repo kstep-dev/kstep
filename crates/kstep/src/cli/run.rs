@@ -175,10 +175,7 @@ fn summary(st: &State) -> String {
         }
         s += &format!(" exec={:.1}ms", t.sum_exec_runtime as f64 / 1e6);
         if let Some(e) = st.entities.iter().find(|e| e.task == t.task) {
-            s += &format!(
-                " vruntime={} lag={} weight={} share={:.2}",
-                e.vruntime, e.lag, e.weight, e.share
-            );
+            s += &format!(" vruntime={} lag={} weight={}", e.vruntime, e.lag, e.weight);
             for (flag, on) in [
                 ("eligible", e.eligible),
                 ("pick", e.pick),

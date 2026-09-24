@@ -167,6 +167,13 @@ impl Boot {
             ]
             .map(String::from),
         );
+        // Under TCG a virtqueue kick on virt's MMIO transport is cheaper handled on the vCPU than
+        // hopped through an eventfd and the main loop (native tick -17%; in the browser, where an
+        // eventfd is a JS pipe on the page's thread, -25%). KVM keeps it, and x86's PCI transport
+        // is unmeasured.
+        if !kvm_available() && self.arch.virtio_serial == "virtio-serial-device" {
+            argv.extend(["-global".into(), "virtio-mmio.ioeventfd=off".into()]);
+        }
         // A snapshot restores RAM, so the kernel, initrd and command line it was booted with are
         // not loaded again; the machine and devices must match what it was taken on.
         match &self.snapshot {
@@ -322,9 +329,12 @@ mod tests {
         // the accelerator is the host's: KVM where /dev/kvm is usable
         assert!(a.starts_with("-machine virt -accel "), "{a}");
         assert!(
-            a.contains("-smp 3 -m 64M -kernel /kernel -initrd /rootfs.cpio -append rw nokaslr"),
+            a.contains("-smp 3 -m 64M -kernel /kernel -initrd /rootfs.cpio -append rw nokaslr")
+                || a.contains("-smp 3 -m 64M -global virtio-mmio.ioeventfd=off -kernel /kernel -initrd /rootfs.cpio -append rw nokaslr"),
             "{a}"
         );
+        // and TCG, always the browser's, handles a virtqueue kick on the vCPU
+        assert_eq!(a.contains("ioeventfd=off"), !kvm_available(), "{a}");
         // the browser's two-way channels are the wasm32 build's (served()); run.mjs --check boots them
         assert!(a.contains("-device virtio-serial-device,id=vs0 -device virtconsole,bus=vs0.0,nr=0,chardev=port -chardev file,id=console,path=/kernel.log -chardev "), "{a}");
     }
@@ -355,6 +365,7 @@ mod tests {
                 || a.contains("-accel tcg,tb-size=64,thread=multi -cpu "),
             "{a}"
         );
+        assert!(!a.contains("ioeventfd"), "{a}"); // x86's PCI transport keeps it
         assert!(a.ends_with("-chardev file,id=console,path=/r/kernel.log -chardev socket,path=/r/kstep.sock,server=on,wait=off,logfile=/r/kstep.jsonl,id=port -chardev socket,path=/r/monitor.sock,server=on,wait=off,id=monitor -monitor chardev:monitor"), "{a}");
         assert!(!a.contains("memory-backend"));
         boot.ram_file = Some("/dev/shm/x".into());

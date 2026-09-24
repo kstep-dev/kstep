@@ -69,6 +69,7 @@ int kstep_task_set_affinity(struct task_struct *p, const char *cpulist); // "1",
 void kstep_task_set_fair(struct task_struct *p, int policy, int nice); // normal/batch/idle with its nice
 void kstep_task_set_rt(struct task_struct *p, int policy, int prio);   // fifo/rr with its priority, 1..99
 void kstep_task_pause(struct task_struct *p);
+void kstep_task_yield(struct task_struct *p); // sched_yield(): gives the CPU up while staying runnable
 void kstep_task_wakeup(struct task_struct *p);
 void kstep_task_block(struct task_struct *p);
 void kstep_task_chan_read(struct task_struct *p);
@@ -76,7 +77,6 @@ void kstep_task_chan_write(struct task_struct *p);
 
 // kernel.c
 int kstep_write(const char *path, const char *buf, size_t size);
-int kstep_read(const char *path, char *buf, size_t size);
 int kstep_mkdir(const char *dir);
 void kstep_sysctl_write(const char *name, const char *fmt, ...);
 void kstep_sched_feat_write(const char *fmt, ...);
@@ -84,7 +84,6 @@ void kstep_sched_feat_enable(const char *name);
 void kstep_sched_feat_disable(const char *name);
 int kstep_cgroup_write(const char *name, const char *filename, const char *fmt,
                        ...);
-int kstep_cgroup_read(const char *name, const char *filename, char *buf, size_t size);
 bool kstep_cgroup_exists(const char *name);
 int kstep_cgroup_create(const char *name);
 void kstep_cgroup_destroy(const char *name);
